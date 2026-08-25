@@ -49,7 +49,8 @@ object AnilistTrackerCoordinator {
         val isExplicitAnime = hasAnimeId || isAnimeCandidate(rawTitle, genres, country, language)
         val cacheKey = if (!mediaId.isNullOrBlank()) mediaId.lowercase() else rawTitle.lowercase()
 
-        if (!forceRefresh && currentKey == cacheKey && (_trackerState.value.media != null || activeJob?.isActive == true)) {
+        val isNewMedia = currentKey != cacheKey
+        if (!forceRefresh && !isNewMedia && (_trackerState.value.media != null || activeJob?.isActive == true)) {
             return
         }
         currentKey = cacheKey
@@ -60,20 +61,30 @@ object AnilistTrackerCoordinator {
         _trackerState.update {
             it.copy(
                 isLoading = true,
-                isAnime = isExplicitAnime || (it.media != null),
+                isAnime = isExplicitAnime || (if (isNewMedia) false else it.media != null),
+                media = if (isNewMedia) null else it.media,
+                entry = if (isNewMedia) null else it.entry,
                 error = null,
                 isAuthenticated = AnilistAuthRepository.isAuthenticated.value,
                 user = AnilistAuthRepository.currentUser.value,
+                lastLookupTitle = rawTitle,
+                lastLookupMediaId = mediaId,
             )
         }
 
         activeJob = scope.launch {
+            val debug = StringBuilder()
+            debug.appendLine("📍 Input: Title=\"$rawTitle\", MediaId=\"$mediaId\"")
+            debug.appendLine("🔎 Anime Candidate: $isExplicitAnime (genres: $genres, country: $country)")
+            var strategyUsed = "None"
+
             try {
                 val token = AnilistAuthRepository.token.value
                 val cachedMedia = mediaCache[cacheKey]
 
                 val media = if (cachedMedia != null) {
-                    // If we have token, refresh entry data
+                    strategyUsed = "Cache Hit (${cachedMedia.title?.displayTitle})"
+                    debug.appendLine("⚡ $strategyUsed")
                     if (!token.isNullOrBlank()) {
                         AnilistApi.fetchMediaById(cachedMedia.id, token = token) ?: cachedMedia
                     } else {
@@ -84,34 +95,42 @@ object AnilistTrackerCoordinator {
 
                     // 1. Direct AniList ID lookup if mediaId contains an AniList ID
                     val anilistId = extractAnilistId(mediaId)
+                    debug.appendLine("1️⃣ Extracted AniList ID: $anilistId")
                     if (anilistId != null) {
                         fetched = AnilistApi.fetchMediaById(anilistId, token = null)
-                            ?: AnilistMedia(
-                                id = anilistId,
-                                title = AnilistTitle(
-                                    english = rawTitle.ifBlank { "AniList #$anilistId" },
-                                    romaji = rawTitle.ifBlank { "AniList #$anilistId" },
-                                    native = rawTitle.ifBlank { "AniList #$anilistId" },
-                                ),
-                                format = "TV",
-                            )
+                        if (fetched != null) {
+                            strategyUsed = "Direct AniList ID #$anilistId -> ${fetched.title?.displayTitle}"
+                            debug.appendLine("✅ Found via AniList ID #$anilistId: \"${fetched.title?.displayTitle}\"")
+                        } else {
+                            debug.appendLine("⚠️ AniList API returned null for ID #$anilistId. Response: ${AnilistApi.lastDebugLog}")
+                        }
                     }
 
                     // 2. Direct MAL ID lookup if mediaId contains a MAL ID
                     if (fetched == null) {
                         val malId = extractMalId(mediaId)
+                        debug.appendLine("2️⃣ Extracted MAL ID: $malId")
                         if (malId != null) {
                             fetched = AnilistApi.fetchMediaByMalId(malId, token = null)
+                            if (fetched != null) {
+                                strategyUsed = "Direct MAL ID #$malId -> ${fetched.title?.displayTitle}"
+                                debug.appendLine("✅ Found via MAL ID #$malId: \"${fetched.title?.displayTitle}\"")
+                            }
                         }
                     }
 
                     // 3. Direct Kitsu ID via ARM
                     if (fetched == null) {
                         val kitsuId = extractKitsuId(mediaId)
+                        debug.appendLine("3️⃣ Extracted Kitsu ID: $kitsuId")
                         if (kitsuId != null) {
                             val armAnilistId = AnilistApi.resolveArmAnilistId(source = "kitsu", id = kitsuId)
+                            debug.appendLine("3️⃣.1 ARM Kitsu -> AniList: $armAnilistId")
                             if (armAnilistId != null) {
                                 fetched = AnilistApi.fetchMediaById(armAnilistId, token = null)
+                                if (fetched != null) {
+                                    strategyUsed = "Kitsu via ARM #$armAnilistId -> ${fetched.title?.displayTitle}"
+                                }
                             }
                         }
                     }
@@ -119,10 +138,13 @@ object AnilistTrackerCoordinator {
                     // 4. Multi-Strategy Title Search (Public, 100% Reliable)
                     if (fetched == null && rawTitle.isNotBlank()) {
                         val candidates = generateSearchCandidates(rawTitle)
+                        debug.appendLine("4️⃣ Search candidates: $candidates")
                         for (query in candidates) {
                             val results = AnilistApi.searchAnime(query = query)
+                            debug.appendLine("   • Search \"$query\" returned ${results.size} items: ${results.take(3).map { "${it.title?.displayTitle} (#${it.id})" }}")
                             if (results.isNotEmpty()) {
                                 fetched = results.first()
+                                strategyUsed = "Title Search \"$query\" -> #${fetched.id} ${fetched.title?.displayTitle}"
                                 break
                             }
                         }
@@ -133,14 +155,13 @@ object AnilistTrackerCoordinator {
                         val candidates = generateSearchCandidates(rawTitle)
                         for (query in candidates) {
                             val resolvedAnilistId = AnilistApi.searchViaKitsu(query)
+                            debug.appendLine("5️⃣ Kitsu search \"$query\" -> AniList ID: $resolvedAnilistId")
                             if (resolvedAnilistId != null) {
                                 fetched = AnilistApi.fetchMediaById(resolvedAnilistId, token = null)
-                                    ?: AnilistMedia(
-                                        id = resolvedAnilistId,
-                                        title = AnilistTitle(english = query, romaji = query, native = query),
-                                        format = "TV",
-                                    )
-                                break
+                                if (fetched != null) {
+                                    strategyUsed = "Kitsu Fallback -> #${fetched.id} ${fetched.title?.displayTitle}"
+                                    break
+                                }
                             }
                         }
                     }
@@ -150,6 +171,7 @@ object AnilistTrackerCoordinator {
                         val enriched = AnilistApi.fetchMediaById(fetched.id, token = token)
                         if (enriched != null) {
                             fetched = enriched
+                            debug.appendLine("👤 Enriched with user list status: ${enriched.mediaListEntry?.status}")
                         }
                     }
 
@@ -160,6 +182,7 @@ object AnilistTrackerCoordinator {
                 }
 
                 val hasMatch = media != null
+                debug.appendLine(if (hasMatch) "🎯 Final Match: #${media.id} ${media.title?.displayTitle}" else "❌ No match found on AniList.")
 
                 _trackerState.update {
                     it.copy(
@@ -168,13 +191,17 @@ object AnilistTrackerCoordinator {
                         media = media,
                         entry = media?.mediaListEntry,
                         error = if (!hasMatch) "No matching anime found on AniList for \"$rawTitle\"" else null,
+                        debugInfo = debug.toString(),
+                        resolvedStrategy = strategyUsed,
                     )
                 }
             } catch (t: Throwable) {
+                debug.appendLine("💥 Exception: ${t.message}")
                 _trackerState.update {
                     it.copy(
                         isLoading = false,
                         error = t.message ?: "Failed to load AniList data",
+                        debugInfo = debug.toString(),
                     )
                 }
             }

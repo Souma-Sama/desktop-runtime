@@ -309,9 +309,56 @@ fun AnimeTrackerDropdownContent(
                 Text(
                     text = trackerState.error ?: "No matching anime found on AniList.",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = MaterialTheme.colorScheme.error,
+                    fontWeight = FontWeight.Medium,
                 )
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(6.dp))
+
+                // Diagnostic Inspector Card
+                if (!trackerState.debugInfo.isNullOrBlank()) {
+                    var showFullDebug by remember { mutableStateOf(false) }
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(6.dp))
+                            .clickable { showFullDebug = !showFullDebug },
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                        shape = RoundedCornerShape(6.dp),
+                    ) {
+                        Column(modifier = Modifier.padding(8.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text(
+                                    text = "🛠️ Diagnostics Trace",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary,
+                                )
+                                Text(
+                                    text = if (showFullDebug) "Hide ▲" else "Show Details ▼",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            if (showFullDebug) {
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Text(
+                                    text = trackerState.debugInfo.orEmpty(),
+                                    style = MaterialTheme.typography.bodySmall.copy(
+                                        fontSize = 11.sp,
+                                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                                    ),
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                )
+                            }
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -333,7 +380,7 @@ fun AnimeTrackerDropdownContent(
                             },
                             modifier = Modifier.weight(1f),
                         ) {
-                            Text("Retry", fontSize = 12.sp)
+                            Text("Retry Auto-Detect", fontSize = 12.sp)
                         }
                     }
                 }
@@ -341,7 +388,7 @@ fun AnimeTrackerDropdownContent(
                 OutlinedTextField(
                     value = manualSearchText,
                     onValueChange = { manualSearchText = it },
-                    placeholder = { Text("Search title or AniList ID (e.g. 140960)...", fontSize = 12.sp) },
+                    placeholder = { Text("Search title or AniList ID...", fontSize = 12.sp) },
                     singleLine = true,
                     textStyle = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.fillMaxWidth(),
@@ -589,6 +636,52 @@ fun AnimeTrackerDropdownContent(
                     color = MaterialTheme.colorScheme.error,
                     style = MaterialTheme.typography.labelMedium,
                 )
+            }
+        }
+
+        // Always available Diagnostics Trace
+        if (!trackerState.debugInfo.isNullOrBlank()) {
+            var showDiagnostics by remember { mutableStateOf(false) }
+            Spacer(modifier = Modifier.height(8.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f))
+            Spacer(modifier = Modifier.height(4.dp))
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(6.dp))
+                    .clickable { showDiagnostics = !showDiagnostics },
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                shape = RoundedCornerShape(6.dp),
+            ) {
+                Column(modifier = Modifier.padding(6.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = "🛠️ AniList Match Diagnostics",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Text(
+                            text = if (showDiagnostics) "Hide ▲" else "View ▼",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
+                    if (showDiagnostics) {
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = trackerState.debugInfo.orEmpty(),
+                            style = MaterialTheme.typography.bodySmall.copy(
+                                fontSize = 10.sp,
+                                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                            ),
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                    }
+                }
             }
         }
     }

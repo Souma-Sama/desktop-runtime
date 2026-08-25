@@ -103,4 +103,8 @@ data class AnilistTrackerState(
     val media: AnilistMedia? = null,
     val entry: AnilistMediaListEntry? = null,
     val error: String? = null,
+    val debugInfo: String? = null,
+    val lastLookupTitle: String? = null,
+    val lastLookupMediaId: String? = null,
+    val resolvedStrategy: String? = null,
 )

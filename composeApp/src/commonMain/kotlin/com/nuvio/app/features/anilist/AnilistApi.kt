@@ -21,6 +21,9 @@ object AnilistApi {
     private const val GRAPHQL_ENDPOINT = "https://graphql.anilist.co"
     private val json = Json { ignoreUnknownKeys = true; isLenient = true }
 
+    var lastDebugLog: String = "No requests made yet"
+        private set
+
     suspend fun executeGraphQL(
         query: String,
         variables: JsonObject = buildJsonObject {},
@@ -39,24 +42,35 @@ object AnilistApi {
             headers["Authorization"] = "Bearer $sanitized"
         }
 
-        val responseText = try {
-            httpPostJsonWithHeaders(
+        var responseText: String? = null
+        try {
+            responseText = httpPostJsonWithHeaders(
                 url = GRAPHQL_ENDPOINT,
                 body = payload,
                 headers = headers,
             )
+            lastDebugLog = "HTTP POST $GRAPHQL_ENDPOINT\nPayload: $payload\nResponse: ${responseText?.take(400)}"
         } catch (e: Exception) {
+            lastDebugLog = "HTTP POST $GRAPHQL_ENDPOINT failed: ${e.message}\nPayload: $payload"
             log.w(e) { "executeGraphQL request failed: ${e.message}" }
-            null
-        } ?: return null
+            return null
+        }
 
-        if (responseText.isBlank()) {
+        if (responseText.isNullOrBlank()) {
+            lastDebugLog = "GraphQL response empty for payload: $payload"
             return null
         }
 
         return try {
-            json.parseToJsonElement(responseText).jsonObject
+            val root = json.parseToJsonElement(responseText).jsonObject
+            val errors = root["errors"]?.jsonArray
+            if (errors != null && errors.isNotEmpty()) {
+                val errMsg = errors.firstOrNull()?.jsonObject?.get("message")?.jsonPrimitive?.contentOrNull
+                lastDebugLog = "GraphQL Error: $errMsg\nRaw: $responseText"
+            }
+            root
         } catch (e: Exception) {
+            lastDebugLog = "Failed to parse GraphQL response: ${e.message}\nRaw: $responseText"
             log.w(e) { "Failed to parse GraphQL response JSON: $responseText" }
             null
         }
