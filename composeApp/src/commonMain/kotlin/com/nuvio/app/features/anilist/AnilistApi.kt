@@ -613,6 +613,68 @@ object AnilistApi {
                   url
                   site
                 }
+                characters(sort: RELEVANCE, role: MAIN, perPage: 16) {
+                  edges {
+                    node {
+                      id
+                      name {
+                        full
+                      }
+                      image {
+                        large
+                      }
+                    }
+                    voiceActors(language: JAPANESE) {
+                      id
+                      name {
+                        full
+                      }
+                      image {
+                        large
+                      }
+                    }
+                  }
+                }
+                studios {
+                  nodes {
+                    id
+                    name
+                    isAnimationStudio
+                  }
+                }
+                recommendations(sort: RATING_DESC, perPage: 12) {
+                  nodes {
+                    mediaRecommendation {
+                      id
+                      title {
+                        english
+                        romaji
+                      }
+                      format
+                      episodes
+                      coverImage {
+                        extraLarge
+                        large
+                      }
+                      bannerImage
+                      averageScore
+                    }
+                  }
+                }
+                trailer {
+                  id
+                  site
+                }
+                staff(perPage: 15) {
+                  edges {
+                    role
+                    node {
+                      name {
+                        full
+                      }
+                    }
+                  }
+                }
                 $mediaListEntryBlock
               }
             }
@@ -732,6 +794,82 @@ object AnilistApi {
             )
         }.orEmpty()
 
+        val characters = obj["characters"].asJsonObjectOrNull()
+            ?.get("edges").asJsonArrayOrNull()
+            ?.mapNotNull { edgeElem ->
+                val edge = edgeElem.asJsonObjectOrNull() ?: return@mapNotNull null
+                val node = edge["node"].asJsonObjectOrNull()
+                val charId = node?.get("id").asIntOrNull()
+                val charName = node?.get("name").asJsonObjectOrNull()?.get("full").asStringOrNull()
+                val charImg = node?.get("image").asJsonObjectOrNull()?.get("large").asStringOrNull()
+
+                val vaNode = edge["voiceActors"].asJsonArrayOrNull()?.firstOrNull().asJsonObjectOrNull()
+                val vaId = vaNode?.get("id").asIntOrNull()
+                val vaName = vaNode?.get("name").asJsonObjectOrNull()?.get("full").asStringOrNull()
+                val vaImg = vaNode?.get("image").asJsonObjectOrNull()?.get("large").asStringOrNull()
+
+                val va = if (vaName != null) AnilistCharacterVoiceActor(id = vaId, name = vaName, image = vaImg) else null
+                if (charName != null || vaName != null) {
+                    AnilistCharacter(id = charId, name = charName, image = charImg, voiceActor = va)
+                } else null
+            }.orEmpty()
+
+        val studios = obj["studios"].asJsonObjectOrNull()
+            ?.get("nodes").asJsonArrayOrNull()
+            ?.mapNotNull { studioElem ->
+                val sObj = studioElem.asJsonObjectOrNull() ?: return@mapNotNull null
+                val sName = sObj["name"].asStringOrNull() ?: return@mapNotNull null
+                val sId = sObj["id"].asIntOrNull()
+                val isAnim = sObj["isAnimationStudio"]?.jsonPrimitive?.contentOrNull?.toBoolean() ?: false
+                AnilistStudio(id = sId, name = sName, isAnimationStudio = isAnim)
+            }.orEmpty()
+
+        val recommendations = obj["recommendations"].asJsonObjectOrNull()
+            ?.get("nodes").asJsonArrayOrNull()
+            ?.mapNotNull { recElem ->
+                val recMedia = recElem.asJsonObjectOrNull()?.get("mediaRecommendation").asJsonObjectOrNull() ?: return@mapNotNull null
+                val recId = recMedia["id"].asIntOrNull() ?: return@mapNotNull null
+                val recTitleObj = recMedia["title"].asJsonObjectOrNull()
+                val recTitle = recTitleObj?.let {
+                    AnilistTitle(
+                        romaji = it["romaji"].asStringOrNull(),
+                        english = it["english"].asStringOrNull(),
+                    )
+                }
+                val recCoverObj = recMedia["coverImage"].asJsonObjectOrNull()
+                val recCover = recCoverObj?.let {
+                    AnilistCoverImage(
+                        extraLarge = it["extraLarge"].asStringOrNull(),
+                        large = it["large"].asStringOrNull(),
+                    )
+                }
+                AnilistRecommendation(
+                    id = recId,
+                    title = recTitle,
+                    format = recMedia["format"].asStringOrNull(),
+                    episodes = recMedia["episodes"].asIntOrNull(),
+                    coverImage = recCover,
+                    bannerImage = recMedia["bannerImage"].asStringOrNull(),
+                    averageScore = recMedia["averageScore"].asIntOrNull(),
+                )
+            }.orEmpty()
+
+        val trailerObj = obj["trailer"].asJsonObjectOrNull()
+        val trailer = trailerObj?.let {
+            val tId = it["id"].asStringOrNull()
+            val tSite = it["site"].asStringOrNull()
+            if (tId != null) AnilistTrailerInfo(id = tId, site = tSite) else null
+        }
+
+        val staff = obj["staff"].asJsonObjectOrNull()
+            ?.get("edges").asJsonArrayOrNull()
+            ?.mapNotNull { staffElem ->
+                val sObj = staffElem.asJsonObjectOrNull() ?: return@mapNotNull null
+                val sRole = sObj["role"].asStringOrNull()
+                val sName = sObj["node"].asJsonObjectOrNull()?.get("name").asJsonObjectOrNull()?.get("full").asStringOrNull()
+                if (sName != null) AnilistStaff(name = sName, role = sRole) else null
+            }.orEmpty()
+
         val entryObj = obj["mediaListEntry"].asJsonObjectOrNull()
         val mediaListEntry = entryObj?.let { parseMediaListEntry(it, defaultMediaId = id) }
 
@@ -750,6 +888,11 @@ object AnilistApi {
             description = description,
             nextAiringEpisode = nextAiringEpisode,
             streamingEpisodes = streamingEpisodes,
+            characters = characters,
+            studios = studios,
+            recommendations = recommendations,
+            trailer = trailer,
+            staff = staff,
             mediaListEntry = mediaListEntry,
         )
     }.getOrNull()

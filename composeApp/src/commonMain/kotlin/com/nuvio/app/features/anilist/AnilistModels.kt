@@ -67,6 +67,51 @@ data class AnilistStreamingEpisode(
 )
 
 @Serializable
+data class AnilistCharacterVoiceActor(
+    val id: Int? = null,
+    val name: String? = null,
+    val image: String? = null,
+)
+
+@Serializable
+data class AnilistCharacter(
+    val id: Int? = null,
+    val name: String? = null,
+    val image: String? = null,
+    val voiceActor: AnilistCharacterVoiceActor? = null,
+)
+
+@Serializable
+data class AnilistStudio(
+    val id: Int? = null,
+    val name: String? = null,
+    val isAnimationStudio: Boolean = false,
+)
+
+@Serializable
+data class AnilistRecommendation(
+    val id: Int,
+    val title: AnilistTitle? = null,
+    val format: String? = null,
+    val episodes: Int? = null,
+    val coverImage: AnilistCoverImage? = null,
+    val bannerImage: String? = null,
+    val averageScore: Int? = null,
+)
+
+@Serializable
+data class AnilistTrailerInfo(
+    val id: String? = null,
+    val site: String? = null,
+)
+
+@Serializable
+data class AnilistStaff(
+    val name: String? = null,
+    val role: String? = null,
+)
+
+@Serializable
 data class AnilistMedia(
     val id: Int,
     val idMal: Int? = null,
@@ -82,6 +127,11 @@ data class AnilistMedia(
     val description: String? = null,
     val nextAiringEpisode: AnilistNextAiringEpisode? = null,
     val streamingEpisodes: List<AnilistStreamingEpisode> = emptyList(),
+    val characters: List<AnilistCharacter> = emptyList(),
+    val studios: List<AnilistStudio> = emptyList(),
+    val recommendations: List<AnilistRecommendation> = emptyList(),
+    val trailer: AnilistTrailerInfo? = null,
+    val staff: List<AnilistStaff> = emptyList(),
     val mediaListEntry: AnilistMediaListEntry? = null,
 )
 

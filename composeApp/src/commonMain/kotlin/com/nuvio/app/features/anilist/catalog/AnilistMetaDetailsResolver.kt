@@ -79,6 +79,70 @@ object AnilistMetaDetailsResolver {
         val cleanDescription = cinemetaMeta?.description?.takeIf { it.isNotBlank() }
             ?: media.description?.cleanAnilistDescription()
 
+        val castPersons = media.characters.mapNotNull { char ->
+            val va = char.voiceActor
+            val name = va?.name ?: char.name ?: return@mapNotNull null
+            val characterRole = if (char.name != null && va?.name != null) "${char.name} (VA)" else char.name ?: "Cast"
+            val photo = va?.image ?: char.image
+            com.nuvio.app.features.details.MetaPerson(
+                name = name,
+                role = characterRole,
+                photo = photo,
+                tmdbId = va?.id ?: char.id,
+            )
+        }
+
+        val animationStudios = media.studios.filter { it.isAnimationStudio }.map { studio ->
+            com.nuvio.app.features.details.MetaCompany(
+                name = studio.name ?: "Studio",
+                tmdbId = studio.id,
+            )
+        }
+
+        val networks = media.studios.filterNot { it.isAnimationStudio }.map { studio ->
+            com.nuvio.app.features.details.MetaCompany(
+                name = studio.name ?: "Network",
+                tmdbId = studio.id,
+            )
+        }
+
+        val recommendations = media.recommendations.mapNotNull { rec ->
+            val recId = rec.id
+            val isRecMovie = rec.format == "MOVIE" || rec.episodes == 1
+            val recType = if (isRecMovie) "movie" else "series"
+            val recPoster = rec.coverImage?.extraLarge ?: rec.coverImage?.large ?: return@mapNotNull null
+            com.nuvio.app.features.home.MetaPreview(
+                id = "ani_$recId",
+                type = recType,
+                name = rec.title?.displayTitle.orEmpty(),
+                poster = recPoster,
+                banner = rec.bannerImage,
+                logo = null,
+                description = null,
+                releaseInfo = if (rec.episodes != null) "${rec.episodes} Ep" else null,
+            )
+        }
+
+        val trailers = if (media.trailer != null && media.trailer.id != null) {
+            listOf(
+                com.nuvio.app.features.details.MetaTrailer(
+                    id = media.trailer.id,
+                    key = media.trailer.id,
+                    name = "Official Trailer",
+                    site = media.trailer.site ?: "YouTube",
+                    type = "Trailer",
+                    official = true,
+                )
+            )
+        } else emptyList()
+
+        val directors = media.staff.filter { it.role?.contains("Director", ignoreCase = true) == true }.mapNotNull { it.name }
+        val writers = media.staff.filter {
+            it.role?.contains("Composition", ignoreCase = true) == true ||
+                it.role?.contains("Original", ignoreCase = true) == true ||
+                it.role?.contains("Writer", ignoreCase = true) == true
+        }.mapNotNull { it.name }
+
         val mappedVideos = if (isMovie) {
             emptyList()
         } else {
@@ -131,6 +195,13 @@ object AnilistMetaDetailsResolver {
                 background = cinemetaMeta.background ?: backdrop,
                 logo = cinemetaMeta.logo ?: logo,
                 description = cleanDescription,
+                cast = castPersons.ifEmpty { cinemetaMeta.cast },
+                productionCompanies = animationStudios.ifEmpty { cinemetaMeta.productionCompanies },
+                networks = networks.ifEmpty { cinemetaMeta.networks },
+                moreLikeThis = recommendations.ifEmpty { cinemetaMeta.moreLikeThis },
+                trailers = trailers.ifEmpty { cinemetaMeta.trailers },
+                director = directors.ifEmpty { cinemetaMeta.director },
+                writer = writers.ifEmpty { cinemetaMeta.writer },
                 videos = mappedVideos,
                 defaultVideoId = if (isMovie) {
                     when {
@@ -157,6 +228,13 @@ object AnilistMetaDetailsResolver {
             country = "JP",
             language = "ja",
             hasScheduledVideos = media.status == "RELEASING",
+            cast = castPersons,
+            productionCompanies = animationStudios,
+            networks = networks,
+            moreLikeThis = recommendations,
+            trailers = trailers,
+            director = directors,
+            writer = writers,
             defaultVideoId = if (isMovie) {
                 when {
                     !kitsuId.isNullOrBlank() -> "kitsu:$kitsuId"
