@@ -1213,7 +1213,7 @@ internal data class TmdbEpisodeEnrichment(
 
 private fun normalizeMetaType(type: String): String =
     when (type.trim().lowercase()) {
-        "series", "tv", "show", "tvshow" -> "tv"
+        "series", "tv", "show", "tvshow", "anime" -> "tv"
         else -> "movie"
     }
 

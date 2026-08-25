@@ -66,45 +66,42 @@ object AnilistMetaDetailsResolver {
         val contentType = if (isMovie) "movie" else "series"
         val totalEpisodes = media.episodes ?: episodeMap.size.takeIf { it > 0 } ?: 12
 
-        val targetSeason = when {
-            media.format in listOf("SPECIAL", "OVA", "ONA") -> 0
-            else -> 1
-        }
-
-        val mappedVideos = if (isMovie) {
-            emptyList()
-        } else {
-            (1..totalEpisodes).map { epNum ->
-                val epData = episodeMap[epNum]
-                val epTitle = epData?.title?.takeIf { it.isNotBlank() } ?: "Episode $epNum"
-                val epOverview = epData?.overview
-                val epThumbnail = epData?.thumbnail
-                    ?: if (!armImdbId.isNullOrBlank()) "https://images.metahub.space/screenshot/medium/$armImdbId/$targetSeason/$epNum/img" else null
-
-                val videoId = when {
-                    !kitsuId.isNullOrBlank() -> "kitsu:$kitsuId:$epNum"
-                    !armImdbId.isNullOrBlank() -> "$armImdbId:$targetSeason:$epNum"
-                    else -> "anilist:$anilistId:$epNum"
-                }
-
-                MetaVideo(
-                    id = videoId,
-                    title = epTitle,
-                    season = targetSeason,
-                    episode = epNum,
-                    overview = epOverview,
-                    thumbnail = epThumbnail,
-                )
-            }
-        }
-
-        // 5. If IMDb ID is resolved, load base Cinemeta details (Trailers, Backdrops, Logos)
+        // 5. If IMDb ID is resolved, load base Cinemeta details (Trailers, Backdrops, Logos, Episodes)
         var cinemetaMeta: MetaDetails? = null
         if (!armImdbId.isNullOrBlank()) {
             val cinemetaUrl = "https://v3-cinemeta.strem.io/meta/$contentType/$armImdbId.json"
             val cinemetaResponse = runCatching { httpGetText(cinemetaUrl) }.getOrNull()
             if (!cinemetaResponse.isNullOrBlank()) {
                 cinemetaMeta = runCatching { com.nuvio.app.features.details.MetaDetailsParser.parse(cinemetaResponse) }.getOrNull()
+            }
+        }
+
+        val mappedVideos = if (isMovie) {
+            emptyList()
+        } else {
+            (1..totalEpisodes).map { epNum ->
+                val cinemetaEp = cinemetaMeta?.videos?.firstOrNull { it.episode == epNum }
+                val epData = episodeMap[epNum]
+                val epTitle = cinemetaEp?.title?.takeIf { it.isNotBlank() } ?: epData?.title?.takeIf { it.isNotBlank() } ?: "Episode $epNum"
+                val epOverview = cinemetaEp?.overview?.takeIf { it.isNotBlank() } ?: epData?.overview
+                val epThumbnail = cinemetaEp?.thumbnail?.takeIf { it.isNotBlank() }
+                    ?: epData?.thumbnail
+                    ?: if (!armImdbId.isNullOrBlank()) "https://images.metahub.space/screenshot/medium/$armImdbId/1/$epNum/img" else null
+
+                val videoId = when {
+                    !kitsuId.isNullOrBlank() -> "kitsu:$kitsuId:$epNum"
+                    !armImdbId.isNullOrBlank() -> "$armImdbId:1:$epNum"
+                    else -> "anilist:$anilistId:$epNum"
+                }
+
+                MetaVideo(
+                    id = videoId,
+                    title = epTitle,
+                    season = 1,
+                    episode = epNum,
+                    overview = epOverview,
+                    thumbnail = epThumbnail,
+                )
             }
         }
 

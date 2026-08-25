@@ -105,7 +105,7 @@ object TmdbService {
     internal fun normalizeMediaType(mediaType: String): String =
         when (mediaType.trim().lowercase()) {
             "movie", "film" -> "movie"
-            "tv", "series", "show", "tvshow" -> "tv"
+            "tv", "series", "show", "tvshow", "anime" -> "tv"
             else -> mediaType.trim().lowercase()
         }
 }
