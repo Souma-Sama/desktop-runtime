@@ -5,7 +5,9 @@ import com.nuvio.app.features.addons.httpPostJsonWithHeaders
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.doubleOrNull
@@ -83,16 +85,16 @@ object AnilistApi {
         if (this is JsonArray) this else null
 
     private fun JsonElement?.asStringOrNull(): String? =
-        if (this is JsonPrimitive && this !is kotlinx.serialization.json.JsonNull) this.contentOrNull else null
+        if (this is JsonPrimitive && this !is JsonNull) this.contentOrNull else null
 
     private fun JsonElement?.asIntOrNull(): Int? =
-        if (this is JsonPrimitive && this !is kotlinx.serialization.json.JsonNull) (this.intOrNull ?: this.contentOrNull?.toIntOrNull()) else null
+        if (this is JsonPrimitive && this !is JsonNull) (this.intOrNull ?: this.contentOrNull?.toIntOrNull()) else null
 
     private fun JsonElement?.asDoubleOrNull(): Double? =
-        if (this is JsonPrimitive && this !is kotlinx.serialization.json.JsonNull) (this.doubleOrNull ?: this.contentOrNull?.toDoubleOrNull()) else null
+        if (this is JsonPrimitive && this !is JsonNull) (this.doubleOrNull ?: this.contentOrNull?.toDoubleOrNull()) else null
 
     private fun JsonElement?.asLongOrNull(): Long? =
-        if (this is JsonPrimitive && this !is kotlinx.serialization.json.JsonNull) (this.longOrNull ?: this.contentOrNull?.toLongOrNull()) else null
+        if (this is JsonPrimitive && this !is JsonNull) (this.longOrNull ?: this.contentOrNull?.toLongOrNull()) else null
 
     suspend fun fetchCurrentUser(token: String): AnilistUser? {
         val query = """
