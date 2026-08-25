@@ -1,5 +1,6 @@
 package com.nuvio.app.features.anilist
 
+import co.touchlab.kermit.Logger
 import com.nuvio.app.features.addons.httpPostJsonWithHeaders
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -16,6 +17,7 @@ import kotlinx.serialization.json.longOrNull
 import kotlinx.serialization.json.put
 
 object AnilistApi {
+    private val log = Logger.withTag("AnilistApi")
     private const val GRAPHQL_ENDPOINT = "https://graphql.anilist.co"
     private val json = Json { ignoreUnknownKeys = true; isLenient = true }
 
@@ -43,6 +45,8 @@ object AnilistApi {
                 body = payload,
                 headers = headers,
             )
+        }.onFailure {
+            log.w(it) { "executeGraphQL request error" }
         }.getOrNull() ?: return null
 
         if (responseText.isBlank()) {

@@ -1,5 +1,6 @@
 package com.nuvio.app.features.anilist
 
+import co.touchlab.kermit.Logger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -11,6 +12,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 object AnilistTrackerCoordinator {
+    private val log = Logger.withTag("AnilistTracker")
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private var activeJob: Job? = null
 
@@ -37,9 +39,11 @@ object AnilistTrackerCoordinator {
         country: String? = null,
         language: String? = null,
     ) {
-        val rawTitle = title.trim()
+        val rawTitle = title.replace(Regex("""\r|\n"""), " ").replace(Regex("""\s+"""), " ").trim()
         val isExplicitAnime = isAnimeCandidate(rawTitle, genres, country, language)
         val cacheKey = if (!mediaId.isNullOrBlank()) mediaId.lowercase() else rawTitle.lowercase()
+
+        log.i { "loadForMedia: title='$rawTitle', mediaId='$mediaId'" }
 
         activeJob?.cancel()
         _trackerState.update {
@@ -301,8 +305,10 @@ object AnilistTrackerCoordinator {
 
     private fun cleanAnimeTitle(raw: String): String {
         return raw
+            .replace(Regex("""\r|\n"""), " ")
             .replace(Regex("""\[(Dub|Sub|Dual Audio|Multi-Audio|1080p|720p|4K|HEVC|x264|x265)\]""", RegexOption.IGNORE_CASE), "")
             .replace(Regex("""\((Dub|Sub|Dual Audio|Multi-Audio|TV|Movie|OVA|ONA|Special)\)""", RegexOption.IGNORE_CASE), "")
+            .replace(Regex("""\s+"""), " ")
             .trim()
     }
 
