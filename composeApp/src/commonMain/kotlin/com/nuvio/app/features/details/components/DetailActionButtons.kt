@@ -226,8 +226,10 @@ fun DetailActionButtons(
                     it.language,
                 )
             } ?: false
+            // Also show tracker for media with plain numeric IDs (AniList IDs)
+            val hasNumericId = meta?.id?.let { id -> id.all { it.isDigit() } && id.length in 1..8 } ?: false
 
-            if (trackerState.isAnime || isAnimeCandidate) {
+            if (trackerState.isAnime || isAnimeCandidate || hasNumericId) {
                 Spacer(modifier = Modifier.width(12.dp))
                 AnimeTrackerButton(meta = meta, title = title, size = iconButtonSize)
             }

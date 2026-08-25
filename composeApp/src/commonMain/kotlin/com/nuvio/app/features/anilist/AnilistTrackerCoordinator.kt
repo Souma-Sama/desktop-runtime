@@ -45,7 +45,8 @@ object AnilistTrackerCoordinator {
         val rawTitle = title.replace(Regex("""\r|\n"""), " ").replace(Regex("""\s+"""), " ").trim()
         if (rawTitle.isBlank() && mediaId.isNullOrBlank()) return
 
-        val isExplicitAnime = isAnimeCandidate(rawTitle, genres, country, language)
+        val hasAnimeId = extractAnilistId(mediaId) != null || extractMalId(mediaId) != null || extractKitsuId(mediaId) != null
+        val isExplicitAnime = hasAnimeId || isAnimeCandidate(rawTitle, genres, country, language)
         val cacheKey = if (!mediaId.isNullOrBlank()) mediaId.lowercase() else rawTitle.lowercase()
 
         if (!forceRefresh && currentKey == cacheKey && (_trackerState.value.media != null || activeJob?.isActive == true)) {
@@ -307,6 +308,8 @@ object AnilistTrackerCoordinator {
         if (id.startsWith("al:", ignoreCase = true)) return id.substringAfter(":").toIntOrNull()
         if (id.startsWith("al_", ignoreCase = true)) return id.substringAfter("_").toIntOrNull()
         if (id.startsWith("anime:", ignoreCase = true)) return id.substringAfter(":").toIntOrNull()
+        // Plain numeric ID that is NOT an IMDb ID (tt...) — treat as AniList ID
+        if (id.all { it.isDigit() } && id.length in 1..8) return id.toIntOrNull()
         return null
     }
 

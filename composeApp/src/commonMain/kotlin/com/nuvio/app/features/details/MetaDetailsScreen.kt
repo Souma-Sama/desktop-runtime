@@ -307,9 +307,9 @@ fun MetaDetailsScreen(
     val effectiveTitle = initialTitle?.takeIf { it.isNotBlank() }
         ?: displayedMeta?.name.orEmpty()
 
-    LaunchedEffect(displayedMeta?.id, effectiveTitle) {
+    LaunchedEffect(displayedMeta?.id, effectiveTitle, id) {
         deferredMetaWorkAllowed = false
-        if (effectiveTitle.isNotBlank() || displayedMeta != null) {
+        if (effectiveTitle.isNotBlank() || displayedMeta != null || id.isNotBlank()) {
             val metaYear = displayedMeta?.releaseInfo?.take(4)?.toIntOrNull()
             com.nuvio.app.features.anilist.AnilistTrackerCoordinator.loadForMedia(
                 title = effectiveTitle,
