@@ -11,8 +11,17 @@ import com.nuvio.app.features.home.HomeCatalogDefinition
 import com.nuvio.app.features.home.MetaPreview
 import com.nuvio.app.features.home.PosterShape
 
+import com.nuvio.app.features.library.LibraryClock
+
+private data class CachedCatalogPage(
+    val timestamp: Long,
+    val page: CatalogPage,
+)
+
 object AnilistCatalogRepository {
     private val log = Logger.withTag("AnilistCatalog")
+    private val pageCache = mutableMapOf<String, CachedCatalogPage>()
+    private const val CACHE_TTL_MS = 5 * 60 * 1000L // 5 minutes
 
     const val CATALOG_WATCHING = "anilist:watching"
     const val CATALOG_PLANNING = "anilist:planning"
@@ -24,6 +33,10 @@ object AnilistCatalogRepository {
     const val CATALOG_POPULAR = "anilist:popular"
     const val CATALOG_TOP_RATED = "anilist:top-rated"
     const val CATALOG_AIRING = "anilist:airing"
+
+    fun clearCache() {
+        pageCache.clear()
+    }
 
     fun getCatalogDefinitions(): List<HomeCatalogDefinition> {
         AnilistAuthRepository.ensureInitialized()
@@ -132,13 +145,6 @@ object AnilistCatalogRepository {
         return list
     }
 
-    private val pageCache = mutableMapOf<String, Pair<Long, CatalogPage>>()
-    private const val CACHE_TTL_MS = 5 * 60 * 1000L // 5 minutes
-
-    fun clearCache() {
-        pageCache.clear()
-    }
-
     suspend fun fetchCatalogPage(catalogId: String, page: Int = 1, perPage: Int = 25, force: Boolean = false): CatalogPage {
         AnilistAuthRepository.ensureInitialized()
         val token = AnilistAuthRepository.token.value
@@ -149,11 +155,11 @@ object AnilistCatalogRepository {
         } else null
 
         val cacheKey = "$catalogId:$page:$perPage:${user?.name ?: "anon"}"
-        val now = kotlinx.datetime.Clock.System.now().toEpochMilliseconds()
+        val now = LibraryClock.nowEpochMs()
         if (!force) {
             val cached = pageCache[cacheKey]
-            if (cached != null && (now - cached.first) < CACHE_TTL_MS) {
-                return cached.second
+            if (cached != null && (now - cached.timestamp) < CACHE_TTL_MS) {
+                return cached.page
             }
         }
 
@@ -250,7 +256,7 @@ object AnilistCatalogRepository {
             rawItemCount = previews.size,
             nextSkip = if (mediaList.size >= perPage) (page * perPage) else null,
         )
-        pageCache[cacheKey] = now to result
+        pageCache[cacheKey] = CachedCatalogPage(timestamp = now, page = result)
         return result
     }
 }
