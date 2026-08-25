@@ -48,7 +48,7 @@ object AnilistTrackerCoordinator {
         val isExplicitAnime = isAnimeCandidate(rawTitle, genres, country, language)
         val cacheKey = if (!mediaId.isNullOrBlank()) mediaId.lowercase() else rawTitle.lowercase()
 
-        if (!forceRefresh && currentKey == cacheKey && _trackerState.value.media != null) {
+        if (!forceRefresh && currentKey == cacheKey && (_trackerState.value.media != null || activeJob?.isActive == true)) {
             return
         }
         currentKey = cacheKey

@@ -164,8 +164,9 @@ object AnilistApi {
     }
 
     suspend fun searchViaKitsu(query: String): Int? {
-        val encoded = query.trim().replace(" ", "%20")
-        val url = "https://kitsu.io/api/edge/anime?filter%5Btext%5D=$encoded&page%5Blimit%5D=1"
+        val safeQuery = query.trim().replace(" ", "%20")
+        val rawUrl = "https://kitsu.io/api/edge/anime?filter%5Btext%5D=$safeQuery&page%5Blimit%5D=1"
+        val url = com.nuvio.app.features.addons.encodeAddonUrl(rawUrl)
         return runCatching {
             val text = com.nuvio.app.features.addons.httpGetText(url)
             val jsonElement = json.parseToJsonElement(text)

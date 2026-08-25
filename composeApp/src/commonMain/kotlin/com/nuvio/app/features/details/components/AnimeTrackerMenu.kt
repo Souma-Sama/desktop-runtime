@@ -78,20 +78,6 @@ fun AnimeTrackerButton(
     val isTrackingActive = trackerState.entry?.status != null
     val effectiveTitle = title?.takeIf { it.isNotBlank() } ?: meta?.name.orEmpty()
 
-    LaunchedEffect(meta?.id, effectiveTitle) {
-        if (effectiveTitle.isNotBlank() || meta != null) {
-            val metaYear = meta?.releaseInfo?.take(4)?.toIntOrNull()
-            AnilistTrackerCoordinator.loadForMedia(
-                title = effectiveTitle,
-                mediaId = meta?.id,
-                year = metaYear,
-                genres = meta?.genres.orEmpty(),
-                country = meta?.country,
-                language = meta?.language,
-            )
-        }
-    }
-
     Box(modifier = modifier) {
         Surface(
             modifier = Modifier.size(size),
