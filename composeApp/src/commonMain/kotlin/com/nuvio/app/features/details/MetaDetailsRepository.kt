@@ -113,31 +113,19 @@ object MetaDetailsRepository {
         _uiState.value = MetaDetailsUiState(isLoading = true)
 
         scope.launch {
-            if (id.startsWith("ani_", ignoreCase = true) || id.startsWith("anilist:", ignoreCase = true)) {
-                val anilistMeta = com.nuvio.app.features.anilist.catalog.AnilistMetaDetailsResolver.resolveMetaDetails(id)
-                if (anilistMeta != null) {
-                    publishLoadedMeta(
-                        requestKey = requestKey,
-                        meta = anilistMeta,
-                        fallbackItemId = id,
-                        fallbackItemType = type,
-                        mdbListSettings = mdbListSettings,
-                        metaScreenSettingsFingerprint = metaScreenSettingsFingerprint,
-                    )
-                    return@launch
-                }
-            }
-
             val metaLookupId = resolveMetaLookupId(itemId = id, itemType = type)
+            val isAnilistItem = id.startsWith("ani_", ignoreCase = true) || id.startsWith("anilist:", ignoreCase = true)
+
             val manifests = findReadyMetaManifests(type = type, id = metaLookupId)
 
             if (manifests.isEmpty()) {
-                val tmdbMeta = tryFetchTmdbFallbackMeta(type = type, id = id)
+                val tmdbMeta = tryFetchTmdbFallbackMeta(type = type, id = metaLookupId)
                 if (tmdbMeta != null) {
+                    val finalMeta = if (isAnilistItem) tmdbMeta.copy(id = id) else tmdbMeta
                     publishLoadedMeta(
                         requestKey = requestKey,
-                        meta = tmdbMeta,
-                        fallbackItemId = id,
+                        meta = finalMeta,
+                        fallbackItemId = metaLookupId,
                         fallbackItemType = type,
                         mdbListSettings = mdbListSettings,
                         metaScreenSettingsFingerprint = metaScreenSettingsFingerprint,
@@ -145,7 +133,22 @@ object MetaDetailsRepository {
                     return@launch
                 }
 
-                log.w { "No addon provides meta for type=$type id=$id" }
+                if (isAnilistItem) {
+                    val anilistMeta = com.nuvio.app.features.anilist.catalog.AnilistMetaDetailsResolver.resolveMetaDetails(id)
+                    if (anilistMeta != null) {
+                        publishLoadedMeta(
+                            requestKey = requestKey,
+                            meta = anilistMeta,
+                            fallbackItemId = metaLookupId,
+                            fallbackItemType = type,
+                            mdbListSettings = mdbListSettings,
+                            metaScreenSettingsFingerprint = metaScreenSettingsFingerprint,
+                        )
+                        return@launch
+                    }
+                }
+
+                log.w { "No addon provides meta for type=$type id=$id (lookupId=$metaLookupId)" }
                 _uiState.value = MetaDetailsUiState(
                     errorMessage = getString(Res.string.details_no_addon_meta),
                 )
@@ -158,9 +161,10 @@ object MetaDetailsRepository {
                     tryFetchMeta(manifest, type, metaLookupId, includeMdbList = false)
                 }
                 if (result != null) {
+                    val finalMeta = if (isAnilistItem) result.copy(id = id) else result
                     publishLoadedMeta(
                         requestKey = requestKey,
-                        meta = result,
+                        meta = finalMeta,
                         fallbackItemId = metaLookupId,
                         fallbackItemType = type,
                         mdbListSettings = mdbListSettings,
@@ -170,12 +174,13 @@ object MetaDetailsRepository {
                 }
             }
 
-            val tmdbMeta = tryFetchTmdbFallbackMeta(type = type, id = id)
+            val tmdbMeta = tryFetchTmdbFallbackMeta(type = type, id = metaLookupId)
             if (tmdbMeta != null) {
+                val finalMeta = if (isAnilistItem) tmdbMeta.copy(id = id) else tmdbMeta
                 publishLoadedMeta(
                     requestKey = requestKey,
-                    meta = tmdbMeta,
-                    fallbackItemId = id,
+                    meta = finalMeta,
+                    fallbackItemId = metaLookupId,
                     fallbackItemType = type,
                     mdbListSettings = mdbListSettings,
                     metaScreenSettingsFingerprint = metaScreenSettingsFingerprint,
@@ -335,6 +340,16 @@ object MetaDetailsRepository {
         addons.enabledAddons().any { addon -> addon.manifest == null && addon.isRefreshing }
 
     private suspend fun resolveMetaLookupId(itemId: String, itemType: String): String {
+        if (itemId.startsWith("ani_", ignoreCase = true) || itemId.startsWith("anilist:", ignoreCase = true)) {
+            val anilistId = com.nuvio.app.features.anilist.AnilistTrackerCoordinator.extractAnilistId(itemId)
+            if (anilistId != null) {
+                val imdbId = com.nuvio.app.features.anilist.catalog.AnilistMetaDetailsResolver.resolveArmImdbId(anilistId)
+                if (!imdbId.isNullOrBlank()) {
+                    return imdbId
+                }
+            }
+        }
+
         val tmdbId = itemId
             .takeIf { it.startsWith("tmdb:", ignoreCase = true) }
             ?.substringAfter(':')

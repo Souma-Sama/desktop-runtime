@@ -179,7 +179,7 @@ object AnilistMetaDetailsResolver {
         )
     }
 
-    private suspend fun resolveArmImdbId(anilistId: Int): String? = runCatching {
+    suspend fun resolveArmImdbId(anilistId: Int): String? = runCatching {
         val url = "https://arm.haglund.dev/api/v2/ids?source=anilist&id=$anilistId&include=imdb"
         val response = httpGetText(url)
         val jsonElement = json.parseToJsonElement(response)
