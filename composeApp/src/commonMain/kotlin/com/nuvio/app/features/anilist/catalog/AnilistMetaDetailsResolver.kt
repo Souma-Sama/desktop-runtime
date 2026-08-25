@@ -76,16 +76,28 @@ object AnilistMetaDetailsResolver {
             }
         }
 
+        val cleanDescription = cinemetaMeta?.description?.takeIf { it.isNotBlank() }
+            ?: media.description?.cleanAnilistDescription()
+
         val mappedVideos = if (isMovie) {
             emptyList()
         } else {
             (1..totalEpisodes).map { epNum ->
+                val streamingEp = media.streamingEpisodes.getOrNull(epNum - 1)
                 val cinemetaEp = cinemetaMeta?.videos?.firstOrNull { it.episode == epNum }
                 val epData = episodeMap[epNum]
-                val epTitle = cinemetaEp?.title?.takeIf { it.isNotBlank() } ?: epData?.title?.takeIf { it.isNotBlank() } ?: "Episode $epNum"
-                val epOverview = cinemetaEp?.overview?.takeIf { it.isNotBlank() } ?: epData?.overview
-                val epThumbnail = cinemetaEp?.thumbnail?.takeIf { it.isNotBlank() }
+
+                val epTitle = streamingEp?.title?.takeIf { it.isNotBlank() }
+                    ?: cinemetaEp?.title?.takeIf { it.isNotBlank() }
+                    ?: epData?.title?.takeIf { it.isNotBlank() }
+                    ?: "Episode $epNum"
+
+                val epOverview = cinemetaEp?.overview?.takeIf { it.isNotBlank() }
+                    ?: epData?.overview
+
+                val epThumbnail = streamingEp?.thumbnail?.takeIf { it.isNotBlank() }
                     ?: epData?.thumbnail
+                    ?: cinemetaEp?.thumbnail?.takeIf { it.isNotBlank() }
                     ?: if (!armImdbId.isNullOrBlank()) "https://images.metahub.space/screenshot/medium/$armImdbId/1/$epNum/img" else null
 
                 val videoId = when {
@@ -118,7 +130,7 @@ object AnilistMetaDetailsResolver {
                 poster = media.coverImage?.extraLarge ?: cinemetaMeta.poster,
                 background = cinemetaMeta.background ?: backdrop,
                 logo = cinemetaMeta.logo ?: logo,
-                description = media.description ?: cinemetaMeta.description,
+                description = cleanDescription,
                 videos = mappedVideos,
                 defaultVideoId = if (isMovie) {
                     when {
@@ -137,7 +149,7 @@ object AnilistMetaDetailsResolver {
             poster = poster,
             background = backdrop,
             logo = logo,
-            description = media.description,
+            description = cleanDescription,
             releaseInfo = if (media.episodes != null) "${media.episodes} Episodes" else null,
             status = media.status,
             imdbRating = formattedScore,
@@ -154,6 +166,16 @@ object AnilistMetaDetailsResolver {
             } else null,
             videos = mappedVideos,
         )
+    }
+
+    private fun String.cleanAnilistDescription(): String {
+        return this
+            .replace(Regex("<br\\s*/?>", RegexOption.IGNORE_CASE), "\n")
+            .replace(Regex("<[^>]*>"), "")
+            .replace(Regex("(?i)\\(Source:.*?\\)"), "")
+            .replace(Regex("(?i)\\[Written by.*?\\]"), "")
+            .replace(Regex("(?i)Source:.*"), "")
+            .trim()
     }
 
     suspend fun resolveArmImdbId(anilistId: Int): String? = runCatching {

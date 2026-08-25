@@ -565,6 +565,20 @@ object AnilistApi {
         mediaId: Int,
         token: String? = null,
     ): AnilistMedia? {
+        val hasAuth = !token.isNullOrBlank()
+        val mediaListEntryBlock = if (hasAuth) {
+            """
+            mediaListEntry {
+              id
+              status
+              score
+              progress
+              repeat
+              updatedAt
+            }
+            """.trimIndent()
+        } else ""
+
         val query = """
             query FetchMediaById(${'$'}id: Int) {
               Media(id: ${'$'}id, type: ANIME) {
@@ -593,14 +607,13 @@ object AnilistApi {
                   airingAt
                   timeUntilAiring
                 }
-                mediaListEntry {
-                  id
-                  status
-                  score
-                  progress
-                  repeat
-                  updatedAt
+                streamingEpisodes {
+                  title
+                  thumbnail
+                  url
+                  site
                 }
+                $mediaListEntryBlock
               }
             }
         """.trimIndent()
@@ -708,6 +721,17 @@ object AnilistApi {
             } else null
         }
 
+        val streamingArray = obj["streamingEpisodes"].asJsonArrayOrNull()
+        val streamingEpisodes = streamingArray?.mapNotNull { item ->
+            val sObj = item.asJsonObjectOrNull() ?: return@mapNotNull null
+            AnilistStreamingEpisode(
+                title = sObj["title"].asStringOrNull(),
+                thumbnail = sObj["thumbnail"].asStringOrNull(),
+                url = sObj["url"].asStringOrNull(),
+                site = sObj["site"].asStringOrNull(),
+            )
+        }.orEmpty()
+
         val entryObj = obj["mediaListEntry"].asJsonObjectOrNull()
         val mediaListEntry = entryObj?.let { parseMediaListEntry(it, defaultMediaId = id) }
 
@@ -725,6 +749,7 @@ object AnilistApi {
             averageScore = averageScore,
             description = description,
             nextAiringEpisode = nextAiringEpisode,
+            streamingEpisodes = streamingEpisodes,
             mediaListEntry = mediaListEntry,
         )
     }.getOrNull()

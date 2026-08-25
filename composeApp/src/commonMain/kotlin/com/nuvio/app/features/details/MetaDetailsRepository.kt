@@ -161,7 +161,7 @@ object MetaDetailsRepository {
 
             for (manifest in manifests) {
                 val result = withContext(Dispatchers.Default) {
-                    tryFetchMeta(manifest, type, metaLookupId, includeMdbList = false)
+                    tryFetchMeta(manifest, effectiveType, metaLookupId, includeMdbList = false)
                 }
                 if (result != null) {
                     val finalMeta = if (isAnilistItem) result.copy(id = id) else result
@@ -169,7 +169,7 @@ object MetaDetailsRepository {
                         requestKey = requestKey,
                         meta = finalMeta,
                         fallbackItemId = metaLookupId,
-                        fallbackItemType = type,
+                        fallbackItemType = effectiveType,
                         mdbListSettings = mdbListSettings,
                         metaScreenSettingsFingerprint = metaScreenSettingsFingerprint,
                     )
@@ -177,14 +177,14 @@ object MetaDetailsRepository {
                 }
             }
 
-            val tmdbMeta = tryFetchTmdbFallbackMeta(type = type, id = metaLookupId)
+            val tmdbMeta = tryFetchTmdbFallbackMeta(type = effectiveType, id = metaLookupId)
             if (tmdbMeta != null) {
                 val finalMeta = if (isAnilistItem) tmdbMeta.copy(id = id) else tmdbMeta
                 publishLoadedMeta(
                     requestKey = requestKey,
                     meta = finalMeta,
                     fallbackItemId = metaLookupId,
-                    fallbackItemType = type,
+                    fallbackItemType = effectiveType,
                     mdbListSettings = mdbListSettings,
                     metaScreenSettingsFingerprint = metaScreenSettingsFingerprint,
                 )

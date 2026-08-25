@@ -59,6 +59,14 @@ data class AnilistNextAiringEpisode(
 )
 
 @Serializable
+data class AnilistStreamingEpisode(
+    val title: String? = null,
+    val thumbnail: String? = null,
+    val url: String? = null,
+    val site: String? = null,
+)
+
+@Serializable
 data class AnilistMedia(
     val id: Int,
     val idMal: Int? = null,
@@ -73,6 +81,7 @@ data class AnilistMedia(
     val averageScore: Int? = null,
     val description: String? = null,
     val nextAiringEpisode: AnilistNextAiringEpisode? = null,
+    val streamingEpisodes: List<AnilistStreamingEpisode> = emptyList(),
     val mediaListEntry: AnilistMediaListEntry? = null,
 )
 
