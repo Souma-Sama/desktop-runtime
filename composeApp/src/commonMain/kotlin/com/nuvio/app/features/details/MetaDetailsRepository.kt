@@ -119,45 +119,7 @@ object MetaDetailsRepository {
             val isAnilistItem = id.startsWith("ani_", ignoreCase = true) || id.startsWith("anilist:", ignoreCase = true)
             val effectiveType = if (type == "movie") "movie" else "series"
 
-            if (isAnilistItem) {
-                val anilistMeta = com.nuvio.app.features.anilist.catalog.AnilistMetaDetailsResolver.resolveMetaDetails(id)
-                if (anilistMeta != null) {
-                    publishLoadedMeta(
-                        requestKey = requestKey,
-                        meta = anilistMeta,
-                        fallbackItemId = metaLookupId,
-                        fallbackItemType = effectiveType,
-                        mdbListSettings = mdbListSettings,
-                        metaScreenSettingsFingerprint = metaScreenSettingsFingerprint,
-                    )
-                    return@launch
-                }
-            }
-
             val manifests = findReadyMetaManifests(type = effectiveType, id = metaLookupId)
-
-            if (manifests.isEmpty()) {
-                val tmdbMeta = tryFetchTmdbFallbackMeta(type = effectiveType, id = metaLookupId)
-                if (tmdbMeta != null) {
-                    val finalMeta = if (isAnilistItem) tmdbMeta.copy(id = id) else tmdbMeta
-                    publishLoadedMeta(
-                        requestKey = requestKey,
-                        meta = finalMeta,
-                        fallbackItemId = metaLookupId,
-                        fallbackItemType = effectiveType,
-                        mdbListSettings = mdbListSettings,
-                        metaScreenSettingsFingerprint = metaScreenSettingsFingerprint,
-                    )
-                    return@launch
-                }
-
-                log.w { "No addon provides meta for type=$type id=$id (lookupId=$metaLookupId)" }
-                _uiState.value = MetaDetailsUiState(
-                    errorMessage = getString(Res.string.details_no_addon_meta),
-                )
-                activeRequestKey = null
-                return@launch
-            }
 
             for (manifest in manifests) {
                 val result = withContext(Dispatchers.Default) {
@@ -191,8 +153,24 @@ object MetaDetailsRepository {
                 return@launch
             }
 
+            if (isAnilistItem) {
+                val anilistMeta = com.nuvio.app.features.anilist.catalog.AnilistMetaDetailsResolver.resolveMetaDetails(id)
+                if (anilistMeta != null) {
+                    publishLoadedMeta(
+                        requestKey = requestKey,
+                        meta = anilistMeta,
+                        fallbackItemId = metaLookupId,
+                        fallbackItemType = effectiveType,
+                        mdbListSettings = mdbListSettings,
+                        metaScreenSettingsFingerprint = metaScreenSettingsFingerprint,
+                    )
+                    return@launch
+                }
+            }
+
+            log.w { "No addon provides meta for type=$type id=$id (lookupId=$metaLookupId)" }
             _uiState.value = MetaDetailsUiState(
-                errorMessage = getString(Res.string.details_load_failed_all_addons),
+                errorMessage = getString(Res.string.details_no_addon_meta),
             )
             activeRequestKey = null
         }
