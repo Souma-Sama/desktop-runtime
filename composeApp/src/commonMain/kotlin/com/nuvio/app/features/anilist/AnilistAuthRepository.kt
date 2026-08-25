@@ -76,6 +76,21 @@ object AnilistAuthRepository {
         return true
     }
 
+    fun handleAuthCallback(url: String): Boolean {
+        if (!url.contains("access_token=") && !url.contains("anilist")) return false
+        val token = extractTokenFromUrl(url) ?: return false
+        scope.launch {
+            loginWithToken(token)
+        }
+        return true
+    }
+
+    private fun extractTokenFromUrl(url: String): String? {
+        val regex = Regex("""access_token=([^&#]+)""")
+        val match = regex.find(url) ?: return null
+        return match.groupValues.getOrNull(1)
+    }
+
     fun logout() {
         _token.value = null
         _currentUser.value = null
