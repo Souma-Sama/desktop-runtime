@@ -1,6 +1,7 @@
 package com.nuvio.app.features.anilist
 
 import co.touchlab.kermit.Logger
+import com.nuvio.app.features.addons.encodeUnsafeHttpUrlCharacters
 import com.nuvio.app.features.addons.httpPostJsonWithHeaders
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
