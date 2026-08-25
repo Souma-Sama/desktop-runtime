@@ -125,6 +125,304 @@ object AnilistApi {
         )
     }
 
+    suspend fun fetchUserAnimeList(
+        token: String? = null,
+        userName: String? = null,
+        status: AnilistMediaListStatus? = null,
+        page: Int = 1,
+        perPage: Int = 25,
+    ): List<AnilistMedia> {
+        val query = """
+            query FetchUserAnimeList(${'$'}userName: String, ${'$'}status: MediaListStatus, ${'$'}page: Int, ${'$'}perPage: Int) {
+              Page(page: ${'$'}page, perPage: ${'$'}perPage) {
+                pageInfo {
+                  hasNextPage
+                }
+                mediaList(userName: ${'$'}userName, type: ANIME, status: ${'$'}status, sort: [UPDATED_TIME_DESC]) {
+                  id
+                  status
+                  score
+                  progress
+                  repeat
+                  updatedAt
+                  media {
+                    id
+                    idMal
+                    title {
+                      romaji
+                      english
+                      native
+                    }
+                    format
+                    status
+                    episodes
+                    duration
+                    coverImage {
+                      extraLarge
+                      large
+                      medium
+                    }
+                    bannerImage
+                    genres
+                    averageScore
+                    description(asHtml: false)
+                    nextAiringEpisode {
+                      episode
+                      airingAt
+                      timeUntilAiring
+                    }
+                  }
+                }
+              }
+            }
+        """.trimIndent()
+
+        val variables = buildJsonObject {
+            if (!userName.isNullOrBlank()) put("userName", userName)
+            if (status != null) put("status", status.name)
+            put("page", page)
+            put("perPage", perPage)
+        }
+
+        val root = executeGraphQL(query = query, variables = variables, token = token)
+        val mediaListArray = root?.get("data")
+            .asJsonObjectOrNull()?.get("Page")
+            .asJsonObjectOrNull()?.get("mediaList")
+            .asJsonArrayOrNull() ?: return emptyList()
+
+        return mediaListArray.mapNotNull { itemElement ->
+            val itemObj = itemElement.asJsonObjectOrNull() ?: return@mapNotNull null
+            val mediaObj = itemObj["media"].asJsonObjectOrNull() ?: return@mapNotNull null
+            val parsedMedia = parseMedia(mediaObj) ?: return@mapNotNull null
+            val entry = parseMediaListEntry(itemObj, defaultMediaId = parsedMedia.id)
+            parsedMedia.copy(mediaListEntry = entry)
+        }
+    }
+
+    suspend fun fetchTrendingAnime(
+        page: Int = 1,
+        perPage: Int = 25,
+    ): List<AnilistMedia> {
+        val query = """
+            query FetchTrendingAnime(${'$'}page: Int, ${'$'}perPage: Int) {
+              Page(page: ${'$'}page, perPage: ${'$'}perPage) {
+                pageInfo {
+                  hasNextPage
+                }
+                media(type: ANIME, sort: [TRENDING_DESC, POPULARITY_DESC]) {
+                  id
+                  idMal
+                  title {
+                    romaji
+                    english
+                    native
+                  }
+                  format
+                  status
+                  episodes
+                  duration
+                  coverImage {
+                    extraLarge
+                    large
+                    medium
+                  }
+                  bannerImage
+                  genres
+                  averageScore
+                  description(asHtml: false)
+                  nextAiringEpisode {
+                    episode
+                    airingAt
+                    timeUntilAiring
+                  }
+                }
+              }
+            }
+        """.trimIndent()
+
+        val variables = buildJsonObject {
+            put("page", page)
+            put("perPage", perPage)
+        }
+
+        val root = executeGraphQL(query = query, variables = variables)
+        val mediaArray = root?.get("data")
+            .asJsonObjectOrNull()?.get("Page")
+            .asJsonObjectOrNull()?.get("media")
+            .asJsonArrayOrNull() ?: return emptyList()
+
+        return mediaArray.mapNotNull { it.asJsonObjectOrNull()?.let { obj -> parseMedia(obj) } }
+    }
+
+    suspend fun fetchPopularSeasonAnime(
+        season: String? = null,
+        seasonYear: Int? = null,
+        page: Int = 1,
+        perPage: Int = 25,
+    ): List<AnilistMedia> {
+        val query = """
+            query FetchPopularSeasonAnime(${'$'}season: MediaSeason, ${'$'}seasonYear: Int, ${'$'}page: Int, ${'$'}perPage: Int) {
+              Page(page: ${'$'}page, perPage: ${'$'}perPage) {
+                pageInfo {
+                  hasNextPage
+                }
+                media(type: ANIME, season: ${'$'}season, seasonYear: ${'$'}seasonYear, sort: [POPULARITY_DESC]) {
+                  id
+                  idMal
+                  title {
+                    romaji
+                    english
+                    native
+                  }
+                  format
+                  status
+                  episodes
+                  duration
+                  coverImage {
+                    extraLarge
+                    large
+                    medium
+                  }
+                  bannerImage
+                  genres
+                  averageScore
+                  description(asHtml: false)
+                  nextAiringEpisode {
+                    episode
+                    airingAt
+                    timeUntilAiring
+                  }
+                }
+              }
+            }
+        """.trimIndent()
+
+        val variables = buildJsonObject {
+            if (!season.isNullOrBlank()) put("season", season.uppercase())
+            if (seasonYear != null && seasonYear > 0) put("seasonYear", seasonYear)
+            put("page", page)
+            put("perPage", perPage)
+        }
+
+        val root = executeGraphQL(query = query, variables = variables)
+        val mediaArray = root?.get("data")
+            .asJsonObjectOrNull()?.get("Page")
+            .asJsonObjectOrNull()?.get("media")
+            .asJsonArrayOrNull() ?: return emptyList()
+
+        return mediaArray.mapNotNull { it.asJsonObjectOrNull()?.let { obj -> parseMedia(obj) } }
+    }
+
+    suspend fun fetchTopRatedAnime(
+        page: Int = 1,
+        perPage: Int = 25,
+    ): List<AnilistMedia> {
+        val query = """
+            query FetchTopRatedAnime(${'$'}page: Int, ${'$'}perPage: Int) {
+              Page(page: ${'$'}page, perPage: ${'$'}perPage) {
+                pageInfo {
+                  hasNextPage
+                }
+                media(type: ANIME, sort: [SCORE_DESC]) {
+                  id
+                  idMal
+                  title {
+                    romaji
+                    english
+                    native
+                  }
+                  format
+                  status
+                  episodes
+                  duration
+                  coverImage {
+                    extraLarge
+                    large
+                    medium
+                  }
+                  bannerImage
+                  genres
+                  averageScore
+                  description(asHtml: false)
+                  nextAiringEpisode {
+                    episode
+                    airingAt
+                    timeUntilAiring
+                  }
+                }
+              }
+            }
+        """.trimIndent()
+
+        val variables = buildJsonObject {
+            put("page", page)
+            put("perPage", perPage)
+        }
+
+        val root = executeGraphQL(query = query, variables = variables)
+        val mediaArray = root?.get("data")
+            .asJsonObjectOrNull()?.get("Page")
+            .asJsonObjectOrNull()?.get("media")
+            .asJsonArrayOrNull() ?: return emptyList()
+
+        return mediaArray.mapNotNull { it.asJsonObjectOrNull()?.let { obj -> parseMedia(obj) } }
+    }
+
+    suspend fun fetchAiringAnime(
+        page: Int = 1,
+        perPage: Int = 25,
+    ): List<AnilistMedia> {
+        val query = """
+            query FetchAiringAnime(${'$'}page: Int, ${'$'}perPage: Int) {
+              Page(page: ${'$'}page, perPage: ${'$'}perPage) {
+                pageInfo {
+                  hasNextPage
+                }
+                media(type: ANIME, status: RELEASING, sort: [POPULARITY_DESC]) {
+                  id
+                  idMal
+                  title {
+                    romaji
+                    english
+                    native
+                  }
+                  format
+                  status
+                  episodes
+                  duration
+                  coverImage {
+                    extraLarge
+                    large
+                    medium
+                  }
+                  bannerImage
+                  genres
+                  averageScore
+                  description(asHtml: false)
+                  nextAiringEpisode {
+                    episode
+                    airingAt
+                    timeUntilAiring
+                  }
+                }
+              }
+            }
+        """.trimIndent()
+
+        val variables = buildJsonObject {
+            put("page", page)
+            put("perPage", perPage)
+        }
+
+        val root = executeGraphQL(query = query, variables = variables)
+        val mediaArray = root?.get("data")
+            .asJsonObjectOrNull()?.get("Page")
+            .asJsonObjectOrNull()?.get("media")
+            .asJsonArrayOrNull() ?: return emptyList()
+
+        return mediaArray.mapNotNull { it.asJsonObjectOrNull()?.let { obj -> parseMedia(obj) } }
+    }
+
     suspend fun searchAnime(
         query: String,
         token: String? = null,

@@ -39,8 +39,9 @@ fun buildHomeCatalogRefreshSignature(addons: List<ManagedAddon>): List<String> =
         }
     }.sorted()
 
-fun buildHomeCatalogDefinitions(addons: List<ManagedAddon>): List<HomeCatalogDefinition> =
-    addons.enabledAddons().mapNotNull { addon ->
+fun buildHomeCatalogDefinitions(addons: List<ManagedAddon>): List<HomeCatalogDefinition> {
+    val anilistCatalogs = com.nuvio.app.features.anilist.catalog.AnilistCatalogRepository.getCatalogDefinitions()
+    val addonCatalogs = addons.enabledAddons().mapNotNull { addon ->
         val manifest = addon.manifest ?: return@mapNotNull null
         addon to manifest
     }.flatMap { (addon, manifest) ->
@@ -65,7 +66,9 @@ fun buildHomeCatalogDefinitions(addons: List<ManagedAddon>): List<HomeCatalogDef
                     descriptorSignature = buildHomeCatalogDescriptorSignature(addon, manifest, catalog),
                 )
             }
-    }.distinctBy(HomeCatalogDefinition::key)
+    }
+    return (anilistCatalogs + addonCatalogs).distinctBy(HomeCatalogDefinition::key)
+}
 
 private fun buildHomeCatalogDescriptorSignature(
     addon: ManagedAddon,

@@ -113,6 +113,21 @@ object MetaDetailsRepository {
         _uiState.value = MetaDetailsUiState(isLoading = true)
 
         scope.launch {
+            if (id.startsWith("ani_", ignoreCase = true) || id.startsWith("anilist:", ignoreCase = true)) {
+                val anilistMeta = com.nuvio.app.features.anilist.catalog.AnilistMetaDetailsResolver.resolveMetaDetails(id)
+                if (anilistMeta != null) {
+                    publishLoadedMeta(
+                        requestKey = requestKey,
+                        meta = anilistMeta,
+                        fallbackItemId = id,
+                        fallbackItemType = type,
+                        mdbListSettings = mdbListSettings,
+                        metaScreenSettingsFingerprint = metaScreenSettingsFingerprint,
+                    )
+                    return@launch
+                }
+            }
+
             val metaLookupId = resolveMetaLookupId(itemId = id, itemType = type)
             val manifests = findReadyMetaManifests(type = type, id = metaLookupId)
 
@@ -196,6 +211,16 @@ object MetaDetailsRepository {
     suspend fun fetch(type: String, id: String, cacheResult: Boolean = true): MetaDetails? {
         val requestKey = "$type:$id"
         cachedMetaByRequestKey[requestKey]?.let { return it.baseMeta }
+
+        if (id.startsWith("ani_", ignoreCase = true) || id.startsWith("anilist:", ignoreCase = true)) {
+            val anilistMeta = com.nuvio.app.features.anilist.catalog.AnilistMetaDetailsResolver.resolveMetaDetails(id)
+            if (anilistMeta != null) {
+                if (cacheResult) {
+                    cachedMetaByRequestKey[requestKey] = CachedMetaEntry(baseMeta = anilistMeta)
+                }
+                return anilistMeta
+            }
+        }
 
         val metaLookupId = resolveMetaLookupId(itemId = id, itemType = type)
         val manifests = findReadyMetaManifests(type = type, id = metaLookupId)

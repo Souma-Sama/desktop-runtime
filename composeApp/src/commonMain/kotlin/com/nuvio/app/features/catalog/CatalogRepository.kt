@@ -165,6 +165,15 @@ object CatalogRepository {
                         page = requestedSkip.takeIf { it > 0 } ?: 1,
                     )
 
+                    is CatalogTarget.Anilist -> {
+                        val pageNum = if (requestedSkip <= 0) 1 else (requestedSkip / 25) + 1
+                        com.nuvio.app.features.anilist.catalog.AnilistCatalogRepository.fetchCatalogPage(
+                            catalogId = target.catalogId,
+                            page = pageNum,
+                            perPage = 25,
+                        )
+                    }
+
                     is CatalogTarget.Library -> error(getString(Res.string.catalog_load_failed))
                 }.withUnreleasedFilter(request.hideUnreleasedContent)
             }.fold(

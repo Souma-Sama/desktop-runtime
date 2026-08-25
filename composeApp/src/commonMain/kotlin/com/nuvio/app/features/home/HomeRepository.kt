@@ -220,26 +220,50 @@ object HomeRepository {
     }
 
     private suspend fun HomeCatalogDefinition.toSection(forceRefresh: Boolean): HomeCatalogSection {
-        val page = fetchCatalogPage(
-            manifestUrl = manifestUrl,
-            type = type,
-            catalogId = catalogId,
-            maxItems = HOME_CATALOG_PREVIEW_FETCH_LIMIT,
-            forceRefresh = forceRefresh,
-        )
+        val page = if (manifestUrl == "native://anilist") {
+            val anilistPage = com.nuvio.app.features.anilist.catalog.AnilistCatalogRepository.fetchCatalogPage(
+                catalogId = catalogId,
+                page = 1,
+                perPage = HOME_CATALOG_PREVIEW_FETCH_LIMIT,
+            )
+            com.nuvio.app.features.catalog.CatalogPage(
+                items = anilistPage.items,
+                hasMore = anilistPage.hasMore,
+                rawItemCount = anilistPage.items.size,
+                nextSkip = if (anilistPage.hasMore) anilistPage.items.size else null,
+            )
+        } else {
+            fetchCatalogPage(
+                manifestUrl = manifestUrl,
+                type = type,
+                catalogId = catalogId,
+                maxItems = HOME_CATALOG_PREVIEW_FETCH_LIMIT,
+                forceRefresh = forceRefresh,
+            )
+        }
         val items = page.items
+        val catalogTarget = if (manifestUrl == "native://anilist") {
+            CatalogTarget.Anilist(
+                catalogId = catalogId,
+                contentType = type,
+                supportsPagination = supportsPagination,
+            )
+        } else {
+            CatalogTarget.Addon(
+                manifestUrl = manifestUrl,
+                contentType = type,
+                catalogId = catalogId,
+                supportsPagination = supportsPagination,
+            )
+        }
+
         if (items.isEmpty()) {
             return HomeCatalogSection(
                 key = key,
                 title = defaultTitle,
                 subtitle = addonName,
                 addonName = addonName,
-                target = CatalogTarget.Addon(
-                    manifestUrl = manifestUrl,
-                    contentType = type,
-                    catalogId = catalogId,
-                    supportsPagination = supportsPagination,
-                ),
+                target = catalogTarget,
                 items = emptyList(),
                 availableItemCount = 0,
                 hasMore = false,
@@ -251,12 +275,7 @@ object HomeRepository {
             title = defaultTitle,
             subtitle = addonName,
             addonName = addonName,
-            target = CatalogTarget.Addon(
-                manifestUrl = manifestUrl,
-                contentType = type,
-                catalogId = catalogId,
-                supportsPagination = supportsPagination,
-            ),
+            target = catalogTarget,
             items = items,
             availableItemCount = page.rawItemCount,
             hasMore = supportsPagination && page.nextSkip != null,
