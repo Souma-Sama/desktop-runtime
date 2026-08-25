@@ -1093,6 +1093,7 @@ fun MetaDetailsScreen(
                                         },
                                     ),
                                     meta = meta,
+                                    title = effectiveTitle,
                                     isTablet = true,
                                     contentHorizontalPadding = 56.dp,
                                     contentMaxWidth = Dp.Unspecified,
@@ -1213,6 +1214,7 @@ fun MetaDetailsScreen(
                                 configuredMetaSectionItems(
                                     settings = metaScreenSettingsUiState,
                                     meta = meta,
+                                    title = effectiveTitle,
                                     isTablet = isTablet,
                                     contentHorizontalPadding = contentHorizontalPadding,
                                     contentMaxWidth = if (isTablet) contentMaxWidth else Dp.Unspecified,
@@ -1879,6 +1881,7 @@ private fun MetaDetails.toMetaPreview(): MetaPreview =
 private fun LazyListScope.configuredMetaSectionItems(
     settings: MetaScreenSettingsUiState,
     meta: MetaDetails,
+    title: String? = null,
     isTablet: Boolean,
     contentHorizontalPadding: Dp,
     contentMaxWidth: Dp,
@@ -1956,6 +1959,7 @@ private fun LazyListScope.configuredMetaSectionItems(
                         tabLayout = forceTabLayout,
                     ),
                     meta = meta,
+                    title = title,
                     isTablet = isTablet,
                     horizontalScrollPadding = contentHorizontalPadding,
                     playButtonLabel = playButtonLabel,
@@ -2105,6 +2109,7 @@ private fun metaSectionHasContent(
 private fun ConfiguredMetaSections(
     settings: MetaScreenSettingsUiState,
     meta: MetaDetails,
+    title: String? = null,
     isTablet: Boolean,
     horizontalScrollPadding: Dp,
     playButtonLabel: String,
@@ -2172,6 +2177,7 @@ private fun ConfiguredMetaSections(
             MetaScreenSectionKey.ACTIONS -> {
                 DetailActionButtons(
                     meta = meta,
+                    title = title,
                     playLabel = playButtonLabel,
                     secondaryActions = buildList {
                         add(DetailSecondaryAction(
