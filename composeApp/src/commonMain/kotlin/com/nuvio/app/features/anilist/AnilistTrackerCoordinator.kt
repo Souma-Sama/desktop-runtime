@@ -85,7 +85,18 @@ object AnilistTrackerCoordinator {
                         }
                     }
 
-                    // 3. Multi-Strategy Title Search (Public, 100% Reliable)
+                    // 3. Direct Kitsu ID via ARM
+                    if (fetched == null) {
+                        val kitsuId = extractKitsuId(mediaId)
+                        if (kitsuId != null) {
+                            val armAnilistId = AnilistApi.resolveArmAnilistId(source = "kitsu", id = kitsuId)
+                            if (armAnilistId != null) {
+                                fetched = AnilistApi.fetchMediaById(armAnilistId, token = null)
+                            }
+                        }
+                    }
+
+                    // 4. Multi-Strategy Title Search (Public, 100% Reliable)
                     if (fetched == null && rawTitle.isNotBlank()) {
                         val candidates = generateSearchCandidates(rawTitle)
                         for (query in candidates) {
@@ -97,7 +108,7 @@ object AnilistTrackerCoordinator {
                         }
                     }
 
-                    // 4. Enrich with personal user list entry if logged in
+                    // 5. Enrich with personal user list entry if logged in
                     if (fetched != null && !token.isNullOrBlank()) {
                         val enriched = AnilistApi.fetchMediaById(fetched.id, token = token)
                         if (enriched != null) {
@@ -269,6 +280,14 @@ object AnilistTrackerCoordinator {
         if (id.startsWith("mal:", ignoreCase = true)) return id.substringAfter(":").toIntOrNull()
         if (id.startsWith("mal_", ignoreCase = true)) return id.substringAfter("_").toIntOrNull()
         if (id.startsWith("myanimelist:", ignoreCase = true)) return id.substringAfter(":").toIntOrNull()
+        return null
+    }
+
+    private fun extractKitsuId(mediaId: String?): String? {
+        if (mediaId.isNullOrBlank()) return null
+        val id = mediaId.trim()
+        if (id.startsWith("kitsu:", ignoreCase = true)) return id.substringAfter(":")
+        if (id.startsWith("kitsu_", ignoreCase = true)) return id.substringAfter("_")
         return null
     }
 

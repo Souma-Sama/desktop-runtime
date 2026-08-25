@@ -149,6 +149,15 @@ object AnilistApi {
         return mediaList.mapNotNull { parseMedia(it.jsonObject) }
     }
 
+    suspend fun resolveArmAnilistId(source: String, id: String): Int? {
+        val url = "https://arm.haglund.dev/api/v2/ids?source=$source&id=$id&include=anilist"
+        return runCatching {
+            val responseText = com.nuvio.app.features.addons.httpGetText(url)
+            val jsonElement = json.parseToJsonElement(responseText)
+            jsonElement.jsonObject["anilist"]?.jsonPrimitive?.intOrNull
+        }.getOrNull()
+    }
+
     suspend fun fetchMediaByMalId(
         malId: Int,
         token: String? = null,

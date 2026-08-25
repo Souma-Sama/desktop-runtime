@@ -158,11 +158,13 @@ private fun buildDesktopRequest(
     val normalizedMethod = method.trim().uppercase().ifBlank { "GET" }
     val sanitizedHeaders = headers.withoutAcceptEncoding()
     val builder = Request.Builder().url(url.encodeUnsafeHttpUrlCharacters())
-    sanitizedHeaders.forEach { (key, value) ->
-        if (key.isNotBlank() && value.isNotBlank()) {
-            builder.header(key, value)
+    sanitizedHeaders
+        .filterNot { (key, _) -> key.equals("Content-Type", ignoreCase = true) }
+        .forEach { (key, value) ->
+            if (key.isNotBlank() && value.isNotBlank()) {
+                builder.header(key, value)
+            }
         }
-    }
 
     return if (requestAllowsBody(normalizedMethod)) {
         val contentType = sanitizedHeaders.getHeaderIgnoreCase("Content-Type")
