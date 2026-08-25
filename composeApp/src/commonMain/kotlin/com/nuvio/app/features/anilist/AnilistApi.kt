@@ -1,6 +1,6 @@
 package com.nuvio.app.features.anilist
 
-import com.nuvio.app.features.addons.httpRequestRaw
+import com.nuvio.app.features.addons.httpPostJsonWithHeaders
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -30,8 +30,6 @@ object AnilistApi {
         }.toString()
 
         val headers = mutableMapOf(
-            "Content-Type" to "application/json",
-            "Accept" to "application/json",
             "User-Agent" to "Nuvio-Kai/1.0",
         )
         if (!token.isNullOrBlank()) {
@@ -39,21 +37,20 @@ object AnilistApi {
             headers["Authorization"] = "Bearer $sanitized"
         }
 
-        val response = runCatching {
-            httpRequestRaw(
-                method = "POST",
+        val responseText = runCatching {
+            httpPostJsonWithHeaders(
                 url = GRAPHQL_ENDPOINT,
-                headers = headers,
                 body = payload,
+                headers = headers,
             )
         }.getOrNull() ?: return null
 
-        if (response.status !in 200..299 || response.body.isBlank()) {
+        if (responseText.isBlank()) {
             return null
         }
 
         return runCatching {
-            json.parseToJsonElement(response.body).jsonObject
+            json.parseToJsonElement(responseText).jsonObject
         }.getOrNull()
     }
 

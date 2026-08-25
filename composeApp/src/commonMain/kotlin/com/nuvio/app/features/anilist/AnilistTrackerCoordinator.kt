@@ -276,6 +276,14 @@ object AnilistTrackerCoordinator {
         val clean = cleanAnimeTitle(trimmed)
         if (clean.isNotBlank() && !list.contains(clean)) list.add(clean)
 
+        // Normalize cross symbols (e.g. SPY x FAMILY vs SPY×FAMILY vs Hunter x Hunter)
+        if (trimmed.contains("×") || trimmed.contains(" x ", ignoreCase = true)) {
+            val normalizedX = trimmed.replace("×", "x")
+            if (!list.contains(normalizedX)) list.add(normalizedX)
+            val crossSymbol = trimmed.replace(Regex("""\s+[xX]\s+"""), "×")
+            if (!list.contains(crossSymbol)) list.add(crossSymbol)
+        }
+
         if (trimmed.contains(":")) {
             val beforeColon = cleanAnimeTitle(trimmed.substringBefore(":")).trim()
             if (beforeColon.length >= 3 && !list.contains(beforeColon)) list.add(beforeColon)
