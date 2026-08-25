@@ -362,9 +362,11 @@ object AnilistTrackerCoordinator {
         language: String?,
     ): Boolean {
         val g = genres.map { it.lowercase() }
-        if (g.any { it.contains("anime") }) return true
+        if (g.any { it.contains("anime") || it.contains("anim") }) return true
+        // Check for Japanese Kanji, Hiragana, or Katakana in the title
+        if (title.any { it in '\u3040'..'\u30ff' || it in '\u4e00'..'\u9faf' }) return true
         val isJapan = country?.lowercase() in listOf("jp", "japan") || language?.lowercase() in listOf("ja", "japanese", "jpn")
-        if (isJapan && g.any { it.contains("anim") }) return true
+        if (isJapan) return true
         return false
     }
 }
