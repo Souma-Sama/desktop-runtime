@@ -26,17 +26,17 @@ jobs:
           java-version: 17
 
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v3
+        uses: gradle/actions/setup-gradle@v4
 
       - name: Prepare build environment
         run: |
           touch local.properties
 
-      - name: Build macOS DMG
+      - name: Build macOS Release DMG
         env:
           NUVIO_MACOS_ARCH: arm64
         run: |
-          ./gradlew :composeApp:packageDmg \
+          ./gradlew :composeApp:packageReleaseDmg \
             -Pnuvio.macos.arch=arm64 \
             -Pcompose.desktop.packaging.checkJdkVendor=false \
             --no-configuration-cache \
@@ -47,9 +47,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: Nuvio-macOS-AppleSilicon-arm64
-          path: |
-            composeApp/build/compose/binaries/main/dmg/*.dmg
-            composeApp/build/compose/release-dmgs/*.dmg
-          if-no-files-found: warn
+          path: composeApp/build/compose/release-dmgs/*.dmg
+          if-no-files-found: error
           retention-days: 14
 
