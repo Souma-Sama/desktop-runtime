@@ -72,20 +72,28 @@ object AnilistTrackerCoordinator {
                     if (mediaId != null && mediaId.startsWith("mal:", ignoreCase = true)) {
                         val malId = mediaId.removePrefix("mal:").removePrefix("MAL:").toIntOrNull()
                         if (malId != null) {
-                            fetched = AnilistApi.fetchMediaByMalId(malId, token = token)
+                            fetched = AnilistApi.fetchMediaByMalId(malId, token = null)
                         }
                     }
 
-                    // 2. Direct exact title search
+                    // 2. Direct exact title search (public, 100% reliable)
                     if (fetched == null && rawTitle.isNotBlank()) {
-                        val searchResults = AnilistApi.searchAnime(query = rawTitle, token = token)
+                        val searchResults = AnilistApi.searchAnime(query = rawTitle)
                         fetched = searchResults.firstOrNull()
                     }
 
                     // 3. Cleaned title search if raw had tags
                     if (fetched == null && cleanTitle != rawTitle && cleanTitle.isNotBlank()) {
-                        val searchResults = AnilistApi.searchAnime(query = cleanTitle, token = token)
+                        val searchResults = AnilistApi.searchAnime(query = cleanTitle)
                         fetched = searchResults.firstOrNull()
+                    }
+
+                    // 4. Enrich with personal user list entry if logged in
+                    if (fetched != null && !token.isNullOrBlank()) {
+                        val enriched = AnilistApi.fetchMediaById(fetched.id, token = token)
+                        if (enriched != null) {
+                            fetched = enriched
+                        }
                     }
 
                     if (fetched != null) {

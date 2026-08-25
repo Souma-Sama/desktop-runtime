@@ -32,9 +32,11 @@ object AnilistApi {
         val headers = mutableMapOf(
             "Content-Type" to "application/json",
             "Accept" to "application/json",
+            "User-Agent" to "Nuvio-Kai/1.0",
         )
         if (!token.isNullOrBlank()) {
-            headers["Authorization"] = "Bearer ${token.trim()}"
+            val sanitized = token.trim().removePrefix("Bearer ").trim()
+            headers["Authorization"] = "Bearer $sanitized"
         }
 
         val response = runCatching {

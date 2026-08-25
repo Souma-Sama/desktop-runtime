@@ -48,7 +48,7 @@ object AnilistAuthRepository {
     }
 
     suspend fun loginWithToken(token: String): Boolean {
-        val cleanToken = token.trim()
+        val cleanToken = token.trim().removePrefix("Bearer ").trim()
         if (cleanToken.isBlank()) return false
 
         _isAuthenticating.value = true
