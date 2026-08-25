@@ -31,6 +31,7 @@ object AnilistTrackerCoordinator {
 
     fun loadForMedia(
         title: String,
+        mediaId: String? = null,
         year: Int? = null,
         genres: List<String> = emptyList(),
         country: String? = null,
@@ -39,7 +40,7 @@ object AnilistTrackerCoordinator {
         val rawTitle = title.trim()
         val cleanTitle = cleanAnimeTitle(rawTitle)
         val isExplicitAnime = isAnimeCandidate(rawTitle, genres, country, language)
-        val cacheKey = "$rawTitle:${year ?: 0}".lowercase()
+        val cacheKey = if (!mediaId.isNullOrBlank()) mediaId.lowercase() else rawTitle.lowercase()
 
         activeJob?.cancel()
         _trackerState.update {
@@ -65,20 +66,32 @@ object AnilistTrackerCoordinator {
                         cachedMedia
                     }
                 } else {
-                    // 1. Search directly with exact title
-                    var searchResults = AnilistApi.searchAnime(query = rawTitle, year = year, token = token)
-                    if (searchResults.isEmpty() && year != null) {
-                        searchResults = AnilistApi.searchAnime(query = rawTitle, year = null, token = token)
-                    }
-                    if (searchResults.isEmpty() && cleanTitle != rawTitle && cleanTitle.isNotBlank()) {
-                        searchResults = AnilistApi.searchAnime(query = cleanTitle, year = null, token = token)
+                    var fetched: AnilistMedia? = null
+
+                    // 1. Direct MAL ID lookup if available
+                    if (mediaId != null && mediaId.startsWith("mal:", ignoreCase = true)) {
+                        val malId = mediaId.removePrefix("mal:").removePrefix("MAL:").toIntOrNull()
+                        if (malId != null) {
+                            fetched = AnilistApi.fetchMediaByMalId(malId, token = token)
+                        }
                     }
 
-                    val bestMatch = searchResults.firstOrNull()
-                    if (bestMatch != null) {
-                        mediaCache[cacheKey] = bestMatch
+                    // 2. Direct exact title search
+                    if (fetched == null && rawTitle.isNotBlank()) {
+                        val searchResults = AnilistApi.searchAnime(query = rawTitle, token = token)
+                        fetched = searchResults.firstOrNull()
                     }
-                    bestMatch
+
+                    // 3. Cleaned title search if raw had tags
+                    if (fetched == null && cleanTitle != rawTitle && cleanTitle.isNotBlank()) {
+                        val searchResults = AnilistApi.searchAnime(query = cleanTitle, token = token)
+                        fetched = searchResults.firstOrNull()
+                    }
+
+                    if (fetched != null) {
+                        mediaCache[cacheKey] = fetched
+                    }
+                    fetched
                 }
 
                 val hasMatch = media != null
@@ -89,7 +102,7 @@ object AnilistTrackerCoordinator {
                         isAnime = hasMatch || isExplicitAnime,
                         media = media,
                         entry = media?.mediaListEntry,
-                        error = if (!hasMatch) "No AniList match found" else null,
+                        error = if (!hasMatch) "No matching anime found on AniList." else null,
                     )
                 }
             } catch (t: Throwable) {
@@ -224,9 +237,8 @@ object AnilistTrackerCoordinator {
 
     private fun cleanAnimeTitle(raw: String): String {
         return raw
-            .replace(Regex("""\((TV|Movie|OVA|ONA|Special)\)""", RegexOption.IGNORE_CASE), "")
-            .replace(Regex("""Season \d+""", RegexOption.IGNORE_CASE), "")
-            .replace(Regex("""S\d+""", RegexOption.IGNORE_CASE), "")
+            .replace(Regex("""\[(Dub|Sub|Dual Audio|Multi-Audio|1080p|720p|4K|HEVC|x264|x265)\]""", RegexOption.IGNORE_CASE), "")
+            .replace(Regex("""\((Dub|Sub|Dual Audio|Multi-Audio|TV|Movie|OVA|ONA|Special)\)""", RegexOption.IGNORE_CASE), "")
             .trim()
     }
 

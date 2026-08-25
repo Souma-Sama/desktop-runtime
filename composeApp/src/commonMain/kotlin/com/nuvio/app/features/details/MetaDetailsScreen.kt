@@ -309,6 +309,7 @@ fun MetaDetailsScreen(
             val metaYear = displayedMeta.releaseInfo?.take(4)?.toIntOrNull()
             com.nuvio.app.features.anilist.AnilistTrackerCoordinator.loadForMedia(
                 title = displayedMeta.name,
+                mediaId = displayedMeta.id,
                 year = metaYear,
                 genres = displayedMeta.genres,
                 country = displayedMeta.country,

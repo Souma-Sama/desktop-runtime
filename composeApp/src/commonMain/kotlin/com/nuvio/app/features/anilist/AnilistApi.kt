@@ -86,16 +86,15 @@ object AnilistApi {
 
     suspend fun searchAnime(
         query: String,
-        year: Int? = null,
         token: String? = null,
     ): List<AnilistMedia> {
         val cleanQuery = query.trim()
         if (cleanQuery.isBlank()) return emptyList()
 
         val graphQLQuery = """
-            query (${'$'}search: String, ${'$'}seasonYear: Int) {
-              Page(page: 1, perPage: 8) {
-                media(search: ${'$'}search, seasonYear: ${'$'}seasonYear, type: ANIME, sort: [POPULARITY_DESC, SEARCH_MATCH]) {
+            query (${'$'}search: String) {
+              Page(page: 1, perPage: 10) {
+                media(search: ${'$'}search, type: ANIME, sort: [SEARCH_MATCH, POPULARITY_DESC]) {
                   id
                   idMal
                   title {
@@ -136,9 +135,6 @@ object AnilistApi {
 
         val variables = buildJsonObject {
             put("search", cleanQuery)
-            if (year != null && year > 1950) {
-                put("seasonYear", year)
-            }
         }
 
         val root = executeGraphQL(query = graphQLQuery, variables = variables, token = token)
@@ -148,6 +144,56 @@ object AnilistApi {
             ?.jsonArray ?: return emptyList()
 
         return mediaList.mapNotNull { parseMedia(it.jsonObject) }
+    }
+
+    suspend fun fetchMediaByMalId(
+        malId: Int,
+        token: String? = null,
+    ): AnilistMedia? {
+        val query = """
+            query (${'$'}idMal: Int) {
+              Media(idMal: ${'$'}idMal, type: ANIME) {
+                id
+                idMal
+                title {
+                  romaji
+                  english
+                  native
+                }
+                format
+                status
+                episodes
+                duration
+                coverImage {
+                  extraLarge
+                  large
+                  medium
+                }
+                bannerImage
+                genres
+                averageScore
+                description(asHtml: false)
+                nextAiringEpisode {
+                  episode
+                  airingAt
+                  timeUntilAiring
+                }
+                mediaListEntry {
+                  id
+                  status
+                  score
+                  progress
+                  repeat
+                  updatedAt
+                }
+              }
+            }
+        """.trimIndent()
+
+        val variables = buildJsonObject { put("idMal", malId) }
+        val root = executeGraphQL(query = query, variables = variables, token = token)
+        val mediaObj = root?.get("data")?.jsonObject?.get("Media")?.jsonObject ?: return null
+        return parseMedia(mediaObj)
     }
 
     suspend fun fetchMediaById(
