@@ -38,7 +38,6 @@ object AnilistTrackerCoordinator {
         language: String? = null,
     ) {
         val rawTitle = title.trim()
-        val cleanTitle = cleanAnimeTitle(rawTitle)
         val isExplicitAnime = isAnimeCandidate(rawTitle, genres, country, language)
         val cacheKey = if (!mediaId.isNullOrBlank()) mediaId.lowercase() else rawTitle.lowercase()
 
@@ -68,24 +67,30 @@ object AnilistTrackerCoordinator {
                 } else {
                     var fetched: AnilistMedia? = null
 
-                    // 1. Direct MAL ID lookup if available
-                    if (mediaId != null && mediaId.startsWith("mal:", ignoreCase = true)) {
-                        val malId = mediaId.removePrefix("mal:").removePrefix("MAL:").toIntOrNull()
+                    // 1. Direct AniList ID lookup if mediaId contains an AniList ID
+                    val anilistId = extractAnilistId(mediaId)
+                    if (anilistId != null) {
+                        fetched = AnilistApi.fetchMediaById(anilistId, token = null)
+                    }
+
+                    // 2. Direct MAL ID lookup if mediaId contains a MAL ID
+                    if (fetched == null) {
+                        val malId = extractMalId(mediaId)
                         if (malId != null) {
                             fetched = AnilistApi.fetchMediaByMalId(malId, token = null)
                         }
                     }
 
-                    // 2. Direct exact title search (public, 100% reliable)
+                    // 3. Multi-Strategy Title Search (Public, 100% Reliable)
                     if (fetched == null && rawTitle.isNotBlank()) {
-                        val searchResults = AnilistApi.searchAnime(query = rawTitle)
-                        fetched = searchResults.firstOrNull()
-                    }
-
-                    // 3. Cleaned title search if raw had tags
-                    if (fetched == null && cleanTitle != rawTitle && cleanTitle.isNotBlank()) {
-                        val searchResults = AnilistApi.searchAnime(query = cleanTitle)
-                        fetched = searchResults.firstOrNull()
+                        val candidates = generateSearchCandidates(rawTitle)
+                        for (query in candidates) {
+                            val results = AnilistApi.searchAnime(query = query)
+                            if (results.isNotEmpty()) {
+                                fetched = results.first()
+                                break
+                            }
+                        }
                     }
 
                     // 4. Enrich with personal user list entry if logged in
@@ -110,7 +115,7 @@ object AnilistTrackerCoordinator {
                         isAnime = hasMatch || isExplicitAnime,
                         media = media,
                         entry = media?.mediaListEntry,
-                        error = if (!hasMatch) "No matching anime found on AniList." else null,
+                        error = if (!hasMatch) "No matching anime found on AniList for \"$rawTitle\"" else null,
                     )
                 }
             } catch (t: Throwable) {
@@ -241,6 +246,49 @@ object AnilistTrackerCoordinator {
                 )
             }
         }
+    }
+
+    private fun extractAnilistId(mediaId: String?): Int? {
+        if (mediaId.isNullOrBlank()) return null
+        val id = mediaId.trim()
+        if (id.startsWith("anilist:", ignoreCase = true)) return id.substringAfter(":").toIntOrNull()
+        if (id.startsWith("anilist_", ignoreCase = true)) return id.substringAfter("_").toIntOrNull()
+        if (id.startsWith("al:", ignoreCase = true)) return id.substringAfter(":").toIntOrNull()
+        if (id.startsWith("al_", ignoreCase = true)) return id.substringAfter("_").toIntOrNull()
+        if (id.startsWith("anime:", ignoreCase = true)) return id.substringAfter(":").toIntOrNull()
+        return id.toIntOrNull()
+    }
+
+    private fun extractMalId(mediaId: String?): Int? {
+        if (mediaId.isNullOrBlank()) return null
+        val id = mediaId.trim()
+        if (id.startsWith("mal:", ignoreCase = true)) return id.substringAfter(":").toIntOrNull()
+        if (id.startsWith("mal_", ignoreCase = true)) return id.substringAfter("_").toIntOrNull()
+        if (id.startsWith("myanimelist:", ignoreCase = true)) return id.substringAfter(":").toIntOrNull()
+        return null
+    }
+
+    private fun generateSearchCandidates(rawTitle: String): List<String> {
+        val list = mutableListOf<String>()
+        val trimmed = rawTitle.trim()
+        if (trimmed.isNotBlank()) list.add(trimmed)
+
+        val clean = cleanAnimeTitle(trimmed)
+        if (clean.isNotBlank() && !list.contains(clean)) list.add(clean)
+
+        if (trimmed.contains(":")) {
+            val beforeColon = cleanAnimeTitle(trimmed.substringBefore(":")).trim()
+            if (beforeColon.length >= 3 && !list.contains(beforeColon)) list.add(beforeColon)
+            val afterColon = cleanAnimeTitle(trimmed.substringAfter(":")).trim()
+            if (afterColon.length >= 3 && !list.contains(afterColon)) list.add(afterColon)
+        }
+
+        if (trimmed.contains(" - ")) {
+            val beforeDash = cleanAnimeTitle(trimmed.substringBefore(" - ")).trim()
+            if (beforeDash.length >= 3 && !list.contains(beforeDash)) list.add(beforeDash)
+        }
+
+        return list
     }
 
     private fun cleanAnimeTitle(raw: String): String {

@@ -294,7 +294,7 @@ fun AnimeTrackerDropdownContent(
 
         if (trackerState.media == null) {
             Text(
-                text = "No matching anime found on AniList.",
+                text = trackerState.error ?: "No matching anime found on AniList.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(vertical = 12.dp),
