@@ -671,9 +671,6 @@ val macosPlayerBridgeCommand = if (missingMacosPlayerBridgeInputs.isNotEmpty()) 
         """
         set -eu
         SDKROOT="${'$'}(xcrun --sdk macosx --show-sdk-path)"
-        SWIFTC="${'$'}(xcrun --toolchain XcodeDefault --find swiftc)"
-        SWIFT_TOOLCHAIN="${'$'}{SWIFTC%/usr/bin/swiftc}"
-        SWIFT_LIB="${'$'}{SWIFT_TOOLCHAIN}/usr/lib/swift/macosx"
         exec xcrun clang++ \
           -std=c++17 \
           -dynamiclib \
@@ -682,13 +679,12 @@ val macosPlayerBridgeCommand = if (missingMacosPlayerBridgeInputs.isNotEmpty()) 
           -arch ${shellQuote(macosPlayerBridgeArch)} \
           -isysroot "${'$'}{SDKROOT}" \
           -mmacosx-version-min=12.0 \
+          -DGL_SILENCE_DEPRECATION=1 \
           ${shellQuote(macosPlayerBridgeSourceFile.absolutePath)} \
           -o ${shellQuote(macosPlayerBridgeOutputFile.absolutePath)} \
           -I${shellQuote("$macosPlayerBridgeJavaHome/include")} \
           -I${shellQuote("$macosPlayerBridgeJavaHome/include/darwin")} \
           -I${shellQuote(macosLibmpvHeaders.asFile.absolutePath)} \
-          -L"${'$'}{SWIFT_LIB}" \
-          -L/usr/lib/swift \
           -framework AppKit \
           -framework IOKit \
           -framework OpenGL \
@@ -696,9 +692,6 @@ val macosPlayerBridgeCommand = if (missingMacosPlayerBridgeInputs.isNotEmpty()) 
           -framework WebKit \
           -framework Metal \
           -framework Security \
-          -lswiftCompatibility56 \
-          -lswiftCompatibilityConcurrency \
-          -lswiftCompatibilityPacks \
           -lc++ \
           -Wl,-rpath,@loader_path \
           ${shellQuote(bundledMacosLibmpvDylib.absolutePath)}
