@@ -2166,6 +2166,7 @@ private fun ConfiguredMetaSections(
         when (key) {
             MetaScreenSectionKey.ACTIONS -> {
                 DetailActionButtons(
+                    meta = displayedMeta,
                     playLabel = playButtonLabel,
                     secondaryActions = buildList {
                         add(DetailSecondaryAction(

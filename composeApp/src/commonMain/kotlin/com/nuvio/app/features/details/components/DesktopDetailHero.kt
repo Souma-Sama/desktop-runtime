@@ -258,6 +258,7 @@ fun DesktopDetailHero(
             Spacer(modifier = Modifier.height(space.s28))
             DetailActionButtons(
                 modifier = Modifier.widthIn(max = 520.dp),
+                meta = meta,
                 playLabel = playButtonLabel,
                 secondaryActions = listOf(
                     DetailSecondaryAction(

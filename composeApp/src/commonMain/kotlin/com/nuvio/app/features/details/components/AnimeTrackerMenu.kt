@@ -67,11 +67,26 @@ import kotlinx.coroutines.launch
 @Composable
 fun AnimeTrackerButton(
     modifier: Modifier = Modifier,
+    meta: com.nuvio.app.features.details.MetaDetails? = null,
     size: androidx.compose.ui.unit.Dp = 52.dp,
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
     val trackerState by AnilistTrackerCoordinator.trackerState.collectAsState()
     val isTrackingActive = trackerState.entry?.status != null
+
+    LaunchedEffect(meta?.id, meta?.name) {
+        if (meta != null) {
+            val metaYear = meta.releaseInfo?.take(4)?.toIntOrNull()
+            AnilistTrackerCoordinator.loadForMedia(
+                title = meta.name,
+                mediaId = meta.id,
+                year = metaYear,
+                genres = meta.genres,
+                country = meta.country,
+                language = meta.language,
+            )
+        }
+    }
 
     Box(modifier = modifier) {
         Surface(
@@ -98,6 +113,17 @@ fun AnimeTrackerButton(
                     .size(size)
                     .clickable(role = Role.Button) {
                         menuExpanded = !menuExpanded
+                        if (menuExpanded && trackerState.media == null && meta != null) {
+                            val metaYear = meta.releaseInfo?.take(4)?.toIntOrNull()
+                            AnilistTrackerCoordinator.loadForMedia(
+                                title = meta.name,
+                                mediaId = meta.id,
+                                year = metaYear,
+                                genres = meta.genres,
+                                country = meta.country,
+                                language = meta.language,
+                            )
+                        }
                     },
                 contentAlignment = Alignment.Center,
             ) {
@@ -134,6 +160,7 @@ fun AnimeTrackerButton(
                 .padding(8.dp),
         ) {
             AnimeTrackerDropdownContent(
+                meta = meta,
                 onClose = { menuExpanded = false },
             )
         }
@@ -142,19 +169,21 @@ fun AnimeTrackerButton(
 
 @Composable
 fun AnimeTrackerDropdownContent(
+    meta: com.nuvio.app.features.details.MetaDetails? = null,
     onClose: () -> Unit,
 ) {
     val trackerState by AnilistTrackerCoordinator.trackerState.collectAsState()
     val coroutineScope = rememberCoroutineScope()
     var tokenInput by remember { mutableStateOf("") }
     var showTokenInput by remember { mutableStateOf(false) }
+    var manualSearchText by remember { mutableStateOf("") }
 
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 8.dp, vertical = 4.dp),
+            .padding(8.dp),
     ) {
-        // Header Row
+        // Header with Logo & User Status
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -167,111 +196,99 @@ fun AnimeTrackerDropdownContent(
                 Icon(
                     imageVector = com.nuvio.app.features.anilist.AnilistLogoVector,
                     contentDescription = null,
-                    tint = com.nuvio.app.features.anilist.AnilistBrandBlue,
                     modifier = Modifier.size(22.dp),
+                    tint = com.nuvio.app.features.anilist.AnilistBrandBlue,
                 )
-                Column {
-                    Text(
-                        text = "AniList Tracker",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-                    Text(
-                        text = if (trackerState.isAuthenticated) {
-                            trackerState.user?.name ?: "Connected"
-                        } else {
-                            "Not Connected"
-                        },
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
+                Text(
+                    text = "AniList",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
             }
 
             if (trackerState.isAuthenticated) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    if (trackerState.media != null) {
-                        IconButton(
-                            onClick = { AnilistTrackerCoordinator.syncNow() },
-                            modifier = Modifier.size(32.dp),
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Refresh,
-                                contentDescription = "Sync",
-                                modifier = Modifier.size(18.dp),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    }
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    Text(
+                        text = trackerState.user?.name ?: "Connected",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Medium,
+                    )
                     IconButton(
                         onClick = { AnilistAuthRepository.logout() },
-                        modifier = Modifier.size(32.dp),
+                        modifier = Modifier.size(24.dp),
                     ) {
                         Icon(
                             imageVector = Icons.Default.Close,
-                            contentDescription = "Disconnect AniList Account",
-                            modifier = Modifier.size(18.dp),
-                            tint = MaterialTheme.colorScheme.error.copy(alpha = 0.8f),
+                            contentDescription = "Disconnect",
+                            modifier = Modifier.size(14.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
                 }
             }
         }
 
-        Spacer(modifier = Modifier.height(10.dp))
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
-        Spacer(modifier = Modifier.height(10.dp))
+        HorizontalDivider(
+            modifier = Modifier.padding(vertical = 8.dp),
+            color = MaterialTheme.colorScheme.surfaceVariant,
+        )
 
+        // Login prompt if unauthenticated
         if (!trackerState.isAuthenticated) {
-            // Not connected view
             Text(
-                text = "Connect your AniList account to track episodes and sync status.",
+                text = "Connect your AniList account to track episodes and update your anime list.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
             if (!showTokenInput) {
-                TextButton(
-                    onClick = { showTokenInput = true },
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text("Enter AniList Token")
-                }
-            } else {
-                OutlinedTextField(
-                    value = tokenInput,
-                    onValueChange = { tokenInput = it },
-                    placeholder = { Text("Paste AniList Token", fontSize = 12.sp) },
-                    singleLine = true,
-                    textStyle = MaterialTheme.typography.bodySmall,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = MaterialTheme.colorScheme.primary,
-                        unfocusedBorderColor = MaterialTheme.colorScheme.outline,
-                    ),
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                Spacer(modifier = Modifier.height(6.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End,
-                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    TextButton(onClick = { showTokenInput = false }) {
-                        Text("Cancel", fontSize = 12.sp)
+                    Button(
+                        onClick = {
+                            com.nuvio.app.core.storage.DesktopStorage.openInBrowser(AnilistAuthRepository.buildAuthUrl())
+                        },
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        Text("Authorize", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     }
-                    Spacer(modifier = Modifier.width(4.dp))
                     TextButton(
+                        onClick = { showTokenInput = true },
+                    ) {
+                        Text("Paste Token", fontSize = 12.sp)
+                    }
+                }
+            } else {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    OutlinedTextField(
+                        value = tokenInput,
+                        onValueChange = { tokenInput = it },
+                        placeholder = { Text("Paste AniList Token / Pin URL...", fontSize = 12.sp) },
+                        singleLine = true,
+                        textStyle = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Button(
                         onClick = {
                             if (tokenInput.isNotBlank()) {
                                 coroutineScope.launch {
-                                    AnilistAuthRepository.loginWithToken(tokenInput)
+                                    val token = tokenInput.substringAfter("access_token=").substringBefore("&").trim()
+                                    AnilistAuthRepository.loginWithToken(token)
                                     showTokenInput = false
                                 }
                             }
                         },
                         enabled = tokenInput.isNotBlank(),
+                        modifier = Modifier.fillMaxWidth(),
                     ) {
                         Text("Save", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     }
@@ -293,12 +310,60 @@ fun AnimeTrackerDropdownContent(
         }
 
         if (trackerState.media == null) {
-            Text(
-                text = trackerState.error ?: "No matching anime found on AniList.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(vertical = 12.dp),
-            )
+            Column(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                Text(
+                    text = trackerState.error ?: "No matching anime found on AniList.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    if (meta != null) {
+                        Button(
+                            onClick = {
+                                val metaYear = meta.releaseInfo?.take(4)?.toIntOrNull()
+                                AnilistTrackerCoordinator.loadForMedia(
+                                    title = meta.name,
+                                    mediaId = meta.id,
+                                    year = metaYear,
+                                    genres = meta.genres,
+                                    country = meta.country,
+                                    language = meta.language,
+                                )
+                            },
+                            modifier = Modifier.weight(1f),
+                        ) {
+                            Text("Retry", fontSize = 12.sp)
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = manualSearchText,
+                    onValueChange = { manualSearchText = it },
+                    placeholder = { Text("Search title on AniList...", fontSize = 12.sp) },
+                    singleLine = true,
+                    textStyle = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                Button(
+                    onClick = {
+                        if (manualSearchText.isNotBlank()) {
+                            AnilistTrackerCoordinator.loadForMedia(
+                                title = manualSearchText.trim(),
+                            )
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = manualSearchText.isNotBlank(),
+                ) {
+                    Text("Search", fontSize = 12.sp)
+                }
+            }
             return@Column
         }
 

@@ -60,6 +60,7 @@ data class DetailSecondaryAction(
 @Composable
 fun DetailActionButtons(
     modifier: Modifier = Modifier,
+    meta: com.nuvio.app.features.details.MetaDetails? = null,
     playLabel: String = stringResource(Res.string.action_play),
     secondaryActions: List<DetailSecondaryAction> = emptyList(),
     actionsMenuLabel: String = stringResource(Res.string.details_actions_menu_label),
@@ -112,7 +113,8 @@ fun DetailActionButtons(
                             role = Role.Button,
                         )
                         .secondaryClick(onPlayLongClick)
-                        .height(buttonHeight),
+                        .height(buttonHeight)
+                        .padding(horizontal = if (isTablet) 20.dp else 16.dp),
                     horizontalArrangement = Arrangement.Center,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -213,9 +215,18 @@ fun DetailActionButtons(
             }
 
             val trackerState by com.nuvio.app.features.anilist.AnilistTrackerCoordinator.trackerState.collectAsState()
-            if (trackerState.isAnime) {
+            val isAnimeCandidate = meta?.let {
+                com.nuvio.app.features.anilist.AnilistTrackerCoordinator.isAnimeCandidate(
+                    it.name,
+                    it.genres,
+                    it.country,
+                    it.language,
+                )
+            } ?: false
+
+            if (trackerState.isAnime || isAnimeCandidate) {
                 Spacer(modifier = Modifier.width(12.dp))
-                AnimeTrackerButton(size = iconButtonSize)
+                AnimeTrackerButton(meta = meta, size = iconButtonSize)
             }
         }
     }
