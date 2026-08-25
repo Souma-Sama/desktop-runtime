@@ -355,7 +355,7 @@ fun AnimeTrackerDropdownContent(
                 OutlinedTextField(
                     value = manualSearchText,
                     onValueChange = { manualSearchText = it },
-                    placeholder = { Text("Search title on AniList...", fontSize = 12.sp) },
+                    placeholder = { Text("Search title or AniList ID (e.g. 140960)...", fontSize = 12.sp) },
                     singleLine = true,
                     textStyle = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.fillMaxWidth(),

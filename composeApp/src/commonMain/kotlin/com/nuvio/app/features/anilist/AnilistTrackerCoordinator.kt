@@ -85,6 +85,15 @@ object AnilistTrackerCoordinator {
                     val anilistId = extractAnilistId(mediaId)
                     if (anilistId != null) {
                         fetched = AnilistApi.fetchMediaById(anilistId, token = null)
+                            ?: AnilistMedia(
+                                id = anilistId,
+                                title = AnilistTitle(
+                                    english = rawTitle.ifBlank { "AniList #$anilistId" },
+                                    romaji = rawTitle.ifBlank { "AniList #$anilistId" },
+                                    native = rawTitle.ifBlank { "AniList #$anilistId" },
+                                ),
+                                format = "TV",
+                            )
                     }
 
                     // 2. Direct MAL ID lookup if mediaId contains a MAL ID
@@ -118,7 +127,24 @@ object AnilistTrackerCoordinator {
                         }
                     }
 
-                    // 5. Enrich with personal user list entry if logged in
+                    // 5. REST Kitsu -> ARM -> AniList Resolver Fallback
+                    if (fetched == null && rawTitle.isNotBlank()) {
+                        val candidates = generateSearchCandidates(rawTitle)
+                        for (query in candidates) {
+                            val resolvedAnilistId = AnilistApi.searchViaKitsu(query)
+                            if (resolvedAnilistId != null) {
+                                fetched = AnilistApi.fetchMediaById(resolvedAnilistId, token = null)
+                                    ?: AnilistMedia(
+                                        id = resolvedAnilistId,
+                                        title = AnilistTitle(english = query, romaji = query, native = query),
+                                        format = "TV",
+                                    )
+                                break
+                            }
+                        }
+                    }
+
+                    // 6. Enrich with personal user list entry if logged in
                     if (fetched != null && !token.isNullOrBlank()) {
                         val enriched = AnilistApi.fetchMediaById(fetched.id, token = token)
                         if (enriched != null) {

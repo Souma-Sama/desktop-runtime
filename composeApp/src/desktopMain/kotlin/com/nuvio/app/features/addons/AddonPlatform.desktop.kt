@@ -157,6 +157,8 @@ private fun buildDesktopRequest(
 ): Request {
     val normalizedMethod = method.trim().uppercase().ifBlank { "GET" }
     val sanitizedHeaders = headers.withoutAcceptEncoding()
+    val contentType = sanitizedHeaders.getHeaderIgnoreCase("Content-Type")
+        ?: "application/json"
     val builder = Request.Builder().url(url.encodeUnsafeHttpUrlCharacters())
     sanitizedHeaders
         .filterNot { (key, _) -> key.equals("Content-Type", ignoreCase = true) }
@@ -167,8 +169,6 @@ private fun buildDesktopRequest(
         }
 
     return if (requestAllowsBody(normalizedMethod)) {
-        val contentType = sanitizedHeaders.getHeaderIgnoreCase("Content-Type")
-            ?: if (normalizedMethod == "POST") "application/x-www-form-urlencoded" else "application/json"
         builder.method(
             normalizedMethod,
             body.toByteArray(Charsets.UTF_8).toRequestBody(contentType.toMediaType()),

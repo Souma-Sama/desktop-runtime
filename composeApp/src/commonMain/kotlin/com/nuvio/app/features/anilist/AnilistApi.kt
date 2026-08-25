@@ -159,6 +159,22 @@ object AnilistApi {
             val responseText = com.nuvio.app.features.addons.httpGetText(url)
             val jsonElement = json.parseToJsonElement(responseText)
             jsonElement.jsonObject["anilist"]?.jsonPrimitive?.intOrNull
+                ?: jsonElement.jsonObject["anilist"]?.jsonPrimitive?.contentOrNull?.toIntOrNull()
+        }.getOrNull()
+    }
+
+    suspend fun searchViaKitsu(query: String): Int? {
+        val encoded = query.trim().replace(" ", "%20")
+        val url = "https://kitsu.io/api/edge/anime?filter%5Btext%5D=$encoded&page%5Blimit%5D=1"
+        return runCatching {
+            val text = com.nuvio.app.features.addons.httpGetText(url)
+            val jsonElement = json.parseToJsonElement(text)
+            val dataArray = jsonElement.jsonObject["data"]?.jsonArray
+            val firstItem = dataArray?.firstOrNull()?.jsonObject
+            val kitsuId = firstItem?.get("id")?.jsonPrimitive?.contentOrNull
+            if (!kitsuId.isNullOrBlank()) {
+                resolveArmAnilistId(source = "kitsu", id = kitsuId)
+            } else null
         }.getOrNull()
     }
 
