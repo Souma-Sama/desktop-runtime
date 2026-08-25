@@ -355,7 +355,7 @@ object AnilistTrackerCoordinator {
         }
     }
 
-    private fun isAnimeCandidate(
+    fun isAnimeCandidate(
         title: String,
         genres: List<String>,
         country: String?,

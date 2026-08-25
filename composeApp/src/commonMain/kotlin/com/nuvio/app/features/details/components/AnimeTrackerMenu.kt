@@ -43,6 +43,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -54,6 +55,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -242,6 +244,8 @@ fun AnimeTrackerDropdownContent(
             color = MaterialTheme.colorScheme.surfaceVariant,
         )
 
+        val uriHandler = LocalUriHandler.current
+
         // Login prompt if unauthenticated
         if (!trackerState.isAuthenticated) {
             Text(
@@ -258,7 +262,7 @@ fun AnimeTrackerDropdownContent(
                 ) {
                     Button(
                         onClick = {
-                            com.nuvio.app.core.storage.DesktopStorage.openInBrowser(AnilistAuthRepository.buildAuthUrl())
+                            uriHandler.openUri(AnilistAuthRepository.OAUTH_AUTHORIZE_URL)
                         },
                         modifier = Modifier.weight(1f),
                     ) {
