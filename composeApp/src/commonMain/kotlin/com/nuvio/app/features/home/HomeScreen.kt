@@ -521,12 +521,13 @@ fun HomeScreen(
         mutableStateOf(0)
     }
 
-    val catalogRefreshKey = remember(enabledAddons) {
+    val anilistAuthenticated by com.nuvio.app.features.anilist.AnilistAuthRepository.isAuthenticated.collectAsStateWithLifecycle()
+    val anilistUser by com.nuvio.app.features.anilist.AnilistAuthRepository.currentUser.collectAsStateWithLifecycle()
+    val catalogRefreshKey = remember(enabledAddons, anilistAuthenticated, anilistUser?.name) {
         buildHomeCatalogRefreshSignature(enabledAddons)
     }
 
     LaunchedEffect(catalogRefreshKey) {
-        if (catalogRefreshKey.isEmpty()) return@LaunchedEffect
         HomeCatalogSettingsRepository.syncCatalogs(enabledAddons)
         HomeRepository.refresh(enabledAddons)
     }

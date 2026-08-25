@@ -89,6 +89,7 @@ internal fun AppEnvironment(content: @Composable () -> Unit) {
             .build()
     }
     val selectedTheme by remember {
+        com.nuvio.app.features.anilist.AnilistAuthRepository.ensureInitialized()
         ThemeSettingsRepository.ensureLoaded()
         ThemeSettingsRepository.selectedTheme
     }.collectAsStateWithLifecycle()

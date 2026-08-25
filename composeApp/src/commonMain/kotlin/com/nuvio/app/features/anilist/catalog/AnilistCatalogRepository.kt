@@ -25,7 +25,9 @@ object AnilistCatalogRepository {
     const val CATALOG_AIRING = "anilist:airing"
 
     fun getCatalogDefinitions(): List<HomeCatalogDefinition> {
-        val isAuthenticated = AnilistAuthRepository.isAuthenticated.value
+        AnilistAuthRepository.ensureInitialized()
+        val token = AnilistAuthRepository.token.value
+        val isAuthenticated = !token.isNullOrBlank() || AnilistAuthRepository.isAuthenticated.value
         val list = mutableListOf<HomeCatalogDefinition>()
 
         if (isAuthenticated) {
@@ -130,8 +132,13 @@ object AnilistCatalogRepository {
     }
 
     suspend fun fetchCatalogPage(catalogId: String, page: Int = 1, perPage: Int = 25): CatalogPage {
+        AnilistAuthRepository.ensureInitialized()
         val token = AnilistAuthRepository.token.value
-        val user = AnilistAuthRepository.currentUser.value
+        val user = AnilistAuthRepository.currentUser.value ?: if (!token.isNullOrBlank()) {
+            runCatching { AnilistApi.fetchCurrentUser(token) }.getOrNull()?.also { fetched ->
+                AnilistAuthStorage.saveUser(fetched)
+            }
+        } else null
 
         log.d { "fetchCatalogPage: catalogId=$catalogId, page=$page, tokenPresent=${!token.isNullOrBlank()}" }
 

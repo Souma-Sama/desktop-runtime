@@ -29,15 +29,19 @@ data class HomeCatalogDefinition(
         if (showCatalogType) defaultTitle else catalogName
 }
 
-fun buildHomeCatalogRefreshSignature(addons: List<ManagedAddon>): List<String> =
-    addons.enabledAddons().mapNotNull { addon ->
+fun buildHomeCatalogRefreshSignature(addons: List<ManagedAddon>): List<String> {
+    val anilistSignatures = com.nuvio.app.features.anilist.catalog.AnilistCatalogRepository.getCatalogDefinitions()
+        .map { it.descriptorSignature }
+    val addonSignatures = addons.enabledAddons().mapNotNull { addon ->
         val manifest = addon.manifest ?: return@mapNotNull null
         addon to manifest
     }.flatMap { (addon, manifest) ->
         manifest.catalogs.map { catalog ->
             buildHomeCatalogDescriptorSignature(addon, manifest, catalog)
         }
-    }.sorted()
+    }
+    return (anilistSignatures + addonSignatures).sorted()
+}
 
 fun buildHomeCatalogDefinitions(addons: List<ManagedAddon>): List<HomeCatalogDefinition> {
     val anilistCatalogs = com.nuvio.app.features.anilist.catalog.AnilistCatalogRepository.getCatalogDefinitions()
