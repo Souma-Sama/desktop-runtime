@@ -8,16 +8,8 @@ on:
 
 jobs:
   build-macos:
-    name: macOS ${{ matrix.arch }} Build
-    runs-on: ${{ matrix.runner }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - runner: macos-14
-            arch: arm64
-          - runner: macos-13
-            arch: x86_64
+    name: macOS Apple Silicon (arm64) Build
+    runs-on: macos-14
 
     steps:
       - name: Check out repository
@@ -25,7 +17,7 @@ jobs:
 
       - name: Fetch macOS runtime (Git LFS)
         run: |
-          git lfs pull --include="composeApp/src/desktopMain/native/macos/runtime/${{ matrix.arch }}/**" --exclude=""
+          git lfs pull --include="composeApp/src/desktopMain/native/macos/runtime/arm64/**" --exclude=""
 
       - name: Set up Java 17
         uses: actions/setup-java@v4
@@ -38,16 +30,17 @@ jobs:
 
       - name: Build macOS DMG
         env:
-          NUVIO_MACOS_ARCH: ${{ matrix.arch }}
+          NUVIO_MACOS_ARCH: arm64
         run: |
-          ./gradlew :composeApp:packageDmg -Pnuvio.macos.arch=${{ matrix.arch }} --no-daemon --stacktrace
+          ./gradlew :composeApp:packageDmg -Pnuvio.macos.arch=arm64 --no-daemon --stacktrace
 
       - name: Upload DMG Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Nuvio-macOS-${{ matrix.arch }}
+          name: Nuvio-macOS-AppleSilicon-arm64
           path: |
             composeApp/build/compose/binaries/main/dmg/*.dmg
             composeApp/build/compose/release-dmgs/*.dmg
           if-no-files-found: warn
           retention-days: 14
+
