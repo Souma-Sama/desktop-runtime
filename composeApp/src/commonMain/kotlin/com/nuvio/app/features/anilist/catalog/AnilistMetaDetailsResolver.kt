@@ -88,21 +88,21 @@ object AnilistMetaDetailsResolver {
                 name = name,
                 role = characterRole,
                 photo = photo,
-                tmdbId = va?.id ?: char.id,
+                tmdbId = null,
             )
         }
 
         val animationStudios = media.studios.filter { it.isAnimationStudio }.map { studio ->
             com.nuvio.app.features.details.MetaCompany(
                 name = studio.name ?: "Studio",
-                tmdbId = studio.id,
+                tmdbId = null,
             )
         }
 
         val networks = media.studios.filterNot { it.isAnimationStudio }.map { studio ->
             com.nuvio.app.features.details.MetaCompany(
                 name = studio.name ?: "Network",
-                tmdbId = studio.id,
+                tmdbId = null,
             )
         }
 
@@ -246,8 +246,41 @@ object AnilistMetaDetailsResolver {
         )
     }
 
-    private val armImdbCache = mutableMapOf<Int, String>()
+    data class ArmMapping(
+        val imdbId: String?,
+        val kitsuId: String?,
+        val tmdbId: Int?,
+        val season: Int,
+    )
+
+    private val armMappingCache = mutableMapOf<Int, ArmMapping>()
     private val kitsuIdCache = mutableMapOf<String, String>()
+
+    suspend fun resolveArmMapping(anilistId: Int): ArmMapping {
+        armMappingCache[anilistId]?.let { return it }
+        return runCatching {
+            val url = "https://arm.haglund.dev/api/v2/ids?source=anilist&id=$anilistId"
+            val text = httpGetText(url) ?: return@runCatching ArmMapping(null, null, null, 1)
+            val obj = json.parseToJsonElement(text).asJsonObjectOrNull() ?: return@runCatching ArmMapping(null, null, null, 1)
+            val imdb = obj["imdb"].asStringOrNull()
+            val kitsu = obj["kitsu"].asStringOrNull()
+            val tmdb = obj["themoviedb"].asIntOrNull()
+            val season = obj["thetvdb-season"].asIntOrNull()
+                ?: obj["themoviedb-season"].asIntOrNull()
+                ?: 1
+
+            val mapping = ArmMapping(
+                imdbId = imdb,
+                kitsuId = kitsu,
+                tmdbId = tmdb,
+                season = if (season > 0) season else 1,
+            )
+            armMappingCache[anilistId] = mapping
+            mapping
+        }.getOrDefault(ArmMapping(null, null, null, 1))
+    }
+
+    suspend fun resolveArmImdbId(anilistId: Int): String? = resolveArmMapping(anilistId).imdbId
 
     suspend fun adaptCinemetaForAnilist(
         cinemetaMeta: MetaDetails,
@@ -256,14 +289,68 @@ object AnilistMetaDetailsResolver {
         val anilistId = AnilistTrackerCoordinator.extractAnilistId(rawId) ?: return@withContext cinemetaMeta
         val token = AnilistAuthRepository.token.value
         val media: AnilistMedia? = AnilistApi.fetchMediaById(anilistId, token = token)
+        val mapping = resolveArmMapping(anilistId)
 
         val anilistPoster = media?.coverImage?.extraLarge
             ?: media?.coverImage?.large
             ?: cinemetaMeta.poster
 
+        val targetSeason = mapping.season
+        val effectiveImdbId = mapping.imdbId ?: cinemetaMeta.id
+
+        val isMovie = media?.format == "MOVIE" || (media?.episodes == 1 && media?.format != "TV")
+
+        if (isMovie) {
+            return@withContext cinemetaMeta.copy(
+                id = rawId,
+                type = "movie",
+                name = media?.title?.displayTitle ?: cinemetaMeta.name,
+                poster = anilistPoster,
+            )
+        }
+
+        // For seasons > 1, isolate and map that season's episodes
+        val seasonVideos = if (targetSeason > 1 && cinemetaMeta.videos.any { it.season == targetSeason }) {
+            cinemetaMeta.videos
+                .filter { it.season == targetSeason }
+                .mapIndexed { idx, v ->
+                    val epNum = idx + 1
+                    val streamingEp = media?.streamingEpisodes?.getOrNull(idx)
+                    v.copy(
+                        id = "$effectiveImdbId:$targetSeason:${v.episode ?: epNum}",
+                        season = 1,
+                        episode = epNum,
+                        title = streamingEp?.title?.takeIf { it.isNotBlank() } ?: v.title,
+                        thumbnail = streamingEp?.thumbnail?.takeIf { it.isNotBlank() } ?: v.thumbnail,
+                    )
+                }
+        } else if (targetSeason > 1 && media?.episodes != null && media.episodes > 0) {
+            (1..media.episodes).map { epNum ->
+                val streamingEp = media.streamingEpisodes.getOrNull(epNum - 1)
+                MetaVideo(
+                    id = "$effectiveImdbId:$targetSeason:$epNum",
+                    season = 1,
+                    episode = epNum,
+                    title = streamingEp?.title?.takeIf { it.isNotBlank() } ?: "Episode $epNum",
+                    thumbnail = streamingEp?.thumbnail?.takeIf { it.isNotBlank() }
+                        ?: "https://images.metahub.space/screenshot/medium/$effectiveImdbId/$targetSeason/$epNum/img",
+                )
+            }
+        } else {
+            cinemetaMeta.videos
+        }
+
+        val releaseYear = when {
+            media?.startDateYear != null -> "${media.startDateYear}"
+            else -> cinemetaMeta.releaseInfo
+        }
+
         cinemetaMeta.copy(
             id = rawId,
+            name = if (targetSeason > 1) (media?.title?.displayTitle ?: cinemetaMeta.name) else cinemetaMeta.name,
             poster = anilistPoster,
+            releaseInfo = releaseYear,
+            videos = seasonVideos,
         )
     }
 
@@ -275,20 +362,6 @@ object AnilistMetaDetailsResolver {
             .replace(Regex("(?i)\\[Written by.*?\\]"), "")
             .replace(Regex("(?i)Source:.*"), "")
             .trim()
-    }
-
-    suspend fun resolveArmImdbId(anilistId: Int): String? {
-        armImdbCache[anilistId]?.let { return it }
-        return runCatching {
-            val url = "https://arm.haglund.dev/api/v2/ids?source=anilist&id=$anilistId&include=imdb"
-            val text = httpGetText(url) ?: return@runCatching null
-            val obj = json.parseToJsonElement(text).asJsonObjectOrNull() ?: return@runCatching null
-            val imdbId = obj["imdb"].asStringOrNull()
-            if (!imdbId.isNullOrBlank()) {
-                armImdbCache[anilistId] = imdbId
-                imdbId
-            } else null
-        }.getOrNull()
     }
 
     private suspend fun resolveKitsuId(anilistId: Int, title: String): String? {
