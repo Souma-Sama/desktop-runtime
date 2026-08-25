@@ -132,7 +132,14 @@ object AnilistCatalogRepository {
         return list
     }
 
-    suspend fun fetchCatalogPage(catalogId: String, page: Int = 1, perPage: Int = 25): CatalogPage {
+    private val pageCache = mutableMapOf<String, Pair<Long, CatalogPage>>()
+    private const val CACHE_TTL_MS = 5 * 60 * 1000L // 5 minutes
+
+    fun clearCache() {
+        pageCache.clear()
+    }
+
+    suspend fun fetchCatalogPage(catalogId: String, page: Int = 1, perPage: Int = 25, force: Boolean = false): CatalogPage {
         AnilistAuthRepository.ensureInitialized()
         val token = AnilistAuthRepository.token.value
         val user = AnilistAuthRepository.currentUser.value ?: if (!token.isNullOrBlank()) {
@@ -140,6 +147,15 @@ object AnilistCatalogRepository {
                 AnilistAuthStorage.saveUser(fetched)
             }
         } else null
+
+        val cacheKey = "$catalogId:$page:$perPage:${user?.name ?: "anon"}"
+        val now = kotlinx.datetime.Clock.System.now().toEpochMilliseconds()
+        if (!force) {
+            val cached = pageCache[cacheKey]
+            if (cached != null && (now - cached.first) < CACHE_TTL_MS) {
+                return cached.second
+            }
+        }
 
         log.d { "fetchCatalogPage: catalogId=$catalogId, page=$page, tokenPresent=${!token.isNullOrBlank()}" }
 
@@ -229,10 +245,12 @@ object AnilistCatalogRepository {
             )
         }
 
-        return CatalogPage(
+        val result = CatalogPage(
             items = previews,
             rawItemCount = previews.size,
             nextSkip = if (mediaList.size >= perPage) (page * perPage) else null,
         )
+        pageCache[cacheKey] = now to result
+        return result
     }
 }

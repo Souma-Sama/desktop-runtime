@@ -54,13 +54,7 @@ fun buildHomeCatalogDefinitions(addons: List<ManagedAddon>): List<HomeCatalogDef
             .map { catalog ->
                 HomeCatalogDefinition(
                     key = "${manifest.id}:${catalog.type}:${catalog.id}",
-                    defaultTitle = runBlocking {
-                        getString(
-                            Res.string.home_catalog_default_title,
-                            catalog.name,
-                            localizedMediaTypeLabel(catalog.type),
-                        )
-                    },
+                    defaultTitle = "${catalog.name} (${localizedMediaTypeLabel(catalog.type)})",
                     catalogName = catalog.name,
                     addonName = addon.displayTitle,
                     manifestUrl = addon.manifestUrl,
