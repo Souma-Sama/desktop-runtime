@@ -2,6 +2,7 @@ package com.nuvio.app.features.anilist.catalog
 
 import co.touchlab.kermit.Logger
 import com.nuvio.app.features.anilist.AnilistAuthRepository
+import com.nuvio.app.features.anilist.AnilistAuthStorage
 import com.nuvio.app.features.anilist.AnilistApi
 import com.nuvio.app.features.anilist.AnilistMedia
 import com.nuvio.app.features.anilist.AnilistMediaListStatus
