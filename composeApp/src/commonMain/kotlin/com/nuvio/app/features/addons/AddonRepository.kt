@@ -68,7 +68,9 @@ object AddonRepository {
         currentProfileId = effectiveProfileId
         log.d { "initialize() — loading local addons for profile $currentProfileId" }
 
-        val storedUrls = dedupeManifestUrls(AddonStorage.loadInstalledAddonUrls(currentProfileId))
+        val rawUrls = AddonStorage.loadInstalledAddonUrls(currentProfileId)
+        val defaultUrls = if (rawUrls.any { it == "native://anilist" }) rawUrls else listOf("native://anilist") + rawUrls
+        val storedUrls = dedupeManifestUrls(defaultUrls)
         val enabledByUrl = loadLocalEnabledStates()
         log.d { "initialize() — local addon count: ${storedUrls.size}" }
         if (storedUrls.isEmpty()) return
@@ -357,14 +359,37 @@ object AddonRepository {
         refreshJob = scope.launch {
             try {
                 val result = runCatching {
-                    val payload = fetchAddonResponseText(
-                        url = manifestUrl,
-                        forceRefresh = forceRefresh,
-                    )
-                    AddonManifestParser.parse(
-                        manifestUrl = manifestUrl,
-                        payload = payload,
-                    )
+                    if (manifestUrl == "native://anilist") {
+                        AddonManifest(
+                            id = "org.nuvio.anilist",
+                            name = "AniList Anime Catalog",
+                            version = "1.0.0",
+                            description = "Official trending, seasonal, top-rated anime catalogs & list tracking powered by AniList.",
+                            types = listOf("anime", "series", "movie"),
+                            resources = listOf(
+                                AddonResource.Catalog,
+                                AddonResource.Meta,
+                            ),
+                            catalogs = listOf(
+                                AddonCatalog(type = "anime", id = "anilist:trending", name = "Trending Anime"),
+                                AddonCatalog(type = "anime", id = "anilist:airing", name = "Currently Airing"),
+                                AddonCatalog(type = "anime", id = "anilist:popular", name = "Popular This Season"),
+                                AddonCatalog(type = "anime", id = "anilist:top-rated", name = "Top Rated Anime"),
+                            ),
+                            idPrefixes = listOf("ani_", "anilist:"),
+                            logoUrl = "https://anilist.co/img/icons/icon.svg",
+                            transportUrl = "native://anilist",
+                        )
+                    } else {
+                        val payload = fetchAddonResponseText(
+                            url = manifestUrl,
+                            forceRefresh = forceRefresh,
+                        )
+                        AddonManifestParser.parse(
+                            manifestUrl = manifestUrl,
+                            payload = payload,
+                        )
+                    }
                 }
 
                 _uiState.update { current ->

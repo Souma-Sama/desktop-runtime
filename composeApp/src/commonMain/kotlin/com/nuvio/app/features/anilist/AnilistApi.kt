@@ -561,10 +561,16 @@ object AnilistApi {
         return parseMedia(mediaObj)
     }
 
+    private val mediaCache = mutableMapOf<Int, AnilistMedia>()
+
     suspend fun fetchMediaById(
         mediaId: Int,
         token: String? = null,
     ): AnilistMedia? {
+        val cached = mediaCache[mediaId]
+        if (cached != null && (!token.isNullOrBlank() == (cached.mediaListEntry != null) || token.isNullOrBlank())) {
+            return cached
+        }
         val hasAuth = !token.isNullOrBlank()
         val mediaListEntryBlock = if (hasAuth) {
             """
@@ -882,7 +888,7 @@ object AnilistApi {
         val entryObj = obj["mediaListEntry"].asJsonObjectOrNull()
         val mediaListEntry = entryObj?.let { parseMediaListEntry(it, defaultMediaId = id) }
 
-        AnilistMedia(
+        val media = AnilistMedia(
             id = id,
             idMal = idMal,
             title = title,
@@ -906,6 +912,8 @@ object AnilistApi {
             endDateYear = endYear,
             mediaListEntry = mediaListEntry,
         )
+        mediaCache[id] = media
+        media
     }.getOrNull()
 
     private fun parseMediaListEntry(obj: JsonObject, defaultMediaId: Int): AnilistMediaListEntry = runCatching {

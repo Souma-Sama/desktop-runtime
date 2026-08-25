@@ -30,8 +30,11 @@ data class HomeCatalogDefinition(
 }
 
 fun buildHomeCatalogRefreshSignature(addons: List<ManagedAddon>): List<String> {
-    val anilistSignatures = com.nuvio.app.features.anilist.catalog.AnilistCatalogRepository.getCatalogDefinitions()
-        .map { it.descriptorSignature }
+    val isAnilistEnabled = addons.firstOrNull { it.manifestUrl == "native://anilist" }?.enabled != false
+    val anilistSignatures = if (isAnilistEnabled) {
+        com.nuvio.app.features.anilist.catalog.AnilistCatalogRepository.getCatalogDefinitions()
+            .map { it.descriptorSignature }
+    } else emptyList()
     val addonSignatures = addons.enabledAddons().mapNotNull { addon ->
         val manifest = addon.manifest ?: return@mapNotNull null
         addon to manifest
@@ -44,7 +47,10 @@ fun buildHomeCatalogRefreshSignature(addons: List<ManagedAddon>): List<String> {
 }
 
 fun buildHomeCatalogDefinitions(addons: List<ManagedAddon>): List<HomeCatalogDefinition> {
-    val anilistCatalogs = com.nuvio.app.features.anilist.catalog.AnilistCatalogRepository.getCatalogDefinitions()
+    val isAnilistEnabled = addons.firstOrNull { it.manifestUrl == "native://anilist" }?.enabled != false
+    val anilistCatalogs = if (isAnilistEnabled) {
+        com.nuvio.app.features.anilist.catalog.AnilistCatalogRepository.getCatalogDefinitions()
+    } else emptyList()
     val addonCatalogs = addons.enabledAddons().mapNotNull { addon ->
         val manifest = addon.manifest ?: return@mapNotNull null
         addon to manifest
