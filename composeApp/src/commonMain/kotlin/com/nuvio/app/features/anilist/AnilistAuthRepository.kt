@@ -9,8 +9,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 object AnilistAuthRepository {
-    // Official / public Nuvio AniList Client ID or direct implicit grant URL
-    const val OAUTH_AUTHORIZE_URL = "https://anilist.co/api/v2/oauth/authorize?client_id=18408&response_type=token"
+    const val CLIENT_ID = "49419"
+    const val OAUTH_AUTHORIZE_URL = "https://anilist.co/api/v2/oauth/authorize?client_id=$CLIENT_ID&response_type=token"
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
