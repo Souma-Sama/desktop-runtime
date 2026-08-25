@@ -29,6 +29,7 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.StarBorder
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
@@ -37,8 +38,8 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -55,8 +56,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -344,6 +347,8 @@ fun AnimeTrackerDropdownContent(
                                 )
                             }
                             if (showFullDebug) {
+                                val clipboardManager = LocalClipboardManager.current
+                                var copied by remember { mutableStateOf(false) }
                                 Spacer(modifier = Modifier.height(6.dp))
                                 Text(
                                     text = trackerState.debugInfo.orEmpty(),
@@ -353,6 +358,25 @@ fun AnimeTrackerDropdownContent(
                                     ),
                                     color = MaterialTheme.colorScheme.onSurface,
                                 )
+                                Spacer(modifier = Modifier.height(6.dp))
+                                OutlinedButton(
+                                    onClick = {
+                                        clipboardManager.setText(AnnotatedString(trackerState.debugInfo.orEmpty()))
+                                        copied = true
+                                    },
+                                    modifier = Modifier.fillMaxWidth(),
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.ContentCopy,
+                                        contentDescription = "Copy Log",
+                                        modifier = Modifier.size(14.dp),
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = if (copied) "✓ Log Copied to Clipboard!" else "Copy Diagnostics Log",
+                                        fontSize = 11.sp,
+                                    )
+                                }
                             }
                         }
                     }
@@ -671,6 +695,8 @@ fun AnimeTrackerDropdownContent(
                         )
                     }
                     if (showDiagnostics) {
+                        val clipboardManager = LocalClipboardManager.current
+                        var copied by remember { mutableStateOf(false) }
                         Spacer(modifier = Modifier.height(6.dp))
                         Text(
                             text = trackerState.debugInfo.orEmpty(),
@@ -680,6 +706,25 @@ fun AnimeTrackerDropdownContent(
                             ),
                             color = MaterialTheme.colorScheme.onSurface,
                         )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        OutlinedButton(
+                            onClick = {
+                                clipboardManager.setText(AnnotatedString(trackerState.debugInfo.orEmpty()))
+                                copied = true
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.ContentCopy,
+                                contentDescription = "Copy Log",
+                                modifier = Modifier.size(14.dp),
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = if (copied) "✓ Log Copied to Clipboard!" else "Copy Diagnostics Log",
+                                fontSize = 11.sp,
+                            )
+                        }
                     }
                 }
             }
