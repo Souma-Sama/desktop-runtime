@@ -367,8 +367,8 @@ object AddonRepository {
                             description = "Official trending, seasonal, top-rated anime catalogs & list tracking powered by AniList.",
                             types = listOf("anime", "series", "movie"),
                             resources = listOf(
-                                AddonResource.Catalog,
-                                AddonResource.Meta,
+                                AddonResource(name = "catalog", types = listOf("anime")),
+                                AddonResource(name = "meta", types = listOf("anime", "series", "movie"), idPrefixes = listOf("ani_", "anilist:")),
                             ),
                             catalogs = listOf(
                                 AddonCatalog(type = "anime", id = "anilist:trending", name = "Trending Anime"),
