@@ -64,6 +64,7 @@ import org.jetbrains.compose.resources.stringResource
 @Composable
 fun DesktopDetailHero(
     meta: MetaDetails,
+    title: String? = null,
     playButtonLabel: String,
     isSaved: Boolean,
     isWatched: Boolean,
@@ -259,6 +260,7 @@ fun DesktopDetailHero(
             DetailActionButtons(
                 modifier = Modifier.widthIn(max = 520.dp),
                 meta = meta,
+                title = title,
                 playLabel = playButtonLabel,
                 secondaryActions = listOf(
                     DetailSecondaryAction(

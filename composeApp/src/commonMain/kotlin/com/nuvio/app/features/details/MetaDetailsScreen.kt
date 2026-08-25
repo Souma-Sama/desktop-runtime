@@ -164,6 +164,7 @@ private val watchedMarkerDiagnosticLog = Logger.withTag("WatchedMarkerDiag")
 fun MetaDetailsScreen(
     type: String,
     id: String,
+    initialTitle: String? = null,
     onBack: () -> Unit,
     onPlay: ((type: String, videoId: String, parentMetaId: String, parentMetaType: String, title: String, logo: String?, poster: String?, background: String?, seasonNumber: Int?, episodeNumber: Int?, episodeTitle: String?, episodeThumbnail: String?, pauseDescription: String?, resumePositionMs: Long?) -> Unit)? = null,
     onPlayManually: ((type: String, videoId: String, parentMetaId: String, parentMetaType: String, title: String, logo: String?, poster: String?, background: String?, seasonNumber: Int?, episodeNumber: Int?, episodeTitle: String?, episodeThumbnail: String?, pauseDescription: String?, resumePositionMs: Long?) -> Unit)? = null,
@@ -303,17 +304,20 @@ fun MetaDetailsScreen(
         displayedMeta != null &&
         displayedMeta.type.lowercase().let { it == "movie" || it == "series" || it == "show" || it == "tv" }
 
-    LaunchedEffect(displayedMeta?.id, displayedMeta?.name) {
+    val effectiveTitle = initialTitle?.takeIf { it.isNotBlank() }
+        ?: displayedMeta?.name.orEmpty()
+
+    LaunchedEffect(displayedMeta?.id, effectiveTitle) {
         deferredMetaWorkAllowed = false
-        if (displayedMeta != null) {
-            val metaYear = displayedMeta.releaseInfo?.take(4)?.toIntOrNull()
+        if (effectiveTitle.isNotBlank() || displayedMeta != null) {
+            val metaYear = displayedMeta?.releaseInfo?.take(4)?.toIntOrNull()
             com.nuvio.app.features.anilist.AnilistTrackerCoordinator.loadForMedia(
-                title = displayedMeta.name,
-                mediaId = displayedMeta.id,
+                title = effectiveTitle,
+                mediaId = displayedMeta?.id ?: id,
                 year = metaYear,
-                genres = displayedMeta.genres,
-                country = displayedMeta.country,
-                language = displayedMeta.language,
+                genres = displayedMeta?.genres.orEmpty(),
+                country = displayedMeta?.country,
+                language = displayedMeta?.language,
             )
             delay(250)
             deferredMetaWorkAllowed = true

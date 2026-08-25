@@ -68,22 +68,24 @@ import kotlinx.coroutines.launch
 fun AnimeTrackerButton(
     modifier: Modifier = Modifier,
     meta: com.nuvio.app.features.details.MetaDetails? = null,
+    title: String? = null,
     size: androidx.compose.ui.unit.Dp = 52.dp,
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
     val trackerState by AnilistTrackerCoordinator.trackerState.collectAsState()
     val isTrackingActive = trackerState.entry?.status != null
+    val effectiveTitle = title?.takeIf { it.isNotBlank() } ?: meta?.name.orEmpty()
 
-    LaunchedEffect(meta?.id, meta?.name) {
-        if (meta != null) {
-            val metaYear = meta.releaseInfo?.take(4)?.toIntOrNull()
+    LaunchedEffect(meta?.id, effectiveTitle) {
+        if (effectiveTitle.isNotBlank() || meta != null) {
+            val metaYear = meta?.releaseInfo?.take(4)?.toIntOrNull()
             AnilistTrackerCoordinator.loadForMedia(
-                title = meta.name,
-                mediaId = meta.id,
+                title = effectiveTitle,
+                mediaId = meta?.id,
                 year = metaYear,
-                genres = meta.genres,
-                country = meta.country,
-                language = meta.language,
+                genres = meta?.genres.orEmpty(),
+                country = meta?.country,
+                language = meta?.language,
             )
         }
     }
@@ -113,15 +115,15 @@ fun AnimeTrackerButton(
                     .size(size)
                     .clickable(role = Role.Button) {
                         menuExpanded = !menuExpanded
-                        if (menuExpanded && trackerState.media == null && meta != null) {
-                            val metaYear = meta.releaseInfo?.take(4)?.toIntOrNull()
+                        if (menuExpanded && trackerState.media == null) {
+                            val metaYear = meta?.releaseInfo?.take(4)?.toIntOrNull()
                             AnilistTrackerCoordinator.loadForMedia(
-                                title = meta.name,
-                                mediaId = meta.id,
+                                title = effectiveTitle,
+                                mediaId = meta?.id,
                                 year = metaYear,
-                                genres = meta.genres,
-                                country = meta.country,
-                                language = meta.language,
+                                genres = meta?.genres.orEmpty(),
+                                country = meta?.country,
+                                language = meta?.language,
                             )
                         }
                     },
@@ -161,6 +163,7 @@ fun AnimeTrackerButton(
         ) {
             AnimeTrackerDropdownContent(
                 meta = meta,
+                title = effectiveTitle,
                 onClose = { menuExpanded = false },
             )
         }
@@ -170,6 +173,7 @@ fun AnimeTrackerButton(
 @Composable
 fun AnimeTrackerDropdownContent(
     meta: com.nuvio.app.features.details.MetaDetails? = null,
+    title: String? = null,
     onClose: () -> Unit,
 ) {
     val trackerState by AnilistTrackerCoordinator.trackerState.collectAsState()
@@ -321,17 +325,18 @@ fun AnimeTrackerDropdownContent(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    if (meta != null) {
+                    val effectiveRetryTitle = title?.takeIf { it.isNotBlank() } ?: meta?.name.orEmpty()
+                    if (effectiveRetryTitle.isNotBlank() || meta != null) {
                         Button(
                             onClick = {
-                                val metaYear = meta.releaseInfo?.take(4)?.toIntOrNull()
+                                val metaYear = meta?.releaseInfo?.take(4)?.toIntOrNull()
                                 AnilistTrackerCoordinator.loadForMedia(
-                                    title = meta.name,
-                                    mediaId = meta.id,
+                                    title = effectiveRetryTitle,
+                                    mediaId = meta?.id,
                                     year = metaYear,
-                                    genres = meta.genres,
-                                    country = meta.country,
-                                    language = meta.language,
+                                    genres = meta?.genres.orEmpty(),
+                                    country = meta?.country,
+                                    language = meta?.language,
                                 )
                             },
                             modifier = Modifier.weight(1f),

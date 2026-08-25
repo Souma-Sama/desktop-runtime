@@ -61,6 +61,7 @@ data class DetailSecondaryAction(
 fun DetailActionButtons(
     modifier: Modifier = Modifier,
     meta: com.nuvio.app.features.details.MetaDetails? = null,
+    title: String? = null,
     playLabel: String = stringResource(Res.string.action_play),
     secondaryActions: List<DetailSecondaryAction> = emptyList(),
     actionsMenuLabel: String = stringResource(Res.string.details_actions_menu_label),
@@ -215,9 +216,10 @@ fun DetailActionButtons(
             }
 
             val trackerState by com.nuvio.app.features.anilist.AnilistTrackerCoordinator.trackerState.collectAsState()
+            val effectiveAnimeTitle = title?.takeIf { it.isNotBlank() } ?: meta?.name.orEmpty()
             val isAnimeCandidate = meta?.let {
                 com.nuvio.app.features.anilist.AnilistTrackerCoordinator.isAnimeCandidate(
-                    it.name,
+                    effectiveAnimeTitle,
                     it.genres,
                     it.country,
                     it.language,
@@ -226,7 +228,7 @@ fun DetailActionButtons(
 
             if (trackerState.isAnime || isAnimeCandidate) {
                 Spacer(modifier = Modifier.width(12.dp))
-                AnimeTrackerButton(meta = meta, size = iconButtonSize)
+                AnimeTrackerButton(meta = meta, title = title, size = iconButtonSize)
             }
         }
     }
