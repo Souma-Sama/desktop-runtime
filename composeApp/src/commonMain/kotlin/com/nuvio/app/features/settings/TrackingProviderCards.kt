@@ -238,10 +238,10 @@ private fun AnilistProviderCard(
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
                     Icon(
-                        imageVector = Icons.Default.Bookmark,
+                        imageVector = com.nuvio.app.features.anilist.AnilistLogoVector,
                         contentDescription = "AniList",
-                        tint = Color(0xFF02A9FF),
-                        modifier = Modifier.size(28.dp),
+                        tint = com.nuvio.app.features.anilist.AnilistBrandBlue,
+                        modifier = Modifier.size(26.dp),
                     )
                     Column {
                         Text(

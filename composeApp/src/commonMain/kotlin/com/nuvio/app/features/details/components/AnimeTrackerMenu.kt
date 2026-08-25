@@ -108,9 +108,14 @@ fun AnimeTrackerButton(
                     )
                 } else {
                     Icon(
-                        imageVector = if (isTrackingActive) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
+                        imageVector = com.nuvio.app.features.anilist.AnilistLogoVector,
                         contentDescription = "AniList Tracker",
-                        modifier = Modifier.size(22.dp),
+                        modifier = Modifier.size(20.dp),
+                        tint = if (isTrackingActive) {
+                            MaterialTheme.colorScheme.onPrimary
+                        } else {
+                            com.nuvio.app.features.anilist.AnilistBrandBlue
+                        },
                     )
                 }
             }
@@ -159,9 +164,9 @@ fun AnimeTrackerDropdownContent(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Icon(
-                    imageVector = Icons.Default.AccountCircle,
+                    imageVector = com.nuvio.app.features.anilist.AnilistLogoVector,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
+                    tint = com.nuvio.app.features.anilist.AnilistBrandBlue,
                     modifier = Modifier.size(22.dp),
                 )
                 Column {
