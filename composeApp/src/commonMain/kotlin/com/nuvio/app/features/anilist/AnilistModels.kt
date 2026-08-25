@@ -97,6 +97,7 @@ data class AnilistUser(
 data class AnilistTrackerState(
     val isLoading: Boolean = false,
     val isSyncing: Boolean = false,
+    val isAnime: Boolean = false,
     val isAuthenticated: Boolean = false,
     val user: AnilistUser? = null,
     val media: AnilistMedia? = null,

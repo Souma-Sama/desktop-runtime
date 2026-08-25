@@ -33,14 +33,18 @@ object AnilistTrackerCoordinator {
         title: String,
         year: Int? = null,
         genres: List<String> = emptyList(),
+        country: String? = null,
+        language: String? = null,
     ) {
         val cleanTitle = cleanAnimeTitle(title)
+        val isExplicitAnime = isAnimeCandidate(cleanTitle, genres, country, language)
         val cacheKey = "$cleanTitle:${year ?: 0}".lowercase()
 
         activeJob?.cancel()
         _trackerState.update {
             it.copy(
                 isLoading = true,
+                isAnime = isExplicitAnime,
                 error = null,
                 isAuthenticated = AnilistAuthRepository.isAuthenticated.value,
                 user = AnilistAuthRepository.currentUser.value,
@@ -66,16 +70,22 @@ object AnilistTrackerCoordinator {
                 if (searchResults.isEmpty() && cleanTitle != title) {
                     searchResults = AnilistApi.searchAnime(query = title.trim(), year = null, token = token)
                 }
-                val bestMatch = searchResults.firstOrNull()
+
+                val bestMatch = searchResults.firstOrNull { candidate ->
+                    isTitleMatch(cleanTitle, title, candidate)
+                }
                 if (bestMatch != null) {
                     mediaCache[cacheKey] = bestMatch
                 }
                 bestMatch
             }
 
+            val isConfirmedAnime = (media != null && (isExplicitAnime || isTitleMatch(cleanTitle, title, media)))
+
             _trackerState.update {
                 it.copy(
                     isLoading = false,
+                    isAnime = isConfirmedAnime,
                     media = media,
                     entry = media?.mediaListEntry,
                     error = if (media == null) "No AniList match found" else null,
@@ -209,5 +219,42 @@ object AnilistTrackerCoordinator {
             .replace(Regex("""Season \d+""", RegexOption.IGNORE_CASE), "")
             .replace(Regex("""S\d+""", RegexOption.IGNORE_CASE), "")
             .trim()
+    }
+
+    private fun isTitleMatch(cleanTitle: String, rawTitle: String, media: AnilistMedia): Boolean {
+        val queryClean = cleanTitle.lowercase().filter { it.isLetterOrDigit() || it.isWhitespace() }.trim()
+        val rawClean = rawTitle.lowercase().filter { it.isLetterOrDigit() || it.isWhitespace() }.trim()
+        val queryTokens = queryClean.split(" ").filter { it.isNotBlank() }
+
+        val candidateTitles = listOfNotNull(
+            media.title?.english?.lowercase(),
+            media.title?.romaji?.lowercase(),
+            media.title?.native?.lowercase(),
+        ).map { it.filter { char -> char.isLetterOrDigit() || char.isWhitespace() }.trim() }
+
+        if (queryTokens.isEmpty()) return false
+
+        return candidateTitles.any { candidateTitle ->
+            if (candidateTitle.isBlank()) return@any false
+            if (candidateTitle == queryClean || candidateTitle == rawClean) return@any true
+            if (candidateTitle.contains(queryClean) || queryClean.contains(candidateTitle)) return@any true
+            val candidateTokens = candidateTitle.split(" ").filter { it.isNotBlank() }
+            val matchCount = queryTokens.count { token -> candidateTokens.contains(token) }
+            val ratio = matchCount.toDouble() / queryTokens.size.toDouble()
+            ratio >= 0.5
+        }
+    }
+
+    private fun isAnimeCandidate(
+        title: String,
+        genres: List<String>,
+        country: String?,
+        language: String?,
+    ): Boolean {
+        val g = genres.map { it.lowercase() }
+        if (g.any { it.contains("anime") }) return true
+        val isJapan = country?.lowercase() in listOf("jp", "japan") || language?.lowercase() in listOf("ja", "japanese", "jpn")
+        if (isJapan && g.any { it.contains("anim") }) return true
+        return false
     }
 }

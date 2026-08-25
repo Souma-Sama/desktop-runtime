@@ -311,6 +311,8 @@ fun MetaDetailsScreen(
                 title = displayedMeta.name,
                 year = metaYear,
                 genres = displayedMeta.genres,
+                country = displayedMeta.country,
+                language = displayedMeta.language,
             )
             delay(250)
             deferredMetaWorkAllowed = true

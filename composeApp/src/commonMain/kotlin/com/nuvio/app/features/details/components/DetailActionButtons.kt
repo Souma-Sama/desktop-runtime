@@ -212,8 +212,11 @@ fun DetailActionButtons(
                 }
             }
 
-            Spacer(modifier = Modifier.width(12.dp))
-            AnimeTrackerButton(size = iconButtonSize)
+            val trackerState by com.nuvio.app.features.anilist.AnilistTrackerCoordinator.trackerState.collectAsState()
+            if (trackerState.isAnime) {
+                Spacer(modifier = Modifier.width(12.dp))
+                AnimeTrackerButton(size = iconButtonSize)
+            }
         }
     }
 }
