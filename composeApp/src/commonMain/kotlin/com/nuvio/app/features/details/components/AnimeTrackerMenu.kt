@@ -126,6 +126,7 @@ fun AnimeTrackerButton(
                                 genres = meta?.genres.orEmpty(),
                                 country = meta?.country,
                                 language = meta?.language,
+                                forceRefresh = true,
                             )
                         }
                     },
@@ -341,6 +342,7 @@ fun AnimeTrackerDropdownContent(
                                     genres = meta?.genres.orEmpty(),
                                     country = meta?.country,
                                     language = meta?.language,
+                                    forceRefresh = true,
                                 )
                             },
                             modifier = Modifier.weight(1f),
@@ -368,10 +370,12 @@ fun AnimeTrackerDropdownContent(
                                 AnilistTrackerCoordinator.loadForMedia(
                                     title = query,
                                     mediaId = "anilist:$numId",
+                                    forceRefresh = true,
                                 )
                             } else {
                                 AnilistTrackerCoordinator.loadForMedia(
                                     title = query,
+                                    forceRefresh = true,
                                 )
                             }
                         }

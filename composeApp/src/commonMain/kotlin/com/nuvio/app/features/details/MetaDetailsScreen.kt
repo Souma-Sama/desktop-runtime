@@ -1048,6 +1048,7 @@ fun MetaDetailsScreen(
                                 ) {
                                     DesktopDetailHero(
                                         meta = meta,
+                                        title = effectiveTitle,
                                         playButtonLabel = playButtonLabel,
                                         isSaved = isSaved,
                                         isWatched = isWatched,

@@ -39,23 +39,27 @@ object AnilistApi {
             headers["Authorization"] = "Bearer $sanitized"
         }
 
-        val responseText = runCatching {
+        val responseText = try {
             httpPostJsonWithHeaders(
                 url = GRAPHQL_ENDPOINT,
                 body = payload,
                 headers = headers,
             )
-        }.onFailure {
-            log.w(it) { "executeGraphQL request error" }
-        }.getOrNull() ?: return null
+        } catch (e: Exception) {
+            log.w(e) { "executeGraphQL request failed: ${e.message}" }
+            null
+        } ?: return null
 
         if (responseText.isBlank()) {
             return null
         }
 
-        return runCatching {
+        return try {
             json.parseToJsonElement(responseText).jsonObject
-        }.getOrNull()
+        } catch (e: Exception) {
+            log.w(e) { "Failed to parse GraphQL response JSON: $responseText" }
+            null
+        }
     }
 
     suspend fun fetchCurrentUser(token: String): AnilistUser? {

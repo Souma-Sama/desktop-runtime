@@ -31,6 +31,8 @@ object AnilistTrackerCoordinator {
         }
     }
 
+    private var currentKey: String? = null
+
     fun loadForMedia(
         title: String,
         mediaId: String? = null,
@@ -38,10 +40,18 @@ object AnilistTrackerCoordinator {
         genres: List<String> = emptyList(),
         country: String? = null,
         language: String? = null,
+        forceRefresh: Boolean = false,
     ) {
         val rawTitle = title.replace(Regex("""\r|\n"""), " ").replace(Regex("""\s+"""), " ").trim()
+        if (rawTitle.isBlank() && mediaId.isNullOrBlank()) return
+
         val isExplicitAnime = isAnimeCandidate(rawTitle, genres, country, language)
         val cacheKey = if (!mediaId.isNullOrBlank()) mediaId.lowercase() else rawTitle.lowercase()
+
+        if (!forceRefresh && currentKey == cacheKey && _trackerState.value.media != null) {
+            return
+        }
+        currentKey = cacheKey
 
         log.i { "loadForMedia: title='$rawTitle', mediaId='$mediaId'" }
 
@@ -271,7 +281,7 @@ object AnilistTrackerCoordinator {
         if (id.startsWith("al:", ignoreCase = true)) return id.substringAfter(":").toIntOrNull()
         if (id.startsWith("al_", ignoreCase = true)) return id.substringAfter("_").toIntOrNull()
         if (id.startsWith("anime:", ignoreCase = true)) return id.substringAfter(":").toIntOrNull()
-        return id.toIntOrNull()
+        return null
     }
 
     private fun extractMalId(mediaId: String?): Int? {
