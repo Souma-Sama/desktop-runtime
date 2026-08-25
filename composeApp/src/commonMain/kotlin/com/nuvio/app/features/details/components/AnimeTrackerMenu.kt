@@ -362,15 +362,24 @@ fun AnimeTrackerDropdownContent(
                 Button(
                     onClick = {
                         if (manualSearchText.isNotBlank()) {
-                            AnilistTrackerCoordinator.loadForMedia(
-                                title = manualSearchText.trim(),
-                            )
+                            val query = manualSearchText.trim()
+                            val numId = query.toIntOrNull()
+                            if (numId != null) {
+                                AnilistTrackerCoordinator.loadForMedia(
+                                    title = query,
+                                    mediaId = "anilist:$numId",
+                                )
+                            } else {
+                                AnilistTrackerCoordinator.loadForMedia(
+                                    title = query,
+                                )
+                            }
                         }
                     },
                     modifier = Modifier.fillMaxWidth(),
                     enabled = manualSearchText.isNotBlank(),
                 ) {
-                    Text("Search", fontSize = 12.sp)
+                    Text("Search AniList", fontSize = 12.sp)
                 }
             }
             return@Column
