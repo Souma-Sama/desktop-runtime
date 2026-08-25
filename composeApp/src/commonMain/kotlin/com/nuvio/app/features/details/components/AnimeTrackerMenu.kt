@@ -183,17 +183,32 @@ fun AnimeTrackerDropdownContent(
                 }
             }
 
-            if (trackerState.isAuthenticated && trackerState.media != null) {
-                IconButton(
-                    onClick = { AnilistTrackerCoordinator.syncNow() },
-                    modifier = Modifier.size(32.dp),
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Refresh,
-                        contentDescription = "Sync",
-                        modifier = Modifier.size(18.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+            if (trackerState.isAuthenticated) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (trackerState.media != null) {
+                        IconButton(
+                            onClick = { AnilistTrackerCoordinator.syncNow() },
+                            modifier = Modifier.size(32.dp),
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Refresh,
+                                contentDescription = "Sync",
+                                modifier = Modifier.size(18.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                    IconButton(
+                        onClick = { AnilistAuthRepository.logout() },
+                        modifier = Modifier.size(32.dp),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "Disconnect AniList Account",
+                            modifier = Modifier.size(18.dp),
+                            tint = MaterialTheme.colorScheme.error.copy(alpha = 0.8f),
+                        )
+                    }
                 }
             }
         }
