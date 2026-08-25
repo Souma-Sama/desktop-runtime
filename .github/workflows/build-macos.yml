@@ -1,0 +1,53 @@
+name: Build macOS DMG
+
+on:
+  push:
+    branches:
+      - '**'
+  workflow_dispatch:
+
+jobs:
+  build-macos:
+    name: macOS ${{ matrix.arch }} Build
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-14
+            arch: arm64
+          - runner: macos-13
+            arch: x86_64
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Fetch macOS runtime (Git LFS)
+        run: |
+          git lfs pull --include="composeApp/src/desktopMain/native/macos/runtime/${{ matrix.arch }}/**" --exclude=""
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Build macOS DMG
+        env:
+          NUVIO_MACOS_ARCH: ${{ matrix.arch }}
+        run: |
+          ./gradlew :composeApp:packageDmg -Pnuvio.macos.arch=${{ matrix.arch }} --no-daemon --stacktrace
+
+      - name: Upload DMG Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Nuvio-macOS-${{ matrix.arch }}
+          path: |
+            composeApp/build/compose/binaries/main/dmg/*.dmg
+            composeApp/build/compose/release-dmgs/*.dmg
+          if-no-files-found: warn
+          retention-days: 14
