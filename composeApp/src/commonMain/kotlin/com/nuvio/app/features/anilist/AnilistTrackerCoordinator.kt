@@ -36,15 +36,16 @@ object AnilistTrackerCoordinator {
         country: String? = null,
         language: String? = null,
     ) {
-        val cleanTitle = cleanAnimeTitle(title)
-        val isExplicitAnime = isAnimeCandidate(cleanTitle, genres, country, language)
-        val cacheKey = "$cleanTitle:${year ?: 0}".lowercase()
+        val rawTitle = title.trim()
+        val cleanTitle = cleanAnimeTitle(rawTitle)
+        val isExplicitAnime = isAnimeCandidate(rawTitle, genres, country, language)
+        val cacheKey = "$rawTitle:${year ?: 0}".lowercase()
 
         activeJob?.cancel()
         _trackerState.update {
             it.copy(
                 isLoading = true,
-                isAnime = isExplicitAnime,
+                isAnime = isExplicitAnime || (it.media != null),
                 error = null,
                 isAuthenticated = AnilistAuthRepository.isAuthenticated.value,
                 user = AnilistAuthRepository.currentUser.value,
@@ -64,33 +65,31 @@ object AnilistTrackerCoordinator {
                         cachedMedia
                     }
                 } else {
-                    var searchResults = AnilistApi.searchAnime(query = cleanTitle, year = year, token = token)
+                    // 1. Search directly with exact title
+                    var searchResults = AnilistApi.searchAnime(query = rawTitle, year = year, token = token)
                     if (searchResults.isEmpty() && year != null) {
+                        searchResults = AnilistApi.searchAnime(query = rawTitle, year = null, token = token)
+                    }
+                    if (searchResults.isEmpty() && cleanTitle != rawTitle && cleanTitle.isNotBlank()) {
                         searchResults = AnilistApi.searchAnime(query = cleanTitle, year = null, token = token)
                     }
-                    if (searchResults.isEmpty() && cleanTitle != title) {
-                        searchResults = AnilistApi.searchAnime(query = title.trim(), year = null, token = token)
-                    }
 
-                    val bestMatch = searchResults.firstOrNull { candidate ->
-                        isTitleMatch(cleanTitle, title, candidate)
-                    } ?: searchResults.firstOrNull()
-
+                    val bestMatch = searchResults.firstOrNull()
                     if (bestMatch != null) {
                         mediaCache[cacheKey] = bestMatch
                     }
                     bestMatch
                 }
 
-                val isConfirmedAnime = (media != null && (isExplicitAnime || isTitleMatch(cleanTitle, title, media)))
+                val hasMatch = media != null
 
                 _trackerState.update {
                     it.copy(
                         isLoading = false,
-                        isAnime = isConfirmedAnime,
+                        isAnime = hasMatch || isExplicitAnime,
                         media = media,
                         entry = media?.mediaListEntry,
-                        error = if (media == null) "No AniList match found" else null,
+                        error = if (!hasMatch) "No AniList match found" else null,
                     )
                 }
             } catch (t: Throwable) {

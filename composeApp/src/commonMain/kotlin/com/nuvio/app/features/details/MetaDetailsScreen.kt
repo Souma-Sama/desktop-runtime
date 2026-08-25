@@ -303,7 +303,7 @@ fun MetaDetailsScreen(
         displayedMeta != null &&
         displayedMeta.type.lowercase().let { it == "movie" || it == "series" || it == "show" || it == "tv" }
 
-    LaunchedEffect(displayedMeta?.id) {
+    LaunchedEffect(displayedMeta?.id, displayedMeta?.name) {
         deferredMetaWorkAllowed = false
         if (displayedMeta != null) {
             val metaYear = displayedMeta.releaseInfo?.take(4)?.toIntOrNull()

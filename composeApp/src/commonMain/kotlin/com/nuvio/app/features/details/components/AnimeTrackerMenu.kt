@@ -293,35 +293,12 @@ fun AnimeTrackerDropdownContent(
         }
 
         if (trackerState.media == null) {
-            var manualSearchQuery by remember { mutableStateOf("") }
-            Column(modifier = Modifier.padding(vertical = 8.dp)) {
-                Text(
-                    text = "No automatic AniList match found.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                OutlinedTextField(
-                    value = manualSearchQuery,
-                    onValueChange = { manualSearchQuery = it },
-                    placeholder = { Text("Search anime name...", fontSize = 12.sp) },
-                    singleLine = true,
-                    textStyle = MaterialTheme.typography.bodySmall,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                Spacer(modifier = Modifier.height(6.dp))
-                Button(
-                    onClick = {
-                        if (manualSearchQuery.isNotBlank()) {
-                            AnilistTrackerCoordinator.loadForMedia(title = manualSearchQuery)
-                        }
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    enabled = manualSearchQuery.isNotBlank(),
-                ) {
-                    Text("Search AniList", fontSize = 12.sp)
-                }
-            }
+            Text(
+                text = "No matching anime found on AniList.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(vertical = 12.dp),
+            )
             return@Column
         }
 
