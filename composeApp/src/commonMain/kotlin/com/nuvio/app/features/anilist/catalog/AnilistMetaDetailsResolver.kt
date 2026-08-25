@@ -246,6 +246,76 @@ object AnilistMetaDetailsResolver {
         )
     }
 
+    suspend fun adaptCinemetaForAnilist(
+        cinemetaMeta: MetaDetails,
+        rawId: String,
+    ): MetaDetails = withContext(Dispatchers.Default) {
+        val anilistId = AnilistTrackerCoordinator.extractAnilistId(rawId) ?: return@withContext cinemetaMeta
+        val token = AnilistAuthRepository.token.value
+        val media: AnilistMedia = AnilistApi.fetchMediaById(anilistId, token = token) ?: return@withContext cinemetaMeta.copy(id = rawId)
+
+        val armImdbId = resolveArmImdbId(anilistId)
+        val kitsuId = resolveKitsuId(anilistId, media.title?.displayTitle.orEmpty())
+
+        val isMovie = media.format == "MOVIE" || (media.episodes == 1 && media.format != "TV")
+        val totalEpisodes = media.episodes ?: cinemetaMeta.videos.size.takeIf { it > 0 } ?: 12
+
+        val targetSeason = when {
+            media.format in listOf("SPECIAL", "OVA", "ONA") -> 0
+            else -> 1
+        }
+
+        val isolatedVideos = if (isMovie) {
+            emptyList()
+        } else {
+            (1..totalEpisodes).map { epNum ->
+                val streamingEp = media.streamingEpisodes.getOrNull(epNum - 1)
+                val cinemetaEp = cinemetaMeta.videos.firstOrNull { it.episode == epNum }
+
+                val epTitle = streamingEp?.title?.takeIf { it.isNotBlank() }
+                    ?: cinemetaEp?.title?.takeIf { it.isNotBlank() }
+                    ?: "Episode $epNum"
+
+                val epOverview = cinemetaEp?.overview
+
+                val epThumbnail = streamingEp?.thumbnail?.takeIf { it.isNotBlank() }
+                    ?: cinemetaEp?.thumbnail?.takeIf { it.isNotBlank() }
+                    ?: if (!armImdbId.isNullOrBlank()) "https://images.metahub.space/screenshot/medium/$armImdbId/1/$epNum/img" else null
+
+                val videoId = when {
+                    !kitsuId.isNullOrBlank() -> "kitsu:$kitsuId:$epNum"
+                    !armImdbId.isNullOrBlank() -> "$armImdbId:$targetSeason:$epNum"
+                    else -> "anilist:$anilistId:$epNum"
+                }
+
+                MetaVideo(
+                    id = videoId,
+                    title = epTitle,
+                    season = targetSeason,
+                    episode = epNum,
+                    overview = epOverview,
+                    thumbnail = epThumbnail,
+                )
+            }
+        }
+
+        val anilistPoster = media.coverImage?.extraLarge
+            ?: media.coverImage?.large
+
+        cinemetaMeta.copy(
+            id = rawId,
+            type = if (isMovie) "movie" else "series",
+            poster = anilistPoster ?: cinemetaMeta.poster,
+            videos = isolatedVideos,
+            defaultVideoId = if (isMovie) {
+                when {
+                    !kitsuId.isNullOrBlank() -> "kitsu:$kitsuId"
+                    else -> cinemetaMeta.defaultVideoId ?: armImdbId
+                }
+            } else null,
+        )
+    }
+
     private fun String.cleanAnilistDescription(): String {
         return this
             .replace(Regex("<br\\s*/?>", RegexOption.IGNORE_CASE), "\n")

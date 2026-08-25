@@ -126,7 +126,9 @@ object MetaDetailsRepository {
                     tryFetchMeta(manifest, effectiveType, metaLookupId, includeMdbList = false)
                 }
                 if (result != null) {
-                    val finalMeta = if (isAnilistItem) result.copy(id = id) else result
+                    val finalMeta = if (isAnilistItem) {
+                        com.nuvio.app.features.anilist.catalog.AnilistMetaDetailsResolver.adaptCinemetaForAnilist(result, id)
+                    } else result
                     publishLoadedMeta(
                         requestKey = requestKey,
                         meta = finalMeta,
@@ -141,7 +143,9 @@ object MetaDetailsRepository {
 
             val tmdbMeta = tryFetchTmdbFallbackMeta(type = effectiveType, id = metaLookupId)
             if (tmdbMeta != null) {
-                val finalMeta = if (isAnilistItem) tmdbMeta.copy(id = id) else tmdbMeta
+                val finalMeta = if (isAnilistItem) {
+                    com.nuvio.app.features.anilist.catalog.AnilistMetaDetailsResolver.adaptCinemetaForAnilist(tmdbMeta, id)
+                } else tmdbMeta
                 publishLoadedMeta(
                     requestKey = requestKey,
                     meta = finalMeta,
