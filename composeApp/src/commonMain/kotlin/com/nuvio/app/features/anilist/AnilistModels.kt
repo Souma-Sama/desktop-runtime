@@ -132,6 +132,8 @@ data class AnilistMedia(
     val recommendations: List<AnilistRecommendation> = emptyList(),
     val trailer: AnilistTrailerInfo? = null,
     val staff: List<AnilistStaff> = emptyList(),
+    val startDateYear: Int? = null,
+    val endDateYear: Int? = null,
     val mediaListEntry: AnilistMediaListEntry? = null,
 )
 

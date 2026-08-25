@@ -665,6 +665,12 @@ object AnilistApi {
                   id
                   site
                 }
+                startDate {
+                  year
+                }
+                endDate {
+                  year
+                }
                 staff(perPage: 15) {
                   edges {
                     role
@@ -870,6 +876,9 @@ object AnilistApi {
                 if (sName != null) AnilistStaff(name = sName, role = sRole) else null
             }.orEmpty()
 
+        val startYear = obj["startDate"].asJsonObjectOrNull()?.get("year").asIntOrNull()
+        val endYear = obj["endDate"].asJsonObjectOrNull()?.get("year").asIntOrNull()
+
         val entryObj = obj["mediaListEntry"].asJsonObjectOrNull()
         val mediaListEntry = entryObj?.let { parseMediaListEntry(it, defaultMediaId = id) }
 
@@ -893,6 +902,8 @@ object AnilistApi {
             recommendations = recommendations,
             trailer = trailer,
             staff = staff,
+            startDateYear = startYear,
+            endDateYear = endYear,
             mediaListEntry = mediaListEntry,
         )
     }.getOrNull()

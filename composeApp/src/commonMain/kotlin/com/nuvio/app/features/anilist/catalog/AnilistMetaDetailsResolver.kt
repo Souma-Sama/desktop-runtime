@@ -246,6 +246,9 @@ object AnilistMetaDetailsResolver {
         )
     }
 
+    private val armImdbCache = mutableMapOf<Int, String>()
+    private val kitsuIdCache = mutableMapOf<String, String>()
+
     suspend fun adaptCinemetaForAnilist(
         cinemetaMeta: MetaDetails,
         rawId: String,
@@ -302,10 +305,25 @@ object AnilistMetaDetailsResolver {
         val anilistPoster = media.coverImage?.extraLarge
             ?: media.coverImage?.large
 
+        val logo = cinemetaMeta.logo?.takeIf { it.isNotBlank() }
+            ?: if (!armImdbId.isNullOrBlank()) "https://images.metahub.space/logo/medium/$armImdbId/img" else null
+
+        val backdrop = cinemetaMeta.background?.takeIf { it.isNotBlank() }
+            ?: if (!armImdbId.isNullOrBlank()) "https://images.metahub.space/background/medium/$armImdbId/img" else (media.bannerImage ?: media.coverImage?.extraLarge)
+
+        val releaseInfo = when {
+            media.startDateYear != null && media.endDateYear != null && media.endDateYear != media.startDateYear -> "${media.startDateYear}–${media.endDateYear}"
+            media.startDateYear != null -> "${media.startDateYear}"
+            else -> cinemetaMeta.releaseInfo
+        }
+
         cinemetaMeta.copy(
             id = rawId,
             type = if (isMovie) "movie" else "series",
             poster = anilistPoster ?: cinemetaMeta.poster,
+            logo = logo,
+            background = backdrop,
+            releaseInfo = releaseInfo,
             videos = isolatedVideos,
             defaultVideoId = if (isMovie) {
                 when {
@@ -326,33 +344,47 @@ object AnilistMetaDetailsResolver {
             .trim()
     }
 
-    suspend fun resolveArmImdbId(anilistId: Int): String? = runCatching {
-        val url = "https://arm.haglund.dev/api/v2/ids?source=anilist&id=$anilistId&include=imdb"
-        val response = httpGetText(url)
-        val jsonElement = json.parseToJsonElement(response)
-        jsonElement.asJsonObjectOrNull()?.get("imdb").asStringOrNull()
-    }.getOrNull()
+    suspend fun resolveArmImdbId(anilistId: Int): String? {
+        armImdbCache[anilistId]?.let { return it }
+        return runCatching {
+            val url = "https://arm.haglund.dev/api/v2/ids?source=anilist&id=$anilistId&include=imdb"
+            val text = httpGetText(url) ?: return@runCatching null
+            val obj = json.parseToJsonElement(text).asJsonObjectOrNull() ?: return@runCatching null
+            val imdbId = obj["imdb"]?.jsonPrimitive?.contentOrNull
+            if (!imdbId.isNullOrBlank()) {
+                armImdbCache[anilistId] = imdbId
+                imdbId
+            } else null
+        }.getOrNull()
+    }
 
-    private suspend fun resolveKitsuId(anilistId: Int, fallbackTitle: String): String? = runCatching {
-        // 1. Try ARM Anilist -> Kitsu ID
-        val url = "https://arm.haglund.dev/api/v2/ids?source=anilist&id=$anilistId&include=kitsu"
-        val response = httpGetText(url)
-        val jsonElement = json.parseToJsonElement(response)
-        val armKitsuId = jsonElement.asJsonObjectOrNull()?.get("kitsu").asStringOrNull()
-            ?: jsonElement.asJsonObjectOrNull()?.get("kitsu").asIntOrNull()?.toString()
-        if (!armKitsuId.isNullOrBlank()) return@runCatching armKitsuId
-
-        // 2. Fallback: Search Kitsu by Title
-        if (fallbackTitle.isNotBlank()) {
-            val safeTitle = fallbackTitle.trim().replace(" ", "%20")
-            val searchUrl = "https://kitsu.io/api/edge/anime?filter%5Btext%5D=$safeTitle&page%5Blimit%5D=1"
-            val searchResponse = httpGetText(searchUrl)
-            val searchJson = json.parseToJsonElement(searchResponse)
-            searchJson.asJsonObjectOrNull()?.get("data").asJsonArrayOrNull()
-                ?.firstOrNull().asJsonObjectOrNull()
-                ?.get("id").asStringOrNull()
-        } else null
-    }.getOrNull()
+    private suspend fun resolveKitsuId(anilistId: Int, title: String): String? {
+        val cacheKey = "$anilistId:$title"
+        kitsuIdCache[cacheKey]?.let { return it }
+        return runCatching {
+            val armUrl = "https://arm.haglund.dev/api/v2/ids?source=anilist&id=$anilistId&include=kitsu"
+            val armText = httpGetText(armUrl)
+            if (!armText.isNullOrBlank()) {
+                val obj = json.parseToJsonElement(armText).asJsonObjectOrNull()
+                val kitsuId = obj?.get("kitsu")?.jsonPrimitive?.contentOrNull
+                if (!kitsuId.isNullOrBlank()) {
+                    kitsuIdCache[cacheKey] = kitsuId
+                    return@runCatching kitsuId
+                }
+            }
+            if (title.isNotBlank()) {
+                val safeTitle = title.trim().replace(" ", "%20")
+                val kitsuSearchUrl = "https://kitsu.io/api/edge/anime?filter%5Btext%5D=$safeTitle&page%5Blimit%5D=1"
+                val searchRes = httpGetText(kitsuSearchUrl) ?: return@runCatching null
+                val sObj = json.parseToJsonElement(searchRes).asJsonObjectOrNull() ?: return@runCatching null
+                val id = sObj["data"].asJsonArrayOrNull()?.firstOrNull()?.asJsonObjectOrNull()?.get("id")?.jsonPrimitive?.contentOrNull
+                if (!id.isNullOrBlank()) {
+                    kitsuIdCache[cacheKey] = id
+                    id
+                } else null
+            } else null
+        }.getOrNull()
+    }
 
     private data class KitsuEpisodeData(
         val title: String?,
