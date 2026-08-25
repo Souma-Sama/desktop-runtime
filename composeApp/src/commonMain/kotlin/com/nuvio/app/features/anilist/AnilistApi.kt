@@ -76,6 +76,24 @@ object AnilistApi {
         }
     }
 
+    private fun JsonElement?.asJsonObjectOrNull(): JsonObject? =
+        if (this is JsonObject) this else null
+
+    private fun JsonElement?.asJsonArrayOrNull(): JsonArray? =
+        if (this is JsonArray) this else null
+
+    private fun JsonElement?.asStringOrNull(): String? =
+        if (this is JsonPrimitive && this !is kotlinx.serialization.json.JsonNull) this.contentOrNull else null
+
+    private fun JsonElement?.asIntOrNull(): Int? =
+        if (this is JsonPrimitive && this !is kotlinx.serialization.json.JsonNull) (this.intOrNull ?: this.contentOrNull?.toIntOrNull()) else null
+
+    private fun JsonElement?.asDoubleOrNull(): Double? =
+        if (this is JsonPrimitive && this !is kotlinx.serialization.json.JsonNull) (this.doubleOrNull ?: this.contentOrNull?.toDoubleOrNull()) else null
+
+    private fun JsonElement?.asLongOrNull(): Long? =
+        if (this is JsonPrimitive && this !is kotlinx.serialization.json.JsonNull) (this.longOrNull ?: this.contentOrNull?.toLongOrNull()) else null
+
     suspend fun fetchCurrentUser(token: String): AnilistUser? {
         val query = """
             query {
@@ -91,12 +109,12 @@ object AnilistApi {
         """.trimIndent()
 
         val root = executeGraphQL(query = query, token = token) ?: return null
-        val viewer = root["data"]?.jsonObject?.get("Viewer")?.jsonObject ?: return null
-        val id = viewer["id"]?.jsonPrimitive?.intOrNull ?: return null
-        val name = viewer["name"]?.jsonPrimitive?.contentOrNull ?: return null
-        val avatar = viewer["avatar"]?.jsonObject
-        val avatarUrl = avatar?.get("large")?.jsonPrimitive?.contentOrNull
-            ?: avatar?.get("medium")?.jsonPrimitive?.contentOrNull
+        val viewer = root["data"].asJsonObjectOrNull()?.get("Viewer").asJsonObjectOrNull() ?: return null
+        val id = viewer["id"].asIntOrNull() ?: return null
+        val name = viewer["name"].asStringOrNull() ?: return null
+        val avatar = viewer["avatar"].asJsonObjectOrNull()
+        val avatarUrl = avatar?.get("large").asStringOrNull()
+            ?: avatar?.get("medium").asStringOrNull()
 
         return AnilistUser(
             id = id,
@@ -160,11 +178,13 @@ object AnilistApi {
 
         val root = executeGraphQL(query = graphQLQuery, variables = variables, token = token)
         val mediaList = root?.get("data")
-            ?.jsonObject?.get("Page")
-            ?.jsonObject?.get("media")
-            ?.jsonArray ?: return emptyList()
+            .asJsonObjectOrNull()?.get("Page")
+            .asJsonObjectOrNull()?.get("media")
+            .asJsonArrayOrNull() ?: return emptyList()
 
-        return mediaList.mapNotNull { parseMedia(it.jsonObject) }
+        return mediaList.mapNotNull { element ->
+            element.asJsonObjectOrNull()?.let { parseMedia(it) }
+        }
     }
 
     suspend fun resolveArmAnilistId(source: String, id: String): Int? {
@@ -172,8 +192,7 @@ object AnilistApi {
         return runCatching {
             val responseText = com.nuvio.app.features.addons.httpGetText(url)
             val jsonElement = json.parseToJsonElement(responseText)
-            jsonElement.jsonObject["anilist"]?.jsonPrimitive?.intOrNull
-                ?: jsonElement.jsonObject["anilist"]?.jsonPrimitive?.contentOrNull?.toIntOrNull()
+            jsonElement.asJsonObjectOrNull()?.get("anilist").asIntOrNull()
         }.getOrNull()
     }
 
@@ -183,9 +202,9 @@ object AnilistApi {
         return runCatching {
             val text = com.nuvio.app.features.addons.httpGetText(url)
             val jsonElement = json.parseToJsonElement(text)
-            val dataArray = jsonElement.jsonObject["data"]?.jsonArray
-            val firstItem = dataArray?.firstOrNull()?.jsonObject
-            val kitsuId = firstItem?.get("id")?.jsonPrimitive?.contentOrNull
+            val dataArray = jsonElement.asJsonObjectOrNull()?.get("data").asJsonArrayOrNull()
+            val firstItem = dataArray?.firstOrNull().asJsonObjectOrNull()
+            val kitsuId = firstItem?.get("id").asStringOrNull()
             if (!kitsuId.isNullOrBlank()) {
                 resolveArmAnilistId(source = "kitsu", id = kitsuId)
             } else null
@@ -238,7 +257,7 @@ object AnilistApi {
 
         val variables = buildJsonObject { put("idMal", malId) }
         val root = executeGraphQL(query = query, variables = variables, token = token)
-        val mediaObj = root?.get("data")?.jsonObject?.get("Media")?.jsonObject ?: return null
+        val mediaObj = root?.get("data").asJsonObjectOrNull()?.get("Media").asJsonObjectOrNull() ?: return null
         return parseMedia(mediaObj)
     }
 
@@ -288,7 +307,7 @@ object AnilistApi {
 
         val variables = buildJsonObject { put("id", mediaId) }
         val root = executeGraphQL(query = query, variables = variables, token = token)
-        val mediaObj = root?.get("data")?.jsonObject?.get("Media")?.jsonObject ?: return null
+        val mediaObj = root?.get("data").asJsonObjectOrNull()?.get("Media").asJsonObjectOrNull() ?: return null
         return parseMedia(mediaObj)
     }
 
@@ -327,7 +346,7 @@ object AnilistApi {
         }
 
         val root = executeGraphQL(query = mutation, variables = variables, token = token)
-        val entryObj = root?.get("data")?.jsonObject?.get("SaveMediaListEntry")?.jsonObject ?: return null
+        val entryObj = root?.get("data").asJsonObjectOrNull()?.get("SaveMediaListEntry").asJsonObjectOrNull() ?: return null
         return parseMediaListEntry(entryObj, defaultMediaId = mediaId)
     }
 
@@ -345,60 +364,51 @@ object AnilistApi {
 
         val variables = buildJsonObject { put("id", entryId) }
         val root = executeGraphQL(query = mutation, variables = variables, token = token)
-        return root?.get("data")?.jsonObject?.get("DeleteMediaListEntry")?.jsonObject?.get("deleted")?.jsonPrimitive?.contentOrNull == "true"
+        return root?.get("data").asJsonObjectOrNull()?.get("DeleteMediaListEntry").asJsonObjectOrNull()?.get("deleted").asStringOrNull() == "true"
     }
 
     private fun parseMedia(obj: JsonObject): AnilistMedia? = runCatching {
-        val id = obj["id"]?.jsonPrimitive?.intOrNull
-            ?: obj["id"]?.jsonPrimitive?.contentOrNull?.toIntOrNull()
-            ?: return null
-        val idMal = obj["idMal"]?.jsonPrimitive?.intOrNull
-            ?: obj["idMal"]?.jsonPrimitive?.contentOrNull?.toIntOrNull()
-        val format = obj["format"]?.jsonPrimitive?.contentOrNull
-        val status = obj["status"]?.jsonPrimitive?.contentOrNull
-        val episodes = obj["episodes"]?.jsonPrimitive?.intOrNull
-            ?: obj["episodes"]?.jsonPrimitive?.contentOrNull?.toIntOrNull()
-        val duration = obj["duration"]?.jsonPrimitive?.intOrNull
-            ?: obj["duration"]?.jsonPrimitive?.contentOrNull?.toIntOrNull()
-        val bannerImage = obj["bannerImage"]?.jsonPrimitive?.contentOrNull
-        val averageScore = obj["averageScore"]?.jsonPrimitive?.intOrNull
-            ?: obj["averageScore"]?.jsonPrimitive?.contentOrNull?.toIntOrNull()
-        val description = obj["description"]?.jsonPrimitive?.contentOrNull
+        val id = obj["id"].asIntOrNull() ?: return null
+        val idMal = obj["idMal"].asIntOrNull()
+        val format = obj["format"].asStringOrNull()
+        val status = obj["status"].asStringOrNull()
+        val episodes = obj["episodes"].asIntOrNull()
+        val duration = obj["duration"].asIntOrNull()
+        val bannerImage = obj["bannerImage"].asStringOrNull()
+        val averageScore = obj["averageScore"].asIntOrNull()
+        val description = obj["description"].asStringOrNull()
 
-        val titleObj = obj["title"]?.jsonObject
+        val titleObj = obj["title"].asJsonObjectOrNull()
         val title = titleObj?.let {
             AnilistTitle(
-                romaji = it["romaji"]?.jsonPrimitive?.contentOrNull,
-                english = it["english"]?.jsonPrimitive?.contentOrNull,
-                native = it["native"]?.jsonPrimitive?.contentOrNull,
+                romaji = it["romaji"].asStringOrNull(),
+                english = it["english"].asStringOrNull(),
+                native = it["native"].asStringOrNull(),
             )
         }
 
-        val coverObj = obj["coverImage"]?.jsonObject
+        val coverObj = obj["coverImage"].asJsonObjectOrNull()
         val coverImage = coverObj?.let {
             AnilistCoverImage(
-                extraLarge = it["extraLarge"]?.jsonPrimitive?.contentOrNull,
-                large = it["large"]?.jsonPrimitive?.contentOrNull,
-                medium = it["medium"]?.jsonPrimitive?.contentOrNull,
+                extraLarge = it["extraLarge"].asStringOrNull(),
+                large = it["large"].asStringOrNull(),
+                medium = it["medium"].asStringOrNull(),
             )
         }
 
-        val genres = obj["genres"]?.jsonArray?.mapNotNull { it.jsonPrimitive.contentOrNull }.orEmpty()
+        val genres = obj["genres"].asJsonArrayOrNull()?.mapNotNull { it.asStringOrNull() }.orEmpty()
 
-        val nextObj = obj["nextAiringEpisode"]?.jsonObject
+        val nextObj = obj["nextAiringEpisode"].asJsonObjectOrNull()
         val nextAiringEpisode = nextObj?.let {
-            val ep = it["episode"]?.jsonPrimitive?.intOrNull
-                ?: it["episode"]?.jsonPrimitive?.contentOrNull?.toIntOrNull()
-            val airAt = it["airingAt"]?.jsonPrimitive?.longOrNull
-                ?: it["airingAt"]?.jsonPrimitive?.contentOrNull?.toLongOrNull()
-            val timeUntil = it["timeUntilAiring"]?.jsonPrimitive?.longOrNull
-                ?: it["timeUntilAiring"]?.jsonPrimitive?.contentOrNull?.toLongOrNull()
+            val ep = it["episode"].asIntOrNull()
+            val airAt = it["airingAt"].asLongOrNull()
+            val timeUntil = it["timeUntilAiring"].asLongOrNull()
             if (ep != null && airAt != null && timeUntil != null) {
                 AnilistNextAiringEpisode(ep, airAt, timeUntil)
             } else null
         }
 
-        val entryObj = obj["mediaListEntry"]?.jsonObject
+        val entryObj = obj["mediaListEntry"].asJsonObjectOrNull()
         val mediaListEntry = entryObj?.let { parseMediaListEntry(it, defaultMediaId = id) }
 
         AnilistMedia(
@@ -420,19 +430,13 @@ object AnilistApi {
     }.getOrNull()
 
     private fun parseMediaListEntry(obj: JsonObject, defaultMediaId: Int): AnilistMediaListEntry = runCatching {
-        val id = obj["id"]?.jsonPrimitive?.intOrNull
-            ?: obj["id"]?.jsonPrimitive?.contentOrNull?.toIntOrNull() ?: 0
-        val mediaId = obj["mediaId"]?.jsonPrimitive?.intOrNull
-            ?: obj["mediaId"]?.jsonPrimitive?.contentOrNull?.toIntOrNull() ?: defaultMediaId
-        val statusStr = obj["status"]?.jsonPrimitive?.contentOrNull
-        val score = obj["score"]?.jsonPrimitive?.doubleOrNull
-            ?: obj["score"]?.jsonPrimitive?.contentOrNull?.toDoubleOrNull() ?: 0.0
-        val progress = obj["progress"]?.jsonPrimitive?.intOrNull
-            ?: obj["progress"]?.jsonPrimitive?.contentOrNull?.toIntOrNull() ?: 0
-        val repeat = obj["repeat"]?.jsonPrimitive?.intOrNull
-            ?: obj["repeat"]?.jsonPrimitive?.contentOrNull?.toIntOrNull() ?: 0
-        val updatedAt = obj["updatedAt"]?.jsonPrimitive?.longOrNull
-            ?: obj["updatedAt"]?.jsonPrimitive?.contentOrNull?.toLongOrNull() ?: 0L
+        val id = obj["id"].asIntOrNull() ?: 0
+        val mediaId = obj["mediaId"].asIntOrNull() ?: defaultMediaId
+        val statusStr = obj["status"].asStringOrNull()
+        val score = obj["score"].asDoubleOrNull() ?: 0.0
+        val progress = obj["progress"].asIntOrNull() ?: 0
+        val repeat = obj["repeat"].asIntOrNull() ?: 0
+        val updatedAt = obj["updatedAt"].asLongOrNull() ?: 0L
 
         AnilistMediaListEntry(
             id = id,
