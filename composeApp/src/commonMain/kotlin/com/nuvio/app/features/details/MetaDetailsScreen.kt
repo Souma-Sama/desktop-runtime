@@ -310,10 +310,16 @@ fun MetaDetailsScreen(
     LaunchedEffect(displayedMeta?.id, effectiveTitle, id) {
         deferredMetaWorkAllowed = false
         if (effectiveTitle.isNotBlank() || displayedMeta != null || id.isNotBlank()) {
+            val videoIds = displayedMeta?.videos.orEmpty().map { it.id }
+            val effectiveMediaId = when {
+                com.nuvio.app.features.anilist.AnilistTrackerCoordinator.hasAnimeId(id) -> id
+                com.nuvio.app.features.anilist.AnilistTrackerCoordinator.hasAnimeId(displayedMeta?.id) -> displayedMeta?.id
+                else -> videoIds.firstOrNull { com.nuvio.app.features.anilist.AnilistTrackerCoordinator.hasAnimeId(it) } ?: (displayedMeta?.id ?: id)
+            }
             val metaYear = displayedMeta?.releaseInfo?.take(4)?.toIntOrNull()
             com.nuvio.app.features.anilist.AnilistTrackerCoordinator.loadForMedia(
                 title = effectiveTitle,
-                mediaId = displayedMeta?.id ?: id,
+                mediaId = effectiveMediaId,
                 year = metaYear,
                 genres = displayedMeta?.genres.orEmpty(),
                 country = displayedMeta?.country,
