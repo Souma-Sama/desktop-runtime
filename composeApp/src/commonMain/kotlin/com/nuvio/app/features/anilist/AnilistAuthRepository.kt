@@ -1,0 +1,85 @@
+package com.nuvio.app.features.anilist
+
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+
+object AnilistAuthRepository {
+    // Official / public Nuvio AniList Client ID or direct implicit grant URL
+    const val OAUTH_AUTHORIZE_URL = "https://anilist.co/api/v2/oauth/authorize?client_id=18408&response_type=token"
+
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+
+    private val _token = MutableStateFlow<String?>(null)
+    val token: StateFlow<String?> = _token.asStateFlow()
+
+    private val _currentUser = MutableStateFlow<AnilistUser?>(null)
+    val currentUser: StateFlow<AnilistUser?> = _currentUser.asStateFlow()
+
+    private val _isAuthenticated = MutableStateFlow(false)
+    val isAuthenticated: StateFlow<Boolean> = _isAuthenticated.asStateFlow()
+
+    private val _isAuthenticating = MutableStateFlow(false)
+    val isAuthenticating: StateFlow<Boolean> = _isAuthenticating.asStateFlow()
+
+    private var initialized = false
+
+    fun ensureInitialized() {
+        if (initialized) return
+        initialized = true
+
+        val savedToken = AnilistAuthStorage.loadToken()
+        val savedUser = AnilistAuthStorage.loadUser()
+
+        if (!savedToken.isNullOrBlank()) {
+            _token.value = savedToken
+            _currentUser.value = savedUser
+            _isAuthenticated.value = true
+
+            // Refresh user profile asynchronously
+            scope.launch {
+                refreshUser()
+            }
+        }
+    }
+
+    suspend fun loginWithToken(token: String): Boolean {
+        val cleanToken = token.trim()
+        if (cleanToken.isBlank()) return false
+
+        _isAuthenticating.value = true
+        val user = runCatching { AnilistApi.fetchCurrentUser(cleanToken) }.getOrNull()
+        _isAuthenticating.value = false
+
+        if (user != null) {
+            _token.value = cleanToken
+            _currentUser.value = user
+            _isAuthenticated.value = true
+
+            AnilistAuthStorage.saveToken(cleanToken)
+            AnilistAuthStorage.saveUser(user)
+            return true
+        }
+
+        return false
+    }
+
+    suspend fun refreshUser(): Boolean {
+        val activeToken = _token.value ?: return false
+        val user = runCatching { AnilistApi.fetchCurrentUser(activeToken) }.getOrNull() ?: return false
+        _currentUser.value = user
+        AnilistAuthStorage.saveUser(user)
+        return true
+    }
+
+    fun logout() {
+        _token.value = null
+        _currentUser.value = null
+        _isAuthenticated.value = false
+        AnilistAuthStorage.clear()
+    }
+}

@@ -306,6 +306,13 @@ fun MetaDetailsScreen(
     LaunchedEffect(displayedMeta?.id) {
         deferredMetaWorkAllowed = false
         if (displayedMeta != null) {
+            val metaYear = displayedMeta.year?.toIntOrNull()
+                ?: displayedMeta.releaseInfo?.take(4)?.toIntOrNull()
+            com.nuvio.app.features.anilist.AnilistTrackerCoordinator.loadForMedia(
+                title = displayedMeta.name,
+                year = metaYear,
+                genres = displayedMeta.genres,
+            )
             delay(250)
             deferredMetaWorkAllowed = true
         }

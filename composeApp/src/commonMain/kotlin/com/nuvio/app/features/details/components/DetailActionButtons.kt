@@ -80,7 +80,7 @@ fun DetailActionButtons(
 
     Box(
         modifier = modifier
-            .widthIn(max = if (isTablet) 520.dp else 420.dp)
+            .widthIn(max = if (isTablet) 580.dp else 480.dp)
             .fillMaxWidth()
             .height(buttonHeight),
     ) {
@@ -209,6 +209,9 @@ fun DetailActionButtons(
                     }
                 }
             }
+
+            Spacer(modifier = Modifier.width(12.dp))
+            AnimeTrackerButton(size = iconButtonSize)
         }
     }
 }

@@ -21,14 +21,17 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.rounded.Sync
 import androidx.compose.material3.BasicAlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -195,10 +198,185 @@ internal fun TrackingProviderCards(
             onInfoRequested = { showSyncInfo = true },
             modifier = Modifier.fillMaxWidth(),
         )
+        AnilistProviderCard(
+            modifier = Modifier.fillMaxWidth(),
+        )
     }
 
     if (showSyncInfo) {
         SimklSyncInfoDialog(onDismiss = { showSyncInfo = false })
+    }
+}
+
+@Composable
+private fun AnilistProviderCard(
+    modifier: Modifier = Modifier,
+) {
+    val isAuth by com.nuvio.app.features.anilist.AnilistAuthRepository.isAuthenticated.collectAsStateWithLifecycle()
+    val user by com.nuvio.app.features.anilist.AnilistAuthRepository.currentUser.collectAsStateWithLifecycle()
+    val uriHandler = LocalUriHandler.current
+    var showTokenDialog by rememberSaveable { mutableStateOf(false) }
+
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Bookmark,
+                        contentDescription = "AniList",
+                        tint = Color(0xFF02A9FF),
+                        modifier = Modifier.size(28.dp),
+                    )
+                    Column {
+                        Text(
+                            text = "AniList",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                        Text(
+                            text = if (isAuth) "Connected as ${user?.name ?: "User"}" else "Anime tracker & list synchronization",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+
+                if (isAuth) {
+                    OutlinedButton(
+                        onClick = { com.nuvio.app.features.anilist.AnilistAuthRepository.logout() },
+                    ) {
+                        Text("Disconnect", color = MaterialTheme.colorScheme.error)
+                    }
+                } else {
+                    Button(
+                        onClick = {
+                            uriHandler.openUri(com.nuvio.app.features.anilist.AnilistAuthRepository.OAUTH_AUTHORIZE_URL)
+                            showTokenDialog = true
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFF02A9FF),
+                            contentColor = Color.White,
+                        ),
+                    ) {
+                        Text("Connect")
+                    }
+                }
+            }
+        }
+    }
+
+    if (showTokenDialog) {
+        AnilistTokenInputDialog(
+            onDismiss = { showTokenDialog = false },
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun AnilistTokenInputDialog(
+    onDismiss: () -> Unit,
+) {
+    var token by remember { mutableStateOf("") }
+    val scope = rememberCoroutineScope()
+    var isSaving by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
+
+    BasicAlertDialog(
+        onDismissRequest = onDismiss,
+    ) {
+        Surface(
+            shape = RoundedCornerShape(16.dp),
+            color = MaterialTheme.colorScheme.surface,
+            modifier = Modifier.widthIn(max = 400.dp).padding(16.dp),
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Text(
+                    text = "Connect AniList",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                )
+                Text(
+                    text = "Log in to AniList in your browser, copy the access token from the URL, and paste it below:",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                OutlinedTextField(
+                    value = token,
+                    onValueChange = {
+                        token = it
+                        error = null
+                    },
+                    label = { Text("AniList Access Token") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                if (error != null) {
+                    Text(
+                        text = error.orEmpty(),
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    TextButton(onClick = onDismiss) {
+                        Text("Cancel")
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Button(
+                        onClick = {
+                            if (token.isNotBlank()) {
+                                scope.launch {
+                                    isSaving = true
+                                    val success = com.nuvio.app.features.anilist.AnilistAuthRepository.loginWithToken(token)
+                                    isSaving = false
+                                    if (success) {
+                                        onDismiss()
+                                    } else {
+                                        error = "Invalid AniList token. Please check and try again."
+                                    }
+                                }
+                            }
+                        },
+                        enabled = token.isNotBlank() && !isSaving,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFF02A9FF),
+                            contentColor = Color.White,
+                        ),
+                    ) {
+                        if (isSaving) {
+                            CircularProgressIndicator(modifier = Modifier.size(16.dp), color = Color.White)
+                        } else {
+                            Text("Connect")
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
