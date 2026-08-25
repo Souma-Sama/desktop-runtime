@@ -23,7 +23,9 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -210,8 +212,13 @@ fun DetailActionButtons(
                 }
             }
 
-            Spacer(modifier = Modifier.width(12.dp))
-            AnimeTrackerButton(size = iconButtonSize)
+            val trackerState by com.nuvio.app.features.anilist.AnilistTrackerCoordinator.trackerState.collectAsState()
+            AnimatedVisibility(visible = trackerState.media != null || trackerState.entry != null) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Spacer(modifier = Modifier.width(12.dp))
+                    AnimeTrackerButton(size = iconButtonSize)
+                }
+            }
         }
     }
 }
