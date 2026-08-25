@@ -52,44 +52,54 @@ object AnilistTrackerCoordinator {
         }
 
         activeJob = scope.launch {
-            val token = AnilistAuthRepository.token.value
-            val cachedMedia = mediaCache[cacheKey]
+            try {
+                val token = AnilistAuthRepository.token.value
+                val cachedMedia = mediaCache[cacheKey]
 
-            val media = if (cachedMedia != null) {
-                // If we have token, refresh entry data
-                if (!token.isNullOrBlank()) {
-                    AnilistApi.fetchMediaById(cachedMedia.id, token = token) ?: cachedMedia
+                val media = if (cachedMedia != null) {
+                    // If we have token, refresh entry data
+                    if (!token.isNullOrBlank()) {
+                        AnilistApi.fetchMediaById(cachedMedia.id, token = token) ?: cachedMedia
+                    } else {
+                        cachedMedia
+                    }
                 } else {
-                    cachedMedia
-                }
-            } else {
-                var searchResults = AnilistApi.searchAnime(query = cleanTitle, year = year, token = token)
-                if (searchResults.isEmpty() && year != null) {
-                    searchResults = AnilistApi.searchAnime(query = cleanTitle, year = null, token = token)
-                }
-                if (searchResults.isEmpty() && cleanTitle != title) {
-                    searchResults = AnilistApi.searchAnime(query = title.trim(), year = null, token = token)
+                    var searchResults = AnilistApi.searchAnime(query = cleanTitle, year = year, token = token)
+                    if (searchResults.isEmpty() && year != null) {
+                        searchResults = AnilistApi.searchAnime(query = cleanTitle, year = null, token = token)
+                    }
+                    if (searchResults.isEmpty() && cleanTitle != title) {
+                        searchResults = AnilistApi.searchAnime(query = title.trim(), year = null, token = token)
+                    }
+
+                    val bestMatch = searchResults.firstOrNull { candidate ->
+                        isTitleMatch(cleanTitle, title, candidate)
+                    } ?: searchResults.firstOrNull()
+
+                    if (bestMatch != null) {
+                        mediaCache[cacheKey] = bestMatch
+                    }
+                    bestMatch
                 }
 
-                val bestMatch = searchResults.firstOrNull { candidate ->
-                    isTitleMatch(cleanTitle, title, candidate)
-                }
-                if (bestMatch != null) {
-                    mediaCache[cacheKey] = bestMatch
-                }
-                bestMatch
-            }
+                val isConfirmedAnime = (media != null && (isExplicitAnime || isTitleMatch(cleanTitle, title, media)))
 
-            val isConfirmedAnime = (media != null && (isExplicitAnime || isTitleMatch(cleanTitle, title, media)))
-
-            _trackerState.update {
-                it.copy(
-                    isLoading = false,
-                    isAnime = isConfirmedAnime,
-                    media = media,
-                    entry = media?.mediaListEntry,
-                    error = if (media == null) "No AniList match found" else null,
-                )
+                _trackerState.update {
+                    it.copy(
+                        isLoading = false,
+                        isAnime = isConfirmedAnime,
+                        media = media,
+                        entry = media?.mediaListEntry,
+                        error = if (media == null) "No AniList match found" else null,
+                    )
+                }
+            } catch (t: Throwable) {
+                _trackerState.update {
+                    it.copy(
+                        isLoading = false,
+                        error = t.message ?: "Failed to load AniList data",
+                    )
+                }
             }
         }
     }
