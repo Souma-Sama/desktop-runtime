@@ -82,12 +82,14 @@ object MetaDetailsRepository {
             )
 
             scope.launch {
+                val lookupId = resolveMetaLookupId(id, type)
+                val normalizedType = if (type == "movie") "movie" else "series"
                 val enrichedMeta = withContext(Dispatchers.Default) {
                     enrichForMetaScreen(
                         requestKey = requestKey,
                         meta = cachedBaseMeta,
-                        fallbackItemId = id,
-                        fallbackItemType = type,
+                        fallbackItemId = lookupId,
+                        fallbackItemType = normalizedType,
                         settings = mdbListSettings,
                         settingsFingerprint = metaScreenSettingsFingerprint,
                     )
