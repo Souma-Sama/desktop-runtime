@@ -223,7 +223,8 @@ object AnilistCatalogRepository {
 
         return CatalogPage(
             items = previews,
-            hasMore = mediaList.size >= perPage,
+            rawItemCount = previews.size,
+            nextSkip = if (mediaList.size >= perPage) (page * perPage) else null,
         )
     }
 }

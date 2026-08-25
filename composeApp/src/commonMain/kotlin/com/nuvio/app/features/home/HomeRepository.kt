@@ -221,16 +221,10 @@ object HomeRepository {
 
     private suspend fun HomeCatalogDefinition.toSection(forceRefresh: Boolean): HomeCatalogSection {
         val page = if (manifestUrl == "native://anilist") {
-            val anilistPage = com.nuvio.app.features.anilist.catalog.AnilistCatalogRepository.fetchCatalogPage(
+            com.nuvio.app.features.anilist.catalog.AnilistCatalogRepository.fetchCatalogPage(
                 catalogId = catalogId,
                 page = 1,
                 perPage = HOME_CATALOG_PREVIEW_FETCH_LIMIT,
-            )
-            com.nuvio.app.features.catalog.CatalogPage(
-                items = anilistPage.items,
-                hasMore = anilistPage.hasMore,
-                rawItemCount = anilistPage.items.size,
-                nextSkip = if (anilistPage.hasMore) anilistPage.items.size else null,
             )
         } else {
             fetchCatalogPage(
