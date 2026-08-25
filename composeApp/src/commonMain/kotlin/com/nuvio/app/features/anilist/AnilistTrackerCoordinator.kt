@@ -300,34 +300,71 @@ object AnilistTrackerCoordinator {
         }
     }
 
-    private fun extractAnilistId(mediaId: String?): Int? {
+    fun extractAnilistId(mediaId: String?): Int? {
         if (mediaId.isNullOrBlank()) return null
         val id = mediaId.trim()
-        if (id.startsWith("anilist:", ignoreCase = true)) return id.substringAfter(":").toIntOrNull()
-        if (id.startsWith("anilist_", ignoreCase = true)) return id.substringAfter("_").toIntOrNull()
-        if (id.startsWith("al:", ignoreCase = true)) return id.substringAfter(":").toIntOrNull()
-        if (id.startsWith("al_", ignoreCase = true)) return id.substringAfter("_").toIntOrNull()
-        if (id.startsWith("anime:", ignoreCase = true)) return id.substringAfter(":").toIntOrNull()
-        // Plain numeric ID that is NOT an IMDb ID (tt...) — treat as AniList ID
+
+        // 1. KatalogAnime_HF format: "ani_140960_140960_50265" or "ani_140960" or "ani:140960"
+        if (id.startsWith("ani_", ignoreCase = true) || id.startsWith("ani:", ignoreCase = true)) {
+            val clean = id.removePrefix("ani_").removePrefix("ANI_").removePrefix("ani:").removePrefix("ANI:")
+            val firstSegment = clean.substringBefore("_").substringBefore(":")
+            val parsed = firstSegment.toIntOrNull()
+            if (parsed != null && parsed > 0) return parsed
+        }
+
+        // 2. Prefixed forms: "anilist:140960", "al:140960", "anime:140960"
+        if (id.startsWith("anilist:", ignoreCase = true)) return id.substringAfter(":").substringBefore("_").substringBefore(":").toIntOrNull()
+        if (id.startsWith("anilist_", ignoreCase = true)) return id.substringAfter("_").substringBefore("_").substringBefore(":").toIntOrNull()
+        if (id.startsWith("al:", ignoreCase = true)) return id.substringAfter(":").substringBefore("_").substringBefore(":").toIntOrNull()
+        if (id.startsWith("al_", ignoreCase = true)) return id.substringAfter("_").substringBefore("_").substringBefore(":").toIntOrNull()
+        if (id.startsWith("anime:", ignoreCase = true)) return id.substringAfter(":").substringBefore("_").substringBefore(":").toIntOrNull()
+
+        // 3. IMDb compound: "tt15477980:140960" (IMDb:AnilistId)
+        if (id.startsWith("tt", ignoreCase = true) && id.contains(":")) {
+            val secondPart = id.substringAfter(":")
+            val parsed = secondPart.toIntOrNull()
+            if (parsed != null && parsed > 0) return parsed
+        }
+
+        // 4. Plain numeric ID that is NOT an IMDb ID (tt...) — treat as AniList ID
         if (id.all { it.isDigit() } && id.length in 1..8) return id.toIntOrNull()
+
         return null
     }
 
-    private fun extractMalId(mediaId: String?): Int? {
+    fun extractMalId(mediaId: String?): Int? {
         if (mediaId.isNullOrBlank()) return null
         val id = mediaId.trim()
         if (id.startsWith("mal:", ignoreCase = true)) return id.substringAfter(":").toIntOrNull()
         if (id.startsWith("mal_", ignoreCase = true)) return id.substringAfter("_").toIntOrNull()
         if (id.startsWith("myanimelist:", ignoreCase = true)) return id.substringAfter(":").toIntOrNull()
+
+        // In KatalogAnime_HF: "ani_<anilistId>_<providerId>_<malId>"
+        if (id.startsWith("ani_", ignoreCase = true)) {
+            val parts = id.removePrefix("ani_").removePrefix("ANI_").split("_")
+            if (parts.size >= 3) {
+                val mal = parts[2].toIntOrNull()
+                if (mal != null && mal > 0) return mal
+            }
+        }
         return null
     }
 
-    private fun extractKitsuId(mediaId: String?): String? {
+    fun extractKitsuId(mediaId: String?): String? {
         if (mediaId.isNullOrBlank()) return null
         val id = mediaId.trim()
         if (id.startsWith("kitsu:", ignoreCase = true)) return id.substringAfter(":")
         if (id.startsWith("kitsu_", ignoreCase = true)) return id.substringAfter("_")
         return null
+    }
+
+    fun hasAnimeId(mediaId: String?): Boolean {
+        if (mediaId.isNullOrBlank()) return false
+        val id = mediaId.trim().lowercase()
+        if (id.startsWith("ani_") || id.startsWith("ani:") || id.startsWith("anilist") || id.startsWith("al:") || id.startsWith("al_") || id.startsWith("kitsu") || id.startsWith("mal") || id.startsWith("anime:")) return true
+        if (id.all { it.isDigit() } && id.length in 1..8) return true
+        if (id.startsWith("tt") && id.contains(":")) return true
+        return false
     }
 
     private fun generateSearchCandidates(rawTitle: String): List<String> {
@@ -338,12 +375,22 @@ object AnilistTrackerCoordinator {
         val clean = cleanAnimeTitle(trimmed)
         if (clean.isNotBlank() && !list.contains(clean)) list.add(clean)
 
+        // Season-stripped candidate (e.g. "SPY x FAMILY Season 2" -> "SPY x FAMILY")
+        val seasonStripped = clean
+            .replace(Regex("""(?i)\s+(?:Season\s+\d+|S\d+|\d+(?:st|nd|rd|th)\s+Season|Part\s+\d+|Cour\s+\d+|Arc).*$"""), "")
+            .trim()
+        if (seasonStripped.length >= 3 && !list.contains(seasonStripped)) {
+            list.add(seasonStripped)
+        }
+
         // Normalize cross symbols (e.g. SPY x FAMILY vs SPY×FAMILY vs Hunter x Hunter)
         if (trimmed.contains("×") || trimmed.contains(" x ", ignoreCase = true)) {
             val normalizedX = trimmed.replace("×", "x")
             if (!list.contains(normalizedX)) list.add(normalizedX)
             val crossSymbol = trimmed.replace(Regex("""\s+[xX]\s+"""), "×")
             if (!list.contains(crossSymbol)) list.add(crossSymbol)
+            val noX = seasonStripped.replace("×", "x")
+            if (!list.contains(noX)) list.add(noX)
         }
 
         if (trimmed.contains(":")) {
@@ -399,7 +446,9 @@ object AnilistTrackerCoordinator {
         genres: List<String>,
         country: String?,
         language: String?,
+        mediaId: String? = null,
     ): Boolean {
+        if (hasAnimeId(mediaId)) return true
         val g = genres.map { it.lowercase() }
         if (g.any { it.contains("anime") || it.contains("anim") }) return true
         // Check for Japanese Kanji, Hiragana, or Katakana in the title

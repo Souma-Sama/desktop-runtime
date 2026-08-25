@@ -218,18 +218,15 @@ fun DetailActionButtons(
 
             val trackerState by com.nuvio.app.features.anilist.AnilistTrackerCoordinator.trackerState.collectAsState()
             val effectiveAnimeTitle = title?.takeIf { it.isNotBlank() } ?: meta?.name.orEmpty()
-            val isAnimeCandidate = meta?.let {
-                com.nuvio.app.features.anilist.AnilistTrackerCoordinator.isAnimeCandidate(
-                    effectiveAnimeTitle,
-                    it.genres,
-                    it.country,
-                    it.language,
-                )
-            } ?: false
-            // Also show tracker for media with plain numeric IDs (AniList IDs)
-            val hasNumericId = meta?.id?.let { id -> id.all { it.isDigit() } && id.length in 1..8 } ?: false
+            val isAnimeCandidate = com.nuvio.app.features.anilist.AnilistTrackerCoordinator.isAnimeCandidate(
+                title = effectiveAnimeTitle,
+                genres = meta?.genres.orEmpty(),
+                country = meta?.country,
+                language = meta?.language,
+                mediaId = meta?.id,
+            )
 
-            if (trackerState.isAnime || isAnimeCandidate || hasNumericId) {
+            if (trackerState.isAnime || isAnimeCandidate) {
                 Spacer(modifier = Modifier.width(12.dp))
                 AnimeTrackerButton(meta = meta, title = title, size = iconButtonSize)
             }
