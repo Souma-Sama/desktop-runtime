@@ -133,38 +133,6 @@ object AnilistMetaDetailsResolver {
         }
 
         // Fallback when Cinemeta / IMDb ID is unavailable: build from AniList + Kitsu
-        val videos = if (isMovie) {
-            emptyList()
-        } else {
-            (1..totalEpisodes).map { epNum ->
-                val epData = episodeMap[epNum]
-                val epTitle = epData?.title?.takeIf { it.isNotBlank() } ?: "Episode $epNum"
-                val epOverview = epData?.overview
-                val epThumbnail = epData?.thumbnail
-                    ?: if (!armImdbId.isNullOrBlank()) "https://images.metahub.space/screenshot/medium/$armImdbId/1/$epNum/img" else null
-
-                val videoId = when {
-                    !kitsuId.isNullOrBlank() -> "kitsu:$kitsuId:$epNum"
-                    !armImdbId.isNullOrBlank() -> "$armImdbId:1:$epNum"
-                    else -> "anilist:$anilistId:$epNum"
-                }
-
-                MetaVideo(
-                    id = videoId,
-                    title = epTitle,
-                    season = 1,
-                    episode = epNum,
-                    overview = epOverview,
-                    thumbnail = epThumbnail,
-                )
-            }
-        }
-
-        val formattedScore = if (media.averageScore != null && media.averageScore > 0) {
-            val score = media.averageScore / 10.0
-            "${(score * 10).toInt() / 10.0}"
-        } else null
-
         MetaDetails(
             id = "ani_$anilistId",
             type = if (isMovie) "movie" else "series",
@@ -187,7 +155,7 @@ object AnilistMetaDetailsResolver {
                     else -> "anilist:$anilistId"
                 }
             } else null,
-            videos = videos,
+            videos = mappedVideos,
         )
     }
 
