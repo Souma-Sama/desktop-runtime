@@ -110,8 +110,6 @@ internal fun DetailsDestination(
                         } ?: false,
                     ),
                 )
-            } else {
-                navController.navigate(SearchRoute(query = person.name))
             }
         },
         onCompanyClick = { company, entityKind ->
@@ -125,8 +123,6 @@ internal fun DetailsDestination(
                         sourceType = route.type,
                     ),
                 )
-            } else {
-                navController.navigate(SearchRoute(query = company.name))
             }
         },
         sharedTransitionScope = sharedTransitionScope,
