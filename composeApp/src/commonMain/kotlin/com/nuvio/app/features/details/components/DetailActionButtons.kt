@@ -212,13 +212,8 @@ fun DetailActionButtons(
                 }
             }
 
-            val trackerState by com.nuvio.app.features.anilist.AnilistTrackerCoordinator.trackerState.collectAsState()
-            AnimatedVisibility(visible = trackerState.media != null || trackerState.entry != null) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Spacer(modifier = Modifier.width(12.dp))
-                    AnimeTrackerButton(size = iconButtonSize)
-                }
-            }
+            Spacer(modifier = Modifier.width(12.dp))
+            AnimeTrackerButton(size = iconButtonSize)
         }
     }
 }

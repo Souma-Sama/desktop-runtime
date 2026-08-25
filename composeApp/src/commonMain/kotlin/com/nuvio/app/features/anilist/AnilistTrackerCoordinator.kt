@@ -59,7 +59,13 @@ object AnilistTrackerCoordinator {
                     cachedMedia
                 }
             } else {
-                val searchResults = AnilistApi.searchAnime(query = cleanTitle, year = year, token = token)
+                var searchResults = AnilistApi.searchAnime(query = cleanTitle, year = year, token = token)
+                if (searchResults.isEmpty() && year != null) {
+                    searchResults = AnilistApi.searchAnime(query = cleanTitle, year = null, token = token)
+                }
+                if (searchResults.isEmpty() && cleanTitle != title) {
+                    searchResults = AnilistApi.searchAnime(query = title.trim(), year = null, token = token)
+                }
                 val bestMatch = searchResults.firstOrNull()
                 if (bestMatch != null) {
                     mediaCache[cacheKey] = bestMatch
