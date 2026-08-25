@@ -70,15 +70,6 @@ object SearchRepository {
         }
 
         val activeAddons = addons.enabledAddons().filter { it.manifest != null }
-        if (activeAddons.isEmpty()) {
-            activeJob?.cancel()
-            lastRequestKey = null
-            _uiState.value = SearchUiState(
-                emptyStateReason = SearchEmptyStateReason.NoActiveAddons,
-            )
-            return
-        }
-
         val requests = buildSearchRequests(
             addons = activeAddons,
             query = normalizedQuery,
@@ -99,7 +90,7 @@ object SearchRepository {
             append('|')
             append(
                 requests.joinToString(separator = "|") { request ->
-                    "${request.addon.manifestUrl}:${request.type}:${request.catalogId}"
+                    "${request.addon?.manifestUrl ?: "native://anilist"}:${request.type}:${request.catalogId}"
                 },
             )
         }
@@ -354,8 +345,18 @@ object SearchRepository {
     private fun buildSearchRequests(
         addons: List<ManagedAddon>,
         query: String,
-    ): List<SearchCatalogRequest> =
-        addons.mapNotNull { addon ->
+    ): List<SearchCatalogRequest> {
+        val anilistRequest = SearchCatalogRequest(
+            addon = null,
+            catalogId = "anilist:search",
+            catalogName = "Anime",
+            type = "anime",
+            query = query,
+            supportsPagination = false,
+            isNativeAnilist = true,
+        )
+
+        val addonRequests = addons.mapNotNull { addon ->
             val manifest = addon.manifest ?: return@mapNotNull null
             addon to manifest
         }.flatMap { (addon, manifest) ->
@@ -369,9 +370,13 @@ object SearchRepository {
                         type = catalog.type,
                         query = query,
                         supportsPagination = catalog.supportsPagination(),
+                        isNativeAnilist = false,
                     )
                 }
         }
+
+        return listOf(anilistRequest) + addonRequests
+    }
 
     private fun buildDiscoverSources(addons: List<ManagedAddon>): List<DiscoverCatalogOption> =
         addons.mapNotNull { addon ->
@@ -397,7 +402,44 @@ object SearchRepository {
         }
 
     private suspend fun SearchCatalogRequest.toSection(forceRefresh: Boolean): HomeCatalogSection {
-        val manifest = requireNotNull(addon.manifest)
+        if (isNativeAnilist) {
+            val mediaList = com.nuvio.app.features.anilist.AnilistApi.searchAnime(query)
+            val previews = mediaList.map { media ->
+                MetaPreview(
+                    id = "ani_${media.id}",
+                    type = if (media.format == "MOVIE") "movie" else "series",
+                    name = media.title?.displayTitle.orEmpty(),
+                    poster = media.coverImage?.extraLarge ?: media.coverImage?.large ?: media.coverImage?.medium,
+                    banner = media.bannerImage,
+                    posterShape = com.nuvio.app.features.home.PosterShape.Poster,
+                    description = media.description,
+                    releaseInfo = if (media.episodes != null) "${media.episodes} eps" else null,
+                    imdbRating = if (media.averageScore != null && media.averageScore > 0) {
+                        "${((media.averageScore / 10.0) * 10).toInt() / 10.0}"
+                    } else null,
+                    genres = media.genres,
+                )
+            }
+            require(previews.isNotEmpty()) {
+                "No anime results found for \"$query\""
+            }
+            return HomeCatalogSection(
+                key = "anilist:search:anime:${query.lowercase()}",
+                title = "AniList Anime",
+                subtitle = "AniList",
+                addonName = "AniList",
+                target = CatalogTarget.Anilist(
+                    catalogId = "anilist:search",
+                    contentType = "anime",
+                    supportsPagination = false,
+                ),
+                items = previews,
+                availableItemCount = previews.size,
+                hasMore = false,
+            )
+        }
+
+        val manifest = requireNotNull(addon?.manifest)
         val page = fetchCatalogPage(
             manifestUrl = manifest.transportUrl,
             type = type,
@@ -551,12 +593,13 @@ private fun CatalogPage.withUnreleasedFilter(): CatalogPage {
 }
 
 private data class SearchCatalogRequest(
-    val addon: ManagedAddon,
+    val addon: ManagedAddon?,
     val catalogId: String,
     val catalogName: String,
     val type: String,
     val query: String,
     val supportsPagination: Boolean,
+    val isNativeAnilist: Boolean = false,
 )
 
 private fun AddonCatalog.supportsSearch(): Boolean =
