@@ -350,7 +350,7 @@ object AnilistMetaDetailsResolver {
             val url = "https://arm.haglund.dev/api/v2/ids?source=anilist&id=$anilistId&include=imdb"
             val text = httpGetText(url) ?: return@runCatching null
             val obj = json.parseToJsonElement(text).asJsonObjectOrNull() ?: return@runCatching null
-            val imdbId = obj["imdb"]?.jsonPrimitive?.contentOrNull
+            val imdbId = obj["imdb"].asStringOrNull()
             if (!imdbId.isNullOrBlank()) {
                 armImdbCache[anilistId] = imdbId
                 imdbId
@@ -366,7 +366,7 @@ object AnilistMetaDetailsResolver {
             val armText = httpGetText(armUrl)
             if (!armText.isNullOrBlank()) {
                 val obj = json.parseToJsonElement(armText).asJsonObjectOrNull()
-                val kitsuId = obj?.get("kitsu")?.jsonPrimitive?.contentOrNull
+                val kitsuId = obj?.get("kitsu").asStringOrNull()
                 if (!kitsuId.isNullOrBlank()) {
                     kitsuIdCache[cacheKey] = kitsuId
                     return@runCatching kitsuId
@@ -377,7 +377,7 @@ object AnilistMetaDetailsResolver {
                 val kitsuSearchUrl = "https://kitsu.io/api/edge/anime?filter%5Btext%5D=$safeTitle&page%5Blimit%5D=1"
                 val searchRes = httpGetText(kitsuSearchUrl) ?: return@runCatching null
                 val sObj = json.parseToJsonElement(searchRes).asJsonObjectOrNull() ?: return@runCatching null
-                val id = sObj["data"].asJsonArrayOrNull()?.firstOrNull()?.asJsonObjectOrNull()?.get("id")?.jsonPrimitive?.contentOrNull
+                val id = sObj["data"].asJsonArrayOrNull()?.firstOrNull()?.asJsonObjectOrNull()?.get("id").asStringOrNull()
                 if (!id.isNullOrBlank()) {
                     kitsuIdCache[cacheKey] = id
                     id
