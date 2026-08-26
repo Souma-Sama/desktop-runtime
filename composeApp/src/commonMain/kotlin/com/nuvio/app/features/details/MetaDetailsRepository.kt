@@ -489,12 +489,26 @@ object MetaDetailsRepository {
         val mdbListRatings = mdbListDeferred.await()
         val traktMeta = traktDeferred.await()
 
+        val isAnilist = meta.id.startsWith("ani_", ignoreCase = true) || meta.id.startsWith("anilist:", ignoreCase = true)
+
+        val mergedVideos = if (isAnilist) {
+            tmdbEnriched.videos.mapIndexed { idx, enrichedVid ->
+                val baseVid = meta.videos.getOrNull(idx)
+                if (enrichedVid.thumbnail.isNullOrBlank() && baseVid?.thumbnail?.isNotBlank() == true) {
+                    enrichedVid.copy(thumbnail = baseVid.thumbnail)
+                } else enrichedVid
+            }
+        } else tmdbEnriched.videos
+
         val enrichedMeta = tmdbEnriched.copy(
             externalRatings = mdbListRatings.ifEmpty { tmdbEnriched.externalRatings },
             moreLikeThis = traktMeta.moreLikeThis.ifEmpty { tmdbEnriched.moreLikeThis },
             moreLikeThisSource = traktMeta.moreLikeThisSource ?: tmdbEnriched.moreLikeThisSource,
-            // Preserve per-season release year from AniList (prevents TMDB overwriting with show's overall first air date)
-            releaseInfo = meta.releaseInfo ?: tmdbEnriched.releaseInfo,
+            videos = mergedVideos,
+            // Preserve per-season release year and air dates from AniList
+            releaseInfo = if (isAnilist && !meta.releaseInfo.isNullOrBlank()) meta.releaseInfo else (meta.releaseInfo ?: tmdbEnriched.releaseInfo),
+            status = if (isAnilist && !meta.status.isNullOrBlank()) meta.status else tmdbEnriched.status,
+            lastAirDate = if (isAnilist && !meta.lastAirDate.isNullOrBlank()) meta.lastAirDate else tmdbEnriched.lastAirDate,
         )
 
         cachedMetaByRequestKey[requestKey] = cachedMetaByRequestKey[requestKey]

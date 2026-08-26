@@ -156,18 +156,17 @@ object AnilistMetaDetailsResolver {
                     ?: cinemetaMeta?.videos?.firstOrNull { it.season == targetSeason && it.episode == null && cinemetaMeta.videos.indexOf(it) == epNum - 1 }
                 val epData = episodeMap[epNum]
 
-                val epTitle = streamingEp?.title?.takeIf { it.isNotBlank() }
-                    ?: cinemetaEp?.title?.takeIf { it.isNotBlank() }
+                val epTitle = cinemetaEp?.title?.takeIf { it.isNotBlank() }
                     ?: epData?.title?.takeIf { it.isNotBlank() }
+                    ?: streamingEp?.title?.takeIf { it.isNotBlank() }
                     ?: "Episode $epNum"
 
                 val epOverview = cinemetaEp?.overview?.takeIf { it.isNotBlank() }
                     ?: epData?.overview
 
-                val epThumbnail = streamingEp?.thumbnail?.takeIf { it.isNotBlank() }
-                    ?: epData?.thumbnail
-                    ?: cinemetaEp?.thumbnail?.takeIf { it.isNotBlank() }
-                    ?: if (!armImdbId.isNullOrBlank()) "https://images.metahub.space/screenshot/medium/$armImdbId/$targetSeason/$epNum/img" else null
+                val epThumbnail = cinemetaEp?.thumbnail?.takeIf { it.isNotBlank() }
+                    ?: if (!armImdbId.isNullOrBlank()) "https://episodes.metahub.space/$armImdbId/$targetSeason/$epNum/w780.jpg"
+                    else epData?.thumbnail ?: streamingEp?.thumbnail
 
                 val videoId = when {
                     !kitsuId.isNullOrBlank() -> "kitsu:$kitsuId:$epNum"
@@ -201,6 +200,8 @@ object AnilistMetaDetailsResolver {
                 logo = cinemetaMeta.logo ?: logo,
                 description = cleanDescription,
                 releaseInfo = media.startDateYear?.toString() ?: cinemetaMeta.releaseInfo,
+                status = media.status ?: cinemetaMeta.status,
+                lastAirDate = media.endDateYear?.toString() ?: media.startDateYear?.toString() ?: cinemetaMeta.releaseInfo,
                 cast = cinemetaMeta.cast.ifEmpty { castPersons },
                 productionCompanies = cinemetaMeta.productionCompanies.ifEmpty { animationStudios },
                 networks = cinemetaMeta.networks.ifEmpty { networks },
@@ -328,10 +329,9 @@ object AnilistMetaDetailsResolver {
                         id = "$effectiveImdbId:$targetSeason:${v.episode ?: epNum}",
                         season = targetSeason,
                         episode = epNum,
-                        title = streamingEp?.title?.takeIf { it.isNotBlank() } ?: v.title,
-                        thumbnail = streamingEp?.thumbnail?.takeIf { it.isNotBlank() }
-                            ?: v.thumbnail
-                            ?: "https://images.metahub.space/screenshot/medium/$effectiveImdbId/$targetSeason/$epNum/img",
+                        title = v.title?.takeIf { it.isNotBlank() } ?: streamingEp?.title?.takeIf { it.isNotBlank() } ?: "Episode $epNum",
+                        thumbnail = v.thumbnail?.takeIf { it.isNotBlank() }
+                            ?: "https://episodes.metahub.space/$effectiveImdbId/$targetSeason/$epNum/w780.jpg",
                     )
                 }
         } else if (targetSeason > 1 && media?.episodes != null && media.episodes > 0) {
@@ -342,8 +342,7 @@ object AnilistMetaDetailsResolver {
                     season = targetSeason,
                     episode = epNum,
                     title = streamingEp?.title?.takeIf { it.isNotBlank() } ?: "Episode $epNum",
-                    thumbnail = streamingEp?.thumbnail?.takeIf { it.isNotBlank() }
-                        ?: "https://images.metahub.space/screenshot/medium/$effectiveImdbId/$targetSeason/$epNum/img",
+                    thumbnail = "https://episodes.metahub.space/$effectiveImdbId/$targetSeason/$epNum/w780.jpg",
                 )
             }
         } else if (cinemetaMeta.videos.any { it.season == 1 }) {
@@ -356,10 +355,9 @@ object AnilistMetaDetailsResolver {
                         id = "$effectiveImdbId:1:${v.episode ?: epNum}",
                         season = 1,
                         episode = epNum,
-                        title = streamingEp?.title?.takeIf { it.isNotBlank() } ?: v.title,
-                        thumbnail = streamingEp?.thumbnail?.takeIf { it.isNotBlank() }
-                            ?: v.thumbnail
-                            ?: "https://images.metahub.space/screenshot/medium/$effectiveImdbId/1/$epNum/img",
+                        title = v.title?.takeIf { it.isNotBlank() } ?: streamingEp?.title?.takeIf { it.isNotBlank() } ?: "Episode $epNum",
+                        thumbnail = v.thumbnail?.takeIf { it.isNotBlank() }
+                            ?: "https://episodes.metahub.space/$effectiveImdbId/1/$epNum/w780.jpg",
                     )
                 }
         } else {
@@ -376,6 +374,8 @@ object AnilistMetaDetailsResolver {
             name = media?.title?.displayTitle ?: cinemetaMeta.name,
             poster = anilistPoster,
             releaseInfo = releaseYear,
+            status = media?.status ?: cinemetaMeta.status,
+            lastAirDate = media?.endDateYear?.toString() ?: releaseYear,
             background = cinemetaMeta.background ?: "https://images.metahub.space/background/medium/$effectiveImdbId/img",
             logo = cinemetaMeta.logo ?: "https://images.metahub.space/logo/medium/$effectiveImdbId/img",
             videos = seasonVideos,
