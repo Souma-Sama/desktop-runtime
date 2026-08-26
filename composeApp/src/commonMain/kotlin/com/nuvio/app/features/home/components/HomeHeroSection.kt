@@ -116,6 +116,14 @@ fun HomeHeroSection(
     var pagerDragActive by remember { mutableStateOf(false) }
     val autoScrollPage = pagerState.currentPage
 
+    LaunchedEffect(items) {
+        items.take(6).forEach { item ->
+            launch {
+                FanartService.resolveLogo(item.id, item.type)
+            }
+        }
+    }
+
     LaunchedEffect(autoScrollPage, items.size) {
         if (items.size <= 1) return@LaunchedEffect
         delay(HERO_AUTO_SCROLL_INTERVAL_MS)
