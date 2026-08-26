@@ -222,7 +222,19 @@ private fun HeroBackgroundLayers(
 
     layerPages.forEach { page ->
         val item = items[page]
-        val backgroundModel = item.banner ?: FanartService.getCachedBackdrop(item.id, item.type) ?: item.poster
+        var fanartBackdrop by remember(item.type, item.id) {
+            mutableStateOf(FanartService.getCachedBackdrop(item.id, item.type))
+        }
+        LaunchedEffect(item.type, item.id) {
+            if (fanartBackdrop == null) {
+                FanartService.resolveLogo(item.id, item.type)
+                val resolved = FanartService.getCachedBackdrop(item.id, item.type)
+                if (resolved != null) {
+                    fanartBackdrop = resolved
+                }
+            }
+        }
+        val backgroundModel = fanartBackdrop ?: item.banner ?: item.poster
         AsyncImage(
             model = backgroundModel,
             contentDescription = item.name,
@@ -745,21 +757,21 @@ private fun HeroContentBlock(
     layout: HomeHeroLayout,
     onItemClick: ((MetaPreview) -> Unit)?,
 ) {
-    var logoLoadError by remember(item.type, item.id, item.logo) {
+    var logoLoadError by remember(item.type, item.id) {
         mutableStateOf(false)
     }
-    var fanartLogo by remember(item.type, item.id, item.logo) {
+    var fanartLogo by remember(item.type, item.id) {
         mutableStateOf(FanartService.getCachedLogo(item.id, item.type))
     }
-    LaunchedEffect(item.type, item.id, item.logo) {
-        if (item.logo.isNullOrBlank() && fanartLogo == null) {
+    LaunchedEffect(item.type, item.id) {
+        if (fanartLogo == null) {
             val resolved = FanartService.resolveLogo(item.id, item.type)
             if (!resolved.isNullOrBlank()) {
                 fanartLogo = resolved
             }
         }
     }
-    val logoUrl = item.logo?.takeIf { it.isNotBlank() } ?: fanartLogo
+    val logoUrl = fanartLogo ?: item.logo?.takeIf { it.isNotBlank() }
 
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -830,21 +842,21 @@ private fun DesktopHeroContentBlock(
     onItemClick: ((MetaPreview) -> Unit)?,
 ) {
     val colorScheme = MaterialTheme.colorScheme
-    var logoLoadError by remember(item.type, item.id, item.logo) {
+    var logoLoadError by remember(item.type, item.id) {
         mutableStateOf(false)
     }
-    var fanartLogo by remember(item.type, item.id, item.logo) {
+    var fanartLogo by remember(item.type, item.id) {
         mutableStateOf(FanartService.getCachedLogo(item.id, item.type))
     }
-    LaunchedEffect(item.type, item.id, item.logo) {
-        if (item.logo.isNullOrBlank() && fanartLogo == null) {
+    LaunchedEffect(item.type, item.id) {
+        if (fanartLogo == null) {
             val resolved = FanartService.resolveLogo(item.id, item.type)
             if (!resolved.isNullOrBlank()) {
                 fanartLogo = resolved
             }
         }
     }
-    val logoUrl = item.logo?.takeIf { it.isNotBlank() } ?: fanartLogo
+    val logoUrl = fanartLogo ?: item.logo?.takeIf { it.isNotBlank() }
 
     Column(
         modifier = Modifier
