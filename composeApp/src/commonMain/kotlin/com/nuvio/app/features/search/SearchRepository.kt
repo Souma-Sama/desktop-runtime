@@ -415,11 +415,14 @@ object SearchRepository {
                     banner = media.bannerImage,
                     posterShape = com.nuvio.app.features.home.PosterShape.Poster,
                     description = media.description,
-                    releaseInfo = if (media.episodes != null && media.episodes > 0 && media.format != "MOVIE") {
-                        "${media.episodes} eps"
-                    } else {
-                        media.startDateYear?.toString() ?: media.duration?.let { "$it min" }
-                    },
+                    releaseInfo = listOfNotNull(
+                        media.startDateYear?.toString(),
+                        if (media.episodes != null && media.episodes > 0 && media.format != "MOVIE") {
+                            "${media.episodes} eps"
+                        } else {
+                            media.duration?.let { "$it min" }
+                        },
+                    ).joinToString(" • ").takeIf { it.isNotBlank() },
                     imdbRating = if (media.averageScore != null && media.averageScore > 0) {
                         "${((media.averageScore / 10.0) * 10).toInt() / 10.0}"
                     } else null,
