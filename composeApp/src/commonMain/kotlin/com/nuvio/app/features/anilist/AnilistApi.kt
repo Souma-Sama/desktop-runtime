@@ -924,6 +924,9 @@ object AnilistApi {
                 )
             }.orEmpty()
 
+        val entryObj = obj["mediaListEntry"].asJsonObjectOrNull()
+        val mediaListEntry = entryObj?.let { parseMediaListEntry(it, defaultMediaId = id) }
+
         val media = AnilistMedia(
             id = id,
             idMal = idMal,

@@ -188,7 +188,7 @@ object AnilistMetaDetailsResolver {
                     episode = actualEpNumber,
                     overview = epOverview,
                     thumbnail = epThumbnail,
-                    released = cinemetaEp?.released ?: epData?.airDate,
+                    released = cinemetaEp?.released,
                     streams = cinemetaEp?.streams.orEmpty(),
                 )
             }
