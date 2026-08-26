@@ -11,6 +11,7 @@ import nuvio.composeapp.generated.resources.settings_integrations_section_title
 import nuvio.composeapp.generated.resources.settings_integrations_tmdb_description
 import nuvio.composeapp.generated.resources.compose_settings_page_fanart
 import nuvio.composeapp.generated.resources.settings_integrations_fanart_description
+import org.jetbrains.compose.resources.stringResource
 
 internal fun LazyListScope.integrationsContent(
     isTablet: Boolean,
