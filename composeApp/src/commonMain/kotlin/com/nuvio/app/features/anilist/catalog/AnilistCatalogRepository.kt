@@ -156,7 +156,8 @@ object AnilistCatalogRepository {
             }
         } else null
 
-        val cacheKey = "$catalogId:$page:$perPage:${user?.name ?: "anon"}"
+        val prefs = com.nuvio.app.features.anilist.AnilistPreferencesRepository.snapshot()
+        val cacheKey = "$catalogId:$page:$perPage:${user?.name ?: "anon"}:${prefs.preferredTitleLanguage.name}"
         val now = LibraryClock.nowEpochMs()
         if (!force) {
             val cached = pageCache[cacheKey]
@@ -165,7 +166,7 @@ object AnilistCatalogRepository {
             }
         }
 
-        log.d { "fetchCatalogPage: catalogId=$catalogId, page=$page, tokenPresent=${!token.isNullOrBlank()}" }
+        log.d { "fetchCatalogPage: catalogId=$catalogId, page=$page, tokenPresent=${!token.isNullOrBlank()}, force=$force" }
 
         val mediaList: List<AnilistMedia> = when (catalogId) {
             CATALOG_WATCHING -> {
@@ -239,7 +240,7 @@ object AnilistCatalogRepository {
             MetaPreview(
                 id = "ani_${media.id}",
                 type = if (media.format == "MOVIE") "movie" else "series",
-                name = media.title?.displayTitle.orEmpty(),
+                name = media.title?.getDisplayTitle(prefs.preferredTitleLanguage).orEmpty(),
                 poster = media.coverImage?.extraLarge ?: media.coverImage?.large ?: media.coverImage?.medium,
                 banner = media.bannerImage,
                 posterShape = PosterShape.Poster,

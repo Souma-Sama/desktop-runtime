@@ -62,6 +62,7 @@ object AnilistAuthRepository {
 
             AnilistAuthStorage.saveToken(cleanToken)
             AnilistAuthStorage.saveUser(user)
+            com.nuvio.app.features.anilist.catalog.AnilistCatalogRepository.clearCache()
             return true
         }
 
@@ -96,5 +97,6 @@ object AnilistAuthRepository {
         _currentUser.value = null
         _isAuthenticated.value = false
         AnilistAuthStorage.clear()
+        com.nuvio.app.features.anilist.catalog.AnilistCatalogRepository.clearCache()
     }
 }

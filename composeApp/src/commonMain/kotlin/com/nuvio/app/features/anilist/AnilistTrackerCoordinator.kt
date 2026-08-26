@@ -219,6 +219,7 @@ object AnilistTrackerCoordinator {
                 status = status,
                 token = token,
             )
+            com.nuvio.app.features.anilist.catalog.AnilistCatalogRepository.clearCache()
             _trackerState.update {
                 it.copy(
                     isSyncing = false,
@@ -251,6 +252,7 @@ object AnilistTrackerCoordinator {
                 progress = safeProgress,
                 token = token,
             )
+            com.nuvio.app.features.anilist.catalog.AnilistCatalogRepository.clearCache()
             _trackerState.update {
                 it.copy(
                     isSyncing = false,
@@ -325,6 +327,7 @@ object AnilistTrackerCoordinator {
                     )
 
                     if (updatedEntry != null) {
+                        com.nuvio.app.features.anilist.catalog.AnilistCatalogRepository.clearCache()
                         _trackerState.update {
                             it.copy(entry = updatedEntry)
                         }
@@ -356,6 +359,7 @@ object AnilistTrackerCoordinator {
                 score = safeScore,
                 token = token,
             )
+            com.nuvio.app.features.anilist.catalog.AnilistCatalogRepository.clearCache()
             _trackerState.update {
                 it.copy(
                     isSyncing = false,
@@ -373,6 +377,7 @@ object AnilistTrackerCoordinator {
             _trackerState.update { it.copy(isSyncing = true) }
             val success = AnilistApi.deleteMediaListEntry(entryId = entryId, token = token)
             if (success) {
+                com.nuvio.app.features.anilist.catalog.AnilistCatalogRepository.clearCache()
                 _trackerState.update {
                     it.copy(isSyncing = false, entry = null)
                 }

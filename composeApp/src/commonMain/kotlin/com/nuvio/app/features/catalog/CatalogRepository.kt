@@ -171,6 +171,7 @@ object CatalogRepository {
                             catalogId = target.catalogId,
                             page = pageNum,
                             perPage = 25,
+                            force = forceRefresh,
                         )
                     }
 

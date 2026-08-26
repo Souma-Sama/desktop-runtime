@@ -58,6 +58,7 @@ object AnilistPreferencesRepository {
         _preferences.update { current ->
             val updated = transform(current)
             AnilistPreferencesStorage.save(updated)
+            com.nuvio.app.features.anilist.catalog.AnilistCatalogRepository.clearCache()
             updated
         }
     }

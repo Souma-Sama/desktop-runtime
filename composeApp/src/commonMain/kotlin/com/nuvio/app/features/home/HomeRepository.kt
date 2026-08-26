@@ -225,6 +225,7 @@ object HomeRepository {
                 catalogId = catalogId,
                 page = 1,
                 perPage = HOME_CATALOG_PREVIEW_FETCH_LIMIT,
+                force = forceRefresh,
             )
         } else {
             fetchCatalogPage(

@@ -55,6 +55,8 @@ import com.nuvio.app.features.trakt.TraktSettingsStorage
 import com.nuvio.app.features.simkl.SimklAuthStorage
 import com.nuvio.app.features.simkl.SimklSyncStorage
 import com.nuvio.app.features.tmdb.TmdbSettingsStorage
+import com.nuvio.app.features.anilist.AnilistAuthStorage
+import com.nuvio.app.features.anilist.AnilistPreferencesStorage
 import com.nuvio.app.features.updater.AndroidAppUpdaterPlatform
 import com.nuvio.app.core.ui.CardDepthStyleStorage
 import com.nuvio.app.core.ui.PosterCardStyleStorage
@@ -116,6 +118,8 @@ open class MainActivity : AppCompatActivity() {
         TraktSettingsStorage.initialize(applicationContext)
         SimklAuthStorage.initialize(applicationContext)
         SimklSyncStorage.initialize(applicationContext)
+        AnilistAuthStorage.initialize(applicationContext)
+        AnilistPreferencesStorage.initialize(applicationContext)
         LibraryDisplaySettingsStorage.initialize(applicationContext)
         ContinueWatchingPreferencesStorage.initialize(applicationContext)
         ResumePromptStorage.initialize(applicationContext)

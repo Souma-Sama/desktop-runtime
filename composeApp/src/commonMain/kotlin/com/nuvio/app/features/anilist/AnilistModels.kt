@@ -35,10 +35,16 @@ data class AnilistTitle(
     val english: String? = null,
     val native: String? = null,
 ) {
+    fun getDisplayTitle(preference: AnilistTitleLanguage = AnilistPreferencesRepository.snapshot().preferredTitleLanguage): String {
+        return when (preference) {
+            AnilistTitleLanguage.ROMAJI -> romaji?.takeIf { it.isNotBlank() } ?: english?.takeIf { it.isNotBlank() } ?: native.orEmpty()
+            AnilistTitleLanguage.ENGLISH -> english?.takeIf { it.isNotBlank() } ?: romaji?.takeIf { it.isNotBlank() } ?: native.orEmpty()
+            AnilistTitleLanguage.NATIVE -> native?.takeIf { it.isNotBlank() } ?: romaji?.takeIf { it.isNotBlank() } ?: english.orEmpty()
+        }
+    }
+
     val displayTitle: String
-        get() = english?.takeIf { it.isNotBlank() }
-            ?: romaji?.takeIf { it.isNotBlank() }
-            ?: native.orEmpty()
+        get() = getDisplayTitle()
 }
 
 @Serializable
