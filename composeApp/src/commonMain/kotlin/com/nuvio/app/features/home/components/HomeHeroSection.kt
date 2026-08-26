@@ -886,7 +886,7 @@ private fun DesktopHeroContentBlock(
             )
         }
 
-        item.description?.takeIf { it.isNotBlank() }?.let { description ->
+        com.nuvio.app.core.format.cleanHtmlDescription(item.description)?.let { description ->
             Spacer(modifier = Modifier.height(NuvioTokens.Space.s16))
             Text(
                 text = description,

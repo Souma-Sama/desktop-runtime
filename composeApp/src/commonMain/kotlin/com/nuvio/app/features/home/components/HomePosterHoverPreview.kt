@@ -490,7 +490,7 @@ private fun HomePosterPreviewCard(
                     )
                 }
 
-            item.description?.takeIf { it.isNotBlank() }?.let { description ->
+            com.nuvio.app.core.format.cleanHtmlDescription(item.description)?.let { description ->
                 Text(
                     text = description,
                     style = MaterialTheme.typography.bodyMedium,

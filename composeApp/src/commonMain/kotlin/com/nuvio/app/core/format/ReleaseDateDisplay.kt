@@ -43,3 +43,26 @@ fun extractReleaseYearForDisplay(raw: String): Int? {
     val yearStr = datePart.split('-').firstOrNull() ?: return null
     return yearStr.toIntOrNull()?.takeIf { it in 1000..9999 }
 }
+
+/**
+ * Strips HTML formatting tags, entity escapes, and source attributions from descriptions.
+ */
+fun cleanHtmlDescription(raw: String?): String? {
+    if (raw.isNullOrBlank()) return null
+    return raw
+        .replace(Regex("<br\\s*/?>", RegexOption.IGNORE_CASE), "\n")
+        .replace(Regex("<[^>]*>"), "")
+        .replace("&quot;", "\"")
+        .replace("&amp;", "&")
+        .replace("&lt;", "<")
+        .replace("&gt;", ">")
+        .replace("&#039;", "'")
+        .replace("&apos;", "'")
+        .replace("&nbsp;", " ")
+        .replace(Regex("(?i)\\(Source:.*?\\)"), "")
+        .replace(Regex("(?i)\\[Written by.*?\\]"), "")
+        .replace(Regex("(?i)Source:.*"), "")
+        .replace(Regex("\n{3,}"), "\n\n")
+        .trim()
+        .takeIf { it.isNotEmpty() }
+}

@@ -80,8 +80,7 @@ object AnilistMetaDetailsResolver {
             }
         }
 
-        val cleanDescription = cinemetaMeta?.description?.takeIf { it.isNotBlank() }
-            ?: media.description?.cleanAnilistDescription()
+        val cleanDescription = com.nuvio.app.core.format.cleanHtmlDescription(cinemetaMeta?.description ?: media.description)
 
         val castPersons = media.characters.mapNotNull { char ->
             val va = char.voiceActor
@@ -493,45 +492,40 @@ object AnilistMetaDetailsResolver {
     ): Int {
         if (media == null) return 0
         val title = media.title?.displayTitle.orEmpty()
-        val isSplit = isSplitCourTitle(title)
+        val partNum = extractPartNumber(title)
 
-        // 1. If relations has a PREQUEL with the same split-cour context
-        val prequels = media.relations.filter { it.relationType.equals("PREQUEL", ignoreCase = true) }
-        if (isSplit && prequels.isNotEmpty()) {
-            var sum = 0
-            for (p in prequels) {
-                val eps = p.episodes
-                if (eps != null && eps > 0) {
-                    sum += eps
-                }
-            }
-            if (sum > 0) return sum
-        }
+        if (partNum > 1) {
+            val prequels = media.relations.filter { it.relationType.equals("PREQUEL", ignoreCase = true) }
+            val prequelEps = prequels.mapNotNull { it.episodes }.firstOrNull { it > 0 }
+                ?: media.episodes
+                ?: (cinemetaVideos.count { it.season == targetSeason } / partNum).coerceAtLeast(11)
 
-        // 2. Fallback heuristic from title matching (e.g. "Part 2", "Cour 2", "Part 3", "Cour 3", "Part 4")
-        if (isSplit) {
-            val partMatch = Regex("(?i)(?:part|cour)\\s*([2-4])|([2-4])(?:nd|rd|th)\\s*cour").find(title)
-            if (partMatch != null) {
-                val partNum = (partMatch.groupValues[1].ifEmpty { partMatch.groupValues[2] }).toIntOrNull() ?: 2
-                if (partNum > 1) {
-                    val totalInSeason = cinemetaVideos.count { it.season == targetSeason }
-                    val estimatedPerPart = if (totalInSeason > 0) (totalInSeason / partNum).coerceAtLeast(11) else 12
-                    return (partNum - 1) * estimatedPerPart
-                }
-            }
+            return (partNum - 1) * prequelEps
         }
 
         return 0
     }
 
-    private fun isSplitCourTitle(title: String): Boolean {
-        val lower = title.lowercase()
-        return lower.contains("part 2") || lower.contains("part ii") ||
-               lower.contains("part 3") || lower.contains("part iii") ||
-               lower.contains("part 4") || lower.contains("part iv") ||
-               lower.contains("cour 2") || lower.contains("2nd cour") ||
-               lower.contains("cour 3") || lower.contains("3rd cour") ||
-               lower.contains("cour 4") || lower.contains("4th cour") ||
-               lower.contains("final season part") || lower.contains("the final season part")
+    private fun extractPartNumber(title: String): Int {
+        val m = Regex("(?i)(?:part|cour)\\s*(?:(\\d+)|(iv|iii|ii|i)\\b)").find(title)
+        if (m != null) {
+            val numStr = m.groupValues[1]
+            if (numStr.isNotEmpty()) {
+                return numStr.toIntOrNull() ?: 1
+            }
+            val roman = m.groupValues[2].lowercase()
+            return when (roman) {
+                "iv" -> 4
+                "iii" -> 3
+                "ii" -> 2
+                "i" -> 1
+                else -> 1
+            }
+        }
+        val m2 = Regex("(?i)(\\d+)(?:nd|rd|th)\\s*cour").find(title)
+        if (m2 != null) {
+            return m2.groupValues[1].toIntOrNull() ?: 1
+        }
+        return 1
     }
 }

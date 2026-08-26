@@ -780,7 +780,7 @@ object AnilistApi {
         val duration = obj["duration"].asIntOrNull()
         val bannerImage = obj["bannerImage"].asStringOrNull()
         val averageScore = obj["averageScore"].asIntOrNull()
-        val description = obj["description"].asStringOrNull()
+        val description = com.nuvio.app.core.format.cleanHtmlDescription(obj["description"].asStringOrNull())
 
         val titleObj = obj["title"].asJsonObjectOrNull()
         val title = titleObj?.let {
