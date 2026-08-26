@@ -152,7 +152,8 @@ object AnilistMetaDetailsResolver {
         } else {
             (1..totalEpisodes).map { epNum ->
                 val streamingEp = media.streamingEpisodes.getOrNull(epNum - 1)
-                val cinemetaEp = cinemetaMeta?.videos?.firstOrNull { it.episode == epNum }
+                val cinemetaEp = cinemetaMeta?.videos?.firstOrNull { it.season == targetSeason && it.episode == epNum }
+                    ?: cinemetaMeta?.videos?.firstOrNull { it.season == targetSeason && it.episode == null && cinemetaMeta.videos.indexOf(it) == epNum - 1 }
                 val epData = episodeMap[epNum]
 
                 val epTitle = streamingEp?.title?.takeIf { it.isNotBlank() }
@@ -199,6 +200,7 @@ object AnilistMetaDetailsResolver {
                 background = cinemetaMeta.background ?: backdrop,
                 logo = cinemetaMeta.logo ?: logo,
                 description = cleanDescription,
+                releaseInfo = media.startDateYear?.toString() ?: cinemetaMeta.releaseInfo,
                 cast = cinemetaMeta.cast.ifEmpty { castPersons },
                 productionCompanies = cinemetaMeta.productionCompanies.ifEmpty { animationStudios },
                 networks = cinemetaMeta.networks.ifEmpty { networks },

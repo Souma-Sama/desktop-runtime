@@ -493,6 +493,8 @@ object MetaDetailsRepository {
             externalRatings = mdbListRatings.ifEmpty { tmdbEnriched.externalRatings },
             moreLikeThis = traktMeta.moreLikeThis.ifEmpty { tmdbEnriched.moreLikeThis },
             moreLikeThisSource = traktMeta.moreLikeThisSource ?: tmdbEnriched.moreLikeThisSource,
+            // Preserve per-season release year from AniList (prevents TMDB overwriting with show's overall first air date)
+            releaseInfo = meta.releaseInfo ?: tmdbEnriched.releaseInfo,
         )
 
         cachedMetaByRequestKey[requestKey] = cachedMetaByRequestKey[requestKey]
