@@ -5,6 +5,7 @@ import com.nuvio.app.features.addons.httpGetText
 import com.nuvio.app.features.anilist.AnilistApi
 import com.nuvio.app.features.anilist.AnilistAuthRepository
 import com.nuvio.app.features.anilist.AnilistMedia
+import com.nuvio.app.features.anilist.AnilistRelation
 import com.nuvio.app.features.anilist.AnilistTrackerCoordinator
 import com.nuvio.app.features.details.MetaDetails
 import com.nuvio.app.features.details.MetaTrailer
