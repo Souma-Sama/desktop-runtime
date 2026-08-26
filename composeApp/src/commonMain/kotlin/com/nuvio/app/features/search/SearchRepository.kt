@@ -415,7 +415,10 @@ object SearchRepository {
                     banner = media.bannerImage,
                     posterShape = com.nuvio.app.features.home.PosterShape.Poster,
                     description = media.description,
-                    releaseInfo = if (media.episodes != null) "${media.episodes} eps" else null,
+                    releaseInfo = listOfNotNull(
+                        media.startDateYear?.toString(),
+                        if (media.episodes != null) "${media.episodes} eps" else null,
+                    ).joinToString(" • ").takeIf { it.isNotBlank() },
                     imdbRating = if (media.averageScore != null && media.averageScore > 0) {
                         "${((media.averageScore / 10.0) * 10).toInt() / 10.0}"
                     } else null,

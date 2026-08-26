@@ -67,7 +67,7 @@ object AnilistMetaDetailsResolver {
             fetchKitsuEpisodes(kitsuId)
         } else emptyMap()
 
-        val isMovie = media.format == "MOVIE" || (media.episodes == 1 && media.format != "TV")
+        val isMovie = media.format == "MOVIE"
         val contentType = if (isMovie) "movie" else "series"
         val totalEpisodes = media.episodes ?: episodeMap.size.takeIf { it > 0 } ?: 12
 
@@ -289,7 +289,7 @@ object AnilistMetaDetailsResolver {
                 imdbId = imdb,
                 kitsuId = kitsu,
                 tmdbId = tmdb,
-                season = if (season > 0) season else 1,
+                season = if (season >= 0) season else 1,
             )
             armMappingCache[anilistId] = mapping
             mapping
@@ -314,7 +314,7 @@ object AnilistMetaDetailsResolver {
         val targetSeason = mapping.season
         val effectiveImdbId = mapping.imdbId ?: cinemetaMeta.id
 
-        val isMovie = media?.format == "MOVIE" || (media?.episodes == 1 && media?.format != "TV")
+        val isMovie = media?.format == "MOVIE"
 
         if (isMovie) {
             return@withContext cinemetaMeta.copy(
@@ -334,7 +334,45 @@ object AnilistMetaDetailsResolver {
         )
 
         // For seasons, isolate and map that season's episodes cleanly
-        val seasonVideos = if (targetSeason > 1 && cinemetaMeta.videos.any { it.season == targetSeason }) {
+        val seasonVideos = if (targetSeason == 0 && cinemetaMeta.videos.any { it.season == 0 }) {
+            val specialVideos = cinemetaMeta.videos.filter { it.season == 0 }
+            val matchedSpecial = findSpecialMatch(media, specialVideos)
+            if (matchedSpecial != null) {
+                listOf(
+                    matchedSpecial.copy(
+                        id = "$effectiveImdbId:0:${matchedSpecial.episode ?: 1}",
+                        season = 0,
+                        episode = matchedSpecial.episode ?: 1,
+                        title = matchedSpecial.title?.takeIf { it.isNotBlank() } ?: media?.title?.displayTitle ?: "Special",
+                        thumbnail = matchedSpecial.thumbnail?.takeIf { it.isNotBlank() }
+                            ?: "https://episodes.metahub.space/$effectiveImdbId/0/${matchedSpecial.episode ?: 1}/w780.jpg",
+                    )
+                )
+            } else {
+                specialVideos.mapIndexed { idx, v ->
+                    val epNum = v.episode ?: (idx + 1)
+                    v.copy(
+                        id = "$effectiveImdbId:0:$epNum",
+                        season = 0,
+                        episode = epNum,
+                        title = v.title?.takeIf { it.isNotBlank() } ?: "Special $epNum",
+                        thumbnail = v.thumbnail?.takeIf { it.isNotBlank() }
+                            ?: "https://episodes.metahub.space/$effectiveImdbId/0/$epNum/w780.jpg",
+                    )
+                }
+            }
+        } else if (targetSeason == 0) {
+            val totalEps = media?.episodes ?: 1
+            (1..totalEps).map { epNum ->
+                MetaVideo(
+                    id = "$effectiveImdbId:0:$epNum",
+                    season = 0,
+                    episode = epNum,
+                    title = media?.title?.displayTitle ?: "Special $epNum",
+                    thumbnail = "https://episodes.metahub.space/$effectiveImdbId/0/$epNum/w780.jpg",
+                )
+            }
+        } else if (targetSeason > 1 && cinemetaMeta.videos.any { it.season == targetSeason }) {
             val targetVideos = cinemetaMeta.videos.filter { it.season == targetSeason }
             val epCount = media?.episodes ?: targetVideos.size.takeIf { it > 0 } ?: 12
             (1..epCount).map { idx ->
@@ -550,5 +588,29 @@ object AnilistMetaDetailsResolver {
             return m2.groupValues[1].toIntOrNull() ?: 1
         }
         return 1
+    }
+
+    private fun findSpecialMatch(media: AnilistMedia?, specials: List<MetaVideo>): MetaVideo? {
+        if (media == null || specials.isEmpty()) return specials.firstOrNull()
+        if (specials.size == 1) return specials.first()
+
+        val englishTitle = media.title?.english?.lowercase().orEmpty()
+        val romajiTitle = media.title?.romaji?.lowercase().orEmpty()
+        val displayTitle = media.title?.displayTitle?.lowercase().orEmpty()
+
+        val stopWords = setOf("dr", "stone", "special", "episode", "ova", "ona", "the", "a", "an", "of", "no", "ni", "to", "part", "season")
+        val keywords = (englishTitle + " " + romajiTitle + " " + displayTitle)
+            .split(Regex("[^a-zA-Z0-9]+"))
+            .filter { it.length > 2 && it !in stopWords }
+            .toSet()
+
+        for (special in specials) {
+            val sTitle = (special.title ?: "").lowercase()
+            if (keywords.any { it in sTitle }) {
+                return special
+            }
+        }
+
+        return specials.firstOrNull()
     }
 }

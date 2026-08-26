@@ -31,7 +31,25 @@ internal fun desktopYearLabel(meta: MetaDetails): String? =
         ?.take(4)
 
 internal fun desktopSeasonCountLabel(meta: MetaDetails): String? {
-    val seasons = meta.videos.mapNotNull { it.season }.filter { it > 0 }.toSet().size
-    if (seasons <= 0) return null
-    return if (seasons == 1) "1 Season" else "$seasons Seasons"
+    if (meta.type.equals("movie", ignoreCase = true)) return null
+    val isAnilist = meta.id.startsWith("ani_", ignoreCase = true) || meta.id.startsWith("anilist:", ignoreCase = true)
+    val seasons = meta.videos.mapNotNull { it.season }.toSet()
+    if (seasons.isEmpty()) return null
+
+    if (isAnilist) {
+        val singleSeason = seasons.firstOrNull() ?: 1
+        return when {
+            singleSeason == 0 -> "Special"
+            else -> "Season $singleSeason"
+        }
+    }
+
+    val validSeasons = seasons.filter { it > 0 }
+    return when {
+        validSeasons.size == 1 && validSeasons.first() > 1 -> "Season ${validSeasons.first()}"
+        validSeasons.size == 1 -> "1 Season"
+        validSeasons.size > 1 -> "${validSeasons.size} Seasons"
+        seasons.contains(0) -> "Special"
+        else -> null
+    }
 }
