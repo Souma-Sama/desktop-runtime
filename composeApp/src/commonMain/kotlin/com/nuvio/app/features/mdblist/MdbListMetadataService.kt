@@ -49,7 +49,12 @@ object MdbListMetadataService {
         if (!settings.enabled) return false
         if (settings.apiKey.trim().isBlank()) return false
         if (settings.enabledProvidersInPriorityOrder().isEmpty()) return false
-        return extractImdbId(meta.id) != null || extractImdbId(fallbackItemId) != null
+        return extractImdbIdSync(meta.id) != null ||
+            extractImdbIdSync(fallbackItemId) != null ||
+            meta.id.startsWith("ani_", ignoreCase = true) ||
+            meta.id.startsWith("anilist:", ignoreCase = true) ||
+            fallbackItemId.startsWith("ani_", ignoreCase = true) ||
+            fallbackItemId.startsWith("anilist:", ignoreCase = true)
     }
 
     suspend fun enrichMeta(
@@ -133,7 +138,12 @@ object MdbListMetadataService {
         }.getOrNull()
     }
 
-    private fun extractImdbId(value: String?): String? {
+    private fun extractImdbIdSync(value: String?): String? {
+        if (value.isNullOrBlank()) return null
+        return imdbRegex.find(value)?.value
+    }
+
+    private suspend fun extractImdbId(value: String?): String? {
         if (value.isNullOrBlank()) return null
         imdbRegex.find(value)?.value?.let { return it }
         if (value.startsWith("ani_", ignoreCase = true) || value.startsWith("anilist:", ignoreCase = true)) {
