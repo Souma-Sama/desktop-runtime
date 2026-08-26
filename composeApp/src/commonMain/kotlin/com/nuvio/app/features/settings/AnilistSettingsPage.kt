@@ -41,6 +41,14 @@ import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
+import androidx.compose.runtime.mutableFloatStateOf
+import kotlin.math.round
+import kotlin.math.roundToInt
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import com.nuvio.app.core.ui.nuvio
@@ -75,7 +83,6 @@ import nuvio.composeapp.generated.resources.settings_anilist_title_lang_title
 import org.jetbrains.compose.resources.stringResource
 
 private enum class AnilistPickerType {
-    THRESHOLD,
     TITLE_LANGUAGE,
     SCORE_FORMAT,
 }
@@ -211,7 +218,6 @@ private fun AnilistAccountSection(isTablet: Boolean) {
 @Composable
 private fun AnilistPlaybackSection(isTablet: Boolean) {
     val prefs by AnilistPreferencesRepository.preferences.collectAsStateWithLifecycle()
-    var activePicker by rememberSaveable { mutableStateOf<String?>(null) }
     val isAuth by AnilistAuthRepository.isAuthenticated.collectAsStateWithLifecycle()
 
     SettingsSection(
@@ -230,12 +236,11 @@ private fun AnilistPlaybackSection(isTablet: Boolean) {
 
             SettingsGroupDivider(isTablet = isTablet)
 
-            TrackingPreferenceActionRow(
-                title = stringResource(Res.string.settings_anilist_threshold_title),
-                description = stringResource(Res.string.settings_anilist_threshold_desc),
-                value = "${prefs.watchedPercentageThreshold}%",
+            AnilistWatchedThresholdSliderRow(
                 isTablet = isTablet,
-                onClick = { activePicker = AnilistPickerType.THRESHOLD.name },
+                threshold = prefs.watchedPercentageThreshold,
+                enabled = isAuth && prefs.autoMarkEpisodeWatched,
+                onThresholdChange = AnilistPreferencesRepository::setWatchedPercentageThreshold,
             )
 
             SettingsGroupDivider(isTablet = isTablet)
@@ -272,28 +277,94 @@ private fun AnilistPlaybackSection(isTablet: Boolean) {
             )
         }
     }
+}
 
-    if (activePicker == AnilistPickerType.THRESHOLD.name) {
-        val thresholdOptions = listOf(75, 80, 85, 90, 95).map { percent ->
-            TrackingPickerOption(
-                value = percent,
-                title = "$percent%",
-                description = "Mark as watched when reaching $percent% of the episode",
-            )
+@Composable
+private fun AnilistWatchedThresholdSliderRow(
+    isTablet: Boolean,
+    threshold: Int,
+    enabled: Boolean,
+    onThresholdChange: (Int) -> Unit,
+) {
+    var sliderValue by remember(threshold) { mutableFloatStateOf(threshold.toFloat()) }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = if (isTablet) 20.dp else 16.dp, vertical = 14.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = stringResource(Res.string.settings_anilist_threshold_title),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
+                    fontWeight = FontWeight.Medium,
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = stringResource(Res.string.settings_anilist_threshold_desc),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (enabled) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f),
+                )
+            }
+            Spacer(modifier = Modifier.width(12.dp))
+            Surface(
+                shape = RoundedCornerShape(8.dp),
+                color = if (enabled) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
+            ) {
+                Text(
+                    text = "${sliderValue.roundToInt()}%",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = if (enabled) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                )
+            }
         }
 
-        TrackingAdaptivePicker(
-            isTablet = isTablet,
-            title = stringResource(Res.string.settings_anilist_threshold_title),
-            subtitle = stringResource(Res.string.settings_anilist_threshold_desc),
-            selectedValue = prefs.watchedPercentageThreshold,
-            options = thresholdOptions,
-            onSelected = {
-                AnilistPreferencesRepository.setWatchedPercentageThreshold(it)
-                activePicker = null
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Slider(
+            value = sliderValue.coerceIn(50f, 95f),
+            onValueChange = { if (enabled) sliderValue = (round(it / 5f) * 5f).coerceIn(50f, 95f) },
+            onValueChangeFinished = {
+                if (enabled) onThresholdChange(sliderValue.roundToInt().coerceIn(50, 95))
             },
-            onDismiss = { activePicker = null },
+            enabled = enabled,
+            valueRange = 50f..95f,
+            steps = 8,
+            colors = SliderDefaults.colors(
+                thumbColor = MaterialTheme.colorScheme.primary,
+                activeTrackColor = MaterialTheme.colorScheme.primary,
+            ),
+            modifier = Modifier.fillMaxWidth(),
         )
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text(
+                text = "50%",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (enabled) 0.7f else 0.3f),
+            )
+            Text(
+                text = "75%",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (enabled) 0.7f else 0.3f),
+            )
+            Text(
+                text = "95%",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (enabled) 0.7f else 0.3f),
+            )
+        }
     }
 }
 
