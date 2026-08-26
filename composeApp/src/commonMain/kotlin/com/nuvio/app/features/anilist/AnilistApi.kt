@@ -563,6 +563,8 @@ object AnilistApi {
 
     private val mediaCache = mutableMapOf<Int, AnilistMedia>()
 
+    fun getCachedMedia(mediaId: Int): AnilistMedia? = mediaCache[mediaId]
+
     suspend fun fetchMediaById(
         mediaId: Int,
         token: String? = null,

@@ -404,6 +404,15 @@ object SearchRepository {
     private suspend fun SearchCatalogRequest.toSection(forceRefresh: Boolean): HomeCatalogSection {
         if (isNativeAnilist) {
             val mediaList = com.nuvio.app.features.anilist.AnilistApi.searchAnime(query)
+            if (mediaList.isNotEmpty()) {
+                kotlinx.coroutines.coroutineScope {
+                    mediaList.map { media ->
+                        kotlinx.coroutines.async {
+                            com.nuvio.app.features.anilist.catalog.AnilistMetaDetailsResolver.resolveArmMapping(media.id)
+                        }
+                    }
+                }
+            }
             val previews = mediaList.map { media ->
                 MetaPreview(
                     id = "ani_${media.id}",

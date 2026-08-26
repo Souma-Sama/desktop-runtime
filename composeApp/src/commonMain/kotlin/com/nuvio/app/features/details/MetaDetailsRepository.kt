@@ -202,7 +202,38 @@ object MetaDetailsRepository {
         val requestKey = "$type:$id"
         cachedMetaByRequestKey[requestKey]?.let { return it.baseMeta }
 
-        if (id.startsWith("ani_", ignoreCase = true) || id.startsWith("anilist:", ignoreCase = true)) {
+        val isAnilistItem = id.startsWith("ani_", ignoreCase = true) || id.startsWith("anilist:", ignoreCase = true)
+        val metaLookupId = resolveMetaLookupId(itemId = id, itemType = type)
+        val effectiveType = if (type == "movie") "movie" else "series"
+        val manifests = findReadyMetaManifests(type = effectiveType, id = metaLookupId)
+
+        for (manifest in manifests) {
+            val result = withTimeoutOrNull(FETCH_TIMEOUT_MS) {
+                tryFetchMeta(manifest, effectiveType, metaLookupId, includeMdbList = false)
+            }
+            if (result != null) {
+                val finalMeta = if (isAnilistItem) {
+                    com.nuvio.app.features.anilist.catalog.AnilistMetaDetailsResolver.adaptCinemetaForAnilist(result, id)
+                } else result
+                if (cacheResult) {
+                    cachedMetaByRequestKey[requestKey] = CachedMetaEntry(baseMeta = finalMeta)
+                }
+                return finalMeta
+            }
+        }
+
+        val tmdbMeta = tryFetchTmdbFallbackMeta(type = effectiveType, id = metaLookupId)
+        if (tmdbMeta != null) {
+            val finalMeta = if (isAnilistItem) {
+                com.nuvio.app.features.anilist.catalog.AnilistMetaDetailsResolver.adaptCinemetaForAnilist(tmdbMeta, id)
+            } else tmdbMeta
+            if (cacheResult) {
+                cachedMetaByRequestKey[requestKey] = CachedMetaEntry(baseMeta = finalMeta)
+            }
+            return finalMeta
+        }
+
+        if (isAnilistItem) {
             val anilistMeta = com.nuvio.app.features.anilist.catalog.AnilistMetaDetailsResolver.resolveMetaDetails(id)
             if (anilistMeta != null) {
                 if (cacheResult) {
@@ -212,26 +243,7 @@ object MetaDetailsRepository {
             }
         }
 
-        val metaLookupId = resolveMetaLookupId(itemId = id, itemType = type)
-        val manifests = findReadyMetaManifests(type = type, id = metaLookupId)
-
-        for (manifest in manifests) {
-            val result = withTimeoutOrNull(FETCH_TIMEOUT_MS) {
-                tryFetchMeta(manifest, type, metaLookupId, includeMdbList = false)
-            }
-            if (result != null) {
-                if (cacheResult) {
-                    cachedMetaByRequestKey[requestKey] = CachedMetaEntry(baseMeta = result)
-                }
-                return result
-            }
-        }
-
-        return tryFetchTmdbFallbackMeta(type = type, id = id)?.also { result ->
-            if (cacheResult) {
-                cachedMetaByRequestKey[requestKey] = CachedMetaEntry(baseMeta = result)
-            }
-        }
+        return null
     }
 
     private const val FETCH_TIMEOUT_MS = 5_000L

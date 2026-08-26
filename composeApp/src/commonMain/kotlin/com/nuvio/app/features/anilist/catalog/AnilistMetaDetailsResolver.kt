@@ -195,13 +195,13 @@ object AnilistMetaDetailsResolver {
                 background = cinemetaMeta.background ?: backdrop,
                 logo = cinemetaMeta.logo ?: logo,
                 description = cleanDescription,
-                cast = castPersons.ifEmpty { cinemetaMeta.cast },
-                productionCompanies = animationStudios.ifEmpty { cinemetaMeta.productionCompanies },
-                networks = networks.ifEmpty { cinemetaMeta.networks },
-                moreLikeThis = recommendations.ifEmpty { cinemetaMeta.moreLikeThis },
-                trailers = trailers.ifEmpty { cinemetaMeta.trailers },
-                director = directors.ifEmpty { cinemetaMeta.director },
-                writer = writers.ifEmpty { cinemetaMeta.writer },
+                cast = cinemetaMeta.cast.ifEmpty { castPersons },
+                productionCompanies = cinemetaMeta.productionCompanies.ifEmpty { animationStudios },
+                networks = cinemetaMeta.networks.ifEmpty { networks },
+                moreLikeThis = cinemetaMeta.moreLikeThis.ifEmpty { recommendations },
+                trailers = cinemetaMeta.trailers.ifEmpty { trailers },
+                director = cinemetaMeta.director.ifEmpty { directors },
+                writer = cinemetaMeta.writer.ifEmpty { writers },
                 videos = mappedVideos,
                 defaultVideoId = if (isMovie) {
                     when {
@@ -306,10 +306,12 @@ object AnilistMetaDetailsResolver {
                 type = "movie",
                 name = media?.title?.displayTitle ?: cinemetaMeta.name,
                 poster = anilistPoster,
+                releaseInfo = media?.startDateYear?.toString() ?: cinemetaMeta.releaseInfo,
+                defaultVideoId = effectiveImdbId,
             )
         }
 
-        // For seasons > 1, isolate and map that season's episodes
+        // For seasons, isolate and map that season's episodes cleanly
         val seasonVideos = if (targetSeason > 1 && cinemetaMeta.videos.any { it.season == targetSeason }) {
             cinemetaMeta.videos
                 .filter { it.season == targetSeason }
@@ -321,7 +323,9 @@ object AnilistMetaDetailsResolver {
                         season = 1,
                         episode = epNum,
                         title = streamingEp?.title?.takeIf { it.isNotBlank() } ?: v.title,
-                        thumbnail = streamingEp?.thumbnail?.takeIf { it.isNotBlank() } ?: v.thumbnail,
+                        thumbnail = streamingEp?.thumbnail?.takeIf { it.isNotBlank() }
+                            ?: v.thumbnail
+                            ?: "https://images.metahub.space/screenshot/medium/$effectiveImdbId/$targetSeason/$epNum/img",
                     )
                 }
         } else if (targetSeason > 1 && media?.episodes != null && media.episodes > 0) {
@@ -336,6 +340,22 @@ object AnilistMetaDetailsResolver {
                         ?: "https://images.metahub.space/screenshot/medium/$effectiveImdbId/$targetSeason/$epNum/img",
                 )
             }
+        } else if (cinemetaMeta.videos.any { it.season == 1 }) {
+            cinemetaMeta.videos
+                .filter { it.season == 1 || it.season == null }
+                .mapIndexed { idx, v ->
+                    val epNum = idx + 1
+                    val streamingEp = media?.streamingEpisodes?.getOrNull(idx)
+                    v.copy(
+                        id = "$effectiveImdbId:1:${v.episode ?: epNum}",
+                        season = 1,
+                        episode = epNum,
+                        title = streamingEp?.title?.takeIf { it.isNotBlank() } ?: v.title,
+                        thumbnail = streamingEp?.thumbnail?.takeIf { it.isNotBlank() }
+                            ?: v.thumbnail
+                            ?: "https://images.metahub.space/screenshot/medium/$effectiveImdbId/1/$epNum/img",
+                    )
+                }
         } else {
             cinemetaMeta.videos
         }
@@ -347,9 +367,11 @@ object AnilistMetaDetailsResolver {
 
         cinemetaMeta.copy(
             id = rawId,
-            name = if (targetSeason > 1) (media?.title?.displayTitle ?: cinemetaMeta.name) else cinemetaMeta.name,
+            name = media?.title?.displayTitle ?: cinemetaMeta.name,
             poster = anilistPoster,
             releaseInfo = releaseYear,
+            background = cinemetaMeta.background ?: "https://images.metahub.space/background/medium/$effectiveImdbId/img",
+            logo = cinemetaMeta.logo ?: "https://images.metahub.space/logo/medium/$effectiveImdbId/img",
             videos = seasonVideos,
         )
     }
