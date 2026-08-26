@@ -367,7 +367,7 @@ private fun TrackingViewingAndDiscovery(
 }
 
 @Composable
-private fun TrackingPreferenceActionRow(
+internal fun TrackingPreferenceActionRow(
     title: String,
     description: String,
     value: String,

@@ -121,9 +121,9 @@ private fun AnilistAccountSection(isTablet: Boolean) {
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(14.dp),
                 ) {
-                    if (isAuth && user?.avatar?.medium != null) {
+                    if (isAuth && !user?.avatarUrl.isNullOrBlank()) {
                         AsyncImage(
-                            model = user?.avatar?.medium,
+                            model = user?.avatarUrl,
                             contentDescription = user?.name,
                             modifier = Modifier
                                 .size(44.dp)
@@ -156,9 +156,7 @@ private fun AnilistAccountSection(isTablet: Boolean) {
                         )
                         Text(
                             text = if (isAuth) {
-                                val animeCount = user?.statistics?.anime?.count ?: 0
-                                val epCount = user?.statistics?.anime?.episodesWatched ?: 0
-                                if (animeCount > 0) "$animeCount anime ($epCount episodes watched)" else "Account linked & sync active"
+                                "Connected as ${user?.name ?: "User"} • Sync active"
                             } else {
                                 "Connect your AniList account to track anime and sync lists"
                             },
