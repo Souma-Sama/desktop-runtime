@@ -62,6 +62,7 @@ import com.nuvio.app.core.ui.isFullscreenActionSupported
 import com.nuvio.app.core.format.formatReleaseDateForDisplay
 import com.nuvio.app.core.ui.heroStretchHeight
 import com.nuvio.app.core.ui.heroStretchZoom
+import com.nuvio.app.features.fanart.FanartService
 import com.nuvio.app.features.home.MetaPreview
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
@@ -221,8 +222,9 @@ private fun HeroBackgroundLayers(
 
     layerPages.forEach { page ->
         val item = items[page]
+        val backgroundModel = item.banner ?: FanartService.getCachedBackdrop(item.id, item.type) ?: item.poster
         AsyncImage(
-            model = item.banner ?: item.poster,
+            model = backgroundModel,
             contentDescription = item.name,
             modifier = Modifier
                 .fillMaxWidth()
@@ -746,7 +748,18 @@ private fun HeroContentBlock(
     var logoLoadError by remember(item.type, item.id, item.logo) {
         mutableStateOf(false)
     }
-    val logoUrl = item.logo?.takeIf { it.isNotBlank() }
+    var fanartLogo by remember(item.type, item.id, item.logo) {
+        mutableStateOf(FanartService.getCachedLogo(item.id, item.type))
+    }
+    LaunchedEffect(item.type, item.id, item.logo) {
+        if (item.logo.isNullOrBlank() && fanartLogo == null) {
+            val resolved = FanartService.resolveLogo(item.id, item.type)
+            if (!resolved.isNullOrBlank()) {
+                fanartLogo = resolved
+            }
+        }
+    }
+    val logoUrl = item.logo?.takeIf { it.isNotBlank() } ?: fanartLogo
 
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -820,7 +833,18 @@ private fun DesktopHeroContentBlock(
     var logoLoadError by remember(item.type, item.id, item.logo) {
         mutableStateOf(false)
     }
-    val logoUrl = item.logo?.takeIf { it.isNotBlank() }
+    var fanartLogo by remember(item.type, item.id, item.logo) {
+        mutableStateOf(FanartService.getCachedLogo(item.id, item.type))
+    }
+    LaunchedEffect(item.type, item.id, item.logo) {
+        if (item.logo.isNullOrBlank() && fanartLogo == null) {
+            val resolved = FanartService.resolveLogo(item.id, item.type)
+            if (!resolved.isNullOrBlank()) {
+                fanartLogo = resolved
+            }
+        }
+    }
+    val logoUrl = item.logo?.takeIf { it.isNotBlank() } ?: fanartLogo
 
     Column(
         modifier = Modifier
@@ -886,7 +910,17 @@ private fun DesktopHeroContentBlock(
             )
         }
 
-        com.nuvio.app.core.format.cleanHtmlDescription(item.description)?.let { description ->
+        com.nuvio.app.core.format.cleanHtmlDescription(item.description)?.let { rawDescription ->
+            val description = remember(rawDescription) {
+                val trimmed = rawDescription.trim()
+                if (trimmed.length > 220) {
+                    val lastSpace = trimmed.substring(0, 215).lastIndexOf(' ')
+                    if (lastSpace > 140) trimmed.substring(0, lastSpace) + "..."
+                    else trimmed.substring(0, 215) + "..."
+                } else {
+                    trimmed
+                }
+            }
             Spacer(modifier = Modifier.height(NuvioTokens.Space.s16))
             Text(
                 text = description,
@@ -896,7 +930,7 @@ private fun DesktopHeroContentBlock(
                     letterSpacing = NuvioTokens.LetterSpacing.none,
                 ),
                 color = colorScheme.onSurface,
-                maxLines = 4,
+                maxLines = 3,
                 overflow = TextOverflow.Ellipsis,
             )
         }

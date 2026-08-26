@@ -65,6 +65,8 @@ import com.nuvio.app.features.collection.CollectionRepository
 import com.nuvio.app.features.addons.enabledAddons
 import com.nuvio.app.features.debrid.DebridSettings
 import com.nuvio.app.features.debrid.DebridSettingsRepository
+import com.nuvio.app.features.fanart.FanartSettings
+import com.nuvio.app.features.fanart.FanartSettingsRepository
 import com.nuvio.app.features.home.HomeCatalogSettingsItem
 import com.nuvio.app.features.home.HomeCatalogSettingsRepository
 import com.nuvio.app.features.mdblist.MdbListSettings
@@ -162,6 +164,10 @@ fun SettingsScreen(
         val mdbListSettings by remember {
             MdbListSettingsRepository.ensureLoaded()
             MdbListSettingsRepository.uiState
+        }.collectAsStateWithLifecycle()
+        val fanartSettings by remember {
+            FanartSettingsRepository.ensureLoaded()
+            FanartSettingsRepository.uiState
         }.collectAsStateWithLifecycle()
         val debridSettings by remember {
             DebridSettingsRepository.ensureLoaded()
@@ -328,6 +334,7 @@ fun SettingsScreen(
                 episodeReleaseNotificationsUiState = episodeReleaseNotificationsUiState,
                 tmdbSettings = tmdbSettings,
                 mdbListSettings = mdbListSettings,
+                fanartSettings = fanartSettings,
                 debridSettings = debridSettings,
                 traktAuthUiState = traktAuthUiState,
                 simklAuthUiState = simklAuthUiState,
@@ -390,6 +397,7 @@ fun SettingsScreen(
                 episodeReleaseNotificationsUiState = episodeReleaseNotificationsUiState,
                 tmdbSettings = tmdbSettings,
                 mdbListSettings = mdbListSettings,
+                fanartSettings = fanartSettings,
                 debridSettings = debridSettings,
                 traktAuthUiState = traktAuthUiState,
                 simklAuthUiState = simklAuthUiState,
@@ -462,6 +470,7 @@ private fun MobileSettingsScreen(
     episodeReleaseNotificationsUiState: EpisodeReleaseNotificationsUiState,
     tmdbSettings: TmdbSettings,
     mdbListSettings: MdbListSettings,
+    fanartSettings: FanartSettings,
     debridSettings: DebridSettings,
     traktAuthUiState: TraktAuthUiState,
     simklAuthUiState: SimklAuthUiState,
@@ -725,6 +734,7 @@ private fun MobileSettingsScreen(
                     isTablet = false,
                     onTmdbClick = { onPageChange(SettingsPage.TmdbEnrichment) },
                     onMdbListClick = { onPageChange(SettingsPage.MdbListRatings) },
+                    onFanartClick = { onPageChange(SettingsPage.FanartArtwork) },
                     onDebridClick = { onPageChange(SettingsPage.Debrid) },
                 )
                 SettingsPage.TmdbEnrichment -> tmdbSettingsContent(
@@ -734,6 +744,10 @@ private fun MobileSettingsScreen(
                 SettingsPage.MdbListRatings -> mdbListSettingsContent(
                     isTablet = false,
                     settings = mdbListSettings,
+                )
+                SettingsPage.FanartArtwork -> fanartSettingsContent(
+                    isTablet = false,
+                    settings = fanartSettings,
                 )
                 SettingsPage.Debrid -> debridSettingsContent(
                     isTablet = false,
@@ -840,6 +854,7 @@ private fun TabletSettingsScreen(
     episodeReleaseNotificationsUiState: EpisodeReleaseNotificationsUiState,
     tmdbSettings: TmdbSettings,
     mdbListSettings: MdbListSettings,
+    fanartSettings: FanartSettings,
     debridSettings: DebridSettings,
     traktAuthUiState: TraktAuthUiState,
     simklAuthUiState: SimklAuthUiState,
@@ -1162,6 +1177,7 @@ private fun TabletSettingsScreen(
                             isTablet = true,
                             onTmdbClick = { onPageChange(SettingsPage.TmdbEnrichment) },
                             onMdbListClick = { onPageChange(SettingsPage.MdbListRatings) },
+                            onFanartClick = { onPageChange(SettingsPage.FanartArtwork) },
                             onDebridClick = { onPageChange(SettingsPage.Debrid) },
                         )
                         SettingsPage.TmdbEnrichment -> tmdbSettingsContent(
@@ -1171,6 +1187,10 @@ private fun TabletSettingsScreen(
                         SettingsPage.MdbListRatings -> mdbListSettingsContent(
                             isTablet = true,
                             settings = mdbListSettings,
+                        )
+                        SettingsPage.FanartArtwork -> fanartSettingsContent(
+                            isTablet = true,
+                            settings = fanartSettings,
                         )
                         SettingsPage.Debrid -> debridSettingsContent(
                             isTablet = true,

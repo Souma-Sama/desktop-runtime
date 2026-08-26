@@ -8,6 +8,7 @@ internal enum class IntegrationLogo {
     Trakt,
     Simkl,
     MdbList,
+    Fanart,
     IntroDb,
 }
 
