@@ -123,7 +123,7 @@ object MetaDetailsRepository {
 
             for (manifest in manifests) {
                 val result = withContext(Dispatchers.Default) {
-                    tryFetchMeta(manifest, effectiveType, metaLookupId, includeMdbList = false)
+                    tryFetchMeta(manifest, effectiveType, metaLookupId, includeMdbList = false, enrichWithTmdb = false)
                 }
                 if (result != null) {
                     val finalMeta = if (isAnilistItem) {
@@ -256,6 +256,7 @@ object MetaDetailsRepository {
         type: String,
         id: String,
         includeMdbList: Boolean,
+        enrichWithTmdb: Boolean = true,
     ): MetaDetails? {
         val url = buildAddonResourceUrl(
             manifestUrl = manifest.transportUrl,
@@ -270,6 +271,9 @@ object MetaDetailsRepository {
             val payload = fetchAddonResponseText(url)
             log.d { "Raw payload length=${payload.length}, first 500 chars: ${payload.take(500)}" }
             val result = MetaDetailsParser.parse(payload)
+            if (!enrichWithTmdb) {
+                return result
+            }
             val tmdbEnriched = withTimeoutOrNull(TMDB_ENRICH_TIMEOUT_MS) {
                 TmdbMetadataService.enrichMeta(
                     meta = result,
@@ -381,16 +385,19 @@ object MetaDetailsRepository {
         val cachedEntry = CachedMetaEntry(baseMeta = meta)
         cachedMetaByRequestKey[requestKey] = cachedEntry
 
+        // 1. Immediately paint base meta on screen (<100ms)
+        _uiState.value = MetaDetailsUiState(
+            isLoading = true,
+            meta = meta.withUnreleasedFilter(),
+        )
+
         if (!shouldEnrichForMetaScreen(meta, fallbackItemId, mdbListSettings)) {
-            _uiState.value = MetaDetailsUiState(meta = meta.withUnreleasedFilter())
+            _uiState.value = MetaDetailsUiState(meta = meta.withUnreleasedFilter(), isLoading = false)
             activeRequestKey = requestKey
             return
         }
 
-        _uiState.value = MetaDetailsUiState(
-            isLoading = true,
-            meta = meta,
-        )
+        // 2. Asynchronously enrich in background without blocking screen presentation
         val enrichedMeta = withContext(Dispatchers.Default) {
             enrichForMetaScreen(
                 requestKey = requestKey,
@@ -405,7 +412,7 @@ object MetaDetailsRepository {
             metaScreenMeta = enrichedMeta,
             metaScreenSettingsFingerprint = metaScreenSettingsFingerprint,
         )
-        _uiState.value = MetaDetailsUiState(meta = enrichedMeta.withUnreleasedFilter())
+        _uiState.value = MetaDetailsUiState(meta = enrichedMeta.withUnreleasedFilter(), isLoading = false)
         activeRequestKey = requestKey
     }
 
@@ -417,13 +424,25 @@ object MetaDetailsRepository {
         settings: com.nuvio.app.features.mdblist.MdbListSettings,
         settingsFingerprint: String,
     ): MetaDetails {
+        val tmdbSettings = TmdbSettingsRepository.snapshot()
+        val tmdbEnrichedMeta = if (tmdbSettings.enabled && tmdbSettings.hasApiKey) {
+            withTimeoutOrNull(TMDB_ENRICH_TIMEOUT_MS) {
+                TmdbMetadataService.enrichMeta(
+                    meta = meta,
+                    fallbackItemId = fallbackItemId,
+                    settings = tmdbSettings,
+                )
+            } ?: meta
+        } else meta
+
         val mdbListEnrichedMeta = withTimeoutOrNull(MDBLIST_ENRICH_TIMEOUT_MS) {
             MdbListMetadataService.enrichMeta(
-                meta = meta,
+                meta = tmdbEnrichedMeta,
                 fallbackItemId = fallbackItemId,
                 settings = settings,
             )
-        } ?: meta
+        } ?: tmdbEnrichedMeta
+
         val enrichedMeta = applyMoreLikeThisSource(
             meta = mdbListEnrichedMeta,
             fallbackItemId = fallbackItemId,
@@ -502,6 +521,8 @@ object MetaDetailsRepository {
         fallbackItemId: String,
         settings: com.nuvio.app.features.mdblist.MdbListSettings,
     ): Boolean {
+        val tmdbSettings = TmdbSettingsRepository.snapshot()
+        if (tmdbSettings.enabled && tmdbSettings.hasApiKey) return true
         if (shouldFetchMdbListOnMetaScreen(meta, fallbackItemId, settings)) return true
         return shouldApplyMoreLikeThisSource(meta)
     }

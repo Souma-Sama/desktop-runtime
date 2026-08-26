@@ -135,7 +135,14 @@ object MdbListMetadataService {
 
     private fun extractImdbId(value: String?): String? {
         if (value.isNullOrBlank()) return null
-        return imdbRegex.find(value)?.value
+        imdbRegex.find(value)?.value?.let { return it }
+        if (value.startsWith("ani_", ignoreCase = true) || value.startsWith("anilist:", ignoreCase = true)) {
+            val anilistId = com.nuvio.app.features.anilist.AnilistTrackerCoordinator.extractAnilistId(value)
+            if (anilistId != null) {
+                return com.nuvio.app.features.anilist.catalog.AnilistMetaDetailsResolver.resolveArmMapping(anilistId).imdbId
+            }
+        }
+        return null
     }
 
     private fun toMdbListMediaType(metaType: String): String {

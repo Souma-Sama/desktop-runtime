@@ -28,6 +28,18 @@ object TmdbService {
 
         if (normalized.isBlank()) return null
         if (normalized.all(Char::isDigit)) return normalized
+        if (normalized.startsWith("ani_", ignoreCase = true) || normalized.startsWith("anilist:", ignoreCase = true)) {
+            val anilistId = com.nuvio.app.features.anilist.AnilistTrackerCoordinator.extractAnilistId(normalized)
+            if (anilistId != null) {
+                val armMapping = com.nuvio.app.features.anilist.catalog.AnilistMetaDetailsResolver.resolveArmMapping(anilistId)
+                if (armMapping.tmdbId != null && armMapping.tmdbId > 0) {
+                    return armMapping.tmdbId.toString()
+                }
+                if (!armMapping.imdbId.isNullOrBlank()) {
+                    return imdbToTmdb(imdbId = armMapping.imdbId, mediaType = mediaType, apiKey = apiKey)
+                }
+            }
+        }
         if (!normalized.startsWith("tt", ignoreCase = true)) return null
 
         return imdbToTmdb(imdbId = normalized, mediaType = mediaType, apiKey = apiKey)
