@@ -244,10 +244,11 @@ object AnilistCatalogRepository {
                 banner = media.bannerImage,
                 posterShape = PosterShape.Poster,
                 description = media.description,
-                releaseInfo = listOfNotNull(
-                    media.startDateYear?.toString(),
-                    if (media.episodes != null) "${media.episodes} eps" else null,
-                ).joinToString(" • ").takeIf { it.isNotBlank() },
+                releaseInfo = if (media.episodes != null && media.episodes > 0 && media.format != "MOVIE") {
+                    "${media.episodes} eps"
+                } else {
+                    media.startDateYear?.toString() ?: media.duration?.let { "$it min" }
+                },
                 imdbRating = if (media.averageScore != null && media.averageScore > 0) {
                     val score = (media.averageScore / 10.0)
                     "${(score * 10).toInt() / 10.0}"

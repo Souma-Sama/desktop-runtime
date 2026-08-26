@@ -166,6 +166,24 @@ object AnilistApi {
                     genres
                     averageScore
                     description(asHtml: false)
+                    startDate {
+                      year
+                    }
+                    relations {
+                      edges {
+                        relationType
+                        node {
+                          id
+                          title {
+                            english
+                            romaji
+                            native
+                          }
+                          format
+                          episodes
+                        }
+                      }
+                    }
                     nextAiringEpisode {
                       episode
                       airingAt
@@ -230,6 +248,24 @@ object AnilistApi {
                   genres
                   averageScore
                   description(asHtml: false)
+                  startDate {
+                    year
+                  }
+                  relations {
+                    edges {
+                      relationType
+                      node {
+                        id
+                        title {
+                          english
+                          romaji
+                          native
+                        }
+                        format
+                        episodes
+                      }
+                    }
+                  }
                   nextAiringEpisode {
                     episode
                     airingAt
@@ -287,6 +323,24 @@ object AnilistApi {
                   genres
                   averageScore
                   description(asHtml: false)
+                  startDate {
+                    year
+                  }
+                  relations {
+                    edges {
+                      relationType
+                      node {
+                        id
+                        title {
+                          english
+                          romaji
+                          native
+                        }
+                        format
+                        episodes
+                      }
+                    }
+                  }
                   nextAiringEpisode {
                     episode
                     airingAt
@@ -344,6 +398,24 @@ object AnilistApi {
                   genres
                   averageScore
                   description(asHtml: false)
+                  startDate {
+                    year
+                  }
+                  relations {
+                    edges {
+                      relationType
+                      node {
+                        id
+                        title {
+                          english
+                          romaji
+                          native
+                        }
+                        format
+                        episodes
+                      }
+                    }
+                  }
                   nextAiringEpisode {
                     episode
                     airingAt
@@ -399,6 +471,24 @@ object AnilistApi {
                   genres
                   averageScore
                   description(asHtml: false)
+                  startDate {
+                    year
+                  }
+                  relations {
+                    edges {
+                      relationType
+                      node {
+                        id
+                        title {
+                          english
+                          romaji
+                          native
+                        }
+                        format
+                        episodes
+                      }
+                    }
+                  }
                   nextAiringEpisode {
                     episode
                     airingAt
@@ -454,6 +544,24 @@ object AnilistApi {
                   genres
                   averageScore
                   description(asHtml: false)
+                  startDate {
+                    year
+                  }
+                  relations {
+                    edges {
+                      relationType
+                      node {
+                        id
+                        title {
+                          english
+                          romaji
+                          native
+                        }
+                        format
+                        episodes
+                      }
+                    }
+                  }
                   nextAiringEpisode {
                     episode
                     airingAt
@@ -538,6 +646,24 @@ object AnilistApi {
                 genres
                 averageScore
                 description(asHtml: false)
+                startDate {
+                  year
+                }
+                relations {
+                  edges {
+                    relationType
+                    node {
+                      id
+                      title {
+                        english
+                        romaji
+                        native
+                      }
+                      format
+                      episodes
+                    }
+                  }
+                }
                 nextAiringEpisode {
                   episode
                   airingAt
