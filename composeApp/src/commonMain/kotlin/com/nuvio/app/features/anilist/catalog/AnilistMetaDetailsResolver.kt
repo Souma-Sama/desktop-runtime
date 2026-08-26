@@ -495,6 +495,13 @@ object AnilistMetaDetailsResolver {
         val partNum = extractPartNumber(title)
 
         if (partNum > 1) {
+            // 1. Recursively sum all prequels that belong to this split-cour sequence (handles different episode counts per cour!)
+            val prequelSum = sumPrequelEpisodes(media.relations, title)
+            if (prequelSum > 0) {
+                return prequelSum
+            }
+
+            // 2. Fallback heuristic if prequel episode count was not specified in metadata
             val prequels = media.relations.filter { it.relationType.equals("PREQUEL", ignoreCase = true) }
             val prequelEps = prequels.mapNotNull { it.episodes }.firstOrNull { it > 0 }
                 ?: media.episodes
@@ -504,6 +511,21 @@ object AnilistMetaDetailsResolver {
         }
 
         return 0
+    }
+
+    private fun sumPrequelEpisodes(relations: List<AnilistRelation>, currentTitle: String): Int {
+        var total = 0
+        val prequels = relations.filter { it.relationType.equals("PREQUEL", ignoreCase = true) }
+        for (prequel in prequels) {
+            val pTitle = prequel.title?.displayTitle.orEmpty()
+            val currentPart = extractPartNumber(currentTitle)
+            val prequelPart = extractPartNumber(pTitle)
+            if (currentPart > 1 && (prequelPart < currentPart || prequelPart == 1)) {
+                val eps = prequel.episodes ?: 0
+                total += eps + sumPrequelEpisodes(prequel.relations, pTitle.ifEmpty { currentTitle })
+            }
+        }
+        return total
     }
 
     private fun extractPartNumber(title: String): Int {

@@ -145,6 +145,7 @@ data class AnilistRelation(
     val title: AnilistTitle? = null,
     val format: String? = null,
     val episodes: Int? = null,
+    val relations: List<AnilistRelation> = emptyList(),
 )
 
 @Serializable
