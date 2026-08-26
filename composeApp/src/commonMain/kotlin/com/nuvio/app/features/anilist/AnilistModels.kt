@@ -135,6 +135,16 @@ data class AnilistMedia(
     val startDateYear: Int? = null,
     val endDateYear: Int? = null,
     val mediaListEntry: AnilistMediaListEntry? = null,
+    val relations: List<AnilistRelation> = emptyList(),
+)
+
+@Serializable
+data class AnilistRelation(
+    val relationType: String? = null,
+    val id: Int,
+    val title: AnilistTitle? = null,
+    val format: String? = null,
+    val episodes: Int? = null,
 )
 
 @Serializable

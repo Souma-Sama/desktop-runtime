@@ -147,40 +147,49 @@ object AnilistMetaDetailsResolver {
                 it.role?.contains("Writer", ignoreCase = true) == true
         }.mapNotNull { it.name }
 
+        val episodeOffset = resolveEpisodeOffset(
+            media = media,
+            targetSeason = targetSeason,
+            cinemetaVideos = cinemetaMeta?.videos.orEmpty(),
+        )
+
         val mappedVideos = if (isMovie) {
             emptyList()
         } else {
-            (1..totalEpisodes).map { epNum ->
-                val streamingEp = media.streamingEpisodes.getOrNull(epNum - 1)
-                val cinemetaEp = cinemetaMeta?.videos?.firstOrNull { it.season == targetSeason && it.episode == epNum }
-                    ?: cinemetaMeta?.videos?.firstOrNull { it.season == targetSeason && it.episode == null && cinemetaMeta.videos.indexOf(it) == epNum - 1 }
-                val epData = episodeMap[epNum]
+            (1..totalEpisodes).map { epIdx ->
+                val actualEpNumber = epIdx + episodeOffset
+                val streamingEp = media.streamingEpisodes.getOrNull(epIdx - 1)
+                val cinemetaEp = cinemetaMeta?.videos?.firstOrNull { it.season == targetSeason && it.episode == actualEpNumber }
+                    ?: cinemetaMeta?.videos?.firstOrNull { it.season == targetSeason && it.episode == null && cinemetaMeta.videos.indexOf(it) == actualEpNumber - 1 }
+                val epData = episodeMap[actualEpNumber]
 
                 val epTitle = cinemetaEp?.title?.takeIf { it.isNotBlank() }
                     ?: epData?.title?.takeIf { it.isNotBlank() }
                     ?: streamingEp?.title?.takeIf { it.isNotBlank() }
-                    ?: "Episode $epNum"
+                    ?: "Episode $actualEpNumber"
 
                 val epOverview = cinemetaEp?.overview?.takeIf { it.isNotBlank() }
                     ?: epData?.overview
 
                 val epThumbnail = cinemetaEp?.thumbnail?.takeIf { it.isNotBlank() }
-                    ?: if (!armImdbId.isNullOrBlank()) "https://episodes.metahub.space/$armImdbId/$targetSeason/$epNum/w780.jpg"
+                    ?: if (!armImdbId.isNullOrBlank()) "https://episodes.metahub.space/$armImdbId/$targetSeason/$actualEpNumber/w780.jpg"
                     else epData?.thumbnail ?: streamingEp?.thumbnail
 
                 val videoId = when {
-                    !kitsuId.isNullOrBlank() -> "kitsu:$kitsuId:$epNum"
-                    !armImdbId.isNullOrBlank() -> "$armImdbId:$targetSeason:$epNum"
-                    else -> "anilist:$anilistId:$epNum"
+                    !kitsuId.isNullOrBlank() -> "kitsu:$kitsuId:$actualEpNumber"
+                    !armImdbId.isNullOrBlank() -> "$armImdbId:$targetSeason:$actualEpNumber"
+                    else -> "anilist:$anilistId:$actualEpNumber"
                 }
 
                 MetaVideo(
                     id = videoId,
                     title = epTitle,
                     season = targetSeason,
-                    episode = epNum,
+                    episode = actualEpNumber,
                     overview = epOverview,
                     thumbnail = epThumbnail,
+                    released = cinemetaEp?.released ?: epData?.airDate,
+                    streams = cinemetaEp?.streams.orEmpty(),
                 )
             }
         }
@@ -318,48 +327,65 @@ object AnilistMetaDetailsResolver {
             )
         }
 
+        val episodeOffset = resolveEpisodeOffset(
+            media = media,
+            targetSeason = targetSeason,
+            cinemetaVideos = cinemetaMeta.videos,
+        )
+
         // For seasons, isolate and map that season's episodes cleanly
         val seasonVideos = if (targetSeason > 1 && cinemetaMeta.videos.any { it.season == targetSeason }) {
-            cinemetaMeta.videos
-                .filter { it.season == targetSeason }
-                .mapIndexed { idx, v ->
-                    val epNum = idx + 1
-                    val streamingEp = media?.streamingEpisodes?.getOrNull(idx)
-                    v.copy(
-                        id = "$effectiveImdbId:$targetSeason:${v.episode ?: epNum}",
-                        season = targetSeason,
-                        episode = epNum,
-                        title = v.title?.takeIf { it.isNotBlank() } ?: streamingEp?.title?.takeIf { it.isNotBlank() } ?: "Episode $epNum",
-                        thumbnail = v.thumbnail?.takeIf { it.isNotBlank() }
-                            ?: "https://episodes.metahub.space/$effectiveImdbId/$targetSeason/$epNum/w780.jpg",
-                    )
-                }
-        } else if (targetSeason > 1 && media?.episodes != null && media.episodes > 0) {
-            (1..media.episodes).map { epNum ->
-                val streamingEp = media.streamingEpisodes.getOrNull(epNum - 1)
+            val targetVideos = cinemetaMeta.videos.filter { it.season == targetSeason }
+            val epCount = media?.episodes ?: targetVideos.size.takeIf { it > 0 } ?: 12
+            (1..epCount).map { idx ->
+                val actualEpNumber = idx + episodeOffset
+                val cinemetaEp = cinemetaMeta.videos.firstOrNull { it.season == targetSeason && it.episode == actualEpNumber }
+                    ?: cinemetaMeta.videos.firstOrNull { it.season == targetSeason && it.episode == null && cinemetaMeta.videos.indexOf(it) == actualEpNumber - 1 }
+                val streamingEp = media?.streamingEpisodes?.getOrNull(idx - 1)
                 MetaVideo(
-                    id = "$effectiveImdbId:$targetSeason:$epNum",
+                    id = "$effectiveImdbId:$targetSeason:$actualEpNumber",
                     season = targetSeason,
-                    episode = epNum,
-                    title = streamingEp?.title?.takeIf { it.isNotBlank() } ?: "Episode $epNum",
-                    thumbnail = "https://episodes.metahub.space/$effectiveImdbId/$targetSeason/$epNum/w780.jpg",
+                    episode = actualEpNumber,
+                    title = cinemetaEp?.title?.takeIf { it.isNotBlank() } ?: streamingEp?.title?.takeIf { it.isNotBlank() } ?: "Episode $actualEpNumber",
+                    thumbnail = cinemetaEp?.thumbnail?.takeIf { it.isNotBlank() }
+                        ?: "https://episodes.metahub.space/$effectiveImdbId/$targetSeason/$actualEpNumber/w780.jpg",
+                    overview = cinemetaEp?.overview,
+                    released = cinemetaEp?.released,
+                    streams = cinemetaEp?.streams.orEmpty(),
+                )
+            }
+        } else if (targetSeason > 1 && media?.episodes != null && media.episodes > 0) {
+            (1..media.episodes).map { idx ->
+                val actualEpNumber = idx + episodeOffset
+                val streamingEp = media.streamingEpisodes.getOrNull(idx - 1)
+                MetaVideo(
+                    id = "$effectiveImdbId:$targetSeason:$actualEpNumber",
+                    season = targetSeason,
+                    episode = actualEpNumber,
+                    title = streamingEp?.title?.takeIf { it.isNotBlank() } ?: "Episode $actualEpNumber",
+                    thumbnail = "https://episodes.metahub.space/$effectiveImdbId/$targetSeason/$actualEpNumber/w780.jpg",
                 )
             }
         } else if (cinemetaMeta.videos.any { it.season == 1 }) {
-            cinemetaMeta.videos
-                .filter { it.season == 1 || it.season == null }
-                .mapIndexed { idx, v ->
-                    val epNum = idx + 1
-                    val streamingEp = media?.streamingEpisodes?.getOrNull(idx)
-                    v.copy(
-                        id = "$effectiveImdbId:1:${v.episode ?: epNum}",
-                        season = 1,
-                        episode = epNum,
-                        title = v.title?.takeIf { it.isNotBlank() } ?: streamingEp?.title?.takeIf { it.isNotBlank() } ?: "Episode $epNum",
-                        thumbnail = v.thumbnail?.takeIf { it.isNotBlank() }
-                            ?: "https://episodes.metahub.space/$effectiveImdbId/1/$epNum/w780.jpg",
-                    )
-                }
+            val targetVideos = cinemetaMeta.videos.filter { it.season == 1 || it.season == null }
+            val epCount = media?.episodes ?: targetVideos.size.takeIf { it > 0 } ?: 12
+            (1..epCount).map { idx ->
+                val actualEpNumber = idx + episodeOffset
+                val cinemetaEp = cinemetaMeta.videos.firstOrNull { (it.season == 1 || it.season == null) && it.episode == actualEpNumber }
+                    ?: cinemetaMeta.videos.firstOrNull { (it.season == 1 || it.season == null) && it.episode == null && cinemetaMeta.videos.indexOf(it) == actualEpNumber - 1 }
+                val streamingEp = media?.streamingEpisodes?.getOrNull(idx - 1)
+                MetaVideo(
+                    id = "$effectiveImdbId:1:$actualEpNumber",
+                    season = 1,
+                    episode = actualEpNumber,
+                    title = cinemetaEp?.title?.takeIf { it.isNotBlank() } ?: streamingEp?.title?.takeIf { it.isNotBlank() } ?: "Episode $actualEpNumber",
+                    thumbnail = cinemetaEp?.thumbnail?.takeIf { it.isNotBlank() }
+                        ?: "https://episodes.metahub.space/$effectiveImdbId/1/$actualEpNumber/w780.jpg",
+                    overview = cinemetaEp?.overview,
+                    released = cinemetaEp?.released,
+                    streams = cinemetaEp?.streams.orEmpty(),
+                )
+            }
         } else {
             cinemetaMeta.videos
         }
@@ -459,4 +485,53 @@ object AnilistMetaDetailsResolver {
         }
         result
     }.getOrElse { emptyMap() }
+
+    private fun resolveEpisodeOffset(
+        media: AnilistMedia?,
+        targetSeason: Int,
+        cinemetaVideos: List<MetaVideo>,
+    ): Int {
+        if (media == null) return 0
+        val title = media.title?.displayTitle.orEmpty()
+        val isSplit = isSplitCourTitle(title)
+
+        // 1. If relations has a PREQUEL with the same split-cour context
+        val prequels = media.relations.filter { it.relationType.equals("PREQUEL", ignoreCase = true) }
+        if (isSplit && prequels.isNotEmpty()) {
+            var sum = 0
+            for (p in prequels) {
+                val eps = p.episodes
+                if (eps != null && eps > 0) {
+                    sum += eps
+                }
+            }
+            if (sum > 0) return sum
+        }
+
+        // 2. Fallback heuristic from title matching (e.g. "Part 2", "Cour 2", "Part 3", "Cour 3", "Part 4")
+        if (isSplit) {
+            val partMatch = Regex("(?i)(?:part|cour)\\s*([2-4])|([2-4])(?:nd|rd|th)\\s*cour").find(title)
+            if (partMatch != null) {
+                val partNum = (partMatch.groupValues[1].ifEmpty { partMatch.groupValues[2] }).toIntOrNull() ?: 2
+                if (partNum > 1) {
+                    val totalInSeason = cinemetaVideos.count { it.season == targetSeason }
+                    val estimatedPerPart = if (totalInSeason > 0) (totalInSeason / partNum).coerceAtLeast(11) else 12
+                    return (partNum - 1) * estimatedPerPart
+                }
+            }
+        }
+
+        return 0
+    }
+
+    private fun isSplitCourTitle(title: String): Boolean {
+        val lower = title.lowercase()
+        return lower.contains("part 2") || lower.contains("part ii") ||
+               lower.contains("part 3") || lower.contains("part iii") ||
+               lower.contains("part 4") || lower.contains("part iv") ||
+               lower.contains("cour 2") || lower.contains("2nd cour") ||
+               lower.contains("cour 3") || lower.contains("3rd cour") ||
+               lower.contains("cour 4") || lower.contains("4th cour") ||
+               lower.contains("final season part") || lower.contains("the final season part")
+    }
 }

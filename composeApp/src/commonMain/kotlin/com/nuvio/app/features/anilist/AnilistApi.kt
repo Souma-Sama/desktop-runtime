@@ -689,6 +689,21 @@ object AnilistApi {
                     }
                   }
                 }
+                relations {
+                  edges {
+                    relationType
+                    node {
+                      id
+                      title {
+                        english
+                        romaji
+                        native
+                      }
+                      format
+                      episodes
+                    }
+                  }
+                }
                 $mediaListEntryBlock
               }
             }
@@ -887,8 +902,27 @@ object AnilistApi {
         val startYear = obj["startDate"].asJsonObjectOrNull()?.get("year").asIntOrNull()
         val endYear = obj["endDate"].asJsonObjectOrNull()?.get("year").asIntOrNull()
 
-        val entryObj = obj["mediaListEntry"].asJsonObjectOrNull()
-        val mediaListEntry = entryObj?.let { parseMediaListEntry(it, defaultMediaId = id) }
+        val relations = obj["relations"].asJsonObjectOrNull()
+            ?.get("edges").asJsonArrayOrNull()
+            ?.mapNotNull { edgeElem ->
+                val edge = edgeElem.asJsonObjectOrNull() ?: return@mapNotNull null
+                val relType = edge["relationType"].asStringOrNull()
+                val node = edge["node"].asJsonObjectOrNull() ?: return@mapNotNull null
+                val nId = node["id"].asIntOrNull() ?: return@mapNotNull null
+                val nTitleObj = node["title"].asJsonObjectOrNull()
+                val nTitle = AnilistTitle(
+                    romaji = nTitleObj?.get("romaji").asStringOrNull(),
+                    english = nTitleObj?.get("english").asStringOrNull(),
+                    native = nTitleObj?.get("native").asStringOrNull(),
+                )
+                AnilistRelation(
+                    relationType = relType,
+                    id = nId,
+                    title = nTitle,
+                    format = node["format"].asStringOrNull(),
+                    episodes = node["episodes"].asIntOrNull(),
+                )
+            }.orEmpty()
 
         val media = AnilistMedia(
             id = id,
@@ -913,6 +947,7 @@ object AnilistApi {
             startDateYear = startYear,
             endDateYear = endYear,
             mediaListEntry = mediaListEntry,
+            relations = relations,
         )
         mediaCache[id] = media
         media
