@@ -348,15 +348,20 @@ object SearchRepository {
         addons: List<ManagedAddon>,
         query: String,
     ): List<SearchCatalogRequest> {
-        val anilistRequest = SearchCatalogRequest(
-            addon = null,
-            catalogId = "anilist:search",
-            catalogName = "Anime",
-            type = "anime",
-            query = query,
-            supportsPagination = false,
-            isNativeAnilist = true,
-        )
+        val isAnilistEnabled = addons.any { it.manifestUrl == "native://anilist" && it.enabled }
+        val anilistRequest = if (isAnilistEnabled) {
+            listOf(
+                SearchCatalogRequest(
+                    addon = null,
+                    catalogId = "anilist:search",
+                    catalogName = "Anime",
+                    type = "anime",
+                    query = query,
+                    supportsPagination = false,
+                    isNativeAnilist = true,
+                )
+            )
+        } else emptyList()
 
         val addonRequests = addons.mapNotNull { addon ->
             val manifest = addon.manifest ?: return@mapNotNull null
@@ -377,7 +382,7 @@ object SearchRepository {
                 }
         }
 
-        return listOf(anilistRequest) + addonRequests
+        return anilistRequest + addonRequests
     }
 
     private fun buildDiscoverSources(addons: List<ManagedAddon>): List<DiscoverCatalogOption> =

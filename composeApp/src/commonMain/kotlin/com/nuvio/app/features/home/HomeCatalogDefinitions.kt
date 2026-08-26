@@ -30,7 +30,7 @@ data class HomeCatalogDefinition(
 }
 
 fun buildHomeCatalogRefreshSignature(addons: List<ManagedAddon>): List<String> {
-    val isAnilistEnabled = addons.firstOrNull { it.manifestUrl == "native://anilist" }?.enabled != false
+    val isAnilistEnabled = addons.any { it.manifestUrl == "native://anilist" && it.enabled }
     val anilistSignatures = if (isAnilistEnabled) {
         com.nuvio.app.features.anilist.catalog.AnilistCatalogRepository.getCatalogDefinitions()
             .map { it.descriptorSignature }
@@ -47,7 +47,7 @@ fun buildHomeCatalogRefreshSignature(addons: List<ManagedAddon>): List<String> {
 }
 
 fun buildHomeCatalogDefinitions(addons: List<ManagedAddon>): List<HomeCatalogDefinition> {
-    val isAnilistEnabled = addons.firstOrNull { it.manifestUrl == "native://anilist" }?.enabled != false
+    val isAnilistEnabled = addons.any { it.manifestUrl == "native://anilist" && it.enabled }
     val anilistCatalogs = if (isAnilistEnabled) {
         com.nuvio.app.features.anilist.catalog.AnilistCatalogRepository.getCatalogDefinitions()
     } else emptyList()
