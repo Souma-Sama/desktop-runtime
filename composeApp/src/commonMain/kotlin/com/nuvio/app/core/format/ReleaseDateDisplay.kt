@@ -44,8 +44,12 @@ fun extractReleaseYearForDisplay(raw: String): Int? {
     return yearStr.toIntOrNull()?.takeIf { it in 1000..9999 }
 }
 
-fun formatYearRange(startYear: Int?, endYear: Int?): String? {
+fun formatYearRange(startYear: Int?, endYear: Int?, status: String? = null): String? {
     if (startYear == null) return endYear?.toString()
+    val isOngoing = status?.trim()?.uppercase() in setOf("RELEASING", "ONGOING", "RETURNING SERIES", "AIRING")
+    if (isOngoing) {
+        return "$startYear -"
+    }
     if (endYear == null || startYear == endYear) return "$startYear"
     return "$startYear - $endYear"
 }
@@ -58,6 +62,9 @@ fun cleanHtmlDescription(raw: String?): String? {
     return raw
         .replace(Regex("<br\\s*/?>", RegexOption.IGNORE_CASE), "\n")
         .replace(Regex("<[^>]*>"), "")
+        .replace(Regex("~!.*?!~"), "")
+        .replace(Regex("\\|\\|.*?\\|\\|"), "")
+        .replace(Regex("\\[(.*?)\\]\\(.*?\\)"), "$1")
         .replace("&quot;", "\"")
         .replace("&amp;", "&")
         .replace("&lt;", "<")
@@ -68,6 +75,7 @@ fun cleanHtmlDescription(raw: String?): String? {
         .replace(Regex("(?i)\\(Source:.*?\\)"), "")
         .replace(Regex("(?i)\\[Written by.*?\\]"), "")
         .replace(Regex("(?i)Source:.*"), "")
+        .replace(Regex("(?i)Note:.*"), "")
         .replace(Regex("\n{3,}"), "\n\n")
         .trim()
         .takeIf { it.isNotEmpty() }

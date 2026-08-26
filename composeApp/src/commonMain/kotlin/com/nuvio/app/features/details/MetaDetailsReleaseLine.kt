@@ -24,7 +24,9 @@ fun formatMetaReleaseLineForDetails(meta: MetaDetails): String? {
     if (isAnilist) {
         val startYear = extractReleaseYearForDisplay(raw) ?: return raw
         val endYear = meta.lastAirDate?.let { extractReleaseYearForDisplay(it) }
+        val isAiring = meta.status?.trim()?.uppercase() in setOf("RELEASING", "ONGOING", "RETURNING SERIES", "AIRING")
         return when {
+            isAiring -> "$startYear -"
             endYear != null && endYear != startYear -> "$startYear - $endYear"
             else -> startYear.toString()
         }

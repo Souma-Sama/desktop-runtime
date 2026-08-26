@@ -25,10 +25,8 @@ internal fun DesktopStripePlaceholder(modifier: Modifier = Modifier) {
 }
 
 internal fun desktopYearLabel(meta: MetaDetails): String? =
-    meta.releaseInfo
-        ?.trim()
-        ?.takeIf { it.length >= 4 }
-        ?.take(4)
+    com.nuvio.app.features.details.formatMetaReleaseLineForDetails(meta)
+        ?: meta.releaseInfo?.trim()
 
 internal fun desktopSeasonCountLabel(meta: MetaDetails): String? {
     if (meta.type.equals("movie", ignoreCase = true)) return null
