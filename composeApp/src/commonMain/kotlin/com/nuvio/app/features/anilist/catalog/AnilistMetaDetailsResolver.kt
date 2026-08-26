@@ -36,7 +36,9 @@ object AnilistMetaDetailsResolver {
         log.d { "resolveMetaDetails: rawId=$rawId, anilistId=$anilistId" }
 
         // 1. Fetch base AniList media details
-        val media: AnilistMedia = AnilistApi.fetchMediaById(anilistId, token = token) ?: return@withContext null
+        val media: AnilistMedia = AnilistApi.getCachedMedia(anilistId)
+            ?: AnilistApi.fetchMediaById(anilistId, token = token)
+            ?: return@withContext null
 
         // 2. Resolve external IDs (IMDb ID & Kitsu ID) via ARM & Kitsu APIs
         val armImdbId = resolveArmImdbId(anilistId)

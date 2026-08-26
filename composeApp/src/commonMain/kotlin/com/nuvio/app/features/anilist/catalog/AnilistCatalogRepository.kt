@@ -235,17 +235,6 @@ object AnilistCatalogRepository {
             else -> emptyList()
         }
 
-        // Pre-warm ARM mappings concurrently so tapping any poster loads instantly
-        if (mediaList.isNotEmpty()) {
-            coroutineScope {
-                mediaList.map { media ->
-                    async {
-                        AnilistMetaDetailsResolver.resolveArmMapping(media.id)
-                    }
-                }
-            }
-        }
-
         val previews = mediaList.map { media ->
             MetaPreview(
                 id = "ani_${media.id}",
