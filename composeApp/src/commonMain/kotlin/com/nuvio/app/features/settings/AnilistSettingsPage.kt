@@ -1,0 +1,468 @@
+package com.nuvio.app.features.settings
+
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.AccountCircle
+import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.OpenInNew
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import coil3.compose.AsyncImage
+import com.nuvio.app.core.ui.nuvio
+import com.nuvio.app.features.anilist.AnilistAuthRepository
+import com.nuvio.app.features.anilist.AnilistBrandBlue
+import com.nuvio.app.features.anilist.AnilistLogoVector
+import com.nuvio.app.features.anilist.AnilistPreferences
+import com.nuvio.app.features.anilist.AnilistPreferencesRepository
+import com.nuvio.app.features.anilist.AnilistScoreFormat
+import com.nuvio.app.features.anilist.AnilistTitleLanguage
+import com.nuvio.app.features.anilist.AnilistUser
+import kotlinx.coroutines.launch
+import nuvio.composeapp.generated.resources.Res
+import nuvio.composeapp.generated.resources.compose_settings_page_anilist
+import nuvio.composeapp.generated.resources.settings_anilist_auto_complete_desc
+import nuvio.composeapp.generated.resources.settings_anilist_auto_complete_title
+import nuvio.composeapp.generated.resources.settings_anilist_auto_mark_desc
+import nuvio.composeapp.generated.resources.settings_anilist_auto_mark_title
+import nuvio.composeapp.generated.resources.settings_anilist_auto_move_watching_desc
+import nuvio.composeapp.generated.resources.settings_anilist_auto_move_watching_title
+import nuvio.composeapp.generated.resources.settings_anilist_notification_desc
+import nuvio.composeapp.generated.resources.settings_anilist_notification_title
+import nuvio.composeapp.generated.resources.settings_anilist_score_format_desc
+import nuvio.composeapp.generated.resources.settings_anilist_score_format_title
+import nuvio.composeapp.generated.resources.settings_anilist_section_account
+import nuvio.composeapp.generated.resources.settings_anilist_section_display
+import nuvio.composeapp.generated.resources.settings_anilist_section_playback
+import nuvio.composeapp.generated.resources.settings_anilist_threshold_desc
+import nuvio.composeapp.generated.resources.settings_anilist_threshold_title
+import nuvio.composeapp.generated.resources.settings_anilist_title_lang_desc
+import nuvio.composeapp.generated.resources.settings_anilist_title_lang_title
+import org.jetbrains.compose.resources.stringResource
+
+private enum class AnilistPickerType {
+    THRESHOLD,
+    TITLE_LANGUAGE,
+    SCORE_FORMAT,
+}
+
+internal fun LazyListScope.anilistSettingsContent(
+    isTablet: Boolean,
+) {
+    item {
+        AnilistAccountSection(isTablet = isTablet)
+    }
+
+    item {
+        AnilistPlaybackSection(isTablet = isTablet)
+    }
+
+    item {
+        AnilistDisplayPreferencesSection(isTablet = isTablet)
+    }
+}
+
+@Composable
+private fun AnilistAccountSection(isTablet: Boolean) {
+    val isAuth by AnilistAuthRepository.isAuthenticated.collectAsStateWithLifecycle()
+    val user by AnilistAuthRepository.currentUser.collectAsStateWithLifecycle()
+    val isAuthenticating by AnilistAuthRepository.isAuthenticating.collectAsStateWithLifecycle()
+    val uriHandler = LocalUriHandler.current
+    var showTokenDialog by rememberSaveable { mutableStateOf(false) }
+
+    SettingsSection(
+        title = stringResource(Res.string.settings_anilist_section_account),
+        isTablet = isTablet,
+    ) {
+        SettingsGroup(isTablet = isTablet) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = if (isTablet) 20.dp else 16.dp, vertical = 14.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Row(
+                    modifier = Modifier.weight(1f),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(14.dp),
+                ) {
+                    if (isAuth && user?.avatar?.medium != null) {
+                        AsyncImage(
+                            model = user?.avatar?.medium,
+                            contentDescription = user?.name,
+                            modifier = Modifier
+                                .size(44.dp)
+                                .clip(CircleShape),
+                            contentScale = ContentScale.Crop,
+                        )
+                    } else {
+                        Surface(
+                            modifier = Modifier.size(44.dp),
+                            shape = CircleShape,
+                            color = AnilistBrandBlue.copy(alpha = 0.15f),
+                        ) {
+                            Icon(
+                                imageVector = AnilistLogoVector,
+                                contentDescription = "AniList",
+                                tint = AnilistBrandBlue,
+                                modifier = Modifier
+                                    .size(24.dp)
+                                    .padding(8.dp),
+                            )
+                        }
+                    }
+
+                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text(
+                            text = if (isAuth) (user?.name ?: "Connected") else "AniList Profile",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                        Text(
+                            text = if (isAuth) {
+                                val animeCount = user?.statistics?.anime?.count ?: 0
+                                val epCount = user?.statistics?.anime?.episodesWatched ?: 0
+                                if (animeCount > 0) "$animeCount anime ($epCount episodes watched)" else "Account linked & sync active"
+                            } else {
+                                "Connect your AniList account to track anime and sync lists"
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+
+                if (isAuth) {
+                    OutlinedButton(
+                        onClick = { AnilistAuthRepository.logout() },
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = MaterialTheme.colorScheme.error,
+                        ),
+                    ) {
+                        Text("Disconnect")
+                    }
+                } else {
+                    Button(
+                        onClick = {
+                            uriHandler.openUri(AnilistAuthRepository.OAUTH_AUTHORIZE_URL)
+                            showTokenDialog = true
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFF02A9FF),
+                            contentColor = Color.White,
+                        ),
+                    ) {
+                        if (isAuthenticating) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(16.dp),
+                                color = Color.White,
+                                strokeWidth = 2.dp,
+                            )
+                        } else {
+                            Text("Connect")
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if (showTokenDialog) {
+        AnilistTokenDialog(onDismiss = { showTokenDialog = false })
+    }
+}
+
+@Composable
+private fun AnilistPlaybackSection(isTablet: Boolean) {
+    val prefs by AnilistPreferencesRepository.preferences.collectAsStateWithLifecycle()
+    var activePicker by rememberSaveable { mutableStateOf<String?>(null) }
+    val isAuth by AnilistAuthRepository.isAuthenticated.collectAsStateWithLifecycle()
+
+    SettingsSection(
+        title = stringResource(Res.string.settings_anilist_section_playback),
+        isTablet = isTablet,
+    ) {
+        SettingsGroup(isTablet = isTablet) {
+            SettingsSwitchRow(
+                title = stringResource(Res.string.settings_anilist_auto_mark_title),
+                description = stringResource(Res.string.settings_anilist_auto_mark_desc),
+                checked = prefs.autoMarkEpisodeWatched,
+                enabled = isAuth,
+                isTablet = isTablet,
+                onCheckedChange = AnilistPreferencesRepository::setAutoMarkEpisodeWatched,
+            )
+
+            SettingsGroupDivider(isTablet = isTablet)
+
+            TrackingPreferenceActionRow(
+                title = stringResource(Res.string.settings_anilist_threshold_title),
+                description = stringResource(Res.string.settings_anilist_threshold_desc),
+                value = "${prefs.watchedPercentageThreshold}%",
+                isTablet = isTablet,
+                onClick = { activePicker = AnilistPickerType.THRESHOLD.name },
+            )
+
+            SettingsGroupDivider(isTablet = isTablet)
+
+            SettingsSwitchRow(
+                title = stringResource(Res.string.settings_anilist_auto_move_watching_title),
+                description = stringResource(Res.string.settings_anilist_auto_move_watching_desc),
+                checked = prefs.autoMoveToWatchingOnStart,
+                enabled = isAuth && prefs.autoMarkEpisodeWatched,
+                isTablet = isTablet,
+                onCheckedChange = AnilistPreferencesRepository::setAutoMoveToWatchingOnStart,
+            )
+
+            SettingsGroupDivider(isTablet = isTablet)
+
+            SettingsSwitchRow(
+                title = stringResource(Res.string.settings_anilist_auto_complete_title),
+                description = stringResource(Res.string.settings_anilist_auto_complete_desc),
+                checked = prefs.autoCompleteOnLastEpisode,
+                enabled = isAuth && prefs.autoMarkEpisodeWatched,
+                isTablet = isTablet,
+                onCheckedChange = AnilistPreferencesRepository::setAutoCompleteOnLastEpisode,
+            )
+
+            SettingsGroupDivider(isTablet = isTablet)
+
+            SettingsSwitchRow(
+                title = stringResource(Res.string.settings_anilist_notification_title),
+                description = stringResource(Res.string.settings_anilist_notification_desc),
+                checked = prefs.showSyncNotification,
+                enabled = isAuth && prefs.autoMarkEpisodeWatched,
+                isTablet = isTablet,
+                onCheckedChange = AnilistPreferencesRepository::setShowSyncNotification,
+            )
+        }
+    }
+
+    if (activePicker == AnilistPickerType.THRESHOLD.name) {
+        val thresholdOptions = listOf(75, 80, 85, 90, 95).map { percent ->
+            TrackingPickerOption(
+                value = percent,
+                title = "$percent%",
+                description = "Mark as watched when reaching $percent% of the episode",
+            )
+        }
+
+        TrackingAdaptivePicker(
+            isTablet = isTablet,
+            title = stringResource(Res.string.settings_anilist_threshold_title),
+            subtitle = stringResource(Res.string.settings_anilist_threshold_desc),
+            selectedValue = prefs.watchedPercentageThreshold,
+            options = thresholdOptions,
+            onSelected = {
+                AnilistPreferencesRepository.setWatchedPercentageThreshold(it)
+                activePicker = null
+            },
+            onDismiss = { activePicker = null },
+        )
+    }
+}
+
+@Composable
+private fun AnilistDisplayPreferencesSection(isTablet: Boolean) {
+    val prefs by AnilistPreferencesRepository.preferences.collectAsStateWithLifecycle()
+    var activePicker by rememberSaveable { mutableStateOf<String?>(null) }
+
+    SettingsSection(
+        title = stringResource(Res.string.settings_anilist_section_display),
+        isTablet = isTablet,
+    ) {
+        SettingsGroup(isTablet = isTablet) {
+            TrackingPreferenceActionRow(
+                title = stringResource(Res.string.settings_anilist_title_lang_title),
+                description = stringResource(Res.string.settings_anilist_title_lang_desc),
+                value = prefs.preferredTitleLanguage.label,
+                isTablet = isTablet,
+                onClick = { activePicker = AnilistPickerType.TITLE_LANGUAGE.name },
+            )
+
+            SettingsGroupDivider(isTablet = isTablet)
+
+            TrackingPreferenceActionRow(
+                title = stringResource(Res.string.settings_anilist_score_format_title),
+                description = stringResource(Res.string.settings_anilist_score_format_desc),
+                value = prefs.preferredScoreFormat.label,
+                isTablet = isTablet,
+                onClick = { activePicker = AnilistPickerType.SCORE_FORMAT.name },
+            )
+        }
+    }
+
+    when (activePicker) {
+        AnilistPickerType.TITLE_LANGUAGE.name -> {
+            val languageOptions = AnilistTitleLanguage.entries.map { lang ->
+                TrackingPickerOption(
+                    value = lang,
+                    title = lang.label,
+                    description = when (lang) {
+                        AnilistTitleLanguage.ROMAJI -> "Display anime titles in romanized Japanese (e.g., Shingeki no Kyojin)"
+                        AnilistTitleLanguage.ENGLISH -> "Display anime titles in English (e.g., Attack on Titan)"
+                        AnilistTitleLanguage.NATIVE -> "Display anime titles in native Japanese Kanji / Kana"
+                    },
+                )
+            }
+
+            TrackingAdaptivePicker(
+                isTablet = isTablet,
+                title = stringResource(Res.string.settings_anilist_title_lang_title),
+                subtitle = stringResource(Res.string.settings_anilist_title_lang_desc),
+                selectedValue = prefs.preferredTitleLanguage,
+                options = languageOptions,
+                onSelected = {
+                    AnilistPreferencesRepository.setPreferredTitleLanguage(it)
+                    activePicker = null
+                },
+                onDismiss = { activePicker = null },
+            )
+        }
+
+        AnilistPickerType.SCORE_FORMAT.name -> {
+            val scoreOptions = AnilistScoreFormat.entries.map { format ->
+                TrackingPickerOption(
+                    value = format,
+                    title = format.label,
+                    description = when (format) {
+                        AnilistScoreFormat.POINT_10_DECIMAL -> "Fine ratings with decimal precision (e.g., 8.5 / 10)"
+                        AnilistScoreFormat.POINT_100 -> "Percentage score scale (e.g., 85 / 100)"
+                        AnilistScoreFormat.POINT_5 -> "Classic 5-star scoring scale"
+                        AnilistScoreFormat.POINT_3 -> "Simplified 3-tier rating (Liked, Neutral, Disliked)"
+                    },
+                )
+            }
+
+            TrackingAdaptivePicker(
+                isTablet = isTablet,
+                title = stringResource(Res.string.settings_anilist_score_format_title),
+                subtitle = stringResource(Res.string.settings_anilist_score_format_desc),
+                selectedValue = prefs.preferredScoreFormat,
+                options = scoreOptions,
+                onSelected = {
+                    AnilistPreferencesRepository.setPreferredScoreFormat(it)
+                    activePicker = null
+                },
+                onDismiss = { activePicker = null },
+            )
+        }
+    }
+}
+
+@Composable
+private fun AnilistTokenDialog(onDismiss: () -> Unit) {
+    var tokenInput by rememberSaveable { mutableStateOf("") }
+    var errorMessage by rememberSaveable { mutableStateOf<String?>(null) }
+    var isSubmitting by rememberSaveable { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+
+    AlertDialog(
+        onDismissRequest = { if (!isSubmitting) onDismiss() },
+        title = {
+            Text(
+                text = "Connect AniList Account",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+            )
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(
+                    text = "Authorize Nuvio in your browser, copy the access token, and paste it below:",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+
+                OutlinedTextField(
+                    value = tokenInput,
+                    onValueChange = {
+                        tokenInput = it
+                        errorMessage = null
+                    },
+                    label = { Text("Access Token") },
+                    placeholder = { Text("Paste AniList token here") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    isError = errorMessage != null,
+                    supportingText = errorMessage?.let { { Text(it, color = MaterialTheme.colorScheme.error) } },
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    if (tokenInput.isBlank()) {
+                        errorMessage = "Please enter an access token"
+                        return@Button
+                    }
+                    isSubmitting = true
+                    scope.launch {
+                        val success = AnilistAuthRepository.loginWithToken(tokenInput)
+                        isSubmitting = false
+                        if (success) {
+                            onDismiss()
+                        } else {
+                            errorMessage = "Invalid or expired token. Please try again."
+                        }
+                    }
+                },
+                enabled = !isSubmitting && tokenInput.isNotBlank(),
+            ) {
+                if (isSubmitting) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(16.dp),
+                        strokeWidth = 2.dp,
+                    )
+                } else {
+                    Text("Connect")
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = onDismiss,
+                enabled = !isSubmitting,
+            ) {
+                Text("Cancel")
+            }
+        },
+    )
+}

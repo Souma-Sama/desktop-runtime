@@ -746,6 +746,10 @@ private fun MobileSettingsScreen(
                     settingsUiState = trackingSettingsUiState,
                     commentsEnabled = traktCommentsEnabled,
                     onCommentsEnabledChange = TraktCommentsSettings::setEnabled,
+                    onAnilistClick = { onPageChange(SettingsPage.AniList) },
+                )
+                SettingsPage.AniList -> anilistSettingsContent(
+                    isTablet = false,
                 )
             }
         }
@@ -1179,6 +1183,10 @@ private fun TabletSettingsScreen(
                             settingsUiState = trackingSettingsUiState,
                             commentsEnabled = traktCommentsEnabled,
                             onCommentsEnabledChange = TraktCommentsSettings::setEnabled,
+                            onAnilistClick = { onPageChange(SettingsPage.AniList) },
+                        )
+                        SettingsPage.AniList -> anilistSettingsContent(
+                            isTablet = true,
                         )
                     }
                 }

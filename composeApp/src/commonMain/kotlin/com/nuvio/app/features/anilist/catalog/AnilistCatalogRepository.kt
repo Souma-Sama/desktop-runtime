@@ -78,7 +78,7 @@ object AnilistCatalogRepository {
         list.add(
             HomeCatalogDefinition(
                 key = "anilist:anime:trending",
-                defaultTitle = "🔥 Trending Anime (AniList)",
+                defaultTitle = "Trending Anime (AniList)",
                 catalogName = "Trending Anime",
                 addonName = "AniList",
                 manifestUrl = "native://anilist",
@@ -91,7 +91,7 @@ object AnilistCatalogRepository {
         list.add(
             HomeCatalogDefinition(
                 key = "anilist:anime:airing",
-                defaultTitle = "⚡ Currently Airing (AniList)",
+                defaultTitle = "Currently Airing (AniList)",
                 catalogName = "Currently Airing",
                 addonName = "AniList",
                 manifestUrl = "native://anilist",
@@ -104,7 +104,7 @@ object AnilistCatalogRepository {
         list.add(
             HomeCatalogDefinition(
                 key = "anilist:anime:popular",
-                defaultTitle = "🌸 Popular This Season (AniList)",
+                defaultTitle = "Popular This Season (AniList)",
                 catalogName = "Popular This Season",
                 addonName = "AniList",
                 manifestUrl = "native://anilist",
@@ -117,7 +117,7 @@ object AnilistCatalogRepository {
         list.add(
             HomeCatalogDefinition(
                 key = "anilist:anime:top-rated",
-                defaultTitle = "⭐ Top Rated Anime (AniList)",
+                defaultTitle = "Top Rated Anime (AniList)",
                 catalogName = "Top Rated Anime",
                 addonName = "AniList",
                 manifestUrl = "native://anilist",

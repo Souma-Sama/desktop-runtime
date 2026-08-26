@@ -163,6 +163,7 @@ internal fun TrackingProviderCards(
     isTablet: Boolean,
     traktUiState: TraktAuthUiState,
     simklUiState: SimklAuthUiState,
+    onAnilistClick: (() -> Unit)? = null,
 ) {
     val syncState by remember {
         SimklSyncRepository.ensureLoaded()
@@ -199,6 +200,7 @@ internal fun TrackingProviderCards(
             modifier = Modifier.fillMaxWidth(),
         )
         AnilistProviderCard(
+            onConfigureClick = onAnilistClick,
             modifier = Modifier.fillMaxWidth(),
         )
     }
@@ -210,6 +212,7 @@ internal fun TrackingProviderCards(
 
 @Composable
 private fun AnilistProviderCard(
+    onConfigureClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val isAuth by com.nuvio.app.features.anilist.AnilistAuthRepository.isAuthenticated.collectAsStateWithLifecycle()
@@ -234,6 +237,7 @@ private fun AnilistProviderCard(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Row(
+                    modifier = Modifier.weight(1f),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
@@ -258,24 +262,40 @@ private fun AnilistProviderCard(
                     }
                 }
 
-                if (isAuth) {
-                    OutlinedButton(
-                        onClick = { com.nuvio.app.features.anilist.AnilistAuthRepository.logout() },
-                    ) {
-                        Text("Disconnect", color = MaterialTheme.colorScheme.error)
-                    }
-                } else {
-                    Button(
-                        onClick = {
-                            uriHandler.openUri(com.nuvio.app.features.anilist.AnilistAuthRepository.OAUTH_AUTHORIZE_URL)
-                            showTokenDialog = true
-                        },
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFF02A9FF),
-                            contentColor = Color.White,
-                        ),
-                    ) {
-                        Text("Connect")
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    if (isAuth) {
+                        if (onConfigureClick != null) {
+                            Button(
+                                onClick = onConfigureClick,
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = Color(0xFF02A9FF),
+                                    contentColor = Color.White,
+                                ),
+                            ) {
+                                Text("Configure")
+                            }
+                        }
+                        OutlinedButton(
+                            onClick = { com.nuvio.app.features.anilist.AnilistAuthRepository.logout() },
+                        ) {
+                            Text("Disconnect", color = MaterialTheme.colorScheme.error)
+                        }
+                    } else {
+                        Button(
+                            onClick = {
+                                uriHandler.openUri(com.nuvio.app.features.anilist.AnilistAuthRepository.OAUTH_AUTHORIZE_URL)
+                                showTokenDialog = true
+                            },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color(0xFF02A9FF),
+                                contentColor = Color.White,
+                            ),
+                        ) {
+                            Text("Connect")
+                        }
                     }
                 }
             }
