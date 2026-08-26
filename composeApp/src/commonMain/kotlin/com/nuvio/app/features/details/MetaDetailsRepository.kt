@@ -505,7 +505,8 @@ object MetaDetailsRepository {
             moreLikeThis = traktMeta.moreLikeThis.ifEmpty { tmdbEnriched.moreLikeThis },
             moreLikeThisSource = traktMeta.moreLikeThisSource ?: tmdbEnriched.moreLikeThisSource,
             videos = mergedVideos,
-            // Preserve per-season release year and air dates from AniList
+            // Preserve per-season description, release year and air dates from AniList
+            description = if (isAnilist && !meta.description.isNullOrBlank()) meta.description else tmdbEnriched.description,
             releaseInfo = if (isAnilist && !meta.releaseInfo.isNullOrBlank()) meta.releaseInfo else (meta.releaseInfo ?: tmdbEnriched.releaseInfo),
             status = if (isAnilist && !meta.status.isNullOrBlank()) meta.status else tmdbEnriched.status,
             lastAirDate = if (isAnilist && !meta.lastAirDate.isNullOrBlank()) meta.lastAirDate else tmdbEnriched.lastAirDate,

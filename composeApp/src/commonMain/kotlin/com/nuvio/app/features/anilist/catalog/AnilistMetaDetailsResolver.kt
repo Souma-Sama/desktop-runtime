@@ -81,7 +81,8 @@ object AnilistMetaDetailsResolver {
             }
         }
 
-        val cleanDescription = com.nuvio.app.core.format.cleanHtmlDescription(cinemetaMeta?.description ?: media.description)
+        val cleanDescription = com.nuvio.app.core.format.cleanHtmlDescription(media.description)
+            ?: com.nuvio.app.core.format.cleanHtmlDescription(cinemetaMeta?.description)
 
         val castPersons = media.characters.mapNotNull { char ->
             val va = char.voiceActor
@@ -433,10 +434,14 @@ object AnilistMetaDetailsResolver {
             else -> cinemetaMeta.releaseInfo
         }
 
+        val cleanDesc = com.nuvio.app.core.format.cleanHtmlDescription(media?.description)
+            ?: cinemetaMeta.description
+
         cinemetaMeta.copy(
             id = rawId,
             name = media?.title?.displayTitle ?: cinemetaMeta.name,
             poster = anilistPoster,
+            description = cleanDesc,
             releaseInfo = releaseYear,
             status = media?.status ?: cinemetaMeta.status,
             lastAirDate = media?.endDateYear?.toString() ?: releaseYear,
