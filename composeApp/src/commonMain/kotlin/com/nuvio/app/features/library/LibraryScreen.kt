@@ -91,6 +91,7 @@ import com.nuvio.app.features.cloud.CloudLibraryItemType
 import com.nuvio.app.features.cloud.CloudLibraryRepository
 import com.nuvio.app.features.cloud.CloudLibraryUiState
 import com.nuvio.app.features.debrid.DebridSettingsRepository
+import com.nuvio.app.features.home.PosterShape
 import com.nuvio.app.features.home.components.HomeEmptyStateCard
 import com.nuvio.app.features.home.components.HomePosterCard
 import com.nuvio.app.features.home.components.HomeSkeletonRow
@@ -398,6 +399,7 @@ fun LibraryScreen(
                                 description = null,
                                 releaseInfo = null,
                                 posterShape = PosterShape.Poster,
+                                savedAtEpochMs = item.updatedAt,
                             ),
                         )
                     },
@@ -522,6 +524,7 @@ fun LibraryScreen(
                 }
             }
         }
+    }
 
         if (sourceMode == LibraryViewMode.AniList) {
             AnilistLibraryActionMenu(

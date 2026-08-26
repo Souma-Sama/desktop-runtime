@@ -75,6 +75,7 @@ import com.nuvio.app.core.ui.PosterZoomOverlayExitAnimation
 import com.nuvio.app.core.ui.TrackingListPickerDialog
 import com.nuvio.app.core.ui.isLiquidGlassNativeTabBarSupported
 import com.nuvio.app.core.ui.localizedContinueWatchingSubtitle
+import com.nuvio.app.core.ui.nuvio
 import com.nuvio.app.core.ui.platformExitApp
 import com.nuvio.app.features.addons.AddAddonResult
 import com.nuvio.app.features.anilist.AnilistLibraryMenuPrefs
@@ -1375,7 +1376,6 @@ internal fun MainAppContent(
                                                             type = mediaType,
                                                             id = result.id,
                                                             title = item.title,
-                                                            manifestUrl = result.manifestUrl,
                                                         ),
                                                     )
                                                 }
