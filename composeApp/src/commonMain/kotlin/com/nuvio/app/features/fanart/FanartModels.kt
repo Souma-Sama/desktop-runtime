@@ -9,6 +9,7 @@ data class FanartImage(
     val url: String? = null,
     val lang: String? = null,
     val likes: String? = null,
+    val season: String? = null,
 )
 
 @Serializable
@@ -34,6 +35,9 @@ data class FanartTvResponse(
     @SerialName("showbackground") val showBackground: List<FanartImage> = emptyList(),
     @SerialName("tvposter") val tvPoster: List<FanartImage> = emptyList(),
     @SerialName("tvbanner") val tvBanner: List<FanartImage> = emptyList(),
+    @SerialName("seasonposter") val seasonPoster: List<FanartImage> = emptyList(),
+    @SerialName("seasonbanner") val seasonBanner: List<FanartImage> = emptyList(),
+    @SerialName("seasonthumb") val seasonThumb: List<FanartImage> = emptyList(),
     @SerialName("clearart") val clearArt: List<FanartImage> = emptyList(),
     @SerialName("tvart") val tvArt: List<FanartImage> = emptyList(),
 )

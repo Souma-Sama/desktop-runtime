@@ -76,6 +76,7 @@ import com.nuvio.app.features.details.MetaEpisodeCardStyle
 import com.nuvio.app.features.details.MetaVideo
 import com.nuvio.app.features.details.SeasonViewMode
 import com.nuvio.app.features.details.SeasonViewModeStorage
+import com.nuvio.app.features.fanart.FanartService
 import com.nuvio.app.features.details.formatRuntimeFromMinutes
 import com.nuvio.app.features.details.metaVideoSeasonEpisodeComparator
 import com.nuvio.app.features.details.normalizeSeasonNumber
@@ -190,11 +191,6 @@ fun DetailSeriesContent(
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             if (seasons.size > 1) {
-                val hasSeasonPosters = seasons.any { season ->
-                    groupedEpisodes[season]
-                        .orEmpty()
-                        .any { !it.seasonPoster.isNullOrBlank() }
-                }
                 Column(
                     modifier = Modifier.animateContentSize(animationSpec = tween(280)),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -212,55 +208,42 @@ fun DetailSeriesContent(
                             ),
                             color = MaterialTheme.colorScheme.onBackground,
                         )
-                        if (hasSeasonPosters) {
-                            SeasonViewModeToggle(
-                                mode = seasonViewMode,
-                                sizing = sizing,
-                                onClick = {
-                                    val next = seasonViewMode.toggled()
-                                    seasonViewMode = next
-                                    SeasonViewModeStorage.save(next)
-                                },
-                            )
-                        }
+                        SeasonViewModeToggle(
+                            mode = seasonViewMode,
+                            sizing = sizing,
+                            onClick = {
+                                val next = seasonViewMode.toggled()
+                                seasonViewMode = next
+                                SeasonViewModeStorage.save(next)
+                            },
+                        )
                     }
 
-                    if (hasSeasonPosters) {
-                        Crossfade(
-                            targetState = seasonViewMode,
-                            animationSpec = tween(280),
-                            label = "season_selector_layout",
-                        ) { mode ->
-                            when (mode) {
-                                SeasonViewMode.Posters -> SeasonPosterScrollRow(
-                                    seasons = seasons,
-                                    groupedEpisodes = groupedEpisodes,
-                                    meta = meta,
-                                    currentSeason = currentSeason,
-                                    sizing = sizing,
-                                    horizontalScrollPadding = horizontalScrollPadding,
-                                    onSelect = { selectedSeasonOverride = it },
-                                    onLongPress = onSeasonLongPress,
-                                )
-                                SeasonViewMode.Text -> SeasonTextChipScrollRow(
-                                    seasons = seasons,
-                                    currentSeason = currentSeason,
-                                    sizing = sizing,
-                                    horizontalScrollPadding = horizontalScrollPadding,
-                                    onSelect = { selectedSeasonOverride = it },
-                                    onLongPress = onSeasonLongPress,
-                                )
-                            }
+                    Crossfade(
+                        targetState = seasonViewMode,
+                        animationSpec = tween(280),
+                        label = "season_selector_layout",
+                    ) { mode ->
+                        when (mode) {
+                            SeasonViewMode.Posters -> SeasonPosterScrollRow(
+                                seasons = seasons,
+                                groupedEpisodes = groupedEpisodes,
+                                meta = meta,
+                                currentSeason = currentSeason,
+                                sizing = sizing,
+                                horizontalScrollPadding = horizontalScrollPadding,
+                                onSelect = { selectedSeasonOverride = it },
+                                onLongPress = onSeasonLongPress,
+                            )
+                            SeasonViewMode.Text -> SeasonTextChipScrollRow(
+                                seasons = seasons,
+                                currentSeason = currentSeason,
+                                sizing = sizing,
+                                horizontalScrollPadding = horizontalScrollPadding,
+                                onSelect = { selectedSeasonOverride = it },
+                                onLongPress = onSeasonLongPress,
+                            )
                         }
-                    } else {
-                        SeasonTextChipScrollRow(
-                            seasons = seasons,
-                            currentSeason = currentSeason,
-                            sizing = sizing,
-                            horizontalScrollPadding = horizontalScrollPadding,
-                            onSelect = { selectedSeasonOverride = it },
-                            onLongPress = onSeasonLongPress,
-                        )
                     }
                 }
             }
@@ -499,13 +482,30 @@ private fun SeasonPosterScrollRow(
         horizontalArrangement = Arrangement.spacedBy(sizing.seasonChipGap),
     ) {
         items(seasons, key = { season -> season }) { season ->
+            val staticSeasonPoster = groupedEpisodes[season]
+                ?.firstNotNullOfOrNull { episode -> episode.seasonPoster?.takeIf(String::isNotBlank) }
+                ?: FanartService.getCachedSeasonPoster(meta.id, season)
+
+            var resolvedSeasonPoster by remember(meta.id, season, staticSeasonPoster) {
+                mutableStateOf(staticSeasonPoster)
+            }
+
+            LaunchedEffect(meta.id, season, staticSeasonPoster) {
+                if (resolvedSeasonPoster == null) {
+                    val fanartPoster = FanartService.resolveSeasonPoster(meta.id, meta.type, season)
+                    if (!fanartPoster.isNullOrBlank()) {
+                        resolvedSeasonPoster = fanartPoster
+                    }
+                }
+            }
+
+            val posterUrl = resolvedSeasonPoster
+                ?: meta.poster
+                ?: meta.background
+
             SeasonPosterButton(
                 label = season.label(),
-                imageUrl = groupedEpisodes[season]
-                    .orEmpty()
-                    .firstNotNullOfOrNull { episode -> episode.seasonPoster }
-                    ?: meta.poster
-                    ?: meta.background,
+                imageUrl = posterUrl,
                 isSelected = season == currentSeason,
                 sizing = sizing,
                 onClick = { onSelect(season) },

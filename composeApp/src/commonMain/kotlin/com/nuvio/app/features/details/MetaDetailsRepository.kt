@@ -7,6 +7,8 @@ import com.nuvio.app.features.addons.AddonResource
 import com.nuvio.app.features.addons.buildAddonResourceUrl
 import com.nuvio.app.features.addons.enabledAddons
 import com.nuvio.app.features.addons.fetchAddonResponseText
+import com.nuvio.app.features.fanart.FanartService
+import com.nuvio.app.features.fanart.FanartSettingsRepository
 import com.nuvio.app.features.home.HomeCatalogSettingsRepository
 import com.nuvio.app.features.home.filterReleasedItems
 import com.nuvio.app.features.mdblist.MdbListMetadataService
@@ -512,18 +514,27 @@ object MetaDetailsRepository {
             lastAirDate = if (isAnilist && !meta.lastAirDate.isNullOrBlank()) meta.lastAirDate else tmdbEnriched.lastAirDate,
         )
 
+        val fanartSettings = FanartSettingsRepository.snapshot()
+        val finalMeta = if (fanartSettings.enabled && fanartSettings.hasApiKey) {
+            FanartService.enrichMetaDetails(
+                meta = enrichedMeta,
+                fallbackItemId = fallbackItemId,
+                settings = fanartSettings,
+            )
+        } else enrichedMeta
+
         cachedMetaByRequestKey[requestKey] = cachedMetaByRequestKey[requestKey]
             ?.copy(
-                metaScreenMeta = enrichedMeta,
+                metaScreenMeta = finalMeta,
                 metaScreenSettingsFingerprint = settingsFingerprint,
             )
             ?: CachedMetaEntry(
                 baseMeta = meta,
-                metaScreenMeta = enrichedMeta,
+                metaScreenMeta = finalMeta,
                 metaScreenSettingsFingerprint = settingsFingerprint,
             )
 
-        enrichedMeta
+        finalMeta
     }
 
     private suspend fun applyMoreLikeThisSource(
