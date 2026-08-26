@@ -288,7 +288,7 @@ object AnilistMetaDetailsResolver {
     ): MetaDetails = withContext(Dispatchers.Default) {
         val anilistId = AnilistTrackerCoordinator.extractAnilistId(rawId) ?: return@withContext cinemetaMeta
         val token = AnilistAuthRepository.token.value
-        val media: AnilistMedia? = AnilistApi.fetchMediaById(anilistId, token = token)
+        val media: AnilistMedia? = AnilistApi.getCachedMedia(anilistId) ?: AnilistApi.fetchMediaById(anilistId, token = token)
         val mapping = resolveArmMapping(anilistId)
 
         val anilistPoster = media?.coverImage?.extraLarge

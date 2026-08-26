@@ -306,10 +306,32 @@ object MetaDetailsRepository {
         }
     }
 
+    private val cinemetaDefaultManifest = AddonManifest(
+        id = "org.stremio.cinemeta",
+        name = "Cinemeta",
+        version = "3.0.0",
+        description = "Cinemeta Official Metadata",
+        resources = listOf(
+            AddonResource(
+                name = "meta",
+                types = listOf("movie", "series"),
+                idPrefixes = listOf("tt"),
+            )
+        ),
+        types = listOf("movie", "series"),
+        catalogs = emptyList(),
+        transportUrl = "https://v3-cinemeta.strem.io/manifest.json",
+    )
+
     private suspend fun findReadyMetaManifests(type: String, id: String): List<AddonManifest> {
         AddonRepository.initialize()
 
-        findMetaManifests(AddonRepository.uiState.value, type, id).takeIf { it.isNotEmpty() }?.let { return it }
+        val active = findMetaManifests(AddonRepository.uiState.value, type, id)
+        if (active.isNotEmpty()) return active
+
+        if (id.startsWith("tt", ignoreCase = true)) {
+            return listOf(cinemetaDefaultManifest)
+        }
 
         if (!AddonRepository.uiState.value.hasPendingEnabledAddonManifests()) {
             return emptyList()
@@ -322,7 +344,11 @@ object MetaDetailsRepository {
             }
         } ?: AddonRepository.uiState.value
 
-        return findMetaManifests(readyState, type, id)
+        val resolved = findMetaManifests(readyState, type, id)
+        if (resolved.isEmpty() && id.startsWith("tt", ignoreCase = true)) {
+            return listOf(cinemetaDefaultManifest)
+        }
+        return resolved
     }
 
     private fun findMetaManifests(state: com.nuvio.app.features.addons.AddonsUiState, type: String, id: String): List<AddonManifest> =
