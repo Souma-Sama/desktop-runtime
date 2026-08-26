@@ -12,6 +12,8 @@ import com.nuvio.app.features.home.MetaPreview
 import com.nuvio.app.features.home.PosterShape
 
 import com.nuvio.app.features.library.LibraryClock
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 
 private data class CachedCatalogPage(
     val timestamp: Long,
@@ -235,9 +237,9 @@ object AnilistCatalogRepository {
 
         // Pre-warm ARM mappings concurrently so tapping any poster loads instantly
         if (mediaList.isNotEmpty()) {
-            kotlinx.coroutines.coroutineScope {
+            coroutineScope {
                 mediaList.map { media ->
-                    kotlinx.coroutines.async {
+                    async {
                         AnilistMetaDetailsResolver.resolveArmMapping(media.id)
                     }
                 }
