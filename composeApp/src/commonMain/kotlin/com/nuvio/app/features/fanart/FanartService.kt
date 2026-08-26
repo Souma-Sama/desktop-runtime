@@ -126,10 +126,22 @@ object FanartService {
                     }
                 }
             }
+            val metahubFallback = if (cleanId.startsWith("tt")) "https://images.metahub.space/logo/medium/$cleanId/img" else null
+            if (metahubFallback != null) {
+                logoCache[cacheKey] = metahubFallback
+                logoCache["$type:$id"] = metahubFallback
+                return@withContext metahubFallback
+            }
             negativeCache.add(cacheKey)
             null
         } catch (e: Throwable) {
             log.w(e) { "Failed to resolve Fanart logo for $cacheKey" }
+            val metahubFallback = if (cleanId.startsWith("tt")) "https://images.metahub.space/logo/medium/$cleanId/img" else null
+            if (metahubFallback != null) {
+                logoCache[cacheKey] = metahubFallback
+                logoCache["$type:$id"] = metahubFallback
+                return@withContext metahubFallback
+            }
             negativeCache.add(cacheKey)
             null
         }
