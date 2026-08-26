@@ -41,7 +41,9 @@ object AnilistMetaDetailsResolver {
             ?: return@withContext null
 
         // 2. Resolve external IDs (IMDb ID & Kitsu ID) via ARM & Kitsu APIs
-        val armImdbId = resolveArmImdbId(anilistId)
+        val armMapping = resolveArmMapping(anilistId)
+        val armImdbId = armMapping.imdbId
+        val targetSeason = armMapping.season
         val kitsuId = resolveKitsuId(anilistId, media.title?.displayTitle.orEmpty())
 
         // 3. 1080p Backdrops & Clear PNG Logos from Metahub
@@ -164,18 +166,18 @@ object AnilistMetaDetailsResolver {
                 val epThumbnail = streamingEp?.thumbnail?.takeIf { it.isNotBlank() }
                     ?: epData?.thumbnail
                     ?: cinemetaEp?.thumbnail?.takeIf { it.isNotBlank() }
-                    ?: if (!armImdbId.isNullOrBlank()) "https://images.metahub.space/screenshot/medium/$armImdbId/1/$epNum/img" else null
+                    ?: if (!armImdbId.isNullOrBlank()) "https://images.metahub.space/screenshot/medium/$armImdbId/$targetSeason/$epNum/img" else null
 
                 val videoId = when {
                     !kitsuId.isNullOrBlank() -> "kitsu:$kitsuId:$epNum"
-                    !armImdbId.isNullOrBlank() -> "$armImdbId:1:$epNum"
+                    !armImdbId.isNullOrBlank() -> "$armImdbId:$targetSeason:$epNum"
                     else -> "anilist:$anilistId:$epNum"
                 }
 
                 MetaVideo(
                     id = videoId,
                     title = epTitle,
-                    season = 1,
+                    season = targetSeason,
                     episode = epNum,
                     overview = epOverview,
                     thumbnail = epThumbnail,
@@ -322,7 +324,7 @@ object AnilistMetaDetailsResolver {
                     val streamingEp = media?.streamingEpisodes?.getOrNull(idx)
                     v.copy(
                         id = "$effectiveImdbId:$targetSeason:${v.episode ?: epNum}",
-                        season = 1,
+                        season = targetSeason,
                         episode = epNum,
                         title = streamingEp?.title?.takeIf { it.isNotBlank() } ?: v.title,
                         thumbnail = streamingEp?.thumbnail?.takeIf { it.isNotBlank() }
@@ -335,7 +337,7 @@ object AnilistMetaDetailsResolver {
                 val streamingEp = media.streamingEpisodes.getOrNull(epNum - 1)
                 MetaVideo(
                     id = "$effectiveImdbId:$targetSeason:$epNum",
-                    season = 1,
+                    season = targetSeason,
                     episode = epNum,
                     title = streamingEp?.title?.takeIf { it.isNotBlank() } ?: "Episode $epNum",
                     thumbnail = streamingEp?.thumbnail?.takeIf { it.isNotBlank() }

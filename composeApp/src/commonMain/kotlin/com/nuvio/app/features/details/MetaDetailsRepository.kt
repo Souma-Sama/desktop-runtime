@@ -24,6 +24,8 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -450,30 +452,47 @@ object MetaDetailsRepository {
         fallbackItemType: String,
         settings: com.nuvio.app.features.mdblist.MdbListSettings,
         settingsFingerprint: String,
-    ): MetaDetails {
+    ): MetaDetails = coroutineScope {
         val tmdbSettings = TmdbSettingsRepository.snapshot()
-        val tmdbEnrichedMeta = if (tmdbSettings.enabled && tmdbSettings.hasApiKey) {
-            withTimeoutOrNull(TMDB_ENRICH_TIMEOUT_MS) {
-                TmdbMetadataService.enrichMeta(
+
+        val tmdbDeferred = async {
+            if (tmdbSettings.enabled && tmdbSettings.hasApiKey) {
+                withTimeoutOrNull(TMDB_ENRICH_TIMEOUT_MS) {
+                    TmdbMetadataService.enrichMeta(
+                        meta = meta,
+                        fallbackItemId = fallbackItemId,
+                        settings = tmdbSettings,
+                    )
+                } ?: meta
+            } else meta
+        }
+
+        val mdbListDeferred = async {
+            withTimeoutOrNull(MDBLIST_ENRICH_TIMEOUT_MS) {
+                MdbListMetadataService.enrichMeta(
                     meta = meta,
                     fallbackItemId = fallbackItemId,
-                    settings = tmdbSettings,
+                    settings = settings,
                 )
-            } ?: meta
-        } else meta
+            }?.externalRatings.orEmpty()
+        }
 
-        val mdbListEnrichedMeta = withTimeoutOrNull(MDBLIST_ENRICH_TIMEOUT_MS) {
-            MdbListMetadataService.enrichMeta(
-                meta = tmdbEnrichedMeta,
+        val traktDeferred = async {
+            applyMoreLikeThisSource(
+                meta = meta,
                 fallbackItemId = fallbackItemId,
-                settings = settings,
+                fallbackItemType = fallbackItemType,
             )
-        } ?: tmdbEnrichedMeta
+        }
 
-        val enrichedMeta = applyMoreLikeThisSource(
-            meta = mdbListEnrichedMeta,
-            fallbackItemId = fallbackItemId,
-            fallbackItemType = fallbackItemType,
+        val tmdbEnriched = tmdbDeferred.await()
+        val mdbListRatings = mdbListDeferred.await()
+        val traktMeta = traktDeferred.await()
+
+        val enrichedMeta = tmdbEnriched.copy(
+            externalRatings = mdbListRatings.ifEmpty { tmdbEnriched.externalRatings },
+            moreLikeThis = traktMeta.moreLikeThis.ifEmpty { tmdbEnriched.moreLikeThis },
+            moreLikeThisSource = traktMeta.moreLikeThisSource ?: tmdbEnriched.moreLikeThisSource,
         )
 
         cachedMetaByRequestKey[requestKey] = cachedMetaByRequestKey[requestKey]
@@ -487,7 +506,7 @@ object MetaDetailsRepository {
                 metaScreenSettingsFingerprint = settingsFingerprint,
             )
 
-        return enrichedMeta
+        enrichedMeta
     }
 
     private suspend fun applyMoreLikeThisSource(
