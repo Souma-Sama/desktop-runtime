@@ -45,6 +45,40 @@ object AnilistPreferencesRepository {
         updateAndPersist { it.copy(showSyncNotification = enabled) }
     }
 
+    fun setAutoAddNewAnime(enabled: Boolean) {
+        updateAndPersist { it.copy(autoAddNewAnime = enabled) }
+    }
+
+    fun setSectionEnabled(type: String, enabled: Boolean) {
+        updateAndPersist { current ->
+            val currentSections = current.librarySections.toMutableList()
+            val index = currentSections.indexOfFirst { it.type.equals(type, ignoreCase = true) }
+            if (index != -1) {
+                currentSections[index] = currentSections[index].copy(enabled = enabled)
+                current.copy(librarySections = currentSections)
+            } else {
+                current
+            }
+        }
+    }
+
+    fun moveSection(fromIndex: Int, toIndex: Int) {
+        updateAndPersist { current ->
+            val currentSections = current.librarySections.toMutableList()
+            if (fromIndex in currentSections.indices && toIndex in currentSections.indices) {
+                val item = currentSections.removeAt(fromIndex)
+                currentSections.add(toIndex, item)
+                current.copy(librarySections = currentSections)
+            } else {
+                current
+            }
+        }
+    }
+
+    fun resetLibrarySections() {
+        updateAndPersist { it.copy(librarySections = AnilistPreferences.defaultLibrarySections) }
+    }
+
     fun setPreferredTitleLanguage(language: AnilistTitleLanguage) {
         updateAndPersist { it.copy(preferredTitleLanguage = language) }
     }

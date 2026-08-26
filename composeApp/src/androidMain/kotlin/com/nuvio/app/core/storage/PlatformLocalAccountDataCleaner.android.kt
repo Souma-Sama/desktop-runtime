@@ -23,6 +23,7 @@ internal actual object PlatformLocalAccountDataCleaner {
         "nuvio_simkl_sync",
         "nuvio_anilist_auth",
         "nuvio_anilist_preferences",
+        "nuvio_anilist_library",
         "nuvio_trakt_library",
         "nuvio_trakt_settings",
         "nuvio_watched",

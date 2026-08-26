@@ -75,9 +75,10 @@ import com.nuvio.app.core.ui.PosterZoomOverlayExitAnimation
 import com.nuvio.app.core.ui.TrackingListPickerDialog
 import com.nuvio.app.core.ui.isLiquidGlassNativeTabBarSupported
 import com.nuvio.app.core.ui.localizedContinueWatchingSubtitle
-import com.nuvio.app.core.ui.nuvio
 import com.nuvio.app.core.ui.platformExitApp
 import com.nuvio.app.features.addons.AddAddonResult
+import com.nuvio.app.features.anilist.AnilistLibraryMenuPrefs
+import com.nuvio.app.features.anilist.AnilistOpenByResolver
 import com.nuvio.app.features.addons.AddonRepository
 import com.nuvio.app.features.catalog.CatalogTarget
 import com.nuvio.app.features.cloud.CloudLibraryContentType
@@ -1356,6 +1357,69 @@ internal fun MainAppContent(
                                         )
                                     } else {
                                         requestedSettingsPageName = "Debrid"
+                                        activateTab(AppScreenTab.Settings)
+                                    }
+                                },
+                                onAnilistPosterClick = { item ->
+                                    coroutineScope.launch {
+                                        val selectedUrl = AnilistLibraryMenuPrefs.state.value.openByCatalogUrl
+                                        val addon = selectedUrl?.let { url ->
+                                            AddonRepository.uiState.value.addons.firstOrNull { it.manifest?.transportUrl == url }
+                                        }
+                                        val mediaType = if (item.format?.equals("MOVIE", ignoreCase = true) == true) "movie" else "series"
+                                        if (addon != null) {
+                                            when (val result = AnilistOpenByResolver.resolve(item, addon)) {
+                                                is AnilistOpenByResolver.Result.OpenDirect -> {
+                                                    navController.navigate(
+                                                        DetailRoute(
+                                                            type = mediaType,
+                                                            id = result.id,
+                                                            title = item.title,
+                                                            manifestUrl = result.manifestUrl,
+                                                        ),
+                                                    )
+                                                }
+                                                is AnilistOpenByResolver.Result.SearchByTitle -> {
+                                                    navController.navigate(
+                                                        DetailRoute(
+                                                            type = mediaType,
+                                                            id = "anilist:${item.id}",
+                                                            title = result.title,
+                                                        ),
+                                                    )
+                                                }
+                                                is AnilistOpenByResolver.Result.NotSupported -> {
+                                                    navController.navigate(
+                                                        DetailRoute(
+                                                            type = mediaType,
+                                                            id = "anilist:${item.id}",
+                                                            title = item.title,
+                                                        ),
+                                                    )
+                                                }
+                                            }
+                                        } else {
+                                            navController.navigate(
+                                                DetailRoute(
+                                                    type = mediaType,
+                                                    id = "anilist:${item.id}",
+                                                    title = item.title,
+                                                ),
+                                            )
+                                        }
+                                    }
+                                },
+                                onConnectAnilistClick = {
+                                    if (useNativeNavigation && !isTabletLayout) {
+                                        activateTab(AppScreenTab.Settings)
+                                        navController.navigate(
+                                            SettingsPageRoute(
+                                                pageName = "AniList",
+                                                title = "AniList",
+                                            ),
+                                        )
+                                    } else {
+                                        requestedSettingsPageName = "AniList"
                                         activateTab(AppScreenTab.Settings)
                                     }
                                 },

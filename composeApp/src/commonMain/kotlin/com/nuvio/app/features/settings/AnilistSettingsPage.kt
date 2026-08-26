@@ -41,6 +41,22 @@ import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material.icons.rounded.Menu
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
+import com.nuvio.app.core.ui.NuvioActionLabel
+import com.nuvio.app.features.anilist.AnilistSectionSettings
+import sh.calvin.reorderable.ReorderableCollectionItemScope
+import sh.calvin.reorderable.ReorderableItem
+import sh.calvin.reorderable.rememberReorderableLazyListState
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
@@ -96,6 +112,10 @@ internal fun LazyListScope.anilistSettingsContent(
 
     item {
         AnilistPlaybackSection(isTablet = isTablet)
+    }
+
+    item {
+        AnilistLibrarySectionsSection(isTablet = isTablet)
     }
 
     item {
@@ -268,6 +288,17 @@ private fun AnilistPlaybackSection(isTablet: Boolean) {
             SettingsGroupDivider(isTablet = isTablet)
 
             SettingsSwitchRow(
+                title = "Automatically Add New Anime to AniList",
+                description = "When enabled, watching an anime not in your AniList library will automatically add it to your Watching list and sync your progress.",
+                checked = prefs.autoAddNewAnime,
+                enabled = isAuth && prefs.autoMarkEpisodeWatched,
+                isTablet = isTablet,
+                onCheckedChange = AnilistPreferencesRepository::setAutoAddNewAnime,
+            )
+
+            SettingsGroupDivider(isTablet = isTablet)
+
+            SettingsSwitchRow(
                 title = stringResource(Res.string.settings_anilist_notification_title),
                 description = stringResource(Res.string.settings_anilist_notification_desc),
                 checked = prefs.showSyncNotification,
@@ -275,6 +306,147 @@ private fun AnilistPlaybackSection(isTablet: Boolean) {
                 isTablet = isTablet,
                 onCheckedChange = AnilistPreferencesRepository::setShowSyncNotification,
             )
+        }
+    }
+}
+
+@Composable
+private fun AnilistLibrarySectionsSection(isTablet: Boolean) {
+    val prefs by AnilistPreferencesRepository.preferences.collectAsStateWithLifecycle()
+    val isAuth by AnilistAuthRepository.isAuthenticated.collectAsStateWithLifecycle()
+
+    if (!isAuth) return
+
+    SettingsSection(
+        title = "Customize Library Sections",
+        isTablet = isTablet,
+        actions = {
+            NuvioActionLabel(
+                text = "Reset",
+                onClick = {
+                    AnilistPreferencesRepository.resetLibrarySections()
+                },
+            )
+        },
+    ) {
+        AnilistSectionsList(
+            isTablet = isTablet,
+            items = prefs.librarySections,
+        )
+    }
+}
+
+@Composable
+private fun AnilistSectionsList(
+    isTablet: Boolean,
+    items: List<AnilistSectionSettings>,
+) {
+    val hapticFeedback = LocalHapticFeedback.current
+    val lazyListState = rememberLazyListState()
+    val reorderableLazyListState = rememberReorderableLazyListState(
+        lazyListState = lazyListState,
+    ) { from, to ->
+        AnilistPreferencesRepository.moveSection(from.index, to.index)
+        hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+    }
+
+    SettingsGroup(isTablet = isTablet) {
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(max = if (isTablet) 550.dp else 400.dp),
+            state = lazyListState,
+        ) {
+            itemsIndexed(items, key = { _, item -> item.type }) { index, item ->
+                ReorderableItem(
+                    reorderableLazyListState,
+                    key = item.type,
+                ) { isDragging ->
+                    val elevation by animateDpAsState(if (isDragging) 4.dp else 0.dp)
+
+                    Surface(shadowElevation = elevation) {
+                        Column {
+                            if (index > 0) {
+                                SettingsGroupDivider(isTablet = isTablet)
+                            }
+                            AnilistSectionSettingsRow(
+                                item = item,
+                                isTablet = isTablet,
+                                onEnabledChange = { enabled ->
+                                    AnilistPreferencesRepository.setSectionEnabled(item.type, enabled)
+                                },
+                                dragHandleScope = this@ReorderableItem,
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AnilistSectionSettingsRow(
+    item: AnilistSectionSettings,
+    isTablet: Boolean,
+    onEnabledChange: (Boolean) -> Unit,
+    dragHandleScope: ReorderableCollectionItemScope,
+) {
+    val tokens = MaterialTheme.nuvio
+    val horizontalPadding = if (isTablet) 20.dp else 16.dp
+    val verticalPadding = if (isTablet) 18.dp else 14.dp
+    val hapticFeedback = LocalHapticFeedback.current
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = horizontalPadding, vertical = verticalPadding),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(
+            modifier = Modifier.weight(1f),
+        ) {
+            Text(
+                text = item.type,
+                style = MaterialTheme.typography.bodyLarge,
+                color = tokens.colors.textPrimary,
+                fontWeight = FontWeight.SemiBold,
+            )
+        }
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Switch(
+                checked = item.enabled,
+                onCheckedChange = onEnabledChange,
+                colors = SwitchDefaults.colors(
+                    checkedThumbColor = tokens.colors.onAccent,
+                    checkedTrackColor = tokens.colors.accent,
+                    uncheckedThumbColor = tokens.colors.textMuted,
+                    uncheckedTrackColor = tokens.colors.borderDefault,
+                ),
+            )
+            IconButton(
+                modifier = with(dragHandleScope) {
+                    Modifier.draggableHandle(
+                        onDragStarted = {
+                            hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                        },
+                        onDragStopped = {
+                            hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        },
+                    )
+                },
+                onClick = {},
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.Menu,
+                    contentDescription = "Reorder",
+                    tint = tokens.colors.textMuted,
+                )
+            }
         }
     }
 }

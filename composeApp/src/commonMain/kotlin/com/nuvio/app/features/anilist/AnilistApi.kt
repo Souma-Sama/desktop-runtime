@@ -1168,4 +1168,99 @@ object AnilistApi {
             )
         }
     }
+
+    suspend fun fetchMediaListCollection(userId: Int, token: String): List<AnilistLibraryItem> {
+        val query = """
+            query (${'$'}userId: Int) {
+                MediaListCollection(userId: ${'$'}userId, type: ANIME) {
+                    lists {
+                        status
+                        entries {
+                            id
+                            status
+                            progress
+                            score(format: POINT_100)
+                            updatedAt
+                            media {
+                                id
+                                idMal
+                                episodes
+                                status
+                                format
+                                title {
+                                    english
+                                    romaji
+                                    native
+                                    userPreferred
+                                }
+                                coverImage {
+                                    extraLarge
+                                    large
+                                    medium
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        """.trimIndent()
+
+        val variables = buildJsonObject {
+            put("userId", userId)
+        }
+
+        return try {
+            val root = executeGraphQL(query = query, variables = variables, token = token) ?: return emptyList()
+            val collectionObj = root["data"].asJsonObjectOrNull()?.get("MediaListCollection").asJsonObjectOrNull() ?: return emptyList()
+            val lists = collectionObj["lists"].asJsonArrayOrNull() ?: return emptyList()
+
+            lists.flatMap { listGroupElem ->
+                val listGroup = listGroupElem.asJsonObjectOrNull() ?: return@flatMap emptyList()
+                val groupStatus = listGroup["status"].asStringOrNull().orEmpty()
+                val entries = listGroup["entries"].asJsonArrayOrNull() ?: return@flatMap emptyList()
+
+                entries.mapNotNull { entryElem ->
+                    val entryObj = entryElem.asJsonObjectOrNull() ?: return@mapNotNull null
+                    val mediaObj = entryObj["media"].asJsonObjectOrNull() ?: return@mapNotNull null
+                    val mediaId = mediaObj["id"].asIntOrNull() ?: return@mapNotNull null
+                    val titleObj = mediaObj["title"].asJsonObjectOrNull()
+                    val titleModel = AnilistTitle(
+                        romaji = titleObj?.get("romaji").asStringOrNull(),
+                        english = titleObj?.get("english").asStringOrNull(),
+                        native = titleObj?.get("native").asStringOrNull(),
+                    )
+                    val displayTitle = titleModel.getDisplayTitle()
+                    val coverObj = mediaObj["coverImage"].asJsonObjectOrNull()
+                    val posterUrl = coverObj?.get("extraLarge").asStringOrNull()
+                        ?: coverObj?.get("large").asStringOrNull()
+                        ?: coverObj?.get("medium").asStringOrNull()
+
+                    val entryId = entryObj["id"].asIntOrNull() ?: 0
+                    val progress = entryObj["progress"].asIntOrNull() ?: 0
+                    val score = entryObj["score"].asDoubleOrNull()
+                    val updatedAt = entryObj["updatedAt"].asLongOrNull() ?: 0L
+                    val totalEpisodes = mediaObj["episodes"].asIntOrNull()
+                    val airingStatus = mediaObj["status"].asStringOrNull()
+                    val format = mediaObj["format"].asStringOrNull()
+
+                    AnilistLibraryItem(
+                        id = mediaId,
+                        title = displayTitle.takeIf { it.isNotBlank() } ?: "Anime $mediaId",
+                        posterUrl = posterUrl,
+                        progress = progress,
+                        totalEpisodes = totalEpisodes,
+                        score = score,
+                        airingStatus = airingStatus,
+                        status = groupStatus,
+                        updatedAt = updatedAt,
+                        entryId = entryId,
+                        format = format,
+                    )
+                }
+            }
+        } catch (e: Exception) {
+            log.e(e) { "Failed to fetch AniList collection: ${e.message}" }
+            emptyList()
+        }
+    }
 }

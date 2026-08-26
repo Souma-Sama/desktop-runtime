@@ -120,6 +120,7 @@ open class MainActivity : AppCompatActivity() {
         SimklSyncStorage.initialize(applicationContext)
         AnilistAuthStorage.initialize(applicationContext)
         AnilistPreferencesStorage.initialize(applicationContext)
+        AnilistLibraryStorage.initialize(applicationContext)
         LibraryDisplaySettingsStorage.initialize(applicationContext)
         ContinueWatchingPreferencesStorage.initialize(applicationContext)
         ResumePromptStorage.initialize(applicationContext)

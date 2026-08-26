@@ -36,6 +36,7 @@ import com.nuvio.app.core.ui.DisintegrationRequest
 import com.nuvio.app.core.ui.NuvioLoadingIndicator
 import com.nuvio.app.core.ui.NuvioTokens
 import com.nuvio.app.core.ui.nuvio
+import com.nuvio.app.features.anilist.AnilistLibraryItem
 import com.nuvio.app.features.cloud.CloudLibraryContentType
 import com.nuvio.app.features.cloud.CloudLibraryFile
 import com.nuvio.app.features.cloud.CloudLibraryItem
@@ -151,6 +152,8 @@ internal data class AppTabActions(
     val onLibrarySectionViewAllClick: ((LibrarySection, LibrarySortOption) -> Unit)? = null,
     val onCloudFilePlay: ((CloudLibraryItem, CloudLibraryFile) -> Unit)? = null,
     val onConnectCloudClick: (() -> Unit)? = null,
+    val onAnilistPosterClick: ((AnilistLibraryItem) -> Unit)? = null,
+    val onConnectAnilistClick: (() -> Unit)? = null,
     val onContinueWatchingClick: ((ContinueWatchingItem) -> Unit)? = null,
     val onContinueWatchingLongPress: ((ContinueWatchingItem) -> Unit)? = null,
     val onSwitchProfile: (() -> Unit)? = null,
@@ -263,6 +266,8 @@ internal fun AppTabHost(
                                 onSectionViewAllClick = actions.onLibrarySectionViewAllClick,
                                 onCloudFilePlay = actions.onCloudFilePlay,
                                 onConnectCloudClick = actions.onConnectCloudClick,
+                                onAnilistPosterClick = actions.onAnilistPosterClick,
+                                onConnectAnilistClick = actions.onConnectAnilistClick,
                                 disintegrationRequest = state.libraryDisintegrationRequest,
                             )
                         }

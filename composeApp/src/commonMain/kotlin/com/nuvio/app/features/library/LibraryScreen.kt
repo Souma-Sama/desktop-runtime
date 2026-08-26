@@ -77,6 +77,14 @@ import com.nuvio.app.core.ui.NuvioViewAllPillSize
 import com.nuvio.app.core.ui.NuvioShelfSection
 import com.nuvio.app.core.ui.ScopedDisintegrationTracker
 import com.nuvio.app.core.ui.nuvioConsumePointerEvents
+import com.nuvio.app.features.addons.AddonRepository
+import com.nuvio.app.features.anilist.AnilistLibraryItem
+import com.nuvio.app.features.anilist.AnilistLibraryMenuPrefs
+import com.nuvio.app.features.anilist.AnilistLibraryRepository
+import com.nuvio.app.features.anilist.AnilistOpenByResolver
+import com.nuvio.app.features.anilist.AnilistPreferencesRepository
+import com.nuvio.app.features.anilist.components.AnilistLibraryActionMenu
+import com.nuvio.app.features.anilist.components.anilistLibraryContent
 import com.nuvio.app.features.cloud.CloudLibraryFile
 import com.nuvio.app.features.cloud.CloudLibraryItem
 import com.nuvio.app.features.cloud.CloudLibraryItemType
@@ -107,6 +115,8 @@ fun LibraryScreen(
     onSectionViewAllClick: ((LibrarySection, LibrarySortOption) -> Unit)? = null,
     onCloudFilePlay: ((CloudLibraryItem, CloudLibraryFile) -> Unit)? = null,
     onConnectCloudClick: (() -> Unit)? = null,
+    onAnilistPosterClick: ((AnilistLibraryItem) -> Unit)? = null,
+    onConnectAnilistClick: (() -> Unit)? = null,
     disintegrationRequest: DisintegrationRequest<String>? = null,
 ) {
     val uiState by remember {
@@ -118,6 +128,19 @@ fun LibraryScreen(
         DebridSettingsRepository.ensureLoaded()
         DebridSettingsRepository.uiState
     }.collectAsStateWithLifecycle()
+    val anilistUiState by remember {
+        AnilistLibraryRepository.ensureLoaded()
+        AnilistLibraryRepository.uiState
+    }.collectAsStateWithLifecycle()
+    val anilistPrefs by remember {
+        AnilistPreferencesRepository.ensureLoaded()
+        AnilistPreferencesRepository.preferences
+    }.collectAsStateWithLifecycle()
+    val anilistMenuPrefs by remember {
+        AnilistLibraryMenuPrefs.ensureLoaded()
+        AnilistLibraryMenuPrefs.state
+    }.collectAsStateWithLifecycle()
+    var isAnilistSyncing by remember { mutableStateOf(false) }
     val watchedUiState by remember {
         WatchedRepository.ensureLoaded()
         WatchedRepository.uiState
@@ -132,6 +155,12 @@ fun LibraryScreen(
     var sourceModeName by rememberSaveable { mutableStateOf(LibraryViewMode.Saved.name) }
     val sourceMode = remember(sourceModeName) {
         runCatching { LibraryViewMode.valueOf(sourceModeName) }.getOrDefault(LibraryViewMode.Saved)
+    }
+
+    LaunchedEffect(sourceMode) {
+        if (sourceMode == LibraryViewMode.AniList) {
+            AnilistLibraryRepository.ensureFresh()
+        }
     }
     var selectedProviderId by rememberSaveable { mutableStateOf<String?>(null) }
     var selectedTypeName by rememberSaveable { mutableStateOf<String?>(null) }
@@ -238,13 +267,15 @@ fun LibraryScreen(
 
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         val gridColumns = remember(maxWidth) { posterGridColumnCountForWidth(maxWidth) }
+        val animeAddons = remember { AnilistOpenByResolver.animeAddons() }
 
-        NuvioScreen(
-            modifier = Modifier.fillMaxSize(),
-            horizontalPadding = 0.dp,
-            topPadding = if (topChromePadding != null) 0.dp else null,
-            listState = listState,
-        ) {
+        val libraryScreenBody = @Composable {
+            NuvioScreen(
+                modifier = Modifier.fillMaxSize(),
+                horizontalPadding = 0.dp,
+                topPadding = if (topChromePadding != null) 0.dp else null,
+                listState = listState,
+            ) {
             stickyHeader {
                 Box(modifier = Modifier.fillMaxWidth()) {
                     Box(
@@ -259,6 +290,8 @@ fun LibraryScreen(
                         NuvioScreenHeader(
                             title = if (sourceMode == LibraryViewMode.Cloud) {
                                 stringResource(Res.string.library_title)
+                            } else if (sourceMode == LibraryViewMode.AniList) {
+                                "AniList Library"
                             } else {
                                 when (uiState.sourceMode) {
                                     LibrarySourceMode.LOCAL -> stringResource(Res.string.library_title)
@@ -346,6 +379,40 @@ fun LibraryScreen(
                     onBackToItems = { selectedCloudItemKey = null },
                     onRefresh = { CloudLibraryRepository.refresh() },
                     onConnectCloudClick = onConnectCloudClick,
+                )
+            } else if (sourceMode == LibraryViewMode.AniList) {
+                anilistLibraryContent(
+                    uiState = anilistUiState,
+                    sectionsConfig = anilistPrefs.librarySections,
+                    sortBy = anilistMenuPrefs.sortBy,
+                    sortAscending = anilistMenuPrefs.sortAscending,
+                    onPosterClick = { item ->
+                        onAnilistPosterClick?.invoke(item) ?: onPosterClick?.invoke(
+                            LibraryItem(
+                                id = "anilist:${item.id}",
+                                type = if (item.format?.equals("MOVIE", ignoreCase = true) == true) "movie" else "series",
+                                name = item.title,
+                                poster = item.posterUrl,
+                                banner = item.posterUrl,
+                                logo = null,
+                                description = null,
+                                releaseInfo = null,
+                                posterShape = PosterShape.Poster,
+                            ),
+                        )
+                    },
+                    onConnectAnilistClick = { onConnectAnilistClick?.invoke() },
+                    onRefresh = {
+                        coroutineScope.launch {
+                            isAnilistSyncing = true
+                            try {
+                                AnilistLibraryRepository.refreshNow()
+                            } finally {
+                                isAnilistSyncing = false
+                            }
+                        }
+                    },
+                    isOffline = observedOfflineState,
                 )
             } else {
                 when {
@@ -454,6 +521,27 @@ fun LibraryScreen(
                     }
                 }
             }
+        }
+
+        if (sourceMode == LibraryViewMode.AniList) {
+            AnilistLibraryActionMenu(
+                animeAddons = animeAddons,
+                isSyncing = isAnilistSyncing,
+                onSyncClick = {
+                    coroutineScope.launch {
+                        isAnilistSyncing = true
+                        try {
+                            AnilistLibraryRepository.refreshNow()
+                        } finally {
+                            isAnilistSyncing = false
+                        }
+                    }
+                },
+                modifier = Modifier.fillMaxSize(),
+                content = libraryScreenBody,
+            )
+        } else {
+            libraryScreenBody()
         }
     }
 }
@@ -660,6 +748,11 @@ private fun LibrarySourceSwitch(
             label = stringResource(Res.string.library_source_cloud),
             selected = selectedMode == LibraryViewMode.Cloud,
             onClick = { onModeSelected(LibraryViewMode.Cloud) },
+        )
+        LibraryChip(
+            label = "AniList",
+            selected = selectedMode == LibraryViewMode.AniList,
+            onClick = { onModeSelected(LibraryViewMode.AniList) },
         )
     }
 }
@@ -1181,6 +1274,7 @@ private fun CloudSkeletonBlock(
 private enum class LibraryViewMode {
     Saved,
     Cloud,
+    AniList,
 }
 
 private fun LazyListScope.librarySections(

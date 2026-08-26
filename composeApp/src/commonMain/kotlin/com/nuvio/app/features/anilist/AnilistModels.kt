@@ -186,3 +186,69 @@ data class AnilistTrackerState(
     val lastLookupMediaId: String? = null,
     val resolvedStrategy: String? = null,
 )
+
+@Serializable
+data class AnilistLibraryItem(
+    val id: Int,
+    val title: String,
+    val posterUrl: String? = null,
+    val progress: Int = 0,
+    val totalEpisodes: Int? = null,
+    val score: Double? = null,
+    val airingStatus: String? = null,
+    val status: String = "",
+    val updatedAt: Long = 0L,
+    val entryId: Int = 0,
+    val format: String? = null,
+    val imdbId: String? = null,
+)
+
+@Serializable
+data class AnilistLibraryUiState(
+    val watching: List<AnilistLibraryItem> = emptyList(),
+    val completed: List<AnilistLibraryItem> = emptyList(),
+    val planning: List<AnilistLibraryItem> = emptyList(),
+    val paused: List<AnilistLibraryItem> = emptyList(),
+    val dropped: List<AnilistLibraryItem> = emptyList(),
+    val rewatching: List<AnilistLibraryItem> = emptyList(),
+    val isLoading: Boolean = false,
+    val isLoaded: Boolean = false,
+    val errorMessage: String? = null,
+)
+
+@Serializable
+enum class AnilistSortBy(val label: String) {
+    LAST_UPDATED("Last Updated"),
+    SCORE("Score"),
+    TITLE("Title"),
+    RELEASE_DATE("Release Date"),
+}
+
+@Serializable
+data class AnilistLibraryMenuPrefsState(
+    val sortBy: AnilistSortBy = AnilistSortBy.LAST_UPDATED,
+    val sortAscending: Boolean = false,
+    val openByCatalogUrl: String? = null,
+)
+
+@Serializable
+data class AniZipResponse(
+    val titles: Map<String, String>? = null,
+    val episodes: Map<String, AniZipEpisode>? = null,
+    val mappings: AniZipMappings? = null,
+)
+
+@Serializable
+data class AniZipEpisode(
+    val seasonNumber: Int? = null,
+    val episodeNumber: Int? = null,
+    val absoluteEpisodeNumber: Int? = null,
+    val airDate: String? = null,
+    val airDateUtc: String? = null,
+)
+
+@Serializable
+data class AniZipMappings(
+    @SerialName("anilist_id") val anilistId: Int? = null,
+    @SerialName("imdb_id") val imdbId: String? = null,
+)
