@@ -335,13 +335,37 @@ fun NuvioPosterCard(
                 overflow = TextOverflow.Ellipsis,
             )
             if (!detailLine.isNullOrBlank()) {
-                Text(
-                    text = detailLine,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = tokens.colors.textMuted,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
+                if (detailLine.contains(" • ")) {
+                    val parts = detailLine.split(" • ", limit = 2)
+                    androidx.compose.foundation.layout.Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceBetween,
+                        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = parts[0].trim(),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = tokens.colors.textMuted,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        Text(
+                            text = parts[1].trim(),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = tokens.colors.textMuted,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                } else {
+                    Text(
+                        text = detailLine,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = tokens.colors.textMuted,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
             } else {
                 Box(modifier = Modifier.height(NuvioTokens.Space.none))
             }

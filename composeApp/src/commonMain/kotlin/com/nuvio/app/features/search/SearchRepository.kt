@@ -416,7 +416,7 @@ object SearchRepository {
                     posterShape = com.nuvio.app.features.home.PosterShape.Poster,
                     description = media.description,
                     releaseInfo = listOfNotNull(
-                        media.startDateYear?.toString(),
+                        com.nuvio.app.core.format.formatYearRange(media.startDateYear, media.endDateYear),
                         if (media.episodes != null && media.episodes > 0 && media.format != "MOVIE") {
                             "${media.episodes} eps"
                         } else {

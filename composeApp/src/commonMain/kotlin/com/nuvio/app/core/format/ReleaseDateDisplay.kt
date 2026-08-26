@@ -44,6 +44,12 @@ fun extractReleaseYearForDisplay(raw: String): Int? {
     return yearStr.toIntOrNull()?.takeIf { it in 1000..9999 }
 }
 
+fun formatYearRange(startYear: Int?, endYear: Int?): String? {
+    if (startYear == null) return endYear?.toString()
+    if (endYear == null || startYear == endYear) return "$startYear"
+    return "$startYear - $endYear"
+}
+
 /**
  * Strips HTML formatting tags, entity escapes, and source attributions from descriptions.
  */

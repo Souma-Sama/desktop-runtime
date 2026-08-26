@@ -169,6 +169,9 @@ object AnilistApi {
                     startDate {
                       year
                     }
+                    endDate {
+                      year
+                    }
                     relations {
                       edges {
                         relationType
@@ -251,6 +254,9 @@ object AnilistApi {
                   startDate {
                     year
                   }
+                  endDate {
+                    year
+                  }
                   relations {
                     edges {
                       relationType
@@ -324,6 +330,9 @@ object AnilistApi {
                   averageScore
                   description(asHtml: false)
                   startDate {
+                    year
+                  }
+                  endDate {
                     year
                   }
                   relations {
@@ -401,6 +410,9 @@ object AnilistApi {
                   startDate {
                     year
                   }
+                  endDate {
+                    year
+                  }
                   relations {
                     edges {
                       relationType
@@ -474,6 +486,9 @@ object AnilistApi {
                   startDate {
                     year
                   }
+                  endDate {
+                    year
+                  }
                   relations {
                     edges {
                       relationType
@@ -545,6 +560,9 @@ object AnilistApi {
                   averageScore
                   description(asHtml: false)
                   startDate {
+                    year
+                  }
+                  endDate {
                     year
                   }
                   relations {
@@ -647,6 +665,9 @@ object AnilistApi {
                 averageScore
                 description(asHtml: false)
                 startDate {
+                  year
+                }
+                endDate {
                   year
                 }
                 relations {
