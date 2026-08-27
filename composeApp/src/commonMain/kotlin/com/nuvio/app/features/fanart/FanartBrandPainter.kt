@@ -1,102 +1,70 @@
 package com.nuvio.app.features.fanart
 
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathFillType
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.graphics.vector.PathBuilder
+import androidx.compose.ui.graphics.vector.PathParser
+import androidx.compose.ui.graphics.vector.group
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.unit.dp
 
-@Composable
-fun rememberFanartBrandPainter(): Painter {
-    val vector = remember {
-        ImageVector.Builder(
-            name = "FanartTvLogo",
-            defaultWidth = 24.dp,
-            defaultHeight = 24.dp,
-            viewportWidth = 24f,
-            viewportHeight = 24f,
-        ).apply {
-            // Dark rounded background tile (#161A22)
+val FanartLogoVector: ImageVector by lazy {
+    ImageVector.Builder(
+        name = "FanartTvIcon",
+        defaultWidth = 24.dp,
+        defaultHeight = 24.dp,
+        viewportWidth = 479.14f,
+        viewportHeight = 479.14f,
+    ).apply {
+        group(
+            name = "fanart_group",
+            translationX = -8.9f,
+            translationY = -13.82f,
+        ) {
+            // Circle Background (#22b6e0)
             addPath(
-                pathData = PathBuilder().apply {
-                    moveTo(5f, 2f)
-                    lineTo(19f, 2f)
-                    arcTo(3f, 3f, 0f, false, true, 22f, 5f)
-                    lineTo(22f, 19f)
-                    arcTo(3f, 3f, 0f, false, true, 19f, 22f)
-                    lineTo(5f, 22f)
-                    arcTo(3f, 3f, 0f, false, true, 2f, 19f)
-                    lineTo(2f, 5f)
-                    arcTo(3f, 3f, 0f, false, true, 5f, 2f)
-                    close()
-                }.nodes,
-                fill = SolidColor(Color(0xFF161A22)),
+                pathData = PathParser().parsePathString(
+                    "M248.47,13.82C380.78,13.82,488,121.07,488,253.39S380.78,493,248.47,493,8.9,385.7,8.9,253.39,116.16,13.82,248.47,13.82Z"
+                ).toNodes(),
+                fill = SolidColor(Color(0xFF22B6E0)),
+                pathFillType = PathFillType.EvenOdd,
             )
-            // Fan blade 1: Top-Left Cyan (#00B4D8)
+            // Main Dark Geometric Aperture / Fold (#21252e)
             addPath(
-                pathData = PathBuilder().apply {
-                    moveTo(12f, 12f)
-                    lineTo(6f, 6.5f)
-                    arcTo(7.5f, 7.5f, 0f, false, true, 12f, 4.5f)
-                    close()
-                }.nodes,
-                fill = SolidColor(Color(0xFF00B4D8)),
+                pathData = PathParser().parsePathString(
+                    "M257.92,31.55l-5.37-17.63c-1.36,0-2.71-.1-4.08-.1a242.43,242.43,0,0,0-26.68,1.51L265,149.84,144.74,246.92,22.75,173A239,239,0,0,0,14,204.23l16,9.41a215.92,215.92,0,0,0-3.79,39.75c0,122.78,99.53,222.31,222.31,222.31s222.31-99.53,222.31-222.31C470.78,133.8,376.28,36.54,257.92,31.55Zm6,19.62c102.63,7.75,184.05,91.31,187.67,195L297.51,161.56ZM47.48,224l74.26,43.73L56.45,320.06a202.94,202.94,0,0,1-11.24-66.67A198.2,198.2,0,0,1,47.48,224Zm201,232.69c-86.13,0-159.7-53.6-189.3-129.25l69.41-55.68L332,391.5l28-24.59L300.75,172.18l150.94,82.94C450.76,366.58,360.15,456.65,248.47,456.65Z"
+                ).toNodes(),
+                fill = SolidColor(Color(0xFF21252E)),
+                pathFillType = PathFillType.EvenOdd,
             )
-            // Fan blade 2: Top-Right Coral Pink (#FF4D6D)
+            // Accent Fold 1 (#228aaa)
             addPath(
-                pathData = PathBuilder().apply {
-                    moveTo(12f, 12f)
-                    lineTo(17.5f, 6.5f)
-                    arcTo(7.5f, 7.5f, 0f, false, true, 19.5f, 12f)
-                    close()
-                }.nodes,
-                fill = SolidColor(Color(0xFFFF4D6D)),
+                pathData = PathParser().parsePathString(
+                    "M168.2,261.12l164.51,99.64L272.3,177.29Z"
+                ).toNodes(),
+                fill = SolidColor(Color(0xFF228AAA)),
+                pathFillType = PathFillType.EvenOdd,
             )
-            // Fan blade 3: Bottom-Right Amber Orange (#FFB703)
+            // Accent Fold 2 (#228aaa)
             addPath(
-                pathData = PathBuilder().apply {
-                    moveTo(12f, 12f)
-                    lineTo(17.5f, 17.5f)
-                    arcTo(7.5f, 7.5f, 0f, false, true, 12f, 19.5f)
-                    close()
-                }.nodes,
-                fill = SolidColor(Color(0xFFFFB703)),
+                pathData = PathParser().parsePathString(
+                    "M47.48,224a198.2,198.2,0,0,0-2.27,29.43,202.94,202.94,0,0,0,11.24,66.67l65.29-52.37Z"
+                ).toNodes(),
+                fill = SolidColor(Color(0xFF228AAA)),
             )
-            // Fan blade 4: Bottom-Left Emerald Green (#06D6A0)
+            // Accent Fold 3 (#228aaa)
             addPath(
-                pathData = PathBuilder().apply {
-                    moveTo(12f, 12f)
-                    lineTo(6.5f, 17.5f)
-                    arcTo(7.5f, 7.5f, 0f, false, true, 4.5f, 12f)
-                    close()
-                }.nodes,
-                fill = SolidColor(Color(0xFF06D6A0)),
+                pathData = PathParser().parsePathString(
+                    "M451.57,246.2c-3.62-103.72-85-187.28-187.67-195l33.61,110.39Z"
+                ).toNodes(),
+                fill = SolidColor(Color(0xFF228AAA)),
             )
-            // Center Aperture Ring in Dark Tile
-            addPath(
-                pathData = PathBuilder().apply {
-                    moveTo(12f, 9.5f)
-                    arcTo(2.5f, 2.5f, 0f, true, true, 12f, 14.5f)
-                    arcTo(2.5f, 2.5f, 0f, true, true, 12f, 9.5f)
-                    close()
-                }.nodes,
-                fill = SolidColor(Color(0xFF161A22)),
-            )
-            // Center Core in Crisp White
-            addPath(
-                pathData = PathBuilder().apply {
-                    moveTo(12f, 10.75f)
-                    arcTo(1.25f, 1.25f, 0f, true, true, 12f, 13.25f)
-                    arcTo(1.25f, 1.25f, 0f, true, true, 12f, 10.75f)
-                    close()
-                }.nodes,
-                fill = SolidColor(Color.White),
-            )
-        }.build()
-    }
-    return rememberVectorPainter(vector)
+        }
+    }.build()
 }
+
+@Composable
+fun rememberFanartBrandPainter(): Painter = rememberVectorPainter(FanartLogoVector)
