@@ -60,7 +60,7 @@ fun buildHomeCatalogDefinitions(addons: List<ManagedAddon>): List<HomeCatalogDef
             .map { catalog ->
                 HomeCatalogDefinition(
                     key = "${manifest.id}:${catalog.type}:${catalog.id}",
-                    defaultTitle = "${catalog.name} (${localizedMediaTypeLabel(catalog.type)})",
+                    defaultTitle = buildDefaultCatalogTitle(catalog.name, catalog.type),
                     catalogName = catalog.name,
                     addonName = addon.displayTitle,
                     manifestUrl = addon.manifestUrl,
@@ -72,6 +72,27 @@ fun buildHomeCatalogDefinitions(addons: List<ManagedAddon>): List<HomeCatalogDef
             }
     }
     return (anilistCatalogs + addonCatalogs).distinctBy(HomeCatalogDefinition::key)
+}
+
+fun buildDefaultCatalogTitle(catalogName: String, type: String): String {
+    val cleanName = catalogName.trim()
+    return when (type.lowercase()) {
+        "movie" -> {
+            if (cleanName.endsWith("movie", ignoreCase = true) || cleanName.endsWith("movies", ignoreCase = true)) {
+                cleanName
+            } else {
+                "$cleanName Movies"
+            }
+        }
+        "series", "tv" -> {
+            if (cleanName.endsWith("series", ignoreCase = true) || cleanName.endsWith("shows", ignoreCase = true) || cleanName.endsWith("tv", ignoreCase = true)) {
+                cleanName
+            } else {
+                "$cleanName Series"
+            }
+        }
+        else -> cleanName
+    }
 }
 
 private fun buildHomeCatalogDescriptorSignature(

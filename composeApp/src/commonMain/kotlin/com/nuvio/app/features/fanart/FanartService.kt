@@ -23,14 +23,17 @@ object FanartService {
     private val negativeCache = mutableSetOf<String>()
 
     private val imdbRegex = Regex("tt\\d+")
-    const val DEFAULT_BETTERPOSTERS_TEMPLATE = "https://btttr.cc/poster/imdb/poster-default/%s.jpg?rs=IM"
 
     fun formatBetterPoster(imdbId: String, template: String? = null): String? {
         if (!imdbId.startsWith("tt")) return null
-        val effectiveTemplate = template?.takeIf { it.isNotBlank() } ?: DEFAULT_BETTERPOSTERS_TEMPLATE
+        val effectiveTemplate = template?.trim()?.takeIf { it.isNotBlank() } ?: return null
         return runCatching {
             if (effectiveTemplate.contains("%s")) {
                 effectiveTemplate.replace("%s", imdbId)
+            } else if (effectiveTemplate.contains("{id}")) {
+                effectiveTemplate.replace("{id}", imdbId)
+            } else if (effectiveTemplate.contains("{imdb}")) {
+                effectiveTemplate.replace("{imdb}", imdbId)
             } else {
                 effectiveTemplate
             }

@@ -64,7 +64,9 @@ object AnilistMetaDetailsResolver {
 
         // 4. Fetch Episode Data from Kitsu
         val episodeMap = if (!kitsuId.isNullOrBlank()) {
-            fetchKitsuEpisodes(kitsuId)
+            kotlinx.coroutines.withTimeoutOrNull(2000L) {
+                fetchKitsuEpisodes(kitsuId)
+            } ?: emptyMap()
         } else emptyMap()
 
         val isMovie = media.format == "MOVIE"
@@ -75,7 +77,9 @@ object AnilistMetaDetailsResolver {
         var cinemetaMeta: MetaDetails? = null
         if (!armImdbId.isNullOrBlank()) {
             val cinemetaUrl = "https://v3-cinemeta.strem.io/meta/$contentType/$armImdbId.json"
-            val cinemetaResponse = runCatching { httpGetText(cinemetaUrl) }.getOrNull()
+            val cinemetaResponse = kotlinx.coroutines.withTimeoutOrNull(2500L) {
+                runCatching { httpGetText(cinemetaUrl) }.getOrNull()
+            }
             if (!cinemetaResponse.isNullOrBlank()) {
                 cinemetaMeta = runCatching { com.nuvio.app.features.details.MetaDetailsParser.parse(cinemetaResponse) }.getOrNull()
             }
@@ -99,15 +103,13 @@ object AnilistMetaDetailsResolver {
 
         val animationStudios = media.studios.filter { it.isAnimationStudio }.map { studio ->
             com.nuvio.app.features.details.MetaCompany(
-                name = studio.name ?: "Studio",
-                tmdbId = null,
+                name = studio.name,
             )
         }
 
-        val networks = media.studios.filterNot { it.isAnimationStudio }.map { studio ->
+        val networks = media.studios.filter { !it.isAnimationStudio }.map { studio ->
             com.nuvio.app.features.details.MetaCompany(
-                name = studio.name ?: "Network",
-                tmdbId = null,
+                name = studio.name,
             )
         }
 
@@ -142,30 +144,21 @@ object AnilistMetaDetailsResolver {
         } else emptyList()
 
         val directors = media.staff.filter { it.role?.contains("Director", ignoreCase = true) == true }.mapNotNull { it.name }
-        val writers = media.staff.filter {
-            it.role?.contains("Composition", ignoreCase = true) == true ||
-                it.role?.contains("Original", ignoreCase = true) == true ||
-                it.role?.contains("Writer", ignoreCase = true) == true
-        }.mapNotNull { it.name }
+        val writers = media.staff.filter { it.role?.contains("Original Creator", ignoreCase = true) == true || it.role?.contains("Series Composition", ignoreCase = true) == true }.mapNotNull { it.name }
 
-        val episodeOffset = resolveEpisodeOffset(
-            media = media,
-            targetSeason = targetSeason,
-            cinemetaVideos = cinemetaMeta?.videos.orEmpty(),
-        )
-
+        // 6. Map Episodes: Prefer Kitsu metadata (Titles, Overviews, Thumbnails) over plain numbers
         val mappedVideos = if (isMovie) {
             emptyList()
         } else {
-            (1..totalEpisodes).map { epIdx ->
-                val actualEpNumber = epIdx + episodeOffset
-                val streamingEp = media.streamingEpisodes.getOrNull(epIdx - 1)
+            (1..totalEpisodes).map { epNumber ->
+                val actualEpNumber = epNumber
+                val epData = episodeMap[actualEpNumber]
                 val cinemetaEp = cinemetaMeta?.videos?.firstOrNull { it.season == targetSeason && it.episode == actualEpNumber }
                     ?: cinemetaMeta?.videos?.firstOrNull { it.season == targetSeason && it.episode == null && cinemetaMeta.videos.indexOf(it) == actualEpNumber - 1 }
-                val epData = episodeMap[actualEpNumber]
+                val streamingEp = media.streamingEpisodes.getOrNull(epNumber - 1)
 
                 val epTitle = cinemetaEp?.title?.takeIf { it.isNotBlank() }
-                    ?: epData?.title?.takeIf { it.isNotBlank() }
+                    ?: epData?.title
                     ?: streamingEp?.title?.takeIf { it.isNotBlank() }
                     ?: "Episode $actualEpNumber"
 
@@ -215,7 +208,7 @@ object AnilistMetaDetailsResolver {
                 cast = cinemetaMeta.cast.ifEmpty { castPersons },
                 productionCompanies = cinemetaMeta.productionCompanies.ifEmpty { animationStudios },
                 networks = cinemetaMeta.networks.ifEmpty { networks },
-                moreLikeThis = cinemetaMeta.moreLikeThis.ifEmpty { recommendations },
+                moreLikeThis = recommendations.ifEmpty { cinemetaMeta.moreLikeThis },
                 trailers = cinemetaMeta.trailers.ifEmpty { trailers },
                 director = cinemetaMeta.director.ifEmpty { directors },
                 writer = cinemetaMeta.writer.ifEmpty { writers },
@@ -319,6 +312,23 @@ object AnilistMetaDetailsResolver {
 
         val isMovie = media?.format == "MOVIE"
 
+        val recommendations = media?.recommendations?.mapNotNull { rec ->
+            val recId = rec.id
+            val isRecMovie = rec.format == "MOVIE" || rec.episodes == 1
+            val recType = if (isRecMovie) "movie" else "series"
+            val recPoster = rec.coverImage?.extraLarge ?: rec.coverImage?.large ?: return@mapNotNull null
+            com.nuvio.app.features.home.MetaPreview(
+                id = "ani_$recId",
+                type = recType,
+                name = rec.title?.displayTitle.orEmpty(),
+                poster = recPoster,
+                banner = rec.bannerImage,
+                logo = null,
+                description = null,
+                releaseInfo = if (rec.episodes != null) "${rec.episodes} Ep" else null,
+            )
+        }.orEmpty()
+
         if (isMovie) {
             return@withContext cinemetaMeta.copy(
                 id = rawId,
@@ -327,6 +337,7 @@ object AnilistMetaDetailsResolver {
                 poster = anilistPoster,
                 releaseInfo = media?.startDateYear?.toString() ?: cinemetaMeta.releaseInfo,
                 defaultVideoId = effectiveImdbId,
+                moreLikeThis = recommendations.ifEmpty { cinemetaMeta.moreLikeThis },
             )
         }
 
@@ -450,6 +461,7 @@ object AnilistMetaDetailsResolver {
             background = cinemetaMeta.background ?: "https://images.metahub.space/background/medium/$effectiveImdbId/img",
             logo = cinemetaMeta.logo ?: "https://images.metahub.space/logo/medium/$effectiveImdbId/img",
             videos = seasonVideos,
+            moreLikeThis = recommendations.ifEmpty { cinemetaMeta.moreLikeThis },
         )
     }
 

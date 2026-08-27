@@ -525,8 +525,16 @@ object MetaDetailsRepository {
 
         val finalMeta = progressiveMeta.copy(
             externalRatings = mdbListRatings.ifEmpty { progressiveMeta.externalRatings },
-            moreLikeThis = traktMeta.moreLikeThis.ifEmpty { progressiveMeta.moreLikeThis },
-            moreLikeThisSource = traktMeta.moreLikeThisSource ?: progressiveMeta.moreLikeThisSource,
+            moreLikeThis = if (isAnilist && progressiveMeta.moreLikeThis.isNotEmpty()) {
+                progressiveMeta.moreLikeThis
+            } else {
+                traktMeta.moreLikeThis.ifEmpty { progressiveMeta.moreLikeThis }
+            },
+            moreLikeThisSource = if (isAnilist && progressiveMeta.moreLikeThis.isNotEmpty()) {
+                null
+            } else {
+                traktMeta.moreLikeThisSource ?: progressiveMeta.moreLikeThisSource
+            },
         )
 
         cachedMetaByRequestKey[requestKey] = cachedMetaByRequestKey[requestKey]

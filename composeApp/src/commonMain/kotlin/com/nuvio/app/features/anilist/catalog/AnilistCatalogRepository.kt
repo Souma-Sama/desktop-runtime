@@ -49,7 +49,7 @@ object AnilistCatalogRepository {
             list.add(
                 HomeCatalogDefinition(
                     key = "anilist:anime:watching",
-                    defaultTitle = "Currently Watching (AniList)",
+                    defaultTitle = "Currently Watching",
                     catalogName = "Currently Watching",
                     addonName = "AniList",
                     manifestUrl = "native://anilist",
@@ -62,7 +62,7 @@ object AnilistCatalogRepository {
             list.add(
                 HomeCatalogDefinition(
                     key = "anilist:anime:planning",
-                    defaultTitle = "Plan to Watch (AniList)",
+                    defaultTitle = "Plan to Watch",
                     catalogName = "Plan to Watch",
                     addonName = "AniList",
                     manifestUrl = "native://anilist",
@@ -77,7 +77,7 @@ object AnilistCatalogRepository {
         list.add(
             HomeCatalogDefinition(
                 key = "anilist:anime:trending",
-                defaultTitle = "Trending Anime (AniList)",
+                defaultTitle = "Trending Anime",
                 catalogName = "Trending Anime",
                 addonName = "AniList",
                 manifestUrl = "native://anilist",
@@ -90,7 +90,7 @@ object AnilistCatalogRepository {
         list.add(
             HomeCatalogDefinition(
                 key = "anilist:anime:airing",
-                defaultTitle = "Currently Airing (AniList)",
+                defaultTitle = "Currently Airing",
                 catalogName = "Currently Airing",
                 addonName = "AniList",
                 manifestUrl = "native://anilist",
@@ -103,7 +103,7 @@ object AnilistCatalogRepository {
         list.add(
             HomeCatalogDefinition(
                 key = "anilist:anime:popular",
-                defaultTitle = "Popular This Season (AniList)",
+                defaultTitle = "Popular This Season",
                 catalogName = "Popular This Season",
                 addonName = "AniList",
                 manifestUrl = "native://anilist",
@@ -116,7 +116,7 @@ object AnilistCatalogRepository {
         list.add(
             HomeCatalogDefinition(
                 key = "anilist:anime:top-rated",
-                defaultTitle = "Top Rated Anime (AniList)",
+                defaultTitle = "Top Rated Anime",
                 catalogName = "Top Rated Anime",
                 addonName = "AniList",
                 manifestUrl = "native://anilist",
@@ -131,7 +131,7 @@ object AnilistCatalogRepository {
             list.add(
                 HomeCatalogDefinition(
                     key = "anilist:anime:completed",
-                    defaultTitle = "Completed (AniList)",
+                    defaultTitle = "Completed",
                     catalogName = "Completed",
                     addonName = "AniList",
                     manifestUrl = "native://anilist",
