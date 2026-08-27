@@ -101,16 +101,20 @@ object AnilistMetaDetailsResolver {
             )
         }
 
-        val animationStudios = media.studios.filter { it.isAnimationStudio }.map { studio ->
-            com.nuvio.app.features.details.MetaCompany(
-                name = studio.name,
-            )
+        val animationStudios = media.studios.filter { it.isAnimationStudio }.mapNotNull { studio ->
+            studio.name?.takeIf { it.isNotBlank() }?.let { name ->
+                com.nuvio.app.features.details.MetaCompany(
+                    name = name,
+                )
+            }
         }
 
-        val networks = media.studios.filter { !it.isAnimationStudio }.map { studio ->
-            com.nuvio.app.features.details.MetaCompany(
-                name = studio.name,
-            )
+        val networks = media.studios.filter { !it.isAnimationStudio }.mapNotNull { studio ->
+            studio.name?.takeIf { it.isNotBlank() }?.let { name ->
+                com.nuvio.app.features.details.MetaCompany(
+                    name = name,
+                )
+            }
         }
 
         val recommendations = media.recommendations.mapNotNull { rec ->
