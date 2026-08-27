@@ -9,7 +9,7 @@ data class FanartSettings(
     val useClearLogos: Boolean = true,
     val preferEnglishLogos: Boolean = true,
     val useHeroBackdrops: Boolean = false,
-    val usePosters: Boolean = false,
+    val usePosters: Boolean = true,
     val useBanners: Boolean = false,
     val useBetterPosters: Boolean = true,
     val betterPostersTemplate: String = "",

@@ -170,23 +170,34 @@ object FanartService {
         val cleanId = resolveLookupId(id, type) ?: return@withContext null
         val cacheKey = "$type:$cleanId"
 
+        // 1. Fanart.tv (Highest priority when configured)
         if (settings.enabled && settings.hasApiKey && settings.usePosters) {
             val isMovie = isMovieType(type)
             try {
                 if (isMovie) {
                     val movie = fetchMovie(cleanId, settings.apiKey)
                     if (movie != null) {
-                        selectBestImage(movie.moviePoster, settings.preferEnglishLogos)?.url?.let {
-                            posterCache[cacheKey] = it
-                            posterCache["$type:$id"] = it
-                            return@withContext it
+                        val moviePoster = selectBestImage(movie.moviePoster, settings.preferEnglishLogos)?.url
+                        if (moviePoster != null) {
+                            posterCache[cacheKey] = moviePoster
+                            posterCache["$type:$id"] = moviePoster
+                            return@withContext moviePoster
                         }
                     }
                 } else {
                     val tv = fetchTv(cleanId, settings.apiKey)
                     if (tv != null) {
                         populateTvCaches(cleanId, tv, settings, id)
-                        posterCache[cacheKey]?.let { return@withContext it }
+                        val fanartPoster = posterCache[cacheKey]
+                            ?: seasonPosterCache["$cleanId:1"]
+                            ?: (if (id.isNotBlank()) seasonPosterCache["$id:1"] else null)
+                            ?: posterCache["series:$cleanId"]
+                            ?: posterCache["tv:$cleanId"]
+                        if (fanartPoster != null) {
+                            posterCache[cacheKey] = fanartPoster
+                            posterCache["$type:$id"] = fanartPoster
+                            return@withContext fanartPoster
+                        }
                     }
                 }
             } catch (e: Throwable) {
@@ -194,6 +205,7 @@ object FanartService {
             }
         }
 
+        // 2. BetterPosters Fallback (Secondary priority: ONLY if Fanart returned nothing or is unconfigured)
         if (settings.useBetterPosters && cleanId.startsWith("tt")) {
             formatBetterPoster(cleanId, settings.betterPostersTemplate)?.let { bp ->
                 posterCache[cacheKey] = bp
@@ -202,6 +214,7 @@ object FanartService {
             }
         }
 
+        // 3. AniList Default Cover Poster (Returns null so caller uses AniList media.coverImage)
         null
     }
 
@@ -379,17 +392,6 @@ object FanartService {
                 }
             }
         }
-        if (settings.usePosters) {
-            selectBestImage(tv.tvPoster, settings.preferEnglishLogos)?.url?.let {
-                posterCache[cacheKey] = it
-                posterCache["tv:$cleanId"] = it
-                if (rawId != null) {
-                    posterCache["series:$rawId"] = it
-                    posterCache["tv:$rawId"] = it
-                }
-            }
-        }
-
         // Cache season posters
         val groupedBySeason = tv.seasonPoster.groupBy { it.season?.toIntOrNull() ?: 1 }
         groupedBySeason.forEach { (seasonNum, images) ->
@@ -398,6 +400,21 @@ object FanartService {
                 seasonPosterCache["$cleanId:$seasonNum"] = bestSeasonPoster
                 if (rawId != null) {
                     seasonPosterCache["$rawId:$seasonNum"] = bestSeasonPoster
+                }
+            }
+        }
+
+        if (settings.usePosters) {
+            val season1Poster = seasonPosterCache["$cleanId:1"] ?: (if (rawId != null) seasonPosterCache["$rawId:1"] else null)
+            val tvPoster = selectBestImage(tv.tvPoster, settings.preferEnglishLogos)?.url
+            val bestPoster = season1Poster ?: tvPoster
+            if (bestPoster != null) {
+                posterCache[cacheKey] = bestPoster
+                posterCache["tv:$cleanId"] = bestPoster
+                posterCache["series:$cleanId"] = bestPoster
+                if (rawId != null) {
+                    posterCache["series:$rawId"] = bestPoster
+                    posterCache["tv:$rawId"] = bestPoster
                 }
             }
         }

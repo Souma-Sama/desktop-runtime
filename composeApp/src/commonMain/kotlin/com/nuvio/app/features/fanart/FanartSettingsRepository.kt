@@ -15,7 +15,7 @@ object FanartSettingsRepository {
     private var useClearLogos = true
     private var preferEnglishLogos = true
     private var useHeroBackdrops = false
-    private var usePosters = false
+    private var usePosters = true
     private var useBanners = false
     private var useBetterPosters = true
     private var betterPostersTemplate = ""
@@ -124,7 +124,7 @@ object FanartSettingsRepository {
         useClearLogos = FanartSettingsStorage.loadUseClearLogos() ?: true
         preferEnglishLogos = FanartSettingsStorage.loadPreferEnglishLogos() ?: true
         useHeroBackdrops = FanartSettingsStorage.loadUseHeroBackdrops() ?: false
-        usePosters = FanartSettingsStorage.loadUsePosters() ?: false
+        usePosters = FanartSettingsStorage.loadUsePosters() ?: true
         useBanners = FanartSettingsStorage.loadUseBanners() ?: false
         useBetterPosters = FanartSettingsStorage.loadUseBetterPosters() ?: true
         betterPostersTemplate = FanartSettingsStorage.loadBetterPostersTemplate().orEmpty().trim()

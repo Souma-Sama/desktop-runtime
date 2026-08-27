@@ -13,12 +13,6 @@ import com.nuvio.app.features.home.PosterShape
 
 import com.nuvio.app.features.fanart.FanartService
 import com.nuvio.app.features.library.LibraryClock
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.async
-import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.launch
 
 private data class CachedCatalogPage(
     val timestamp: Long,
@@ -28,7 +22,6 @@ private data class CachedCatalogPage(
 object AnilistCatalogRepository {
     private val log = Logger.withTag("AnilistCatalog")
     private val pageCache = mutableMapOf<String, CachedCatalogPage>()
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private const val CACHE_TTL_MS = 5 * 60 * 1000L // 5 minutes
 
     const val CATALOG_WATCHING = "anilist:watching"
@@ -271,18 +264,6 @@ object AnilistCatalogRepository {
                 } else null,
                 genres = media.genres,
             )
-        }
-
-        // Asynchronously pre-warm Fanart/BetterPosters artwork & ARM lookups for first items
-        scope.launch {
-            previews.take(12).forEach { preview ->
-                launch {
-                    FanartService.resolveLogo(preview.id, preview.type)
-                }
-                launch {
-                    FanartService.resolvePoster(preview.id, preview.type)
-                }
-            }
         }
 
         val result = CatalogPage(
