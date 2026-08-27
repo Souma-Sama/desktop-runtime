@@ -17,6 +17,8 @@ object FanartSettingsRepository {
     private var useHeroBackdrops = false
     private var usePosters = false
     private var useBanners = false
+    private var useBetterPosters = true
+    private var betterPostersTemplate = ""
 
     fun ensureLoaded() {
         if (hasLoaded) return
@@ -96,6 +98,25 @@ object FanartSettingsRepository {
         FanartSettingsStorage.saveUseBanners(value)
     }
 
+    fun setUseBetterPosters(value: Boolean) {
+        ensureLoaded()
+        if (useBetterPosters == value) return
+        useBetterPosters = value
+        publish()
+        FanartSettingsStorage.saveUseBetterPosters(value)
+        FanartService.clearCache()
+    }
+
+    fun setBetterPostersTemplate(value: String) {
+        ensureLoaded()
+        val normalized = value.trim()
+        if (betterPostersTemplate == normalized) return
+        betterPostersTemplate = normalized
+        publish()
+        FanartSettingsStorage.saveBetterPostersTemplate(normalized)
+        FanartService.clearCache()
+    }
+
     private fun loadFromDisk() {
         hasLoaded = true
         apiKey = FanartSettingsStorage.loadApiKey().orEmpty().trim()
@@ -105,6 +126,8 @@ object FanartSettingsRepository {
         useHeroBackdrops = FanartSettingsStorage.loadUseHeroBackdrops() ?: false
         usePosters = FanartSettingsStorage.loadUsePosters() ?: false
         useBanners = FanartSettingsStorage.loadUseBanners() ?: false
+        useBetterPosters = FanartSettingsStorage.loadUseBetterPosters() ?: true
+        betterPostersTemplate = FanartSettingsStorage.loadBetterPostersTemplate().orEmpty().trim()
         publish()
     }
 
@@ -117,6 +140,8 @@ object FanartSettingsRepository {
             useHeroBackdrops = useHeroBackdrops,
             usePosters = usePosters,
             useBanners = useBanners,
+            useBetterPosters = useBetterPosters,
+            betterPostersTemplate = betterPostersTemplate,
         )
     }
 }

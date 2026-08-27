@@ -18,6 +18,8 @@ actual object FanartSettingsStorage {
     private const val useHeroBackdropsKey = "fanart_use_hero_backdrops"
     private const val usePostersKey = "fanart_use_posters"
     private const val useBannersKey = "fanart_use_banners"
+    private const val useBetterPostersKey = "fanart_use_better_posters"
+    private const val betterPostersTemplateKey = "fanart_better_posters_template"
 
     private val syncKeys = listOf(
         enabledKey,
@@ -27,6 +29,8 @@ actual object FanartSettingsStorage {
         useHeroBackdropsKey,
         usePostersKey,
         useBannersKey,
+        useBetterPostersKey,
+        betterPostersTemplateKey,
     )
 
     actual fun loadEnabled(): Boolean? = loadBoolean(enabledKey)
@@ -54,6 +58,16 @@ actual object FanartSettingsStorage {
     actual fun loadUseBanners(): Boolean? = loadBoolean(useBannersKey)
     actual fun saveUseBanners(enabled: Boolean) = saveBoolean(useBannersKey, enabled)
 
+    actual fun loadUseBetterPosters(): Boolean? = loadBoolean(useBetterPostersKey)
+    actual fun saveUseBetterPosters(enabled: Boolean) = saveBoolean(useBetterPostersKey, enabled)
+
+    actual fun loadBetterPostersTemplate(): String? =
+        NSUserDefaults.standardUserDefaults.stringForKey(ProfileScopedKey.of(betterPostersTemplateKey))
+
+    actual fun saveBetterPostersTemplate(template: String) {
+        NSUserDefaults.standardUserDefaults.setObject(template, forKey = ProfileScopedKey.of(betterPostersTemplateKey))
+    }
+
     private fun loadBoolean(key: String): Boolean? {
         val scopedKey = ProfileScopedKey.of(key)
         val defaults = NSUserDefaults.standardUserDefaults
@@ -76,6 +90,8 @@ actual object FanartSettingsStorage {
         loadUseHeroBackdrops()?.let { put(useHeroBackdropsKey, encodeSyncBoolean(it)) }
         loadUsePosters()?.let { put(usePostersKey, encodeSyncBoolean(it)) }
         loadUseBanners()?.let { put(useBannersKey, encodeSyncBoolean(it)) }
+        loadUseBetterPosters()?.let { put(useBetterPostersKey, encodeSyncBoolean(it)) }
+        loadBetterPostersTemplate()?.let { put(betterPostersTemplateKey, encodeSyncString(it)) }
     }
 
     actual fun replaceFromSyncPayload(payload: JsonObject) {
@@ -89,5 +105,7 @@ actual object FanartSettingsStorage {
         payload.decodeSyncBoolean(useHeroBackdropsKey)?.let(::saveUseHeroBackdrops)
         payload.decodeSyncBoolean(usePostersKey)?.let(::saveUsePosters)
         payload.decodeSyncBoolean(useBannersKey)?.let(::saveUseBanners)
+        payload.decodeSyncBoolean(useBetterPostersKey)?.let(::saveUseBetterPosters)
+        payload.decodeSyncString(betterPostersTemplateKey)?.let(::saveBetterPostersTemplate)
     }
 }

@@ -82,8 +82,8 @@ object MetaDetailsRepository {
 
             activeRequestKey = requestKey
             _uiState.value = MetaDetailsUiState(
-                isLoading = true,
-                meta = cachedBaseMeta,
+                isLoading = false,
+                meta = cachedBaseMeta.withUnreleasedFilter(),
             )
 
             scope.launch {
@@ -99,7 +99,7 @@ object MetaDetailsRepository {
                         settingsFingerprint = metaScreenSettingsFingerprint,
                     )
                 }
-                _uiState.value = MetaDetailsUiState(meta = enrichedMeta.withUnreleasedFilter())
+                _uiState.value = MetaDetailsUiState(meta = enrichedMeta.withUnreleasedFilter(), isLoading = false)
                 activeRequestKey = requestKey
             }
             return
@@ -298,11 +298,6 @@ object MetaDetailsRepository {
             } else {
                 tmdbEnriched
             }
-            log.d { "Parsed meta: type=${enriched.type}, name=${enriched.name}, videos=${enriched.videos.size}" }
-            if (enriched.videos.isNotEmpty()) {
-                val first = enriched.videos.first()
-                log.d { "First video: id=${first.id} title=${first.title} s=${first.season} e=${first.episode} embeddedStreams=${first.streams.size}" }
-            }
             enriched
         } catch (e: Throwable) {
             if (e is CancellationException) throw e
@@ -372,28 +367,10 @@ object MetaDetailsRepository {
         addons.enabledAddons().any { addon -> addon.manifest == null && addon.isRefreshing }
 
     private suspend fun resolveMetaLookupId(itemId: String, itemType: String): String {
-        if (itemId.startsWith("ani_", ignoreCase = true) || itemId.startsWith("anilist:", ignoreCase = true)) {
-            val anilistId = com.nuvio.app.features.anilist.AnilistTrackerCoordinator.extractAnilistId(itemId)
-            if (anilistId != null) {
-                val imdbId = com.nuvio.app.features.anilist.catalog.AnilistMetaDetailsResolver.resolveArmImdbId(anilistId)
-                if (!imdbId.isNullOrBlank()) {
-                    return imdbId
-                }
-            }
-        }
+        val cached = FanartService.extractLookupId(itemId)
+        if (cached != null) return cached
 
-        val tmdbId = itemId
-            .takeIf { it.startsWith("tmdb:", ignoreCase = true) }
-            ?.substringAfter(':')
-            ?.substringBefore(':')
-            ?.toIntOrNull()
-            ?: return itemId
-
-        return withTimeoutOrNull(FETCH_TIMEOUT_MS) {
-            TmdbService.tmdbToImdb(tmdbId = tmdbId, mediaType = itemType)
-        }
-            ?.takeIf { it.isNotBlank() }
-            ?: itemId
+        return FanartService.resolveLookupId(itemId, itemType) ?: itemId
     }
 
     private suspend fun tryFetchTmdbFallbackMeta(type: String, id: String): MetaDetails? =
@@ -416,19 +393,18 @@ object MetaDetailsRepository {
         val cachedEntry = CachedMetaEntry(baseMeta = meta)
         cachedMetaByRequestKey[requestKey] = cachedEntry
 
-        // 1. Immediately paint base meta on screen (<100ms)
+        // 1. Immediately render base meta on screen with 0ms perceived delay
         _uiState.value = MetaDetailsUiState(
-            isLoading = true,
+            isLoading = false,
             meta = meta.withUnreleasedFilter(),
         )
 
         if (!shouldEnrichForMetaScreen(meta, fallbackItemId, mdbListSettings)) {
-            _uiState.value = MetaDetailsUiState(meta = meta.withUnreleasedFilter(), isLoading = false)
             activeRequestKey = requestKey
             return
         }
 
-        // 2. Asynchronously enrich in background without blocking screen presentation
+        // 2. Asynchronously enrich in background with parallel coroutines
         val enrichedMeta = withContext(Dispatchers.Default) {
             enrichForMetaScreen(
                 requestKey = requestKey,
@@ -456,6 +432,7 @@ object MetaDetailsRepository {
         settingsFingerprint: String,
     ): MetaDetails = coroutineScope {
         val tmdbSettings = TmdbSettingsRepository.snapshot()
+        val fanartSettings = FanartSettingsRepository.snapshot()
 
         val tmdbDeferred = async {
             if (tmdbSettings.enabled && tmdbSettings.hasApiKey) {
@@ -464,6 +441,18 @@ object MetaDetailsRepository {
                         meta = meta,
                         fallbackItemId = fallbackItemId,
                         settings = tmdbSettings,
+                    )
+                } ?: meta
+            } else meta
+        }
+
+        val fanartDeferred = async {
+            if ((fanartSettings.enabled && fanartSettings.hasApiKey) || fanartSettings.useBetterPosters) {
+                withTimeoutOrNull(TMDB_ENRICH_TIMEOUT_MS) {
+                    FanartService.enrichMetaDetails(
+                        meta = meta,
+                        fallbackItemId = fallbackItemId,
+                        settings = fanartSettings,
                     )
                 } ?: meta
             } else meta
@@ -488,24 +477,36 @@ object MetaDetailsRepository {
         }
 
         val tmdbEnriched = tmdbDeferred.await()
-        val mdbListRatings = mdbListDeferred.await()
-        val traktMeta = traktDeferred.await()
+        val fanartEnriched = fanartDeferred.await()
 
         val isAnilist = meta.id.startsWith("ani_", ignoreCase = true) || meta.id.startsWith("anilist:", ignoreCase = true)
 
         val mergedVideos = if (isAnilist) {
             tmdbEnriched.videos.mapIndexed { idx, enrichedVid ->
                 val baseVid = meta.videos.getOrNull(idx)
-                if (enrichedVid.thumbnail.isNullOrBlank() && baseVid?.thumbnail?.isNotBlank() == true) {
-                    enrichedVid.copy(thumbnail = baseVid.thumbnail)
+                val fanartVid = fanartEnriched.videos.getOrNull(idx)
+                var vid = enrichedVid
+                if (vid.thumbnail.isNullOrBlank() && baseVid?.thumbnail?.isNotBlank() == true) {
+                    vid = vid.copy(thumbnail = baseVid.thumbnail)
+                }
+                if (!fanartVid?.seasonPoster.isNullOrBlank()) {
+                    vid = vid.copy(seasonPoster = fanartVid.seasonPoster)
+                }
+                vid
+            }
+        } else {
+            tmdbEnriched.videos.mapIndexed { idx, enrichedVid ->
+                val fanartVid = fanartEnriched.videos.getOrNull(idx)
+                if (!fanartVid?.seasonPoster.isNullOrBlank()) {
+                    enrichedVid.copy(seasonPoster = fanartVid.seasonPoster)
                 } else enrichedVid
             }
-        } else tmdbEnriched.videos
+        }
 
-        val enrichedMeta = tmdbEnriched.copy(
-            externalRatings = mdbListRatings.ifEmpty { tmdbEnriched.externalRatings },
-            moreLikeThis = traktMeta.moreLikeThis.ifEmpty { tmdbEnriched.moreLikeThis },
-            moreLikeThisSource = traktMeta.moreLikeThisSource ?: tmdbEnriched.moreLikeThisSource,
+        val progressiveMeta = tmdbEnriched.copy(
+            logo = fanartEnriched.logo ?: tmdbEnriched.logo ?: meta.logo,
+            background = fanartEnriched.background ?: tmdbEnriched.background ?: meta.background,
+            poster = fanartEnriched.poster ?: tmdbEnriched.poster ?: meta.poster,
             videos = mergedVideos,
             // Preserve per-season description, release year and air dates from AniList
             description = if (isAnilist && !meta.description.isNullOrBlank()) meta.description else tmdbEnriched.description,
@@ -514,14 +515,19 @@ object MetaDetailsRepository {
             lastAirDate = if (isAnilist && !meta.lastAirDate.isNullOrBlank()) meta.lastAirDate else tmdbEnriched.lastAirDate,
         )
 
-        val fanartSettings = FanartSettingsRepository.snapshot()
-        val finalMeta = if (fanartSettings.enabled && fanartSettings.hasApiKey) {
-            FanartService.enrichMetaDetails(
-                meta = enrichedMeta,
-                fallbackItemId = fallbackItemId,
-                settings = fanartSettings,
-            )
-        } else enrichedMeta
+        // Progressively emit fast enrichments (TMDB + Fanart) without waiting for slower rating APIs
+        if (activeRequestKey == requestKey) {
+            _uiState.value = MetaDetailsUiState(meta = progressiveMeta.withUnreleasedFilter(), isLoading = false)
+        }
+
+        val mdbListRatings = mdbListDeferred.await()
+        val traktMeta = traktDeferred.await()
+
+        val finalMeta = progressiveMeta.copy(
+            externalRatings = mdbListRatings.ifEmpty { progressiveMeta.externalRatings },
+            moreLikeThis = traktMeta.moreLikeThis.ifEmpty { progressiveMeta.moreLikeThis },
+            moreLikeThisSource = traktMeta.moreLikeThisSource ?: progressiveMeta.moreLikeThisSource,
+        )
 
         cachedMetaByRequestKey[requestKey] = cachedMetaByRequestKey[requestKey]
             ?.copy(

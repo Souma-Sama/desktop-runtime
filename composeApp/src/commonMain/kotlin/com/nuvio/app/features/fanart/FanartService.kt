@@ -19,9 +19,23 @@ object FanartService {
     private val bannerCache = mutableMapOf<String, String>()
     private val posterCache = mutableMapOf<String, String>()
     private val seasonPosterCache = mutableMapOf<String, String>()
+    private val lookupIdCache = mutableMapOf<String, String>()
     private val negativeCache = mutableSetOf<String>()
 
     private val imdbRegex = Regex("tt\\d+")
+    const val DEFAULT_BETTERPOSTERS_TEMPLATE = "https://btttr.cc/poster/imdb/poster-default/%s.jpg?rs=IM"
+
+    fun formatBetterPoster(imdbId: String, template: String? = null): String? {
+        if (!imdbId.startsWith("tt")) return null
+        val effectiveTemplate = template?.takeIf { it.isNotBlank() } ?: DEFAULT_BETTERPOSTERS_TEMPLATE
+        return runCatching {
+            if (effectiveTemplate.contains("%s")) {
+                effectiveTemplate.replace("%s", imdbId)
+            } else {
+                effectiveTemplate
+            }
+        }.getOrNull()
+    }
 
     fun clearCache() {
         logoCache.clear()
@@ -29,31 +43,32 @@ object FanartService {
         bannerCache.clear()
         posterCache.clear()
         seasonPosterCache.clear()
+        lookupIdCache.clear()
         negativeCache.clear()
     }
 
-    fun getCachedLogo(id: String, type: String): String? {
+    fun getCachedLogo(id: String, type: String = "tv"): String? {
         val direct = logoCache["$type:$id"]
         if (direct != null) return direct
         val cleanId = extractLookupId(id) ?: return null
         return logoCache["$type:$cleanId"]
     }
 
-    fun getCachedBackdrop(id: String, type: String): String? {
+    fun getCachedBackdrop(id: String, type: String = "tv"): String? {
         val direct = backdropCache["$type:$id"]
         if (direct != null) return direct
         val cleanId = extractLookupId(id) ?: return null
         return backdropCache["$type:$cleanId"]
     }
 
-    fun getCachedBanner(id: String, type: String): String? {
+    fun getCachedBanner(id: String, type: String = "tv"): String? {
         val direct = bannerCache["$type:$id"]
         if (direct != null) return direct
         val cleanId = extractLookupId(id) ?: return null
         return bannerCache["$type:$cleanId"]
     }
 
-    fun getCachedPoster(id: String, type: String): String? {
+    fun getCachedPoster(id: String, type: String = "tv"): String? {
         val direct = posterCache["$type:$id"]
         if (direct != null) return direct
         val cleanId = extractLookupId(id) ?: return null
@@ -147,13 +162,54 @@ object FanartService {
         }
     }
 
+    suspend fun resolvePoster(id: String, type: String = "tv"): String? = withContext(Dispatchers.Default) {
+        val cached = getCachedPoster(id, type)
+        if (cached != null) return@withContext cached
+
+        val settings = FanartSettingsRepository.snapshot()
+        val cleanId = resolveLookupId(id, type) ?: return@withContext null
+        val cacheKey = "$type:$cleanId"
+
+        if (settings.enabled && settings.hasApiKey && settings.usePosters) {
+            val isMovie = isMovieType(type)
+            try {
+                if (isMovie) {
+                    val movie = fetchMovie(cleanId, settings.apiKey)
+                    if (movie != null) {
+                        selectBestImage(movie.moviePoster, settings.preferEnglishLogos)?.url?.let {
+                            posterCache[cacheKey] = it
+                            posterCache["$type:$id"] = it
+                            return@withContext it
+                        }
+                    }
+                } else {
+                    val tv = fetchTv(cleanId, settings.apiKey)
+                    if (tv != null) {
+                        populateTvCaches(cleanId, tv, settings, id)
+                        posterCache[cacheKey]?.let { return@withContext it }
+                    }
+                }
+            } catch (e: Throwable) {
+                log.w(e) { "Failed to fetch Fanart poster for $cacheKey" }
+            }
+        }
+
+        if (settings.useBetterPosters && cleanId.startsWith("tt")) {
+            formatBetterPoster(cleanId, settings.betterPostersTemplate)?.let { bp ->
+                posterCache[cacheKey] = bp
+                posterCache["$type:$id"] = bp
+                return@withContext bp
+            }
+        }
+
+        null
+    }
+
     suspend fun resolveSeasonPoster(id: String, type: String, seasonNumber: Int): String? = withContext(Dispatchers.Default) {
         val cached = getCachedSeasonPoster(id, seasonNumber)
         if (cached != null) return@withContext cached
 
         val settings = FanartSettingsRepository.snapshot()
-        if (!settings.enabled || !settings.hasApiKey) return@withContext null
-
         val cleanId = resolveLookupId(id, type) ?: return@withContext null
         val sKey = "$cleanId:$seasonNumber"
         seasonPosterCache[sKey]?.let {
@@ -161,17 +217,28 @@ object FanartService {
             return@withContext it
         }
 
-        try {
-            val tv = fetchTv(cleanId, settings.apiKey)
-            if (tv != null) {
-                populateTvCaches(cleanId, tv, settings, id)
-                return@withContext seasonPosterCache[sKey]
+        if (settings.enabled && settings.hasApiKey) {
+            try {
+                val tv = fetchTv(cleanId, settings.apiKey)
+                if (tv != null) {
+                    populateTvCaches(cleanId, tv, settings, id)
+                    seasonPosterCache[sKey]?.let { return@withContext it }
+                }
+            } catch (e: Throwable) {
+                log.w(e) { "Failed to resolve Fanart season poster for $sKey" }
             }
-            null
-        } catch (e: Throwable) {
-            log.w(e) { "Failed to resolve Fanart season poster for $sKey" }
-            null
         }
+
+        // Fallback: BetterPosters for season 1 or movies
+        if (settings.useBetterPosters && seasonNumber <= 1 && cleanId.startsWith("tt")) {
+            formatBetterPoster(cleanId, settings.betterPostersTemplate)?.let { bp ->
+                seasonPosterCache[sKey] = bp
+                seasonPosterCache["$id:$seasonNumber"] = bp
+                return@withContext bp
+            }
+        }
+
+        null
     }
 
     suspend fun enrichMetaDetails(
@@ -179,8 +246,6 @@ object FanartService {
         fallbackItemId: String,
         settings: FanartSettings,
     ): MetaDetails = withContext(Dispatchers.Default) {
-        if (!settings.enabled || !settings.hasApiKey) return@withContext meta
-
         val targetId = meta.id.takeIf { it.isNotBlank() } ?: fallbackItemId
         val cleanId = resolveLookupId(targetId, meta.type) ?: return@withContext meta
         val cacheKey = "${meta.type}:$cleanId"
@@ -188,34 +253,49 @@ object FanartService {
         val isMovie = isMovieType(meta.type)
         try {
             if (isMovie) {
-                val movie = fetchMovie(cleanId, settings.apiKey) ?: return@withContext meta
+                val movie = if (settings.enabled && settings.hasApiKey) fetchMovie(cleanId, settings.apiKey) else null
                 var updated = meta
 
-                if (settings.useClearLogos) {
-                    selectBestImage(movie.hdMovieLogo.ifEmpty { movie.movieLogo }, settings.preferEnglishLogos)?.url?.let {
-                        logoCache[cacheKey] = it
-                        logoCache["${meta.type}:$targetId"] = it
-                        updated = updated.copy(logo = it)
+                if (movie != null) {
+                    if (settings.useClearLogos) {
+                        selectBestImage(movie.hdMovieLogo.ifEmpty { movie.movieLogo }, settings.preferEnglishLogos)?.url?.let {
+                            logoCache[cacheKey] = it
+                            logoCache["${meta.type}:$targetId"] = it
+                            updated = updated.copy(logo = it)
+                        }
+                    }
+                    if (settings.useHeroBackdrops) {
+                        selectBestImage(movie.movieBackground, settings.preferEnglishLogos)?.url?.let {
+                            backdropCache[cacheKey] = it
+                            backdropCache["${meta.type}:$targetId"] = it
+                            updated = updated.copy(background = it)
+                        }
+                    }
+                    if (settings.usePosters) {
+                        selectBestImage(movie.moviePoster, settings.preferEnglishLogos)?.url?.let {
+                            posterCache[cacheKey] = it
+                            posterCache["${meta.type}:$targetId"] = it
+                            updated = updated.copy(poster = it)
+                        }
                     }
                 }
-                if (settings.useHeroBackdrops) {
-                    selectBestImage(movie.movieBackground, settings.preferEnglishLogos)?.url?.let {
-                        backdropCache[cacheKey] = it
-                        backdropCache["${meta.type}:$targetId"] = it
-                        updated = updated.copy(background = it)
+
+                if (settings.useBetterPosters && (updated.poster.isNullOrBlank() || !settings.usePosters) && cleanId.startsWith("tt")) {
+                    formatBetterPoster(cleanId, settings.betterPostersTemplate)?.let { bp ->
+                        posterCache[cacheKey] = bp
+                        posterCache["${meta.type}:$targetId"] = bp
+                        if (updated.poster.isNullOrBlank()) {
+                            updated = updated.copy(poster = bp)
+                        }
                     }
                 }
-                if (settings.usePosters) {
-                    selectBestImage(movie.moviePoster, settings.preferEnglishLogos)?.url?.let {
-                        posterCache[cacheKey] = it
-                        posterCache["${meta.type}:$targetId"] = it
-                        updated = updated.copy(poster = it)
-                    }
-                }
+
                 updated
             } else {
-                val tv = fetchTv(cleanId, settings.apiKey) ?: return@withContext meta
-                populateTvCaches(cleanId, tv, settings, targetId)
+                val tv = if (settings.enabled && settings.hasApiKey) fetchTv(cleanId, settings.apiKey) else null
+                if (tv != null) {
+                    populateTvCaches(cleanId, tv, settings, targetId)
+                }
                 var updated = meta
 
                 if (settings.useClearLogos) {
@@ -234,12 +314,21 @@ object FanartService {
                     }
                 }
 
+                val betterPosterFallback = if (settings.useBetterPosters && cleanId.startsWith("tt")) {
+                    formatBetterPoster(cleanId, settings.betterPostersTemplate)?.also { bp ->
+                        posterCache[cacheKey] = bp
+                        posterCache["${meta.type}:$targetId"] = bp
+                    }
+                } else null
+
                 // Enrich season posters into videos
                 val updatedVideos = updated.videos.map { vid ->
                     val s = vid.season ?: 1
                     val fanartSeasonPoster = seasonPosterCache["$cleanId:$s"] ?: seasonPosterCache["$targetId:$s"]
                     if (fanartSeasonPoster != null) {
                         vid.copy(seasonPoster = fanartSeasonPoster)
+                    } else if (s <= 1 && betterPosterFallback != null) {
+                        vid.copy(seasonPoster = betterPosterFallback)
                     } else if (vid.seasonPoster.isNullOrBlank() && !updated.poster.isNullOrBlank()) {
                         vid.copy(seasonPoster = updated.poster)
                     } else {
@@ -375,8 +464,14 @@ object FanartService {
 
     suspend fun resolveLookupId(id: String, type: String = "tv"): String? {
         val raw = id.trim()
+        val cached = lookupIdCache[raw]
+        if (cached != null) return cached
+
         val imdbMatch = imdbRegex.find(raw)?.value
-        if (imdbMatch != null) return imdbMatch
+        if (imdbMatch != null) {
+            lookupIdCache[raw] = imdbMatch
+            return imdbMatch
+        }
 
         val isMovie = isMovieType(type)
 
@@ -385,11 +480,20 @@ object FanartService {
             val anilistId = com.nuvio.app.features.anilist.AnilistTrackerCoordinator.extractAnilistId(raw)
             if (anilistId != null) {
                 val arm = com.nuvio.app.features.anilist.catalog.AnilistMetaDetailsResolver.resolveArmMapping(anilistId)
-                if (!arm.imdbId.isNullOrBlank()) return arm.imdbId
+                if (!arm.imdbId.isNullOrBlank()) {
+                    lookupIdCache[raw] = arm.imdbId
+                    return arm.imdbId
+                }
                 if (arm.tmdbId != null && arm.tmdbId > 0) {
-                    if (isMovie) return arm.tmdbId.toString()
+                    if (isMovie) {
+                        val tmdbStr = arm.tmdbId.toString()
+                        lookupIdCache[raw] = tmdbStr
+                        return tmdbStr
+                    }
                     val converted = com.nuvio.app.features.tmdb.TmdbService.tmdbToImdb(arm.tmdbId, "tv")
-                    return converted ?: arm.tmdbId.toString()
+                    val result = converted ?: arm.tmdbId.toString()
+                    lookupIdCache[raw] = result
+                    return result
                 }
             }
         }
@@ -402,7 +506,10 @@ object FanartService {
             if (!armText.isNullOrBlank()) {
                 val obj = runCatching { json.parseToJsonElement(armText) }.getOrNull()
                 val imdb = obj?.let { (it as? JsonObject)?.get("imdb")?.let { el -> (el as? JsonPrimitive)?.content } }
-                if (!imdb.isNullOrBlank()) return imdb
+                if (!imdb.isNullOrBlank()) {
+                    lookupIdCache[raw] = imdb
+                    return imdb
+                }
             }
         }
 
@@ -410,24 +517,36 @@ object FanartService {
         if (raw.contains("tmdb", ignoreCase = true)) {
             val digits = raw.filter(Char::isDigit)
             if (digits.isNotBlank()) {
-                if (isMovie) return digits
+                if (isMovie) {
+                    lookupIdCache[raw] = digits
+                    return digits
+                }
                 val num = digits.toIntOrNull()
                 if (num != null) {
                     val converted = com.nuvio.app.features.tmdb.TmdbService.tmdbToImdb(num, "tv")
-                    return converted ?: digits
+                    val result = converted ?: digits
+                    lookupIdCache[raw] = result
+                    return result
                 }
+                lookupIdCache[raw] = digits
                 return digits
             }
         }
 
         // 4. Plain numeric ID
         if (raw.all(Char::isDigit)) {
-            if (isMovie) return raw
+            if (isMovie) {
+                lookupIdCache[raw] = raw
+                return raw
+            }
             val num = raw.toIntOrNull()
             if (num != null) {
                 val converted = com.nuvio.app.features.tmdb.TmdbService.tmdbToImdb(num, "tv")
-                return converted ?: raw
+                val result = converted ?: raw
+                lookupIdCache[raw] = result
+                return result
             }
+            lookupIdCache[raw] = raw
             return raw
         }
 

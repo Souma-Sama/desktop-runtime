@@ -19,6 +19,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.nuvio.app.features.fanart.FanartSettings
 import com.nuvio.app.features.fanart.FanartSettingsRepository
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.action_save
 import nuvio.composeapp.generated.resources.settings_fanart_add_api_key_first
@@ -28,6 +30,11 @@ import nuvio.composeapp.generated.resources.settings_fanart_backdrops
 import nuvio.composeapp.generated.resources.settings_fanart_backdrops_description
 import nuvio.composeapp.generated.resources.settings_fanart_banners
 import nuvio.composeapp.generated.resources.settings_fanart_banners_description
+import nuvio.composeapp.generated.resources.settings_fanart_betterposters_enable
+import nuvio.composeapp.generated.resources.settings_fanart_betterposters_enable_description
+import nuvio.composeapp.generated.resources.settings_fanart_betterposters_template_description
+import nuvio.composeapp.generated.resources.settings_fanart_betterposters_template_placeholder
+import nuvio.composeapp.generated.resources.settings_fanart_betterposters_template_title
 import nuvio.composeapp.generated.resources.settings_fanart_clearlogos
 import nuvio.composeapp.generated.resources.settings_fanart_clearlogos_description
 import nuvio.composeapp.generated.resources.settings_fanart_enable
@@ -37,6 +44,7 @@ import nuvio.composeapp.generated.resources.settings_fanart_posters_description
 import nuvio.composeapp.generated.resources.settings_fanart_prefer_english
 import nuvio.composeapp.generated.resources.settings_fanart_prefer_english_description
 import nuvio.composeapp.generated.resources.settings_fanart_section_api_key
+import nuvio.composeapp.generated.resources.settings_fanart_section_betterposters
 import nuvio.composeapp.generated.resources.settings_fanart_section_options
 import nuvio.composeapp.generated.resources.settings_fanart_section_title
 import org.jetbrains.compose.resources.stringResource
@@ -140,6 +148,32 @@ internal fun LazyListScope.fanartSettingsContent(
             }
         }
     }
+
+    item {
+        SettingsSection(
+            title = stringResource(Res.string.settings_fanart_section_betterposters),
+            isTablet = isTablet,
+        ) {
+            SettingsGroup(isTablet = isTablet) {
+                SettingsSwitchRow(
+                    title = stringResource(Res.string.settings_fanart_betterposters_enable),
+                    description = stringResource(Res.string.settings_fanart_betterposters_enable_description),
+                    checked = settings.useBetterPosters,
+                    enabled = true,
+                    isTablet = isTablet,
+                    onCheckedChange = FanartSettingsRepository::setUseBetterPosters,
+                )
+                if (settings.useBetterPosters) {
+                    SettingsGroupDivider(isTablet = isTablet)
+                    BetterPostersTemplateRow(
+                        isTablet = isTablet,
+                        value = settings.betterPostersTemplate,
+                        onTemplateCommitted = FanartSettingsRepository::setBetterPostersTemplate,
+                    )
+                }
+            }
+        }
+    }
 }
 
 @Composable
@@ -197,19 +231,68 @@ private fun FanartApiKeyRow(
 }
 
 @Composable
-private fun FanartInfoRow(
+private fun BetterPostersTemplateRow(
     isTablet: Boolean,
-    text: String,
+    value: String,
+    onTemplateCommitted: (String) -> Unit,
 ) {
     val horizontalPadding = if (isTablet) 20.dp else 16.dp
-    val verticalPadding = if (isTablet) 14.dp else 12.dp
+    val verticalPadding = if (isTablet) 16.dp else 14.dp
+    var draft by rememberSaveable(value) { mutableStateOf(value) }
+    val normalizedDraft = draft.trim()
 
-    Text(
-        text = text,
+    Column(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = horizontalPadding, vertical = verticalPadding),
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-    )
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(
+                text = stringResource(Res.string.settings_fanart_betterposters_template_title),
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+                fontWeight = FontWeight.Medium,
+            )
+            Text(
+                text = stringResource(Res.string.settings_fanart_betterposters_template_description),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+
+        OutlinedTextField(
+            value = draft,
+            onValueChange = { draft = it },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            placeholder = {
+                Text(
+                    text = stringResource(Res.string.settings_fanart_betterposters_template_placeholder),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                )
+            },
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
+                cursorColor = MaterialTheme.colorScheme.primary,
+            ),
+        )
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Button(
+                onClick = {
+                    draft = normalizedDraft
+                    onTemplateCommitted(normalizedDraft)
+                },
+                enabled = normalizedDraft != value,
+            ) {
+                Text(stringResource(Res.string.action_save))
+            }
+        }
+    }
 }

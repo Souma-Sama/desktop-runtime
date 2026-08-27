@@ -11,9 +11,14 @@ import com.nuvio.app.features.home.HomeCatalogDefinition
 import com.nuvio.app.features.home.MetaPreview
 import com.nuvio.app.features.home.PosterShape
 
+import com.nuvio.app.features.fanart.FanartService
 import com.nuvio.app.features.library.LibraryClock
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
 
 private data class CachedCatalogPage(
     val timestamp: Long,
@@ -23,6 +28,7 @@ private data class CachedCatalogPage(
 object AnilistCatalogRepository {
     private val log = Logger.withTag("AnilistCatalog")
     private val pageCache = mutableMapOf<String, CachedCatalogPage>()
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private const val CACHE_TTL_MS = 5 * 60 * 1000L // 5 minutes
 
     const val CATALOG_WATCHING = "anilist:watching"
@@ -237,12 +243,18 @@ object AnilistCatalogRepository {
         }
 
         val previews = mediaList.map { media ->
+            val itemId = "ani_${media.id}"
+            val itemType = if (media.format == "MOVIE") "movie" else "series"
             MetaPreview(
-                id = "ani_${media.id}",
-                type = if (media.format == "MOVIE") "movie" else "series",
+                id = itemId,
+                type = itemType,
                 name = media.title?.getDisplayTitle(prefs.preferredTitleLanguage).orEmpty(),
-                poster = media.coverImage?.extraLarge ?: media.coverImage?.large ?: media.coverImage?.medium,
-                banner = media.bannerImage,
+                poster = FanartService.getCachedPoster(itemId, itemType)
+                    ?: media.coverImage?.extraLarge
+                    ?: media.coverImage?.large
+                    ?: media.coverImage?.medium,
+                banner = FanartService.getCachedBackdrop(itemId, itemType) ?: media.bannerImage,
+                logo = FanartService.getCachedLogo(itemId, itemType),
                 posterShape = PosterShape.Poster,
                 description = media.description,
                 releaseInfo = listOfNotNull(
@@ -259,6 +271,18 @@ object AnilistCatalogRepository {
                 } else null,
                 genres = media.genres,
             )
+        }
+
+        // Asynchronously pre-warm Fanart/BetterPosters artwork & ARM lookups for first items
+        scope.launch {
+            previews.take(12).forEach { preview ->
+                launch {
+                    FanartService.resolveLogo(preview.id, preview.type)
+                }
+                launch {
+                    FanartService.resolvePoster(preview.id, preview.type)
+                }
+            }
         }
 
         val result = CatalogPage(

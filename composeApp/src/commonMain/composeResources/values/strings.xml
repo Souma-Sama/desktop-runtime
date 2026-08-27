@@ -873,6 +873,12 @@
     <string name="settings_fanart_posters_description">Use Fanart.tv clean posters when available.</string>
     <string name="settings_fanart_banners">HD Fanart Banners</string>
     <string name="settings_fanart_banners_description">Use Fanart.tv widescreen banners when available.</string>
+    <string name="settings_fanart_section_betterposters">BETTERPOSTERS FALLBACK</string>
+    <string name="settings_fanart_betterposters_enable">Use BetterPosters Fallback</string>
+    <string name="settings_fanart_betterposters_enable_description">Use BetterPosters for single-season anime &amp; movies when Fanart.tv has no poster.</string>
+    <string name="settings_fanart_betterposters_template_title">Template URL (Optional)</string>
+    <string name="settings_fanart_betterposters_template_description">Pattern with %s for IMDb ID. Defaults to btttr.cc if blank.</string>
+    <string name="settings_fanart_betterposters_template_placeholder">https://btttr.cc/poster/imdb/poster-default/%s.jpg?rs=IM</string>
     <string name="settings_debrid_section_title">CONNECTED SERVICES</string>
     <string name="settings_debrid_experimental_notice">These integrations are experimental and may be kept, changed, or removed later.</string>
     <string name="settings_debrid_cloud_library">Cloud library</string>

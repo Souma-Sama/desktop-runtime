@@ -11,6 +11,8 @@ data class FanartSettings(
     val useHeroBackdrops: Boolean = false,
     val usePosters: Boolean = false,
     val useBanners: Boolean = false,
+    val useBetterPosters: Boolean = true,
+    val betterPostersTemplate: String = "",
 ) {
     val hasApiKey: Boolean
         get() = apiKey.isNotBlank()
