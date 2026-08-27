@@ -296,3 +296,21 @@ private fun BetterPostersTemplateRow(
         }
     }
 }
+
+@Composable
+private fun FanartInfoRow(
+    isTablet: Boolean,
+    text: String,
+) {
+    val horizontalPadding = if (isTablet) 20.dp else 16.dp
+    val verticalPadding = if (isTablet) 14.dp else 12.dp
+
+    Text(
+        text = text,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = horizontalPadding, vertical = verticalPadding),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+}
