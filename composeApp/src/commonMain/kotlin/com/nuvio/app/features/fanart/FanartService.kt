@@ -336,18 +336,21 @@ object FanartService {
                 var updated = meta
 
                 if (settings.useClearLogos) {
-                    logoCache[cacheKey]?.let {
-                        updated = updated.copy(logo = it)
+                    val resolvedLogo = logoCache["${meta.type}:$targetId"] ?: logoCache[cacheKey] ?: logoCache["tv:$cleanId"] ?: logoCache["series:$cleanId"]
+                    if (resolvedLogo != null) {
+                        updated = updated.copy(logo = resolvedLogo)
                     }
                 }
                 if (settings.useHeroBackdrops) {
-                    backdropCache[cacheKey]?.let {
-                        updated = updated.copy(background = it)
+                    val resolvedBg = backdropCache["${meta.type}:$targetId"] ?: backdropCache[cacheKey] ?: backdropCache["tv:$cleanId"] ?: backdropCache["series:$cleanId"]
+                    if (resolvedBg != null) {
+                        updated = updated.copy(background = resolvedBg)
                     }
                 }
                 if (settings.usePosters) {
-                    posterCache[cacheKey]?.let {
-                        updated = updated.copy(poster = it)
+                    val resolvedPoster = posterCache["${meta.type}:$targetId"] ?: posterCache[cacheKey] ?: posterCache["tv:$cleanId"] ?: posterCache["series:$cleanId"]
+                    if (resolvedPoster != null) {
+                        updated = updated.copy(poster = resolvedPoster)
                     }
                 }
 

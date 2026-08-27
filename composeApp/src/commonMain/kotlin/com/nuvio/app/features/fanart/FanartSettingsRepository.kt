@@ -10,13 +10,13 @@ object FanartSettingsRepository {
 
     private var hasLoaded = false
 
-    private var enabled = false
+    private var enabled = true
     private var apiKey = ""
     private var useClearLogos = true
     private var preferEnglishLogos = true
-    private var useHeroBackdrops = false
+    private var useHeroBackdrops = true
     private var usePosters = true
-    private var useBanners = false
+    private var useBanners = true
     private var useBetterPosters = true
     private var betterPostersTemplate = ""
 
@@ -48,7 +48,10 @@ object FanartSettingsRepository {
         val normalized = value.trim()
         if (apiKey == normalized) return
         apiKey = normalized
-        if (apiKey.isBlank()) {
+        if (apiKey.isNotBlank()) {
+            enabled = true
+            FanartSettingsStorage.saveEnabled(true)
+        } else {
             enabled = false
             FanartSettingsStorage.saveEnabled(false)
         }
@@ -120,12 +123,12 @@ object FanartSettingsRepository {
     private fun loadFromDisk() {
         hasLoaded = true
         apiKey = FanartSettingsStorage.loadApiKey().orEmpty().trim()
-        enabled = (FanartSettingsStorage.loadEnabled() ?: false) && apiKey.isNotBlank()
+        enabled = (FanartSettingsStorage.loadEnabled() ?: true) && apiKey.isNotBlank()
         useClearLogos = FanartSettingsStorage.loadUseClearLogos() ?: true
         preferEnglishLogos = FanartSettingsStorage.loadPreferEnglishLogos() ?: true
-        useHeroBackdrops = FanartSettingsStorage.loadUseHeroBackdrops() ?: false
+        useHeroBackdrops = FanartSettingsStorage.loadUseHeroBackdrops() ?: true
         usePosters = FanartSettingsStorage.loadUsePosters() ?: true
-        useBanners = FanartSettingsStorage.loadUseBanners() ?: false
+        useBanners = FanartSettingsStorage.loadUseBanners() ?: true
         useBetterPosters = FanartSettingsStorage.loadUseBetterPosters() ?: true
         betterPostersTemplate = FanartSettingsStorage.loadBetterPostersTemplate().orEmpty().trim()
         publish()

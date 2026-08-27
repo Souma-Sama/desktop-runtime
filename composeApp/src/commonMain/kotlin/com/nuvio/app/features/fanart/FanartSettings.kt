@@ -4,13 +4,13 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class FanartSettings(
-    val enabled: Boolean = false,
+    val enabled: Boolean = true,
     val apiKey: String = "",
     val useClearLogos: Boolean = true,
     val preferEnglishLogos: Boolean = true,
-    val useHeroBackdrops: Boolean = false,
+    val useHeroBackdrops: Boolean = true,
     val usePosters: Boolean = true,
-    val useBanners: Boolean = false,
+    val useBanners: Boolean = true,
     val useBetterPosters: Boolean = true,
     val betterPostersTemplate: String = "",
 ) {
