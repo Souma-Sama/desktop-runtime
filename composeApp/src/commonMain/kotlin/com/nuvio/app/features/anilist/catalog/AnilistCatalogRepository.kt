@@ -238,48 +238,36 @@ object AnilistCatalogRepository {
             else -> emptyList()
         }
 
-        val fanartSettings = FanartSettingsRepository.snapshot()
-        val resolveFanart = fanartSettings.enabled && fanartSettings.hasApiKey && fanartSettings.usePosters
+        val previews = mediaList.map { media ->
+            val itemId = "ani_${media.id}"
+            val itemType = if (media.format == "MOVIE") "movie" else "series"
 
-        val previews = kotlinx.coroutines.coroutineScope {
-            mediaList.map { media ->
-                async {
-                    val itemId = "ani_${media.id}"
-                    val itemType = if (media.format == "MOVIE") "movie" else "series"
-                    val fanartPoster = if (resolveFanart) {
-                        FanartService.resolvePoster(itemId, itemType)
+            MetaPreview(
+                id = itemId,
+                type = itemType,
+                name = media.title?.getDisplayTitle(prefs.preferredTitleLanguage).orEmpty(),
+                poster = FanartService.getCachedPoster(itemId, itemType)
+                    ?: media.coverImage?.extraLarge
+                    ?: media.coverImage?.large
+                    ?: media.coverImage?.medium,
+                banner = FanartService.getCachedBackdrop(itemId, itemType) ?: media.bannerImage,
+                logo = FanartService.getCachedLogo(itemId, itemType),
+                posterShape = PosterShape.Poster,
+                description = media.description,
+                releaseInfo = listOfNotNull(
+                    com.nuvio.app.core.format.formatYearRange(media.startDateYear, media.endDateYear, media.status),
+                    if (media.episodes != null && media.episodes > 0 && media.format != "MOVIE") {
+                        "${media.episodes} eps"
                     } else {
-                        FanartService.getCachedPoster(itemId, itemType)
-                    }
-
-                    MetaPreview(
-                        id = itemId,
-                        type = itemType,
-                        name = media.title?.getDisplayTitle(prefs.preferredTitleLanguage).orEmpty(),
-                        poster = fanartPoster
-                            ?: media.coverImage?.extraLarge
-                            ?: media.coverImage?.large
-                            ?: media.coverImage?.medium,
-                        banner = FanartService.getCachedBackdrop(itemId, itemType) ?: media.bannerImage,
-                        logo = FanartService.getCachedLogo(itemId, itemType),
-                        posterShape = PosterShape.Poster,
-                        description = media.description,
-                        releaseInfo = listOfNotNull(
-                            com.nuvio.app.core.format.formatYearRange(media.startDateYear, media.endDateYear, media.status),
-                            if (media.episodes != null && media.episodes > 0 && media.format != "MOVIE") {
-                                "${media.episodes} eps"
-                            } else {
-                                media.duration?.let { "$it min" }
-                            },
-                        ).joinToString(" • ").takeIf { it.isNotBlank() },
-                        imdbRating = if (media.averageScore != null && media.averageScore > 0) {
-                            val score = (media.averageScore / 10.0)
-                            "${(score * 10).toInt() / 10.0}"
-                        } else null,
-                        genres = media.genres,
-                    )
-                }
-            }.awaitAll()
+                        media.duration?.let { "$it min" }
+                    },
+                ).joinToString(" • ").takeIf { it.isNotBlank() },
+                imdbRating = if (media.averageScore != null && media.averageScore > 0) {
+                    val score = (media.averageScore / 10.0)
+                    "${(score * 10).toInt() / 10.0}"
+                } else null,
+                genres = media.genres,
+            )
         }
 
         val result = CatalogPage(
