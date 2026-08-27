@@ -373,10 +373,13 @@ object AddonRepository {
                                 AddonResource(name = "meta", types = listOf("anime", "series", "movie"), idPrefixes = listOf("ani_", "anilist:")),
                             ),
                             catalogs = listOf(
+                                AddonCatalog(type = "anime", id = "anilist:watching", name = "Currently Watching"),
+                                AddonCatalog(type = "anime", id = "anilist:planning", name = "Plan to Watch"),
                                 AddonCatalog(type = "anime", id = "anilist:trending", name = "Trending Anime"),
                                 AddonCatalog(type = "anime", id = "anilist:airing", name = "Currently Airing"),
                                 AddonCatalog(type = "anime", id = "anilist:popular", name = "Popular This Season"),
                                 AddonCatalog(type = "anime", id = "anilist:top-rated", name = "Top Rated Anime"),
+                                AddonCatalog(type = "anime", id = "anilist:completed", name = "Completed"),
                             ),
                             idPrefixes = listOf("ani_", "anilist:"),
                             logoUrl = "https://anilist.co/img/icons/icon.svg",

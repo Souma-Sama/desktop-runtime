@@ -51,37 +51,37 @@ object FanartService {
     }
 
     fun getCachedLogo(id: String, type: String = "tv"): String? {
-        val direct = logoCache["$type:$id"]
+        val direct = logoCache["$type:$id"] ?: logoCache["series:$id"] ?: logoCache["tv:$id"] ?: logoCache["anime:$id"]
         if (direct != null) return direct
-        val cleanId = extractLookupId(id) ?: return null
-        return logoCache["$type:$cleanId"]
+        val cleanId = lookupIdCache[id] ?: extractLookupId(id) ?: return null
+        return logoCache["$type:$cleanId"] ?: logoCache["series:$cleanId"] ?: logoCache["tv:$cleanId"] ?: logoCache["anime:$cleanId"]
     }
 
     fun getCachedBackdrop(id: String, type: String = "tv"): String? {
-        val direct = backdropCache["$type:$id"]
+        val direct = backdropCache["$type:$id"] ?: backdropCache["series:$id"] ?: backdropCache["tv:$id"] ?: backdropCache["anime:$id"]
         if (direct != null) return direct
-        val cleanId = extractLookupId(id) ?: return null
-        return backdropCache["$type:$cleanId"]
+        val cleanId = lookupIdCache[id] ?: extractLookupId(id) ?: return null
+        return backdropCache["$type:$cleanId"] ?: backdropCache["series:$cleanId"] ?: backdropCache["tv:$cleanId"] ?: backdropCache["anime:$cleanId"]
     }
 
     fun getCachedBanner(id: String, type: String = "tv"): String? {
-        val direct = bannerCache["$type:$id"]
+        val direct = bannerCache["$type:$id"] ?: bannerCache["series:$id"] ?: bannerCache["tv:$id"] ?: bannerCache["anime:$id"]
         if (direct != null) return direct
-        val cleanId = extractLookupId(id) ?: return null
-        return bannerCache["$type:$cleanId"]
+        val cleanId = lookupIdCache[id] ?: extractLookupId(id) ?: return null
+        return bannerCache["$type:$cleanId"] ?: bannerCache["series:$cleanId"] ?: bannerCache["tv:$cleanId"] ?: bannerCache["anime:$cleanId"]
     }
 
     fun getCachedPoster(id: String, type: String = "tv"): String? {
-        val direct = posterCache["$type:$id"]
+        val direct = posterCache["$type:$id"] ?: posterCache["series:$id"] ?: posterCache["tv:$id"] ?: posterCache["anime:$id"]
         if (direct != null) return direct
-        val cleanId = extractLookupId(id) ?: return null
-        return posterCache["$type:$cleanId"]
+        val cleanId = lookupIdCache[id] ?: extractLookupId(id) ?: return null
+        return posterCache["$type:$cleanId"] ?: posterCache["series:$cleanId"] ?: posterCache["tv:$cleanId"] ?: posterCache["anime:$cleanId"]
     }
 
     fun getCachedSeasonPoster(id: String, seasonNumber: Int): String? {
         val direct = seasonPosterCache["$id:$seasonNumber"]
         if (direct != null) return direct
-        val cleanId = extractLookupId(id) ?: return null
+        val cleanId = lookupIdCache[id] ?: extractLookupId(id) ?: return null
         return seasonPosterCache["$cleanId:$seasonNumber"]
     }
 
