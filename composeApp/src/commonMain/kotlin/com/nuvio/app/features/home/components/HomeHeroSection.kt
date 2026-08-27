@@ -230,19 +230,22 @@ private fun HeroBackgroundLayers(
 
     layerPages.forEach { page ->
         val item = items[page]
-        var fanartBackdrop by remember(item.type, item.id) {
-            mutableStateOf(FanartService.getCachedBackdrop(item.id, item.type))
+        var heroBackdrop by remember(item.type, item.id) {
+            mutableStateOf(
+                FanartService.getCachedBackdrop(item.id, item.type)
+                    ?: if (item.id.startsWith("tt")) "https://images.metahub.space/background/medium/${item.id}/img" else null
+            )
         }
         LaunchedEffect(item.type, item.id) {
-            if (fanartBackdrop == null) {
+            if (heroBackdrop == null) {
                 FanartService.resolveLogo(item.id, item.type)
                 val resolved = FanartService.getCachedBackdrop(item.id, item.type)
                 if (resolved != null) {
-                    fanartBackdrop = resolved
+                    heroBackdrop = resolved
                 }
             }
         }
-        val backgroundModel = fanartBackdrop ?: item.banner ?: item.poster
+        val backgroundModel = heroBackdrop ?: item.banner ?: item.poster
         AsyncImage(
             model = backgroundModel,
             contentDescription = item.name,

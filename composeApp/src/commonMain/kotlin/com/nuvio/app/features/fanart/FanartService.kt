@@ -87,9 +87,20 @@ object FanartService {
 
     suspend fun resolveLogo(id: String, type: String): String? = withContext(Dispatchers.Default) {
         val settings = FanartSettingsRepository.snapshot()
-        if (!settings.enabled || !settings.hasApiKey || !settings.useClearLogos) return@withContext null
+        val cleanId = resolveLookupId(id, type)
 
-        val cleanId = resolveLookupId(id, type) ?: return@withContext null
+        if (!settings.enabled || !settings.hasApiKey || !settings.useClearLogos) {
+            if (cleanId != null && cleanId.startsWith("tt")) {
+                val metahubLogo = "https://images.metahub.space/logo/medium/$cleanId/img"
+                val metahubBackdrop = "https://images.metahub.space/background/medium/$cleanId/img"
+                logoCache["$type:$id"] = metahubLogo
+                backdropCache["$type:$id"] = metahubBackdrop
+                return@withContext metahubLogo
+            }
+            return@withContext null
+        }
+
+        if (cleanId == null) return@withContext null
         val cacheKey = "$type:$cleanId"
 
         logoCache[cacheKey]?.let {
@@ -145,6 +156,11 @@ object FanartService {
                 }
             }
             val metahubFallback = if (cleanId.startsWith("tt")) "https://images.metahub.space/logo/medium/$cleanId/img" else null
+            val metahubBackdropFallback = if (cleanId.startsWith("tt")) "https://images.metahub.space/background/medium/$cleanId/img" else null
+            if (metahubBackdropFallback != null && backdropCache[cacheKey] == null) {
+                backdropCache[cacheKey] = metahubBackdropFallback
+                backdropCache["$type:$id"] = metahubBackdropFallback
+            }
             if (metahubFallback != null) {
                 logoCache[cacheKey] = metahubFallback
                 logoCache["$type:$id"] = metahubFallback
@@ -155,6 +171,11 @@ object FanartService {
         } catch (e: Throwable) {
             log.w(e) { "Failed to resolve Fanart logo for $cacheKey" }
             val metahubFallback = if (cleanId.startsWith("tt")) "https://images.metahub.space/logo/medium/$cleanId/img" else null
+            val metahubBackdropFallback = if (cleanId.startsWith("tt")) "https://images.metahub.space/background/medium/$cleanId/img" else null
+            if (metahubBackdropFallback != null && backdropCache[cacheKey] == null) {
+                backdropCache[cacheKey] = metahubBackdropFallback
+                backdropCache["$type:$id"] = metahubBackdropFallback
+            }
             if (metahubFallback != null) {
                 logoCache[cacheKey] = metahubFallback
                 logoCache["$type:$id"] = metahubFallback

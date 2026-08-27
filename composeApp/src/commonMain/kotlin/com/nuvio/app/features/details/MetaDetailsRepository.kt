@@ -120,10 +120,26 @@ object MetaDetailsRepository {
         _uiState.value = MetaDetailsUiState(isLoading = true)
 
         scope.launch {
-            val metaLookupId = resolveMetaLookupId(itemId = id, itemType = type)
             val isAnilistItem = id.startsWith("ani_", ignoreCase = true) || id.startsWith("anilist:", ignoreCase = true)
             val effectiveType = if (type == "movie") "movie" else "series"
 
+            if (isAnilistItem) {
+                val anilistMeta = com.nuvio.app.features.anilist.catalog.AnilistMetaDetailsResolver.resolveMetaDetails(id)
+                if (anilistMeta != null) {
+                    val metaLookupId = resolveMetaLookupId(itemId = id, itemType = type)
+                    publishLoadedMeta(
+                        requestKey = requestKey,
+                        meta = anilistMeta,
+                        fallbackItemId = metaLookupId,
+                        fallbackItemType = effectiveType,
+                        mdbListSettings = mdbListSettings,
+                        metaScreenSettingsFingerprint = metaScreenSettingsFingerprint,
+                    )
+                    return@launch
+                }
+            }
+
+            val metaLookupId = resolveMetaLookupId(itemId = id, itemType = type)
             val manifests = findReadyMetaManifests(type = effectiveType, id = metaLookupId)
 
             for (manifest in manifests) {
@@ -162,21 +178,6 @@ object MetaDetailsRepository {
                 return@launch
             }
 
-            if (isAnilistItem) {
-                val anilistMeta = com.nuvio.app.features.anilist.catalog.AnilistMetaDetailsResolver.resolveMetaDetails(id)
-                if (anilistMeta != null) {
-                    publishLoadedMeta(
-                        requestKey = requestKey,
-                        meta = anilistMeta,
-                        fallbackItemId = metaLookupId,
-                        fallbackItemType = effectiveType,
-                        mdbListSettings = mdbListSettings,
-                        metaScreenSettingsFingerprint = metaScreenSettingsFingerprint,
-                    )
-                    return@launch
-                }
-            }
-
             log.w { "No addon provides meta for type=$type id=$id (lookupId=$metaLookupId)" }
             _uiState.value = MetaDetailsUiState(
                 errorMessage = getString(Res.string.details_no_addon_meta),
@@ -208,8 +209,19 @@ object MetaDetailsRepository {
         cachedMetaByRequestKey[requestKey]?.let { return it.baseMeta }
 
         val isAnilistItem = id.startsWith("ani_", ignoreCase = true) || id.startsWith("anilist:", ignoreCase = true)
-        val metaLookupId = resolveMetaLookupId(itemId = id, itemType = type)
         val effectiveType = if (type == "movie") "movie" else "series"
+
+        if (isAnilistItem) {
+            val anilistMeta = com.nuvio.app.features.anilist.catalog.AnilistMetaDetailsResolver.resolveMetaDetails(id)
+            if (anilistMeta != null) {
+                if (cacheResult) {
+                    cachedMetaByRequestKey[requestKey] = CachedMetaEntry(baseMeta = anilistMeta)
+                }
+                return anilistMeta
+            }
+        }
+
+        val metaLookupId = resolveMetaLookupId(itemId = id, itemType = type)
         val manifests = findReadyMetaManifests(type = effectiveType, id = metaLookupId)
 
         for (manifest in manifests) {
@@ -236,16 +248,6 @@ object MetaDetailsRepository {
                 cachedMetaByRequestKey[requestKey] = CachedMetaEntry(baseMeta = finalMeta)
             }
             return finalMeta
-        }
-
-        if (isAnilistItem) {
-            val anilistMeta = com.nuvio.app.features.anilist.catalog.AnilistMetaDetailsResolver.resolveMetaDetails(id)
-            if (anilistMeta != null) {
-                if (cacheResult) {
-                    cachedMetaByRequestKey[requestKey] = CachedMetaEntry(baseMeta = anilistMeta)
-                }
-                return anilistMeta
-            }
         }
 
         return null
