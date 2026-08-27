@@ -13,9 +13,13 @@ import com.nuvio.app.features.home.PosterShape
 import com.nuvio.app.features.fanart.FanartService
 import com.nuvio.app.features.fanart.FanartSettingsRepository
 import com.nuvio.app.features.library.LibraryClock
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 private data class CachedCatalogPage(
     val timestamp: Long,
@@ -276,6 +280,21 @@ object AnilistCatalogRepository {
             nextSkip = if (mediaList.size >= perPage) (page * perPage) else null,
         )
         pageCache[cacheKey] = CachedCatalogPage(timestamp = now, page = result)
+
+        val fanartSettings = FanartSettingsRepository.snapshot()
+        if (fanartSettings.enabled && fanartSettings.hasApiKey && fanartSettings.usePosters) {
+            kotlinx.coroutines.CoroutineScope(Dispatchers.Default).launch {
+                for (media in mediaList) {
+                    val itemId = "ani_${media.id}"
+                    val itemType = if (media.format == "MOVIE") "movie" else "series"
+                    if (FanartService.getCachedPoster(itemId, itemType) == null) {
+                        FanartService.resolvePoster(itemId, itemType)
+                        kotlinx.coroutines.delay(80L)
+                    }
+                }
+            }
+        }
+
         return result
     }
 }

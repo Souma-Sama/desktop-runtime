@@ -114,6 +114,7 @@ open class MainActivity : AppCompatActivity() {
         TmdbSettingsStorage.initialize(applicationContext)
         MdbListSettingsStorage.initialize(applicationContext)
         FanartSettingsStorage.initialize(applicationContext)
+        FanartCacheStorage.initialize(applicationContext)
         TraktAuthStorage.initialize(applicationContext)
         TraktCommentsStorage.initialize(applicationContext)
         TraktLibraryStorage.initialize(applicationContext)
