@@ -14,13 +14,13 @@ import androidx.compose.ui.unit.dp
 fun rememberFanartBrandPainter(): Painter {
     val vector = remember {
         ImageVector.Builder(
-            name = "FanartLogo",
+            name = "FanartTvLogo",
             defaultWidth = 24.dp,
             defaultHeight = 24.dp,
             viewportWidth = 24f,
             viewportHeight = 24f,
         ).apply {
-            // Rounded background in Fanart cyan/blue (#2DAAE1)
+            // Dark rounded background tile (#161A22)
             addPath(
                 pathData = PathBuilder().apply {
                     moveTo(5f, 2f)
@@ -34,27 +34,64 @@ fun rememberFanartBrandPainter(): Painter {
                     arcTo(3f, 3f, 0f, false, true, 5f, 2f)
                     close()
                 }.nodes,
-                fill = SolidColor(Color(0xFF2DAAE1)),
+                fill = SolidColor(Color(0xFF161A22)),
             )
-            // Stylized 'f' logo mark in pure white
+            // Fan blade 1: Top-Left Cyan (#00B4D8)
             addPath(
                 pathData = PathBuilder().apply {
-                    moveTo(14.5f, 6.5f)
-                    curveTo(13.2f, 6.5f, 12f, 7.5f, 12f, 9f)
-                    lineTo(12f, 10.5f)
-                    lineTo(9.5f, 10.5f)
-                    lineTo(9.5f, 13f)
-                    lineTo(12f, 13f)
-                    lineTo(12f, 18.5f)
-                    lineTo(15f, 18.5f)
-                    lineTo(15f, 13f)
-                    lineTo(17.5f, 13f)
-                    lineTo(17.5f, 10.5f)
-                    lineTo(15f, 10.5f)
-                    lineTo(15f, 9.2f)
-                    curveTo(15f, 8.6f, 15.4f, 8.3f, 16f, 8.3f)
-                    lineTo(17.5f, 8.3f)
+                    moveTo(12f, 12f)
+                    lineTo(6f, 6.5f)
+                    arcTo(7.5f, 7.5f, 0f, false, true, 12f, 4.5f)
+                    close()
+                }.nodes,
+                fill = SolidColor(Color(0xFF00B4D8)),
+            )
+            // Fan blade 2: Top-Right Coral Pink (#FF4D6D)
+            addPath(
+                pathData = PathBuilder().apply {
+                    moveTo(12f, 12f)
                     lineTo(17.5f, 6.5f)
+                    arcTo(7.5f, 7.5f, 0f, false, true, 19.5f, 12f)
+                    close()
+                }.nodes,
+                fill = SolidColor(Color(0xFFFF4D6D)),
+            )
+            // Fan blade 3: Bottom-Right Amber Orange (#FFB703)
+            addPath(
+                pathData = PathBuilder().apply {
+                    moveTo(12f, 12f)
+                    lineTo(17.5f, 17.5f)
+                    arcTo(7.5f, 7.5f, 0f, false, true, 12f, 19.5f)
+                    close()
+                }.nodes,
+                fill = SolidColor(Color(0xFFFFB703)),
+            )
+            // Fan blade 4: Bottom-Left Emerald Green (#06D6A0)
+            addPath(
+                pathData = PathBuilder().apply {
+                    moveTo(12f, 12f)
+                    lineTo(6.5f, 17.5f)
+                    arcTo(7.5f, 7.5f, 0f, false, true, 4.5f, 12f)
+                    close()
+                }.nodes,
+                fill = SolidColor(Color(0xFF06D6A0)),
+            )
+            // Center Aperture Ring in Dark Tile
+            addPath(
+                pathData = PathBuilder().apply {
+                    moveTo(12f, 9.5f)
+                    arcTo(2.5f, 2.5f, 0f, true, true, 12f, 14.5f)
+                    arcTo(2.5f, 2.5f, 0f, true, true, 12f, 9.5f)
+                    close()
+                }.nodes,
+                fill = SolidColor(Color(0xFF161A22)),
+            )
+            // Center Core in Crisp White
+            addPath(
+                pathData = PathBuilder().apply {
+                    moveTo(12f, 10.75f)
+                    arcTo(1.25f, 1.25f, 0f, true, true, 12f, 13.25f)
+                    arcTo(1.25f, 1.25f, 0f, true, true, 12f, 10.75f)
                     close()
                 }.nodes,
                 fill = SolidColor(Color.White),
