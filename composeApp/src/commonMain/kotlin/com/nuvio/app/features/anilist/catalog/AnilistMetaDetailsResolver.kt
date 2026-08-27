@@ -266,6 +266,7 @@ object AnilistMetaDetailsResolver {
         val imdbId: String?,
         val kitsuId: String?,
         val tmdbId: Int?,
+        val tvdbId: String?,
         val season: Int,
     )
 
@@ -277,11 +278,12 @@ object AnilistMetaDetailsResolver {
         return kotlinx.coroutines.withTimeoutOrNull(2500L) {
             runCatching {
                 val url = "https://arm.haglund.dev/api/v2/ids?source=anilist&id=$anilistId"
-                val text = httpGetText(url) ?: return@runCatching ArmMapping(null, null, null, 1)
-                val obj = json.parseToJsonElement(text).asJsonObjectOrNull() ?: return@runCatching ArmMapping(null, null, null, 1)
+                val text = httpGetText(url) ?: return@runCatching ArmMapping(null, null, null, null, 1)
+                val obj = json.parseToJsonElement(text).asJsonObjectOrNull() ?: return@runCatching ArmMapping(null, null, null, null, 1)
                 val imdb = obj["imdb"].asStringOrNull()
                 val kitsu = obj["kitsu"].asStringOrNull()
                 val tmdb = obj["themoviedb"].asIntOrNull()
+                val tvdb = obj["thetvdb"].asStringOrNull() ?: obj["thetvdb"].asIntOrNull()?.toString()
                 val season = obj["thetvdb-season"].asIntOrNull()
                     ?: obj["themoviedb-season"].asIntOrNull()
                     ?: 1
@@ -290,12 +292,13 @@ object AnilistMetaDetailsResolver {
                     imdbId = imdb,
                     kitsuId = kitsu,
                     tmdbId = tmdb,
+                    tvdbId = tvdb,
                     season = if (season >= 0) season else 1,
                 )
                 armMappingCache[anilistId] = mapping
                 mapping
-            }.getOrDefault(ArmMapping(null, null, null, 1))
-        } ?: ArmMapping(null, null, null, 1)
+            }.getOrDefault(ArmMapping(null, null, null, null, 1))
+        } ?: ArmMapping(null, null, null, null, 1)
     }
 
     suspend fun resolveArmImdbId(anilistId: Int): String? = resolveArmMapping(anilistId).imdbId

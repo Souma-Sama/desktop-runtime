@@ -456,10 +456,25 @@ object FanartService {
     }
 
     private suspend fun fetchTv(id: String, apiKey: String): FanartTvResponse? {
+        val direct = tryFetchTv(id, apiKey)
+        if (direct != null) return direct
+
+        // If id is an IMDb ID and Fanart returned 404 (because Fanart TV uses TVDB IDs), resolve TVDB ID via TMDB
+        if (id.startsWith("tt")) {
+            val tvdbId = com.nuvio.app.features.tmdb.TmdbService.imdbToTvdbId(id)
+            if (!tvdbId.isNullOrBlank() && tvdbId != id) {
+                val tvdbResult = tryFetchTv(tvdbId, apiKey)
+                if (tvdbResult != null) return tvdbResult
+            }
+        }
+        return null
+    }
+
+    private suspend fun tryFetchTv(id: String, apiKey: String): FanartTvResponse? {
         val url = "$BASE_URL/tv/$id?api_key=$apiKey"
         return try {
             val responseText = httpGetText(url)
-            if (responseText.isBlank() || responseText.contains("\"status\":\"error\"")) null
+            if (responseText.isBlank() || responseText.contains("\"status\":\"error\"") || responseText.contains("\"error message\"")) null
             else json.decodeFromString<FanartTvResponse>(responseText)
         } catch (e: Exception) {
             null
@@ -508,12 +523,6 @@ object FanartService {
         val cached = lookupIdCache[raw]
         if (cached != null) return cached
 
-        val imdbMatch = imdbRegex.find(raw)?.value
-        if (imdbMatch != null) {
-            lookupIdCache[raw] = imdbMatch
-            return imdbMatch
-        }
-
         val isMovie = isMovieType(type)
 
         // 1. AniList ID (ani_... or anilist:...)
@@ -521,22 +530,26 @@ object FanartService {
             val anilistId = com.nuvio.app.features.anilist.AnilistTrackerCoordinator.extractAnilistId(raw)
             if (anilistId != null) {
                 val arm = com.nuvio.app.features.anilist.catalog.AnilistMetaDetailsResolver.resolveArmMapping(anilistId)
-                if (!arm.imdbId.isNullOrBlank()) {
-                    lookupIdCache[raw] = arm.imdbId
-                    return arm.imdbId
-                }
-                if (arm.tmdbId != null && arm.tmdbId > 0) {
-                    if (isMovie) {
-                        val tmdbStr = arm.tmdbId.toString()
-                        lookupIdCache[raw] = tmdbStr
-                        return tmdbStr
+                if (isMovie) {
+                    val movieId = arm.imdbId ?: arm.tmdbId?.toString()
+                    if (!movieId.isNullOrBlank()) {
+                        lookupIdCache[raw] = movieId
+                        return movieId
                     }
-                    val converted = com.nuvio.app.features.tmdb.TmdbService.tmdbToImdb(arm.tmdbId, "tv")
-                    val result = converted ?: arm.tmdbId.toString()
-                    lookupIdCache[raw] = result
-                    return result
+                } else {
+                    val tvId = arm.tvdbId ?: arm.imdbId ?: arm.tmdbId?.toString()
+                    if (!tvId.isNullOrBlank()) {
+                        lookupIdCache[raw] = tvId
+                        return tvId
+                    }
                 }
             }
+        }
+
+        val imdbMatch = imdbRegex.find(raw)?.value
+        if (imdbMatch != null) {
+            lookupIdCache[raw] = imdbMatch
+            return imdbMatch
         }
 
         // 2. Kitsu ID (kitsu:...)

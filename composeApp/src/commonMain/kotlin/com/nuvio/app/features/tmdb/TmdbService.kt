@@ -45,6 +45,14 @@ object TmdbService {
         return imdbToTmdb(imdbId = normalized, mediaType = mediaType, apiKey = apiKey)
     }
 
+    suspend fun imdbToTvdbId(imdbId: String): String? {
+        val apiKey = currentApiKey() ?: return null
+        val tmdbIdStr = imdbToTmdb(imdbId, "tv", apiKey) ?: return null
+        val tmdbId = tmdbIdStr.toIntOrNull() ?: return null
+        val body = fetch<TmdbExternalIdsResponse>(endpoint = "tv/$tmdbId/external_ids", apiKey = apiKey) ?: return null
+        return body.tvdbId?.toString()
+    }
+
     suspend fun tmdbToImdb(tmdbId: Int, mediaType: String): String? {
         val apiKey = currentApiKey() ?: return null
 
@@ -157,4 +165,5 @@ private data class TmdbExternalResult(
 @Serializable
 private data class TmdbExternalIdsResponse(
     @SerialName("imdb_id") val imdbId: String? = null,
+    @SerialName("tvdb_id") val tvdbId: Int? = null,
 )
