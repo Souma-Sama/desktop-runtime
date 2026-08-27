@@ -480,6 +480,7 @@ object MetaDetailsRepository {
         val fanartEnriched = fanartDeferred.await()
 
         val isAnilist = meta.id.startsWith("ani_", ignoreCase = true) || meta.id.startsWith("anilist:", ignoreCase = true)
+        val anilistRecommendations = if (isAnilist) meta.moreLikeThis else emptyList()
 
         val mergedVideos = if (isAnilist) {
             tmdbEnriched.videos.mapIndexed { idx, enrichedVid ->
@@ -508,6 +509,8 @@ object MetaDetailsRepository {
             background = fanartEnriched.background ?: tmdbEnriched.background ?: meta.background,
             poster = fanartEnriched.poster ?: tmdbEnriched.poster ?: meta.poster,
             videos = mergedVideos,
+            moreLikeThis = if (isAnilist && anilistRecommendations.isNotEmpty()) anilistRecommendations else tmdbEnriched.moreLikeThis,
+            moreLikeThisSource = if (isAnilist && anilistRecommendations.isNotEmpty()) null else tmdbEnriched.moreLikeThisSource,
             // Preserve per-season description, release year and air dates from AniList
             description = if (isAnilist && !meta.description.isNullOrBlank()) meta.description else tmdbEnriched.description,
             releaseInfo = if (isAnilist && !meta.releaseInfo.isNullOrBlank()) meta.releaseInfo else (meta.releaseInfo ?: tmdbEnriched.releaseInfo),
@@ -525,12 +528,12 @@ object MetaDetailsRepository {
 
         val finalMeta = progressiveMeta.copy(
             externalRatings = mdbListRatings.ifEmpty { progressiveMeta.externalRatings },
-            moreLikeThis = if (isAnilist && progressiveMeta.moreLikeThis.isNotEmpty()) {
-                progressiveMeta.moreLikeThis
+            moreLikeThis = if (isAnilist && anilistRecommendations.isNotEmpty()) {
+                anilistRecommendations
             } else {
                 traktMeta.moreLikeThis.ifEmpty { progressiveMeta.moreLikeThis }
             },
-            moreLikeThisSource = if (isAnilist && progressiveMeta.moreLikeThis.isNotEmpty()) {
+            moreLikeThisSource = if (isAnilist && anilistRecommendations.isNotEmpty()) {
                 null
             } else {
                 traktMeta.moreLikeThisSource ?: progressiveMeta.moreLikeThisSource

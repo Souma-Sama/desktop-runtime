@@ -736,10 +736,13 @@ object TmdbMetadataService {
         }
 
         if (enrichment != null && settings.useMoreLikeThis) {
-            updated = updated.copy(
-                moreLikeThis = enrichment.moreLikeThis,
-                moreLikeThisSource = MoreLikeThisSource.TMDB.takeIf { enrichment.moreLikeThis.isNotEmpty() },
-            )
+            val isAnilist = meta.id.startsWith("ani_", ignoreCase = true) || meta.id.startsWith("anilist:", ignoreCase = true)
+            if (!isAnilist || meta.moreLikeThis.isEmpty()) {
+                updated = updated.copy(
+                    moreLikeThis = enrichment.moreLikeThis,
+                    moreLikeThisSource = MoreLikeThisSource.TMDB.takeIf { enrichment.moreLikeThis.isNotEmpty() },
+                )
+            }
         }
 
         if (enrichment != null && settings.useCollections) {
