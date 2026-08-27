@@ -10,9 +10,12 @@ import com.nuvio.app.features.catalog.CatalogPage
 import com.nuvio.app.features.home.HomeCatalogDefinition
 import com.nuvio.app.features.home.MetaPreview
 import com.nuvio.app.features.home.PosterShape
-
 import com.nuvio.app.features.fanart.FanartService
+import com.nuvio.app.features.fanart.FanartSettingsRepository
 import com.nuvio.app.features.library.LibraryClock
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 
 private data class CachedCatalogPage(
     val timestamp: Long,
