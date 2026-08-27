@@ -282,15 +282,18 @@ object AnilistCatalogRepository {
         pageCache[cacheKey] = CachedCatalogPage(timestamp = now, page = result)
 
         val fanartSettings = FanartSettingsRepository.snapshot()
-        if (fanartSettings.enabled && fanartSettings.hasApiKey && fanartSettings.usePosters) {
+        if (fanartSettings.enabled && fanartSettings.hasApiKey) {
             kotlinx.coroutines.CoroutineScope(Dispatchers.Default).launch {
                 for (media in mediaList) {
                     val itemId = "ani_${media.id}"
                     val itemType = if (media.format == "MOVIE") "movie" else "series"
                     if (FanartService.getCachedPoster(itemId, itemType) == null) {
                         FanartService.resolvePoster(itemId, itemType)
-                        kotlinx.coroutines.delay(80L)
                     }
+                    if (FanartService.getCachedBackdrop(itemId, itemType) == null || FanartService.getCachedLogo(itemId, itemType) == null) {
+                        FanartService.resolveLogo(itemId, itemType)
+                    }
+                    kotlinx.coroutines.delay(60L)
                 }
             }
         }

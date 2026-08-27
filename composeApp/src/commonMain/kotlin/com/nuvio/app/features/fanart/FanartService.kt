@@ -105,14 +105,25 @@ object FanartService {
             backdropCache["$type:$id"] = direct
             return direct
         }
-        val cleanId = lookupIdCache[id] ?: FanartCacheStorage.get("lookup:$id") ?: extractLookupId(id) ?: return null
-        val fromClean = backdropCache["$type:$cleanId"] ?: backdropCache["series:$cleanId"] ?: backdropCache["tv:$cleanId"] ?: backdropCache["anime:$cleanId"]
-            ?: FanartCacheStorage.get("backdrop:$type:$cleanId") ?: FanartCacheStorage.get("backdrop:series:$cleanId") ?: FanartCacheStorage.get("backdrop:tv:$cleanId") ?: FanartCacheStorage.get("backdrop:anime:$cleanId")
-        if (fromClean != null) {
-            backdropCache["$type:$id"] = fromClean
-            backdropCache["$type:$cleanId"] = fromClean
+        val cleanId = lookupIdCache[id] ?: FanartCacheStorage.get("lookup:$id") ?: extractLookupId(id)
+        if (cleanId != null) {
+            val fromClean = backdropCache["$type:$cleanId"] ?: backdropCache["series:$cleanId"] ?: backdropCache["tv:$cleanId"] ?: backdropCache["anime:$cleanId"]
+                ?: FanartCacheStorage.get("backdrop:$type:$cleanId") ?: FanartCacheStorage.get("backdrop:series:$cleanId") ?: FanartCacheStorage.get("backdrop:tv:$cleanId") ?: FanartCacheStorage.get("backdrop:anime:$cleanId")
+            if (fromClean != null) {
+                backdropCache["$type:$id"] = fromClean
+                backdropCache["$type:$cleanId"] = fromClean
+                return fromClean
+            }
         }
-        return fromClean
+        val imdbId = lookupIdCache["imdb:$id"] ?: FanartCacheStorage.get("lookup:imdb:$id")
+            ?: (if (cleanId != null) lookupIdCache["imdb:$cleanId"] ?: FanartCacheStorage.get("lookup:imdb:$cleanId") else null)
+            ?: (if (id.startsWith("tt")) id else null)
+        if (!imdbId.isNullOrBlank()) {
+            val metahub = "https://images.metahub.space/background/medium/$imdbId/img"
+            backdropCache["$type:$id"] = metahub
+            return metahub
+        }
+        return null
     }
 
     fun getCachedBanner(id: String, type: String = "tv"): String? {
@@ -247,8 +258,15 @@ object FanartService {
                     }
                 }
             }
-            val metahubFallback = if (cleanId.startsWith("tt")) "https://images.metahub.space/logo/medium/$cleanId/img" else null
-            val metahubBackdropFallback = if (cleanId.startsWith("tt")) "https://images.metahub.space/background/medium/$cleanId/img" else null
+            val effectiveImdbId = if (cleanId.startsWith("tt")) {
+                cleanId
+            } else {
+                lookupIdCache["imdb:$id"] ?: FanartCacheStorage.get("lookup:imdb:$id")
+                    ?: lookupIdCache["imdb:$cleanId"] ?: FanartCacheStorage.get("lookup:imdb:$cleanId")
+                    ?: (if (id.startsWith("tt")) id else null)
+            }
+            val metahubFallback = if (!effectiveImdbId.isNullOrBlank()) "https://images.metahub.space/logo/medium/$effectiveImdbId/img" else null
+            val metahubBackdropFallback = if (!effectiveImdbId.isNullOrBlank()) "https://images.metahub.space/background/medium/$effectiveImdbId/img" else null
             if (metahubBackdropFallback != null && getCachedBackdrop(id, type) == null) {
                 storeBackdrop(cacheKey, metahubBackdropFallback)
                 storeBackdrop("$type:$id", metahubBackdropFallback)
@@ -262,8 +280,15 @@ object FanartService {
             null
         } catch (e: Throwable) {
             log.w(e) { "Failed to resolve Fanart logo for $cacheKey" }
-            val metahubFallback = if (cleanId.startsWith("tt")) "https://images.metahub.space/logo/medium/$cleanId/img" else null
-            val metahubBackdropFallback = if (cleanId.startsWith("tt")) "https://images.metahub.space/background/medium/$cleanId/img" else null
+            val effectiveImdbId = if (cleanId.startsWith("tt")) {
+                cleanId
+            } else {
+                lookupIdCache["imdb:$id"] ?: FanartCacheStorage.get("lookup:imdb:$id")
+                    ?: lookupIdCache["imdb:$cleanId"] ?: FanartCacheStorage.get("lookup:imdb:$cleanId")
+                    ?: (if (id.startsWith("tt")) id else null)
+            }
+            val metahubFallback = if (!effectiveImdbId.isNullOrBlank()) "https://images.metahub.space/logo/medium/$effectiveImdbId/img" else null
+            val metahubBackdropFallback = if (!effectiveImdbId.isNullOrBlank()) "https://images.metahub.space/background/medium/$effectiveImdbId/img" else null
             if (metahubBackdropFallback != null && getCachedBackdrop(id, type) == null) {
                 storeBackdrop(cacheKey, metahubBackdropFallback)
                 storeBackdrop("$type:$id", metahubBackdropFallback)
@@ -630,6 +655,10 @@ object FanartService {
             val anilistId = com.nuvio.app.features.anilist.AnilistTrackerCoordinator.extractAnilistId(raw)
             if (anilistId != null) {
                 val arm = com.nuvio.app.features.anilist.catalog.AnilistMetaDetailsResolver.resolveArmMapping(anilistId)
+                if (!arm.imdbId.isNullOrBlank()) {
+                    storeLookupId("imdb:$raw", arm.imdbId)
+                    storeLookupId("imdb:$anilistId", arm.imdbId)
+                }
                 if (isMovie) {
                     val movieId = arm.imdbId ?: arm.tmdbId?.toString()
                     if (!movieId.isNullOrBlank()) {
