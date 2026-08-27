@@ -21,9 +21,16 @@ internal actual object FanartSettingsStorage {
     private const val useBetterPostersKey = "fanart_use_better_posters"
     private const val betterPostersTemplateKey = "fanart_better_posters_template"
 
+    private const val qualityKey = "fanart_quality"
+    private const val preferHdLogosKey = "fanart_prefer_hd_logos"
+    private const val preferHdClearArtKey = "fanart_prefer_hd_clearart"
+
     private val syncKeys = listOf(
         enabledKey,
         apiKey,
+        qualityKey,
+        preferHdLogosKey,
+        preferHdClearArtKey,
         useClearLogosKey,
         preferEnglishLogosKey,
         useHeroBackdropsKey,
@@ -38,6 +45,12 @@ internal actual object FanartSettingsStorage {
     actual fun saveEnabled(enabled: Boolean) = saveBoolean(enabledKey, enabled)
     actual fun loadApiKey(): String? = loadString(apiKey)
     actual fun saveApiKey(apiKey: String) = saveString(this.apiKey, apiKey)
+    actual fun loadQuality(): String? = loadString(qualityKey)
+    actual fun saveQuality(qualityId: String) = saveString(qualityKey, qualityId)
+    actual fun loadPreferHdLogos(): Boolean? = loadBoolean(preferHdLogosKey)
+    actual fun savePreferHdLogos(enabled: Boolean) = saveBoolean(preferHdLogosKey, enabled)
+    actual fun loadPreferHdClearArt(): Boolean? = loadBoolean(preferHdClearArtKey)
+    actual fun savePreferHdClearArt(enabled: Boolean) = saveBoolean(preferHdClearArtKey, enabled)
     actual fun loadUseClearLogos(): Boolean? = loadBoolean(useClearLogosKey)
     actual fun saveUseClearLogos(enabled: Boolean) = saveBoolean(useClearLogosKey, enabled)
     actual fun loadPreferEnglishLogos(): Boolean? = loadBoolean(preferEnglishLogosKey)
@@ -61,6 +74,9 @@ internal actual object FanartSettingsStorage {
     actual fun exportToSyncPayload(): JsonObject = buildJsonObject {
         loadEnabled()?.let { put(enabledKey, encodeSyncBoolean(it)) }
         loadApiKey()?.let { put(apiKey, encodeSyncString(it)) }
+        loadQuality()?.let { put(qualityKey, encodeSyncString(it)) }
+        loadPreferHdLogos()?.let { put(preferHdLogosKey, encodeSyncBoolean(it)) }
+        loadPreferHdClearArt()?.let { put(preferHdClearArtKey, encodeSyncBoolean(it)) }
         loadUseClearLogos()?.let { put(useClearLogosKey, encodeSyncBoolean(it)) }
         loadPreferEnglishLogos()?.let { put(preferEnglishLogosKey, encodeSyncBoolean(it)) }
         loadUseHeroBackdrops()?.let { put(useHeroBackdropsKey, encodeSyncBoolean(it)) }
@@ -74,6 +90,9 @@ internal actual object FanartSettingsStorage {
         store.removeAll(syncKeys.map(ProfileScopedKey::of))
         payload.decodeSyncBoolean(enabledKey)?.let(::saveEnabled)
         payload.decodeSyncString(apiKey)?.let(::saveApiKey)
+        payload.decodeSyncString(qualityKey)?.let(::saveQuality)
+        payload.decodeSyncBoolean(preferHdLogosKey)?.let(::savePreferHdLogos)
+        payload.decodeSyncBoolean(preferHdClearArtKey)?.let(::savePreferHdClearArt)
         payload.decodeSyncBoolean(useClearLogosKey)?.let(::saveUseClearLogos)
         payload.decodeSyncBoolean(preferEnglishLogosKey)?.let(::savePreferEnglishLogos)
         payload.decodeSyncBoolean(useHeroBackdropsKey)?.let(::saveUseHeroBackdrops)

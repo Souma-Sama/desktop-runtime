@@ -20,7 +20,12 @@ internal expect object FanartSettingsStorage {
     fun loadUseBetterPosters(): Boolean?
     fun saveUseBetterPosters(enabled: Boolean)
     fun loadBetterPostersTemplate(): String?
-    fun saveBetterPostersTemplate(template: String)
+    fun loadQuality(): String?
+    fun saveQuality(qualityId: String)
+    fun loadPreferHdLogos(): Boolean?
+    fun savePreferHdLogos(enabled: Boolean)
+    fun loadPreferHdClearArt(): Boolean?
+    fun savePreferHdClearArt(enabled: Boolean)
     fun exportToSyncPayload(): JsonObject
     fun replaceFromSyncPayload(payload: JsonObject)
 }

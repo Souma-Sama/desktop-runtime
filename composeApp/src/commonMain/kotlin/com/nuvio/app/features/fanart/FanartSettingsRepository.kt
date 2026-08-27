@@ -12,6 +12,9 @@ object FanartSettingsRepository {
 
     private var enabled = true
     private var apiKey = ""
+    private var quality = FanartArtworkQuality.MEDIUM
+    private var preferHdLogos = true
+    private var preferHdClearArt = true
     private var useClearLogos = true
     private var preferEnglishLogos = true
     private var useHeroBackdrops = true
@@ -57,6 +60,33 @@ object FanartSettingsRepository {
         }
         publish()
         FanartSettingsStorage.saveApiKey(normalized)
+        FanartService.clearCache()
+    }
+
+    fun setQuality(value: FanartArtworkQuality) {
+        ensureLoaded()
+        if (quality == value) return
+        quality = value
+        publish()
+        FanartSettingsStorage.saveQuality(value.id)
+        FanartService.clearCache()
+    }
+
+    fun setPreferHdLogos(value: Boolean) {
+        ensureLoaded()
+        if (preferHdLogos == value) return
+        preferHdLogos = value
+        publish()
+        FanartSettingsStorage.savePreferHdLogos(value)
+        FanartService.clearCache()
+    }
+
+    fun setPreferHdClearArt(value: Boolean) {
+        ensureLoaded()
+        if (preferHdClearArt == value) return
+        preferHdClearArt = value
+        publish()
+        FanartSettingsStorage.savePreferHdClearArt(value)
         FanartService.clearCache()
     }
 
@@ -124,6 +154,9 @@ object FanartSettingsRepository {
         hasLoaded = true
         apiKey = FanartSettingsStorage.loadApiKey().orEmpty().trim()
         enabled = (FanartSettingsStorage.loadEnabled() ?: true) && apiKey.isNotBlank()
+        quality = FanartArtworkQuality.fromId(FanartSettingsStorage.loadQuality())
+        preferHdLogos = FanartSettingsStorage.loadPreferHdLogos() ?: true
+        preferHdClearArt = FanartSettingsStorage.loadPreferHdClearArt() ?: true
         useClearLogos = FanartSettingsStorage.loadUseClearLogos() ?: true
         preferEnglishLogos = FanartSettingsStorage.loadPreferEnglishLogos() ?: true
         useHeroBackdrops = FanartSettingsStorage.loadUseHeroBackdrops() ?: true
@@ -138,6 +171,9 @@ object FanartSettingsRepository {
         _uiState.value = FanartSettings(
             enabled = enabled,
             apiKey = apiKey,
+            quality = quality,
+            preferHdLogos = preferHdLogos,
+            preferHdClearArt = preferHdClearArt,
             useClearLogos = useClearLogos,
             preferEnglishLogos = preferEnglishLogos,
             useHeroBackdrops = useHeroBackdrops,

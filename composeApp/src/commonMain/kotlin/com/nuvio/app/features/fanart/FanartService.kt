@@ -164,6 +164,14 @@ object FanartService {
         return fromClean
     }
 
+    fun applyQualityUrl(url: String, quality: FanartArtworkQuality): String {
+        if (quality == FanartArtworkQuality.HIGH) return url
+        if (url.contains("assets.fanart.tv/fanart/")) {
+            return url.replace("assets.fanart.tv/fanart/", "assets.fanart.tv/preview/")
+        }
+        return url
+    }
+
     suspend fun resolveLogo(id: String, type: String): String? = withContext(Dispatchers.Default) {
         val settings = FanartSettingsRepository.snapshot()
         val cleanId = resolveLookupId(id, type)
@@ -191,27 +199,35 @@ object FanartService {
             if (isMovie) {
                 val movie = fetchMovie(cleanId, settings.apiKey)
                 if (movie != null) {
+                    val logoCandidates = if (settings.preferHdLogos) {
+                        movie.hdMovieLogo.ifEmpty { movie.movieLogo }
+                    } else {
+                        movie.movieLogo.ifEmpty { movie.hdMovieLogo }
+                    }
                     val logo = selectBestImage(
-                        images = movie.hdMovieLogo.ifEmpty { movie.movieLogo },
+                        images = logoCandidates,
                         preferEnglish = settings.preferEnglishLogos,
                     )?.url
 
                     if (settings.useHeroBackdrops) {
                         selectBestImage(movie.movieBackground, settings.preferEnglishLogos)?.url?.let {
-                            storeBackdrop(cacheKey, it)
-                            storeBackdrop("$type:$id", it)
+                            val optimized = applyQualityUrl(it, settings.quality)
+                            storeBackdrop(cacheKey, optimized)
+                            storeBackdrop("$type:$id", optimized)
                         }
                     }
                     if (settings.useBanners) {
                         selectBestImage(movie.movieBanner, settings.preferEnglishLogos)?.url?.let {
-                            storeBanner(cacheKey, it)
-                            storeBanner("$type:$id", it)
+                            val optimized = applyQualityUrl(it, settings.quality)
+                            storeBanner(cacheKey, optimized)
+                            storeBanner("$type:$id", optimized)
                         }
                     }
                     if (settings.usePosters) {
                         selectBestImage(movie.moviePoster, settings.preferEnglishLogos)?.url?.let {
-                            storePoster(cacheKey, it)
-                            storePoster("$type:$id", it)
+                            val optimized = applyQualityUrl(it, settings.quality)
+                            storePoster(cacheKey, optimized)
+                            storePoster("$type:$id", optimized)
                         }
                     }
 
@@ -277,7 +293,7 @@ object FanartService {
                 if (isMovie) {
                     val movie = fetchMovie(cleanId, settings.apiKey)
                     if (movie != null) {
-                        val moviePoster = selectBestImage(movie.moviePoster, settings.preferEnglishLogos)?.url
+                        val moviePoster = selectBestImage(movie.moviePoster, settings.preferEnglishLogos)?.url?.let { applyQualityUrl(it, settings.quality) }
                         if (moviePoster != null) {
                             storePoster(cacheKey, moviePoster)
                             storePoster("$type:$id", moviePoster)
@@ -456,8 +472,13 @@ object FanartService {
     private fun populateTvCaches(cleanId: String, tv: FanartTvResponse, settings: FanartSettings, rawId: String? = null) {
         val cacheKey = "series:$cleanId"
 
+        val logoCandidates = if (settings.preferHdLogos) {
+            tv.hdTvLogo.ifEmpty { tv.clearLogo }
+        } else {
+            tv.clearLogo.ifEmpty { tv.hdTvLogo }
+        }
         val logo = selectBestImage(
-            images = tv.hdTvLogo.ifEmpty { tv.clearLogo },
+            images = logoCandidates,
             preferEnglish = settings.preferEnglishLogos,
         )?.url
         if (logo != null) {
@@ -471,21 +492,23 @@ object FanartService {
 
         if (settings.useHeroBackdrops) {
             selectBestImage(tv.showBackground, settings.preferEnglishLogos)?.url?.let {
-                storeBackdrop(cacheKey, it)
-                storeBackdrop("tv:$cleanId", it)
+                val optimized = applyQualityUrl(it, settings.quality)
+                storeBackdrop(cacheKey, optimized)
+                storeBackdrop("tv:$cleanId", optimized)
                 if (rawId != null) {
-                    storeBackdrop("series:$rawId", it)
-                    storeBackdrop("tv:$rawId", it)
+                    storeBackdrop("series:$rawId", optimized)
+                    storeBackdrop("tv:$rawId", optimized)
                 }
             }
         }
         if (settings.useBanners) {
             selectBestImage(tv.tvBanner, settings.preferEnglishLogos)?.url?.let {
-                storeBanner(cacheKey, it)
-                storeBanner("tv:$cleanId", it)
+                val optimized = applyQualityUrl(it, settings.quality)
+                storeBanner(cacheKey, optimized)
+                storeBanner("tv:$cleanId", optimized)
                 if (rawId != null) {
-                    storeBanner("series:$rawId", it)
-                    storeBanner("tv:$rawId", it)
+                    storeBanner("series:$rawId", optimized)
+                    storeBanner("tv:$rawId", optimized)
                 }
             }
         }
@@ -494,9 +517,10 @@ object FanartService {
         groupedBySeason.forEach { (seasonNum, images) ->
             val bestSeasonPoster = selectBestImage(images, settings.preferEnglishLogos)?.url
             if (bestSeasonPoster != null) {
-                storeSeasonPoster("$cleanId:$seasonNum", bestSeasonPoster)
+                val optimized = applyQualityUrl(bestSeasonPoster, settings.quality)
+                storeSeasonPoster("$cleanId:$seasonNum", optimized)
                 if (rawId != null) {
-                    storeSeasonPoster("$rawId:$seasonNum", bestSeasonPoster)
+                    storeSeasonPoster("$rawId:$seasonNum", optimized)
                 }
             }
         }
@@ -504,7 +528,7 @@ object FanartService {
         if (settings.usePosters) {
             val season1Poster = getCachedSeasonPoster(cleanId, 1) ?: (if (rawId != null) getCachedSeasonPoster(rawId, 1) else null)
             val tvPoster = selectBestImage(tv.tvPoster, settings.preferEnglishLogos)?.url
-            val bestPoster = season1Poster ?: tvPoster
+            val bestPoster = (season1Poster ?: tvPoster)?.let { applyQualityUrl(it, settings.quality) }
             if (bestPoster != null) {
                 storePoster(cacheKey, bestPoster)
                 storePoster("tv:$cleanId", bestPoster)
