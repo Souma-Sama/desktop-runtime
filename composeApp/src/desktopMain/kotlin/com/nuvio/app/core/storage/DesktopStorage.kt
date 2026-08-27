@@ -141,6 +141,12 @@ internal object DesktopStorage {
             persist()
         }
 
+        fun clear() = synchronized(lock) {
+            ensureLoaded()
+            properties.clear()
+            persist()
+        }
+
         fun clearInMemory() = synchronized(lock) {
             properties.clear()
             loaded = false
