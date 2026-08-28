@@ -44,13 +44,26 @@ object AnilistMetaDetailsResolver {
             ?: AnilistApi.fetchMediaById(anilistId, token = token)
             ?: return@withContext null
 
-        // 2. Resolve external IDs (IMDb ID & Kitsu ID) via ARM & Kitsu APIs
-        val armMapping = resolveArmMapping(anilistId)
-        val armImdbId = armMapping.imdbId
-        val targetSeason = armMapping.season
-        val kitsuId = resolveKitsuId(anilistId, media.title?.displayTitle.orEmpty())
+        // 2. Fast cache check for ARM mapping (0ms)
+        val cachedArm = armMappingCache[anilistId] ?: runCatching {
+            val diskCached = com.nuvio.app.features.fanart.FanartCacheStorage.get("arm:$anilistId")
+            if (!diskCached.isNullOrBlank()) {
+                val parts = diskCached.split("|")
+                if (parts.size >= 5) {
+                    ArmMapping(
+                        imdbId = parts[0].takeIf(String::isNotBlank),
+                        kitsuId = parts[1].takeIf(String::isNotBlank),
+                        tmdbId = parts[2].toIntOrNull(),
+                        tvdbId = parts[3].takeIf(String::isNotBlank),
+                        season = parts[4].toIntOrNull() ?: 1,
+                    ).also { armMappingCache[anilistId] = it }
+                } else null
+            } else null
+        }.getOrNull()
 
-        // 3. 1080p Backdrops & Clear PNG Logos from Metahub
+        val armImdbId = cachedArm?.imdbId
+        val targetSeason = cachedArm?.season ?: 1
+
         val backdrop = if (!armImdbId.isNullOrBlank()) {
             "https://images.metahub.space/background/medium/$armImdbId/img"
         } else {
@@ -67,36 +80,9 @@ object AnilistMetaDetailsResolver {
 
         val isMovie = media.format == "MOVIE"
         val contentType = if (isMovie) "movie" else "series"
-
-        // 4 & 5. Fetch Episode Data and Cinemeta in parallel
-        val (episodeMap: Map<Int, KitsuEpisodeData>, cinemetaMeta: MetaDetails?) = coroutineScope {
-            val kitsuDeferred = async {
-                if (!kitsuId.isNullOrBlank()) {
-                    withTimeoutOrNull(1500L) {
-                        fetchKitsuEpisodes(kitsuId)
-                    } ?: emptyMap()
-                } else emptyMap()
-            }
-
-            val cinemetaDeferred = async {
-                if (!armImdbId.isNullOrBlank()) {
-                    val cinemetaUrl = "https://v3-cinemeta.strem.io/meta/$contentType/$armImdbId.json"
-                    val cinemetaResponse = withTimeoutOrNull(1500L) {
-                        runCatching { httpGetText(cinemetaUrl) }.getOrNull()
-                    }
-                    if (!cinemetaResponse.isNullOrBlank()) {
-                        runCatching { com.nuvio.app.features.details.MetaDetailsParser.parse(cinemetaResponse) }.getOrNull()
-                    } else null
-                } else null
-            }
-
-            Pair(kitsuDeferred.await(), cinemetaDeferred.await())
-        }
-
-        val totalEpisodes = media.episodes ?: episodeMap.size.takeIf { it > 0 } ?: 12
+        val totalEpisodes = media.episodes ?: media.streamingEpisodes.size.takeIf { it > 0 } ?: 12
 
         val cleanDescription = com.nuvio.app.core.format.cleanHtmlDescription(media.description)
-            ?: com.nuvio.app.core.format.cleanHtmlDescription(cinemetaMeta?.description)
 
         val castPersons = media.characters.mapNotNull { char ->
             val va = char.voiceActor
@@ -160,44 +146,33 @@ object AnilistMetaDetailsResolver {
         val directors = media.staff.filter { it.role?.contains("Director", ignoreCase = true) == true }.mapNotNull { it.name }
         val writers = media.staff.filter { it.role?.contains("Original Creator", ignoreCase = true) == true || it.role?.contains("Series Composition", ignoreCase = true) == true }.mapNotNull { it.name }
 
-        // 6. Map Episodes: Prefer Kitsu metadata (Titles, Overviews, Thumbnails) over plain numbers
+        // 3. Map Episodes directly from AniList streaming episodes with zero delay
         val mappedVideos = if (isMovie) {
             emptyList()
         } else {
             (1..totalEpisodes).map { epNumber ->
-                val actualEpNumber = epNumber
-                val epData = episodeMap[actualEpNumber]
-                val cinemetaEp = cinemetaMeta?.videos?.firstOrNull { it.season == targetSeason && it.episode == actualEpNumber }
-                    ?: cinemetaMeta?.videos?.firstOrNull { it.season == targetSeason && it.episode == null && cinemetaMeta.videos.indexOf(it) == actualEpNumber - 1 }
                 val streamingEp = media.streamingEpisodes.getOrNull(epNumber - 1)
-
-                val epTitle = cinemetaEp?.title?.takeIf { it.isNotBlank() }
-                    ?: epData?.title
-                    ?: streamingEp?.title?.takeIf { it.isNotBlank() }
-                    ?: "Episode $actualEpNumber"
-
-                val epOverview = cinemetaEp?.overview?.takeIf { it.isNotBlank() }
-                    ?: epData?.overview
-
-                val epThumbnail = cinemetaEp?.thumbnail?.takeIf { it.isNotBlank() }
-                    ?: if (!armImdbId.isNullOrBlank()) "https://episodes.metahub.space/$armImdbId/$targetSeason/$actualEpNumber/w780.jpg"
-                    else epData?.thumbnail ?: streamingEp?.thumbnail
-
-                val videoId = when {
-                    !kitsuId.isNullOrBlank() -> "kitsu:$kitsuId:$actualEpNumber"
-                    !armImdbId.isNullOrBlank() -> "$armImdbId:$targetSeason:$actualEpNumber"
-                    else -> "anilist:$anilistId:$actualEpNumber"
+                val epTitle = streamingEp?.title?.takeIf { it.isNotBlank() } ?: "Episode $epNumber"
+                val epThumbnail = if (!armImdbId.isNullOrBlank()) {
+                    "https://episodes.metahub.space/$armImdbId/$targetSeason/$epNumber/w780.jpg"
+                } else {
+                    streamingEp?.thumbnail
+                }
+                val videoId = if (!armImdbId.isNullOrBlank()) {
+                    "$armImdbId:$targetSeason:$epNumber"
+                } else {
+                    "anilist:$anilistId:$epNumber"
                 }
 
                 MetaVideo(
                     id = videoId,
                     title = epTitle,
                     season = targetSeason,
-                    episode = actualEpNumber,
-                    overview = epOverview,
+                    episode = epNumber,
+                    overview = null,
                     thumbnail = epThumbnail,
-                    released = cinemetaEp?.released,
-                    streams = cinemetaEp?.streams.orEmpty(),
+                    released = null,
+                    streams = emptyList(),
                 )
             }
         }
@@ -207,38 +182,12 @@ object AnilistMetaDetailsResolver {
             "${(score * 10).toInt() / 10.0}"
         } else null
 
-        if (cinemetaMeta != null) {
-            return@withContext cinemetaMeta.copy(
-                id = "ani_$anilistId",
-                type = if (isMovie) "movie" else "series",
-                name = media.title?.displayTitle ?: cinemetaMeta.name,
-                poster = media.coverImage?.extraLarge ?: cinemetaMeta.poster,
-                background = backdrop ?: cinemetaMeta.background,
-                logo = logo ?: cinemetaMeta.logo,
-                description = cleanDescription,
-                releaseInfo = media.startDateYear?.toString() ?: cinemetaMeta.releaseInfo,
-                status = media.status ?: cinemetaMeta.status,
-                lastAirDate = media.endDateYear?.toString() ?: media.startDateYear?.toString() ?: cinemetaMeta.releaseInfo,
-                imdbRating = formattedScore ?: cinemetaMeta.imdbRating,
-                genres = media.genres.ifEmpty { cinemetaMeta.genres },
-                cast = castPersons.ifEmpty { cinemetaMeta.cast },
-                productionCompanies = animationStudios.ifEmpty { cinemetaMeta.productionCompanies },
-                networks = networks.ifEmpty { cinemetaMeta.networks },
-                moreLikeThis = recommendations.ifEmpty { cinemetaMeta.moreLikeThis },
-                trailers = trailers.ifEmpty { cinemetaMeta.trailers },
-                director = directors.ifEmpty { cinemetaMeta.director },
-                writer = writers.ifEmpty { cinemetaMeta.writer },
-                videos = mappedVideos,
-                defaultVideoId = if (isMovie) {
-                    when {
-                        !kitsuId.isNullOrBlank() -> "kitsu:$kitsuId"
-                        else -> cinemetaMeta.defaultVideoId ?: armImdbId
-                    }
-                } else null,
-            )
+        val releaseYear = when {
+            media.startDateYear != null -> "${media.startDateYear}"
+            media.episodes != null -> "${media.episodes} Episodes"
+            else -> null
         }
 
-        // Fallback when Cinemeta / IMDb ID is unavailable: build from AniList + Kitsu
         MetaDetails(
             id = "ani_$anilistId",
             type = if (isMovie) "movie" else "series",
@@ -247,8 +196,9 @@ object AnilistMetaDetailsResolver {
             background = backdrop,
             logo = logo,
             description = cleanDescription,
-            releaseInfo = if (media.episodes != null) "${media.episodes} Episodes" else null,
+            releaseInfo = releaseYear,
             status = media.status,
+            lastAirDate = media.endDateYear?.toString() ?: releaseYear,
             imdbRating = formattedScore,
             genres = media.genres,
             country = "JP",
@@ -261,14 +211,8 @@ object AnilistMetaDetailsResolver {
             trailers = trailers,
             director = directors,
             writer = writers,
-            defaultVideoId = if (isMovie) {
-                when {
-                    !kitsuId.isNullOrBlank() -> "kitsu:$kitsuId"
-                    !armImdbId.isNullOrBlank() -> armImdbId
-                    else -> "anilist:$anilistId"
-                }
-            } else null,
             videos = mappedVideos,
+            defaultVideoId = if (isMovie) (armImdbId ?: "anilist:$anilistId") else mappedVideos.firstOrNull()?.id,
         )
     }
 
