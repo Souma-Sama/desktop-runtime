@@ -870,7 +870,7 @@ object AnilistApi {
         token: String? = null,
     ): AnilistMedia? {
         val cached = mediaCache[mediaId]
-        if (cached != null && (!token.isNullOrBlank() == (cached.mediaListEntry != null) || token.isNullOrBlank())) {
+        if (cached != null && cached.characters.isNotEmpty() && cached.recommendations.isNotEmpty() && (!token.isNullOrBlank() == (cached.mediaListEntry != null) || token.isNullOrBlank())) {
             return cached
         }
         val hasAuth = !token.isNullOrBlank()

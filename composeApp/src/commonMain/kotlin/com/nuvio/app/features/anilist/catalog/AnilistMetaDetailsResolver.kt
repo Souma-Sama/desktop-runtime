@@ -37,12 +37,13 @@ object AnilistMetaDetailsResolver {
         val anilistId = AnilistTrackerCoordinator.extractAnilistId(rawId) ?: return@withContext null
         val token = AnilistAuthRepository.token.value
 
-        log.d { "resolveMetaDetails: rawId=$rawId, anilistId=$anilistId" }
-
         // 1. Fetch base AniList media details
-        val media: AnilistMedia = AnilistApi.getCachedMedia(anilistId)
-            ?: AnilistApi.fetchMediaById(anilistId, token = token)
-            ?: return@withContext null
+        val cached = AnilistApi.getCachedMedia(anilistId)
+        val media: AnilistMedia = if (cached != null && cached.characters.isNotEmpty() && cached.recommendations.isNotEmpty()) {
+            cached
+        } else {
+            AnilistApi.fetchMediaById(anilistId, token = token)
+        } ?: return@withContext null
 
         // 2. Fast cache check for ARM mapping (0ms)
         val cachedArm = armMappingCache[anilistId] ?: runCatching {
