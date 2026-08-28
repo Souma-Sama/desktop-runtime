@@ -606,16 +606,21 @@ object MetaDetailsRepository {
         // 3. MDBList job: External ratings (IMDb, TMDb, Trakt, RT, AniList) - Streams in independently!
         val mdbListJob = launch {
             if (isAnilist) {
-                // For anime, fetch genuine MAL score from Jikan/MAL API if not already present
+                // For anime, fetch genuine MAL score and certification from MAL/Jikan if not already present
                 val anilistId = meta.id.removePrefix("ani_").toIntOrNull()
                 val idMal = anilistId?.let { com.nuvio.app.features.anilist.AnilistApi.fetchMediaById(it)?.idMal }
-                val realMalScore = idMal?.let { com.nuvio.app.features.anilist.AnilistApi.fetchMalScore(it) }
+                val malMeta = idMal?.let { com.nuvio.app.features.anilist.AnilistApi.fetchMalMetadata(it) }
+                val realMalScore = malMeta?.score
+                val ageRating = malMeta?.ageRating
 
                 if (realMalScore != null && realMalScore > 0) {
                     emitUpdate { current ->
                         val existingWithoutMal = current.externalRatings.filterNot { it.source == "mal" }
                         val updated = existingWithoutMal + MetaExternalRating(source = "mal", value = realMalScore)
-                        current.copy(externalRatings = updated)
+                        current.copy(
+                            externalRatings = updated,
+                            ageRating = current.ageRating ?: ageRating,
+                        )
                     }
                 }
             } else {

@@ -147,25 +147,31 @@ object AnilistMetaDetailsResolver {
         val directors = media.staff.filter { it.role?.contains("Director", ignoreCase = true) == true }.mapNotNull { it.name }
         val writers = media.staff.filter { it.role?.contains("Original Creator", ignoreCase = true) == true || it.role?.contains("Series Composition", ignoreCase = true) == true }.mapNotNull { it.name }
 
+        val kitsuEpisodes = if (!cachedArm?.kitsuId.isNullOrBlank()) {
+            fetchKitsuEpisodes(cachedArm!!.kitsuId!!)
+        } else emptyMap()
+
         val episodeOffset = resolveEpisodeOffset(
             media = media,
             targetSeason = targetSeason,
             cinemetaVideos = emptyList(),
         )
 
-        // 3. Map Episodes directly from AniList streaming episodes with accurate Season/Part/Cour offset
+        // 3. Map Episodes directly from AniList & Kitsu with accurate Season/Part/Cour offset
         val mappedVideos = if (isMovie) {
             emptyList()
         } else if (targetSeason == 0) {
             val totalEps = media.episodes ?: media.streamingEpisodes.size.takeIf { it > 0 } ?: 1
             (1..totalEps).map { epNum ->
                 val streamingEp = media.streamingEpisodes.getOrNull(epNum - 1)
-                val epTitle = streamingEp?.title?.takeIf { it.isNotBlank() } ?: media.title?.displayTitle ?: "Special $epNum"
-                val epThumbnail = if (!armImdbId.isNullOrBlank()) {
-                    "https://episodes.metahub.space/$armImdbId/0/$epNum/w780.jpg"
-                } else {
-                    streamingEp?.thumbnail
-                }
+                val kitsuEp = kitsuEpisodes[epNum]
+                val epTitle = streamingEp?.title?.takeIf { it.isNotBlank() }
+                    ?: kitsuEp?.title?.takeIf { it.isNotBlank() }
+                    ?: media.title?.displayTitle
+                    ?: "Special $epNum"
+                val epThumbnail = streamingEp?.thumbnail
+                    ?: kitsuEp?.thumbnail
+                    ?: if (!armImdbId.isNullOrBlank()) "https://episodes.metahub.space/$armImdbId/0/$epNum/w780.jpg" else null
                 val videoId = if (!armImdbId.isNullOrBlank()) {
                     "$armImdbId:0:$epNum"
                 } else {
@@ -176,7 +182,7 @@ object AnilistMetaDetailsResolver {
                     title = epTitle,
                     season = 0,
                     episode = epNum,
-                    overview = null,
+                    overview = kitsuEp?.overview,
                     thumbnail = epThumbnail,
                     released = null,
                     streams = emptyList(),
@@ -186,12 +192,13 @@ object AnilistMetaDetailsResolver {
             (1..totalEpisodes).map { epIdx ->
                 val actualEpNumber = epIdx + episodeOffset
                 val streamingEp = media.streamingEpisodes.getOrNull(epIdx - 1)
-                val epTitle = streamingEp?.title?.takeIf { it.isNotBlank() } ?: "Episode $actualEpNumber"
-                val epThumbnail = if (!armImdbId.isNullOrBlank()) {
-                    "https://episodes.metahub.space/$armImdbId/$targetSeason/$actualEpNumber/w780.jpg"
-                } else {
-                    streamingEp?.thumbnail
-                }
+                val kitsuEp = kitsuEpisodes[actualEpNumber] ?: kitsuEpisodes[epIdx]
+                val epTitle = streamingEp?.title?.takeIf { it.isNotBlank() }
+                    ?: kitsuEp?.title?.takeIf { it.isNotBlank() }
+                    ?: "Episode $actualEpNumber"
+                val epThumbnail = streamingEp?.thumbnail
+                    ?: kitsuEp?.thumbnail
+                    ?: if (!armImdbId.isNullOrBlank()) "https://episodes.metahub.space/$armImdbId/$targetSeason/$actualEpNumber/w780.jpg" else null
                 val videoId = if (!armImdbId.isNullOrBlank()) {
                     "$armImdbId:$targetSeason:$actualEpNumber"
                 } else {
@@ -203,7 +210,7 @@ object AnilistMetaDetailsResolver {
                     title = epTitle,
                     season = targetSeason,
                     episode = actualEpNumber,
-                    overview = null,
+                    overview = kitsuEp?.overview,
                     thumbnail = epThumbnail,
                     released = null,
                     streams = emptyList(),
@@ -226,11 +233,13 @@ object AnilistMetaDetailsResolver {
             )
         }
 
-        val malScore = media.idMal?.let {
+        val malMeta = media.idMal?.let {
             runCatching {
-                com.nuvio.app.features.anilist.AnilistApi.fetchMalScore(it)
+                com.nuvio.app.features.anilist.AnilistApi.fetchMalMetadata(it)
             }.getOrNull()
-        } ?: if (media.averageScore != null && media.averageScore > 0) {
+        }
+
+        val malScore = malMeta?.score ?: if (media.averageScore != null && media.averageScore > 0) {
             val approx = (media.averageScore / 10.0)
             kotlin.math.round(approx * 10.0) / 10.0
         } else null
@@ -250,6 +259,9 @@ object AnilistMetaDetailsResolver {
             else -> null
         }
 
+        val ageRating = malMeta?.ageRating ?: if (media.isAdult == true) "18+" else "TV-14"
+        val runtime = if (media.duration != null && media.duration > 0) "${media.duration} min" else null
+
         MetaDetails(
             id = "ani_$anilistId",
             type = if (isMovie) "movie" else "series",
@@ -262,6 +274,8 @@ object AnilistMetaDetailsResolver {
             status = media.status,
             lastAirDate = media.endDateYear?.toString() ?: releaseYear,
             imdbRating = formattedScore,
+            ageRating = ageRating,
+            runtime = runtime,
             externalRatings = ratings,
             genres = media.genres,
             country = "JP",

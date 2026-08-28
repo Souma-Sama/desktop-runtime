@@ -1251,34 +1251,69 @@ object AnilistApi {
         return parseMedia(mediaObj)
     }
 
-    private val malScoreCache = mutableMapOf<Int, Double>()
-    private val malRatingRegex = Regex("itemprop=[\"']ratingValue[\"'][^>]*>([0-9.]+)|class=[\"']score-label[^\"']*[\"']>([0-9.]+)")
+    data class MalMetadata(
+        val score: Double?,
+        val ageRating: String?,
+    )
 
-    suspend fun fetchMalScore(idMal: Int): Double? = withContext(Dispatchers.Default) {
+    private val malMetadataCache = mutableMapOf<Int, MalMetadata>()
+    private val malScoreRegex = Regex("itemprop=[\"']ratingValue[\"'][^>]*>([0-9.]+)|class=[\"']score-label[^\"']*[\"']>([0-9.]+)")
+    private val malAgeRatingRegex = Regex("Rating:</span>\\s*([^<\\n\\r]+)")
+
+    private fun normalizeAnimeAgeRating(raw: String): String {
+        val clean = raw.trim()
+        return when {
+            clean.startsWith("PG-13", ignoreCase = true) -> "TV-14"
+            clean.startsWith("R - 17+", ignoreCase = true) || clean.startsWith("R-17+", ignoreCase = true) -> "TV-MA"
+            clean.startsWith("R+", ignoreCase = true) -> "TV-MA"
+            clean.startsWith("Rx", ignoreCase = true) || clean.startsWith("18+", ignoreCase = true) -> "18+"
+            clean.startsWith("PG", ignoreCase = true) -> "PG"
+            clean.startsWith("G", ignoreCase = true) -> "G"
+            else -> clean.substringBefore("-").trim().ifEmpty { clean }
+        }
+    }
+
+    suspend fun fetchMalMetadata(idMal: Int): MalMetadata? = withContext(Dispatchers.Default) {
         if (idMal <= 0) return@withContext null
-        malScoreCache[idMal]?.let { return@withContext it }
+        malMetadataCache[idMal]?.let { return@withContext it }
 
-        val directScore = runCatching {
+        val directMeta = runCatching {
             val url = "https://myanimelist.net/anime/$idMal"
             val text = com.nuvio.app.features.addons.httpGetText(url) ?: return@runCatching null
-            val match = malRatingRegex.find(text)
-            val scoreStr = match?.groupValues?.getOrNull(1)?.takeIf { it.isNotBlank() }
-                ?: match?.groupValues?.getOrNull(2)?.takeIf { it.isNotBlank() }
-            scoreStr?.toDoubleOrNull()
+            val scoreMatch = malScoreRegex.find(text)
+            val scoreStr = scoreMatch?.groupValues?.getOrNull(1)?.takeIf { it.isNotBlank() }
+                ?: scoreMatch?.groupValues?.getOrNull(2)?.takeIf { it.isNotBlank() }
+            val score = scoreStr?.toDoubleOrNull()
+
+            val ratingMatch = malAgeRatingRegex.find(text)
+            val rawRating = ratingMatch?.groupValues?.getOrNull(1)?.trim()
+            val ageRating = rawRating?.let { normalizeAnimeAgeRating(it) }
+
+            MalMetadata(score = score, ageRating = ageRating)
         }.getOrNull()
 
-        val score = directScore ?: runCatching {
-            val url = "https://api.jikan.moe/v4/anime/$idMal"
-            val text = com.nuvio.app.features.addons.httpGetText(url) ?: return@runCatching null
-            val root = json.parseToJsonElement(text).asJsonObjectOrNull() ?: return@runCatching null
-            root["data"]?.asJsonObjectOrNull()?.get("score")?.asDoubleOrNull()
-        }.getOrNull()
-
-        if (score != null && score > 0) {
-            malScoreCache[idMal] = score
+        val finalMeta = if (directMeta != null && directMeta.score != null) {
+            directMeta
+        } else {
+            runCatching {
+                val url = "https://api.jikan.moe/v4/anime/$idMal"
+                val text = com.nuvio.app.features.addons.httpGetText(url) ?: return@runCatching null
+                val root = json.parseToJsonElement(text).asJsonObjectOrNull() ?: return@runCatching null
+                val dataObj = root["data"]?.asJsonObjectOrNull()
+                val score = dataObj?.get("score")?.asDoubleOrNull() ?: directMeta?.score
+                val rawRating = dataObj?.get("rating")?.asStringOrNull()
+                val ageRating = rawRating?.let { normalizeAnimeAgeRating(it) } ?: directMeta?.ageRating
+                MalMetadata(score = score, ageRating = ageRating)
+            }.getOrNull() ?: directMeta
         }
-        score
+
+        if (finalMeta != null) {
+            malMetadataCache[idMal] = finalMeta
+        }
+        finalMeta
     }
+
+    suspend fun fetchMalScore(idMal: Int): Double? = fetchMalMetadata(idMal)?.score
 
     private val mediaCache = mutableMapOf<Int, AnilistMedia>()
 
