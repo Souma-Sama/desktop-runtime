@@ -337,6 +337,9 @@ let state = {
   subtitleColorSwatches: [],
   subtitleOutlineColorSwatches: [],
   closeModalsToken: 0,
+  submitIntroContentKey: "",
+  notificationMessage: "",
+  notificationToken: 0,
 };
 let isScrubbing = false;
 let scrubPositionMs = 0;
@@ -363,6 +366,7 @@ let suppressNextPointerToggleClick = false;
 let pendingCustomSubtitleStyling = null;
 let pendingCustomSubtitleStylingTimer = 0;
 let submitIntroDraft = {
+  contentKey: "",
   segmentType: "intro",
   startTime: "00:00",
   endTime: "00:00",
@@ -906,12 +910,16 @@ const openPlayerModal = modal => {
   }
   activeModal = modal;
   if (modal === "submitIntro") {
-    submitIntroDraft = {
-      segmentType: state.submitIntroSegmentType || "intro",
-      startTime: state.submitIntroStartTime || "00:00",
-      endTime: state.submitIntroEndTime || "00:00",
-      status: "",
-    };
+    const contentKey = state.submitIntroContentKey || "";
+    if (submitIntroDraft.contentKey !== contentKey) {
+      submitIntroDraft = {
+        contentKey: contentKey,
+        segmentType: state.submitIntroSegmentType || "intro",
+        startTime: state.submitIntroStartTime || "00:00",
+        endTime: state.submitIntroEndTime || "00:00",
+        status: "",
+      };
+    }
   }
   if (modal === "subtitles") {
     resetSubtitleSelectionState();
@@ -2646,6 +2654,14 @@ captureEndButton.addEventListener("click", event => {
   renderSubmitIntroModal();
 });
 
+submitIntroStartInput.addEventListener("input", () => {
+  submitIntroDraft.startTime = submitIntroStartInput.value;
+});
+
+submitIntroEndInput.addEventListener("input", () => {
+  submitIntroDraft.endTime = submitIntroEndInput.value;
+});
+
 submitIntroCloseButton.addEventListener("click", event => {
   event.stopPropagation();
   closePlayerModal();
@@ -2804,6 +2820,8 @@ window.playerUpdate = update => {
 
 window.playerControls = nextState => {
   const previousCloseToken = Number(state.closeModalsToken) || 0;
+  const previousSubmitIntroSuccessToken = Number(state.submitIntroSuccessToken) || 0;
+  const previousNotificationToken = Number(state.notificationToken) || 0;
   const previousResizeLabel = state.resizeModeLabel || "";
   const previousSpeedLabel = state.playbackSpeedLabel || "";
   const previousVolumeLevel = typeof state.volumeLevel === "number" ? state.volumeLevel : NaN;
@@ -2819,8 +2837,19 @@ window.playerControls = nextState => {
   }
   hasReceivedPlayerControls = true;
   const closeToken = Number(state.closeModalsToken) || 0;
+  const submitIntroSuccessToken = Number(state.submitIntroSuccessToken) || 0;
   if (closeToken !== previousCloseToken) {
     closePlayerModal();
+  }
+  if (submitIntroSuccessToken !== previousSubmitIntroSuccessToken) {
+    submitIntroDraft.segmentType = "intro";
+    submitIntroDraft.startTime = "00:00";
+    submitIntroDraft.endTime = "00:00";
+    submitIntroDraft.status = "";
+  }
+  const notificationToken = Number(state.notificationToken) || 0;
+  if (notificationToken !== previousNotificationToken) {
+    showPlayerToast(state.notificationMessage);
   }
   if (state.showP2pConsent && activeModal !== "p2pConsent") {
     openPlayerModal("p2pConsent");
@@ -2855,9 +2884,47 @@ window.playerControls = nextState => {
   }
 };
 
+
+const isControlsSurfaceEvent = event => {
+  if (activeModal) return true;
+  if (event.target.closest("button, input, textarea, select, a, .action-pill, .volume-control, .modal-layer, .skip-prompt, .next-episode-card")) {
+    return true;
+  }
+
+  const seekEl = document.getElementById("seek");
+  if (seekEl && event.clientY >= seekEl.getBoundingClientRect().top - 6) {
+    return true;
+  }
+
+  const titleEl = document.getElementById("title");
+  const metaRow = document.querySelector(".meta-row");
+  if (titleEl && metaRow) {
+    const titleRect = titleEl.getBoundingClientRect();
+    const metaRect = metaRow.getBoundingClientRect();
+    const textTop = Math.min(titleRect.top, metaRect.top);
+    const textBottom = Math.max(titleRect.bottom, metaRect.bottom);
+    const textRight = titleRect.left + Math.max(titleEl.scrollWidth, metaRow.scrollWidth) + 16;
+
+    if (
+        event.clientX >= titleRect.left &&
+        event.clientX <= textRight &&
+        event.clientY >= textTop &&
+        event.clientY <= textBottom
+    ) {
+      return true;
+    }
+  }
+
+  const header = document.querySelector(".header");
+  if (header && event.clientY <= header.getBoundingClientRect().bottom + 10) {
+    return true;
+  }
+
+  return false;
+};
+
 root.addEventListener("click", event => {
-  if (playbackErrorText()) return;
-  if (event.target.closest("button,input")) return;
+  if (playbackErrorText() || isControlsSurfaceEvent(event)) return;
   window.clearTimeout(tapTimer);
   tapTimer = window.setTimeout(() => {
     requestPlaybackState("setPlaybackStateQuiet", false);
@@ -2865,8 +2932,7 @@ root.addEventListener("click", event => {
 });
 
 root.addEventListener("dblclick", event => {
-  if (playbackErrorText()) return;
-  if (event.target.closest("button,input")) return;
+  if (playbackErrorText() || isControlsSurfaceEvent(event)) return;
   event.preventDefault();
   window.clearTimeout(tapTimer);
   togglePlayerFullscreen();

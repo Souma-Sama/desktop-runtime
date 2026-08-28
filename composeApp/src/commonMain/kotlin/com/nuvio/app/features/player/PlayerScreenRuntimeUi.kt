@@ -220,7 +220,9 @@ internal fun PlayerScreenRuntime.RenderPlayerRuntimeUi() {
             }
         }
     }.orEmpty()
-    val nativeSkipInterval = activeSkipInterval.takeIf { initialLoadCompleted && !pausedOverlayVisible }
+    val nativeSkipInterval = activeSkipInterval.takeIf {
+        initialLoadCompleted && !pausedOverlayVisible && !skipIntervalDismissed
+    }
     val nextEpisodeForControls = nextEpisodeInfo.takeIf { 
         isSeries && (showNextEpisodeCard || nextEpisodeAutoPlaySearching || nextEpisodeAutoPlayCountdown != null) 
     }
@@ -250,7 +252,7 @@ internal fun PlayerScreenRuntime.RenderPlayerRuntimeUi() {
             activeProviderName
         },
         pauseOverlayEpisodeTitle = activeEpisodeTitle.orEmpty(),
-        pauseOverlayDescription = (pauseDescription ?: activeStreamSubtitle).orEmpty(),
+        pauseOverlayDescription = (activePauseDescription ?: activeStreamSubtitle).orEmpty(),
         resizeModeLabel = stringResource(resizeMode.labelRes),
         playbackSpeedLabel = formatPlaybackSpeedLabel(playbackSnapshot.playbackSpeed),
         subtitlesLabel = stringResource(Res.string.compose_player_subs),
@@ -370,6 +372,7 @@ internal fun PlayerScreenRuntime.RenderPlayerRuntimeUi() {
         episodeStreamItems = episodeStreamItems,
         blurUnwatchedEpisodes = metaScreenSettingsUiState.blurUnwatchedEpisodes,
         submitIntroSegmentType = submitIntroSegmentType,
+        submitIntroContentKey = activeSubmitIntroContentKey(),
         submitIntroStartTime = submitIntroStartTimeStr,
         submitIntroEndTime = submitIntroEndTimeStr,
         isSubmitIntroSubmitting = isSubmitIntroSubmitting,
@@ -393,6 +396,9 @@ internal fun PlayerScreenRuntime.RenderPlayerRuntimeUi() {
         subtitleAutoSyncIsLoading = subtitleAutoSyncState.isLoading,
         subtitleAutoSyncErrorMessage = subtitleAutoSyncState.errorMessage.orEmpty(),
         closeModalsToken = playerControlsCloseModalsToken,
+        submitIntroSuccessToken = playerControlsSubmitIntroSuccessToken,
+        notificationMessage = playerNotificationMessage,
+        notificationToken = playerNotificationToken,
         showOpeningOverlay = openingOverlayWanted,
         openingArtwork = background ?: poster,
         openingLogo = logo,
@@ -1140,10 +1146,16 @@ private fun PlayerScreenRuntime.submitIntroFromPlayerControls() {
             submitIntroSegmentType = "intro"
             submitIntroStatusMessage = null
             playerControlsCloseModalsToken += 1
+            playerControlsSubmitIntroSuccessToken += 1
         } else {
             submitIntroStatusMessage = "Unable to submit timestamps."
         }
     }
+}
+
+private fun PlayerScreenRuntime.activeSubmitIntroContentKey(): String {
+    val imdbId = activeSubmitIntroImdbId()?.takeIf { it.isNotBlank() } ?: return ""
+    return "$imdbId:$activeSeasonNumber:$activeEpisodeNumber"
 }
 
 private fun PlayerScreenRuntime.activeSubmitIntroImdbId(): String? =
@@ -1676,6 +1688,8 @@ private fun PlayerScreenRuntime.RenderPlayerModals(displayedPositionMs: Long) {
         subtitleAutoSyncState = subtitleAutoSyncState,
         onBuiltInSubtitleTrackSelected = { index ->
             val wasCustom = useCustomSubtitles
+            isUserExplicitSubtitleSelection = true
+            preferredSubtitleSelectionApplied = true
             selectedSubtitleIndex = index
             selectedAddonSubtitleId = null
             useCustomSubtitles = false
@@ -1687,9 +1701,11 @@ private fun PlayerScreenRuntime.RenderPlayerModals(displayedPositionMs: Long) {
             }
         },
         onAddonSubtitleSelected = { addon ->
+            isUserExplicitSubtitleSelection = true
             selectedAddonSubtitleId = addon.id
             selectedSubtitleIndex = -1
             useCustomSubtitles = true
+            preferredSubtitleSelectionApplied = true
             persistAddonSubtitlePreference(addon)
             playerController?.setSubtitleUri(addon.url)
         },

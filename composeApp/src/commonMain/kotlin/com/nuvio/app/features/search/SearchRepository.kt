@@ -41,6 +41,15 @@ internal fun <T> canReuseRequestState(
     cachedRequestKey: T?,
 ): Boolean = !forceRefresh && requestKey == cachedRequestKey
 
+internal fun resolveDiscoverCatalog(
+    sources: List<DiscoverCatalogOption>,
+    preferredCatalogKey: String?,
+    currentCatalogKey: String?,
+): DiscoverCatalogOption? =
+    sources.firstOrNull { it.key == preferredCatalogKey }
+        ?: sources.firstOrNull { it.key == currentCatalogKey }
+        ?: sources.firstOrNull()
+
 private data class DiscoverRequestKey(
     val sources: List<DiscoverCatalogOption>,
     val hideUnreleasedContent: Boolean,
@@ -109,7 +118,7 @@ object SearchRepository {
                     runCatching { request.toSection(forceRefresh = forceRefresh) }
                         .fold(
                             onSuccess = { section ->
-                                resultChannel.send(
+                                resultChannel.trySend(
                                     IndexedSearchResult(
                                         index = index,
                                         section = section,
@@ -118,7 +127,7 @@ object SearchRepository {
                             },
                             onFailure = { error ->
                                 if (error is CancellationException) throw error
-                                resultChannel.send(
+                                resultChannel.trySend(
                                     IndexedSearchResult(
                                         index = index,
                                         error = error,
@@ -226,12 +235,19 @@ object SearchRepository {
             return
         }
 
+        val preferredCatalogKey = DiscoverSelectionStorage.loadCatalogKey()
+            ?.trim()
+            ?.takeIf { it.isNotEmpty() }
+        val selectedCatalog = requireNotNull(
+            resolveDiscoverCatalog(
+                sources = sources,
+                preferredCatalogKey = preferredCatalogKey,
+                currentCatalogKey = current.selectedCatalogKey,
+            ),
+        )
         val typeOptions = sources.map { it.type }.distinct()
-        val selectedType = current.selectedType
-            ?.takeIf { type -> typeOptions.contains(type) }
-            ?: typeOptions.first()
+        val selectedType = selectedCatalog.type
         val catalogOptions = sources.filter { it.type == selectedType }
-        val selectedCatalog = catalogOptions.firstOrNull { it.key == current.selectedCatalogKey } ?: catalogOptions.first()
         val selectedGenre = selectedCatalog.resolveGenreSelection(current.selectedGenre)
 
         _discoverUiState.value = DiscoverUiState(
@@ -289,6 +305,7 @@ object SearchRepository {
             emptyStateReason = null,
             errorMessage = null,
         )
+        DiscoverSelectionStorage.saveCatalogKey(selectedCatalog.key)
         loadDiscoverFeed(
             reset = true,
             forceRefresh = false,
@@ -309,6 +326,7 @@ object SearchRepository {
             emptyStateReason = null,
             errorMessage = null,
         )
+        DiscoverSelectionStorage.saveCatalogKey(selectedCatalog.key)
         loadDiscoverFeed(
             reset = true,
             forceRefresh = false,

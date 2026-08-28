@@ -133,7 +133,7 @@ internal class PlayerScreenRuntime(
 
     var gestureController: PlayerGestureController? = null
 
-    var controlsVisible by mutableStateOf(true)
+    var controlsVisible by mutableStateOf(false)
     var controlsActivityTick by mutableStateOf(0)
     var playerControlsLocked by mutableStateOf(false)
     var activeSourceUrl by mutableStateOf(sourceUrl)
@@ -211,6 +211,9 @@ internal class PlayerScreenRuntime(
     var submitIntroStatusMessage by mutableStateOf<String?>(null)
     var playerControlsPendingP2pSwitch by mutableStateOf<PendingPlayerP2pSwitch?>(null)
     var playerControlsCloseModalsToken by mutableStateOf(0L)
+    var playerControlsSubmitIntroSuccessToken by mutableStateOf(0L)
+    var playerNotificationMessage by mutableStateOf("")
+    var playerNotificationToken by mutableStateOf(0L)
     var episodeStreamsPanelState by mutableStateOf(EpisodeStreamsPanelState())
     var playerMetaVideos by mutableStateOf<List<MetaVideo>>(emptyList())
     var skipIntervals by mutableStateOf<List<SkipInterval>>(emptyList())
@@ -243,6 +246,8 @@ internal class PlayerScreenRuntime(
     var preferredAudioSelectionApplied by mutableStateOf(false)
     var preferredSubtitleSelectionApplied by mutableStateOf(false)
     var activeSubtitleTab by mutableStateOf(SubtitleTab.BuiltIn)
+    var isUserExplicitSubtitleSelection by mutableStateOf(false)
+    var hasScannedTextTracksOnce by mutableStateOf(false)
     var autoFetchedAddonSubtitlesForKey by mutableStateOf<String?>(null)
     var trackPreferenceRestoreApplied by mutableStateOf(false)
     var subtitleDelayMs by mutableStateOf(0)

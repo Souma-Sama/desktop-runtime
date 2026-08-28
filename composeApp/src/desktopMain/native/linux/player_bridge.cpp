@@ -449,7 +449,16 @@ void onPlayerMessage(WebKitUserContentManager *, WebKitJavascriptResult *js, gpo
     // it is up. cursorActivity also arrives while hidden (mouse woke the UI) and
     // must re-activate compositing so the fade-in is actually shown.
     if (type) {
-        if (strncmp(type, "keyboard", 8) == 0) {
+        if (strcmp(type, "setPlaybackState") == 0 ||
+            strcmp(type, "setPlaybackStateQuiet") == 0) {
+            bool shouldPlay = value >= 0.5;
+            if (shouldPlay && (player->ended.load() || mpvGetFlag(player->mpv, "eof-reached"))) {
+                const char *cmd[] = {"seek", "0", "absolute", nullptr};
+                mpv_command(player->mpv, cmd);
+                player->ended.store(false);
+            }
+            mpvSetFlag(player->mpv, "pause", !shouldPlay);
+        } else if (strncmp(type, "keyboard", 8) == 0) {
             // Keyboard shortcuts (page keydown, real X focus): the page renders
             // its feedback toast without revealing the chrome, so neither latch
             // overlayActive (nothing would ever unlatch it — hideChrome only
@@ -1064,6 +1073,37 @@ gboolean createWebviewOnGtk(gpointer data) {
                                     gpointer) -> gboolean { return TRUE; }),
                      nullptr);
 
+    // Mouse thumb buttons never reach the controls page on Linux. X11 delivers
+    // them as buttons 8 and 9, but the DOM numbers them 3 and 4, and WebKitGTK
+    // does not translate between the two -- so the page's back/forward seek
+    // handler (which is shared with Windows, where WebView2 does translate)
+    // never fires here. Nothing reports it: the buttons are simply dead.
+    // Emit the same events the page would have sent, so both platforms end up
+    // in the same Kotlin handler.
+    g_signal_connect(wv, "button-press-event",
+                     G_CALLBACK(+[](GtkWidget *, GdkEventButton *ev,
+                                    gpointer data) -> gboolean {
+                         auto *p = static_cast<Player *>(data);
+                         if (!playerAlive(p)) return FALSE;
+                         const char *action = ev->button == 8   ? "seekBack"
+                                              : ev->button == 9 ? "seekForward"
+                                                                : nullptr;
+                         if (!action) return FALSE;
+                         // Consume it either way: letting a half-handled thumb
+                         // button fall through to WebKit gains nothing.
+                         if (!p->eventSink || !p->eventMethod) return TRUE;
+                         JNIEnv *env = attachGtkThread();
+                         if (env) {
+                             jstring jtype = env->NewStringUTF(action);
+                             env->CallVoidMethod(p->eventSink, p->eventMethod,
+                                                 jtype, (jdouble)0.0);
+                             env->DeleteLocalRef(jtype);
+                         }
+                         NUVIO_LOG("thumb button %u -> %s", ev->button, action);
+                         return TRUE;
+                     }),
+                     player);
+
     if (!adopted) gtk_container_add(GTK_CONTAINER(win), GTK_WIDGET(wv));
 
     // Make sure the overlay actually asks the X server for pointer/keyboard
@@ -1287,7 +1327,19 @@ gboolean destroyWebviewOnGtk(gpointer data) {
             }
         }
         player->savedFocusXid = 0;
+        // WebKit's dispose resets the tooltip (WebPageProxy::close ->
+        // resetState -> setToolTip("")), and GTK answers that with a
+        // pointer-position query — gtk_tooltip_trigger_tooltip_query ->
+        // gdk_device_get_window_at_position -> XIQueryPointer — which walks the
+        // very X tree this destroy is dismantling. The reply comes back
+        // BadWindow, and GDK escalates an untrapped X error to a fatal g_log,
+        // i.e. G_BREAKPOINT: the process dies on int3 with no Java stack. Seen
+        // at every episode boundary, where the next-episode swap disposes the
+        // player. Trap the destroy the same way the focus handover above does.
+        GdkDisplay *destroyDisplay = gtk_widget_get_display(player->gtkWindow);
+        gdk_x11_display_error_trap_push(destroyDisplay);
         gtk_widget_destroy(player->gtkWindow);
+        gdk_x11_display_error_trap_pop_ignored(destroyDisplay);
         player->gtkWindow = nullptr;
         player->webview = nullptr;
         player->overlayXid = 0;
@@ -1919,7 +1971,15 @@ JNIEXPORT void JNICALL NP(shutdownWebView2Warmup)(JNIEnv *, jobject) {
     g_main_context_invoke(nullptr,
                           +[](gpointer) -> gboolean {
                               if (gWarmupWindow) {
+                                  // Same fatal-X-error exposure as the overlay
+                                  // teardown (see destroyWebviewOnGtk): the
+                                  // webview's dispose queries the pointer
+                                  // position while this window is dying.
+                                  GdkDisplay *d =
+                                      gtk_widget_get_display(gWarmupWindow);
+                                  gdk_x11_display_error_trap_push(d);
                                   gtk_widget_destroy(gWarmupWindow);
+                                  gdk_x11_display_error_trap_pop_ignored(d);
                                   // The view/ucm die with their window — null
                                   // them too or the adoption gate could later
                                   // read dangling pointers.
