@@ -68,7 +68,7 @@ object AnilistMetaDetailsResolver {
         val backdrop = if (!armImdbId.isNullOrBlank()) {
             "https://images.metahub.space/background/medium/$armImdbId/img"
         } else {
-            media.bannerImage ?: media.coverImage?.extraLarge
+            media.bannerImage
         }
 
         val logo = if (!armImdbId.isNullOrBlank()) {

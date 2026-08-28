@@ -114,7 +114,7 @@ fun DetailHero(
                 contentAlignment = Alignment.BottomCenter,
             ) {
                 val imageUrl = meta.background ?: meta.poster
-                val backdropScale = if (isTablet) 1f else 1.08f
+                val backdropScale = 1f
                 if (imageUrl != null) {
                     AsyncImage(
                         model = imageUrl,

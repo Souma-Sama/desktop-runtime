@@ -583,7 +583,7 @@ object MetaDetailsRepository {
                             name = if (isAnilist) current.name else tmdbEnriched.name,
                             genres = if (current.genres.isNotEmpty()) current.genres else tmdbEnriched.genres,
                             logo = current.logo ?: tmdbEnriched.logo ?: meta.logo,
-                            background = current.background ?: tmdbEnriched.background ?: meta.background,
+                            background = tmdbEnriched.background ?: current.background ?: meta.background,
                             poster = current.poster ?: tmdbEnriched.poster ?: meta.poster,
                             videos = mergedVideos,
                             cast = if (isAnilist && anilistCast.isNotEmpty()) anilistCast else tmdbEnriched.cast,
