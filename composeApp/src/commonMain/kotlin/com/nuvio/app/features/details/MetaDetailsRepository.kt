@@ -546,11 +546,19 @@ object MetaDetailsRepository {
                             }
                         }
 
+                        val anilistRecommendations = if (isAnilist) (if (meta.moreLikeThis.isNotEmpty()) meta.moreLikeThis else current.moreLikeThis) else emptyList()
+                        val anilistCast = if (isAnilist) (if (meta.cast.isNotEmpty()) meta.cast else current.cast) else emptyList()
+                        val anilistCompanies = if (isAnilist) (if (meta.productionCompanies.isNotEmpty()) meta.productionCompanies else current.productionCompanies) else emptyList()
+                        val anilistNetworks = if (isAnilist) (if (meta.networks.isNotEmpty()) meta.networks else current.networks) else emptyList()
+
                         tmdbEnriched.copy(
                             logo = current.logo ?: tmdbEnriched.logo ?: meta.logo,
                             background = current.background ?: tmdbEnriched.background ?: meta.background,
                             poster = current.poster ?: tmdbEnriched.poster ?: meta.poster,
                             videos = mergedVideos,
+                            cast = if (isAnilist && anilistCast.isNotEmpty()) anilistCast else tmdbEnriched.cast,
+                            productionCompanies = if (isAnilist && anilistCompanies.isNotEmpty()) anilistCompanies else tmdbEnriched.productionCompanies,
+                            networks = if (isAnilist && anilistNetworks.isNotEmpty()) anilistNetworks else tmdbEnriched.networks,
                             moreLikeThis = if (isAnilist && anilistRecommendations.isNotEmpty()) anilistRecommendations else tmdbEnriched.moreLikeThis,
                             moreLikeThisSource = if (isAnilist && anilistRecommendations.isNotEmpty()) null else tmdbEnriched.moreLikeThisSource,
                             description = if (isAnilist && !meta.description.isNullOrBlank()) meta.description else tmdbEnriched.description,
