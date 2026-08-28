@@ -60,7 +60,6 @@ import nuvio.composeapp.generated.resources.rating_rotten_tomatoes
 import nuvio.composeapp.generated.resources.rating_tmdb
 import nuvio.composeapp.generated.resources.rating_trakt
 
-const val PROVIDER_ANILIST = "anilist"
 import org.jetbrains.compose.resources.DrawableResource
 import org.jetbrains.compose.resources.getString
 import org.jetbrains.compose.resources.painterResource
@@ -68,6 +67,8 @@ import org.jetbrains.compose.resources.stringResource
 import kotlinx.coroutines.runBlocking
 import kotlin.math.absoluteValue
 import kotlin.math.roundToInt
+
+const val PROVIDER_ANILIST = "anilist"
 
 @Composable
 fun DetailMetaInfo(
