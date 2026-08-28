@@ -146,29 +146,62 @@ object AnilistMetaDetailsResolver {
         val directors = media.staff.filter { it.role?.contains("Director", ignoreCase = true) == true }.mapNotNull { it.name }
         val writers = media.staff.filter { it.role?.contains("Original Creator", ignoreCase = true) == true || it.role?.contains("Series Composition", ignoreCase = true) == true }.mapNotNull { it.name }
 
-        // 3. Map Episodes directly from AniList streaming episodes with zero delay
+        val episodeOffset = resolveEpisodeOffset(
+            media = media,
+            targetSeason = targetSeason,
+            cinemetaVideos = emptyList(),
+        )
+
+        // 3. Map Episodes directly from AniList streaming episodes with accurate Season/Part/Cour offset
         val mappedVideos = if (isMovie) {
             emptyList()
-        } else {
-            (1..totalEpisodes).map { epNumber ->
-                val streamingEp = media.streamingEpisodes.getOrNull(epNumber - 1)
-                val epTitle = streamingEp?.title?.takeIf { it.isNotBlank() } ?: "Episode $epNumber"
+        } else if (targetSeason == 0) {
+            val totalEps = media.episodes ?: media.streamingEpisodes.size.takeIf { it > 0 } ?: 1
+            (1..totalEps).map { epNum ->
+                val streamingEp = media.streamingEpisodes.getOrNull(epNum - 1)
+                val epTitle = streamingEp?.title?.takeIf { it.isNotBlank() } ?: media.title?.displayTitle ?: "Special $epNum"
                 val epThumbnail = if (!armImdbId.isNullOrBlank()) {
-                    "https://episodes.metahub.space/$armImdbId/$targetSeason/$epNumber/w780.jpg"
+                    "https://episodes.metahub.space/$armImdbId/0/$epNum/w780.jpg"
                 } else {
                     streamingEp?.thumbnail
                 }
                 val videoId = if (!armImdbId.isNullOrBlank()) {
-                    "$armImdbId:$targetSeason:$epNumber"
+                    "$armImdbId:0:$epNum"
                 } else {
-                    "anilist:$anilistId:$epNumber"
+                    "anilist:$anilistId:$epNum"
+                }
+                MetaVideo(
+                    id = videoId,
+                    title = epTitle,
+                    season = 0,
+                    episode = epNum,
+                    overview = null,
+                    thumbnail = epThumbnail,
+                    released = null,
+                    streams = emptyList(),
+                )
+            }
+        } else {
+            (1..totalEpisodes).map { epIdx ->
+                val actualEpNumber = epIdx + episodeOffset
+                val streamingEp = media.streamingEpisodes.getOrNull(epIdx - 1)
+                val epTitle = streamingEp?.title?.takeIf { it.isNotBlank() } ?: "Episode $actualEpNumber"
+                val epThumbnail = if (!armImdbId.isNullOrBlank()) {
+                    "https://episodes.metahub.space/$armImdbId/$targetSeason/$actualEpNumber/w780.jpg"
+                } else {
+                    streamingEp?.thumbnail
+                }
+                val videoId = if (!armImdbId.isNullOrBlank()) {
+                    "$armImdbId:$targetSeason:$actualEpNumber"
+                } else {
+                    "anilist:$anilistId:$epIdx"
                 }
 
                 MetaVideo(
                     id = videoId,
                     title = epTitle,
                     season = targetSeason,
-                    episode = epNumber,
+                    episode = actualEpNumber,
                     overview = null,
                     thumbnail = epThumbnail,
                     released = null,
