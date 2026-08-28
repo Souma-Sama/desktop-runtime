@@ -539,7 +539,7 @@ object AnilistApi {
 
         val graphQLQuery = """
             query SearchAnime(${'$'}search: String) {
-              Page(page: 1, perPage: 10) {
+              Page(page: 1, perPage: 25) {
                 media(search: ${'$'}search, type: ANIME, sort: [SEARCH_MATCH, POPULARITY_DESC]) {
                   id
                   idMal

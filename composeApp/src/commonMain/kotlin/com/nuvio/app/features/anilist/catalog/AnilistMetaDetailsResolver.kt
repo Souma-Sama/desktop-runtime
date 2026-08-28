@@ -230,7 +230,11 @@ object AnilistMetaDetailsResolver {
             runCatching {
                 com.nuvio.app.features.anilist.AnilistApi.fetchMalScore(it)
             }.getOrNull()
-        }
+        } ?: if (media.averageScore != null && media.averageScore > 0) {
+            val approx = (media.averageScore / 10.0)
+            kotlin.math.round(approx * 10.0) / 10.0
+        } else null
+
         if (malScore != null && malScore > 0) {
             ratings.add(
                 com.nuvio.app.features.details.MetaExternalRating(

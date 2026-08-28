@@ -452,9 +452,6 @@ object SearchRepository {
                     genres = media.genres,
                 )
             }
-            require(previews.isNotEmpty()) {
-                "No anime results found for \"$query\""
-            }
             return HomeCatalogSection(
                 key = "anilist:search:anime:${query.lowercase()}",
                 title = "AniList Anime",
