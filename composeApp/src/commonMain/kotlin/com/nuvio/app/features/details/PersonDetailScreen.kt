@@ -104,14 +104,19 @@ fun PersonDetailScreen(
     }.collectAsStateWithLifecycle()
     val resolvedAvatarTransitionKey = avatarTransitionKey ?: castAvatarSharedTransitionKey(personId)
 
-    LaunchedEffect(personId) {
+    LaunchedEffect(personId, personName) {
         uiState = PersonDetailUiState.Loading
         val detail = TmdbMetadataService.fetchPersonDetail(
             personId = personId,
             preferCrewCredits = preferCrew,
+            fallbackName = personName,
         )
         uiState = if (detail != null) {
-            PersonDetailUiState.Success(detail)
+            PersonDetailUiState.Success(
+                if (detail.profilePhoto.isNullOrBlank() && !initialProfilePhoto.isNullOrBlank()) {
+                    detail.copy(profilePhoto = initialProfilePhoto)
+                } else detail
+            )
         } else {
             PersonDetailUiState.Error(getString(Res.string.person_load_failed, personName))
         }

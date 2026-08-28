@@ -40,12 +40,42 @@ object TmdbMetadataService {
     suspend fun fetchPersonDetail(
         personId: Int,
         preferCrewCredits: Boolean? = null,
+        fallbackName: String? = null,
     ): PersonDetail? = withContext(Dispatchers.Default) {
         val settings = TmdbSettingsRepository.snapshot()
-        if (!settings.enabled || !settings.hasApiKey) return@withContext null
         val language = normalizeTmdbLanguage(settings.language)
-        val cacheKey = "$personId:${preferCrewCredits?.toString() ?: "auto"}:$language"
+        val cacheKey = "$personId:${fallbackName.orEmpty()}:${preferCrewCredits?.toString() ?: "auto"}:$language"
         personCache[cacheKey]?.let { return@withContext it }
+
+        val anilistFallback = if (!fallbackName.isNullOrBlank()) {
+            val staffMedia = runCatching {
+                com.nuvio.app.features.anilist.AnilistApi.fetchStaffMedia(fallbackName)
+            }.getOrNull().orEmpty()
+            if (staffMedia.isNotEmpty()) {
+                val anilistMovies = staffMedia.filter { it.type == "movie" }
+                val anilistTv = staffMedia.filter { it.type == "series" }
+                PersonDetail(
+                    tmdbId = personId,
+                    name = fallbackName,
+                    biography = null,
+                    birthday = null,
+                    deathday = null,
+                    placeOfBirth = "Japan",
+                    profilePhoto = null,
+                    knownFor = "Voice Acting",
+                    movieCredits = anilistMovies,
+                    tvCredits = anilistTv,
+                )
+            } else null
+        } else null
+
+        if (!settings.enabled || !settings.hasApiKey || personId <= 0) {
+            if (anilistFallback != null) {
+                personCache[cacheKey] = anilistFallback
+                return@withContext anilistFallback
+            }
+            return@withContext null
+        }
 
         try {
             val (person, credits) = coroutineScope {
@@ -387,11 +417,44 @@ object TmdbMetadataService {
         fallbackName: String? = null,
     ): TmdbEntityBrowseData? = withContext(Dispatchers.Default) {
         val settings = TmdbSettingsRepository.snapshot()
-        if (!settings.enabled || !settings.hasApiKey) return@withContext null
         val language = normalizeTmdbLanguage(settings.language)
         val normalizedSourceType = normalizeEntitySourceType(sourceType)
-        val cacheKey = "${entityKind.routeValue}:$entityId:$normalizedSourceType:$language"
+        val cacheKey = "${entityKind.routeValue}:$entityId:${fallbackName.orEmpty()}:$normalizedSourceType:$language"
         entityBrowseCache[cacheKey]?.let { return@withContext it }
+
+        val studioName = fallbackName.orEmpty()
+        val anilistStudioMedia = if (studioName.isNotBlank()) {
+            runCatching {
+                com.nuvio.app.features.anilist.AnilistApi.fetchStudioMedia(studioName)
+            }.getOrNull().orEmpty()
+        } else emptyList()
+
+        if (!settings.enabled || !settings.hasApiKey || entityId <= 0) {
+            if (anilistStudioMedia.isNotEmpty()) {
+                val anilistRail = TmdbEntityRail(
+                    mediaType = TmdbEntityMediaType.TV,
+                    railType = TmdbEntityRailType.POPULAR,
+                    items = anilistStudioMedia,
+                    currentPage = 1,
+                    hasMore = false,
+                )
+                val browseData = TmdbEntityBrowseData(
+                    header = TmdbEntityHeader(
+                        id = entityId,
+                        kind = entityKind,
+                        name = studioName,
+                        logo = null,
+                        originCountry = "JP",
+                        secondaryLabel = null,
+                        description = null,
+                    ),
+                    rails = listOf(anilistRail),
+                )
+                entityBrowseCache[cacheKey] = browseData
+                return@withContext browseData
+            }
+            return@withContext null
+        }
 
         val (header, rails) = coroutineScope {
             val headerDeferred = async {
