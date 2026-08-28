@@ -620,9 +620,26 @@ object AnilistApi {
         val cleanSearch = searchName?.trim()?.takeIf { it.isNotBlank() }
         if (staffId == null && cleanSearch == null) return null
 
-        val graphQLQuery = """
-            query (${'$'}id: Int, ${'$'}search: String) {
-              Staff(id: ${'$'}id, search: ${'$'}search) {
+        // 1. Try querying Staff first (by ID if available, or by search name)
+        var staffResult = queryStaffEntity(staffId = staffId, searchName = cleanSearch)
+
+        // If ID lookup returned null or search wasn't tried yet, try search by name
+        if (staffResult == null && cleanSearch != null && staffId != null) {
+            staffResult = queryStaffEntity(staffId = null, searchName = cleanSearch)
+        }
+
+        // 2. If Staff was not found, fallback to querying Character (by ID or search name)
+        return staffResult ?: queryCharacterEntity(charId = staffId, searchName = cleanSearch)
+    }
+
+    private suspend fun queryStaffEntity(
+        staffId: Int? = null,
+        searchName: String? = null,
+    ): com.nuvio.app.features.details.PersonDetail? {
+        val query = if (staffId != null && staffId > 0) {
+            """
+            query (${'$'}id: Int) {
+              Staff(id: ${'$'}id) {
                 id
                 name {
                   full
@@ -658,7 +675,12 @@ object AnilistApi {
                   }
                 }
               }
-              Character(id: ${'$'}id, search: ${'$'}search) {
+            }
+            """.trimIndent()
+        } else if (!searchName.isNullOrBlank()) {
+            """
+            query (${'$'}search: String) {
+              Staff(search: ${'$'}search) {
                 id
                 name {
                   full
@@ -673,7 +695,8 @@ object AnilistApi {
                   month
                   day
                 }
-                media(page: 1, perPage: 35, sort: POPULARITY_DESC) {
+                homeTown
+                characterMedia(page: 1, perPage: 35, sort: POPULARITY_DESC) {
                   nodes {
                     id
                     title {
@@ -694,28 +717,24 @@ object AnilistApi {
                 }
               }
             }
-        """.trimIndent()
+            """.trimIndent()
+        } else return null
 
         val variables = buildJsonObject {
             if (staffId != null && staffId > 0) put("id", staffId)
-            if (cleanSearch != null) put("search", cleanSearch)
+            else if (!searchName.isNullOrBlank()) put("search", searchName)
         }
 
-        val root = executeGraphQL(query = graphQLQuery, variables = variables, token = null) ?: return null
-        val dataObj = root.get("data").asJsonObjectOrNull() ?: return null
-        val staffObj = dataObj["Staff"].asJsonObjectOrNull()
-        val charObj = dataObj["Character"].asJsonObjectOrNull()
+        val root = executeGraphQL(query = query, variables = variables, token = null) ?: return null
+        val staffObj = root.get("data").asJsonObjectOrNull()?.get("Staff").asJsonObjectOrNull() ?: return null
 
-        val entityObj = staffObj ?: charObj ?: return null
-        val isStaff = staffObj != null
+        val id = staffObj["id"].asIntOrNull() ?: staffId ?: 0
+        val nameObj = staffObj["name"].asJsonObjectOrNull()
+        val fullName = nameObj?.get("full").asStringOrNull() ?: searchName.orEmpty()
+        val photo = staffObj["image"].asJsonObjectOrNull()?.get("large").asStringOrNull()
+        val bio = staffObj["description"].asStringOrNull()
 
-        val id = entityObj["id"].asIntOrNull() ?: staffId ?: 0
-        val nameObj = entityObj["name"].asJsonObjectOrNull()
-        val fullName = nameObj?.get("full").asStringOrNull() ?: cleanSearch.orEmpty()
-        val photo = entityObj["image"].asJsonObjectOrNull()?.get("large").asStringOrNull()
-        val bio = entityObj["description"].asStringOrNull()
-
-        val dobObj = entityObj["dateOfBirth"].asJsonObjectOrNull()
+        val dobObj = staffObj["dateOfBirth"].asJsonObjectOrNull()
         val dobYear = dobObj?.get("year").asIntOrNull()
         val dobMonth = dobObj?.get("month").asIntOrNull()
         val dobDay = dobObj?.get("day").asIntOrNull()
@@ -725,13 +744,9 @@ object AnilistApi {
             "$dobYear-$m-$d"
         } else null
 
-        val hometown = entityObj["homeTown"].asStringOrNull() ?: "Japan"
+        val hometown = staffObj["homeTown"].asStringOrNull() ?: "Japan"
 
-        val rawNodes = (if (isStaff) {
-            staffObj?.get("characterMedia").asJsonObjectOrNull()?.get("nodes").asJsonArrayOrNull()
-        } else {
-            charObj?.get("media").asJsonObjectOrNull()?.get("nodes").asJsonArrayOrNull()
-        }) ?: JsonArray(emptyList())
+        val rawNodes = staffObj["characterMedia"].asJsonObjectOrNull()?.get("nodes").asJsonArrayOrNull() ?: JsonArray(emptyList())
 
         val seen = mutableSetOf<Int>()
         val total = rawNodes.size
@@ -778,7 +793,170 @@ object AnilistApi {
             deathday = null,
             placeOfBirth = hometown,
             profilePhoto = photo,
-            knownFor = if (isStaff) "Voice Acting" else "Character",
+            knownFor = "Voice Acting",
+            movieCredits = movieCredits,
+            tvCredits = tvCredits,
+        )
+    }
+
+    private suspend fun queryCharacterEntity(
+        charId: Int? = null,
+        searchName: String? = null,
+    ): com.nuvio.app.features.details.PersonDetail? {
+        val query = if (charId != null && charId > 0) {
+            """
+            query (${'$'}id: Int) {
+              Character(id: ${'$'}id) {
+                id
+                name {
+                  full
+                  native
+                }
+                image {
+                  large
+                }
+                description(asHtml: false)
+                dateOfBirth {
+                  year
+                  month
+                  day
+                }
+                media(page: 1, perPage: 35, sort: POPULARITY_DESC) {
+                  nodes {
+                    id
+                    title {
+                      english
+                      romaji
+                    }
+                    coverImage {
+                      extraLarge
+                      large
+                    }
+                    bannerImage
+                    episodes
+                    format
+                    startDate {
+                      year
+                    }
+                  }
+                }
+              }
+            }
+            """.trimIndent()
+        } else if (!searchName.isNullOrBlank()) {
+            """
+            query (${'$'}search: String) {
+              Character(search: ${'$'}search) {
+                id
+                name {
+                  full
+                  native
+                }
+                image {
+                  large
+                }
+                description(asHtml: false)
+                dateOfBirth {
+                  year
+                  month
+                  day
+                }
+                media(page: 1, perPage: 35, sort: POPULARITY_DESC) {
+                  nodes {
+                    id
+                    title {
+                      english
+                      romaji
+                    }
+                    coverImage {
+                      extraLarge
+                      large
+                    }
+                    bannerImage
+                    episodes
+                    format
+                    startDate {
+                      year
+                    }
+                  }
+                }
+              }
+            }
+            """.trimIndent()
+        } else return null
+
+        val variables = buildJsonObject {
+            if (charId != null && charId > 0) put("id", charId)
+            else if (!searchName.isNullOrBlank()) put("search", searchName)
+        }
+
+        val root = executeGraphQL(query = query, variables = variables, token = null) ?: return null
+        val charObj = root.get("data").asJsonObjectOrNull()?.get("Character").asJsonObjectOrNull() ?: return null
+
+        val id = charObj["id"].asIntOrNull() ?: charId ?: 0
+        val nameObj = charObj["name"].asJsonObjectOrNull()
+        val fullName = nameObj?.get("full").asStringOrNull() ?: searchName.orEmpty()
+        val photo = charObj["image"].asJsonObjectOrNull()?.get("large").asStringOrNull()
+        val bio = charObj["description"].asStringOrNull()
+
+        val dobObj = charObj["dateOfBirth"].asJsonObjectOrNull()
+        val dobYear = dobObj?.get("year").asIntOrNull()
+        val dobMonth = dobObj?.get("month").asIntOrNull()
+        val dobDay = dobObj?.get("day").asIntOrNull()
+        val birthday = if (dobYear != null) {
+            val m = (dobMonth ?: 1).toString().padStart(2, '0')
+            val d = (dobDay ?: 1).toString().padStart(2, '0')
+            "$dobYear-$m-$d"
+        } else null
+
+        val rawNodes = charObj["media"].asJsonObjectOrNull()?.get("nodes").asJsonArrayOrNull() ?: JsonArray(emptyList())
+
+        val seen = mutableSetOf<Int>()
+        val total = rawNodes.size
+        val mediaList = rawNodes.mapIndexedNotNull { idx, element ->
+            val obj = element.asJsonObjectOrNull() ?: return@mapIndexedNotNull null
+            val mId = obj["id"].asIntOrNull() ?: return@mapIndexedNotNull null
+            if (!seen.add(mId)) return@mapIndexedNotNull null
+
+            val titleObj = obj["title"].asJsonObjectOrNull()
+            val engTitle = titleObj?.get("english").asStringOrNull()
+            val romTitle = titleObj?.get("romaji").asStringOrNull()
+            val displayTitle = engTitle ?: romTitle ?: return@mapIndexedNotNull null
+
+            val coverObj = obj["coverImage"].asJsonObjectOrNull()
+            val poster = coverObj?.get("extraLarge").asStringOrNull() ?: coverObj?.get("large").asStringOrNull() ?: return@mapIndexedNotNull null
+            val banner = obj["bannerImage"].asStringOrNull()
+            val format = obj["format"].asStringOrNull()
+            val episodes = obj["episodes"].asIntOrNull()
+            val year = obj["startDate"].asJsonObjectOrNull()?.get("year").asIntOrNull()
+
+            val isMovie = format.equals("MOVIE", ignoreCase = true) || episodes == 1
+            com.nuvio.app.features.home.MetaPreview(
+                id = "ani_$mId",
+                type = if (isMovie) "movie" else "series",
+                name = displayTitle,
+                poster = poster,
+                banner = banner,
+                logo = null,
+                description = null,
+                releaseInfo = if (episodes != null) "$episodes Ep" else year?.toString(),
+                rawReleaseDate = if (year != null) "$year-01-01" else null,
+                popularity = (total - idx).toDouble(),
+            )
+        }
+
+        val movieCredits = mediaList.filter { it.type == "movie" }
+        val tvCredits = mediaList.filter { it.type == "series" }
+
+        return com.nuvio.app.features.details.PersonDetail(
+            tmdbId = id,
+            name = fullName,
+            biography = bio,
+            birthday = birthday,
+            deathday = null,
+            placeOfBirth = "Japan",
+            profilePhoto = photo,
+            knownFor = "Character",
             movieCredits = movieCredits,
             tvCredits = tvCredits,
         )
