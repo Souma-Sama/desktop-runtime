@@ -437,6 +437,7 @@ object MetaDetailsRepository {
     ): MetaDetails = coroutineScope {
         val tmdbSettings = TmdbSettingsRepository.snapshot()
         val fanartSettings = FanartSettingsRepository.snapshot()
+        val isAnilist = meta.id.startsWith("ani_", ignoreCase = true) || meta.id.startsWith("anilist:", ignoreCase = true)
 
         var currentMeta = meta
         val mutex = Mutex()
