@@ -69,7 +69,7 @@ object AnilistMetaDetailsResolver {
         val contentType = if (isMovie) "movie" else "series"
 
         // 4 & 5. Fetch Episode Data and Cinemeta in parallel
-        val (episodeMap: Map<Int, KitsuEpisode>, cinemetaMeta: MetaDetails?) = coroutineScope {
+        val (episodeMap: Map<Int, KitsuEpisodeData>, cinemetaMeta: MetaDetails?) = coroutineScope {
             val kitsuDeferred = async {
                 if (!kitsuId.isNullOrBlank()) {
                     withTimeoutOrNull(1500L) {
