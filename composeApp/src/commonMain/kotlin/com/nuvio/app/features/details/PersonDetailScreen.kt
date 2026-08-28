@@ -227,10 +227,17 @@ private fun PersonDetailContent(
             .sortedBy { it.rawReleaseDate ?: "" }
     }
 
+    val isAnimePerson = person.knownFor == "Voice Acting" || allCredits.any { it.id.startsWith("ani_") }
+    val animeTvCredits = remember(person.tvCredits) {
+        person.tvCredits.filter { it.id.startsWith("ani_") || it.id.startsWith("anilist:") }
+    }
+    val animeMovieCredits = remember(person.movieCredits) {
+        person.movieCredits.filter { it.id.startsWith("ani_") || it.id.startsWith("anilist:") }
+    }
+
     val scrollState = rememberScrollState()
     val haptic = LocalHapticFeedback.current
 
-    // Hero collapse: 0 = fully expanded, 1 = fully collapsed
     val collapseProgress by remember {
         derivedStateOf {
             (scrollState.value / HERO_COLLAPSE_SCROLL_RANGE).coerceIn(0f, 1f)
@@ -238,35 +245,31 @@ private fun PersonDetailContent(
     }
 
     val shouldTriggerCatalogHaptic by remember {
-        derivedStateOf { scrollState.value >= HAPTIC_TRIGGER_SCROLL_THRESHOLD_PX }
+        derivedStateOf { scrollState.value > 0 }
     }
-    var didTriggerCatalogHaptic by remember(person.tmdbId) { mutableStateOf(false) }
-    LaunchedEffect(shouldTriggerCatalogHaptic, didTriggerCatalogHaptic) {
-        if (shouldTriggerCatalogHaptic && !didTriggerCatalogHaptic) {
+    var catalogScrolledPastZero by remember { mutableStateOf(false) }
+    LaunchedEffect(shouldTriggerCatalogHaptic) {
+        if (shouldTriggerCatalogHaptic != catalogScrolledPastZero) {
+            catalogScrolledPastZero = shouldTriggerCatalogHaptic
             haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-            didTriggerCatalogHaptic = true
         }
     }
 
-    val accentGradient = remember(accentColor) {
+    val systemBarBackground = MaterialTheme.colorScheme.surface
+    val accentGradient = remember(accentColor, systemBarBackground) {
         Brush.verticalGradient(
-            colorStops = arrayOf(
-                0.0f to accentColor.copy(alpha = 0.18f),
-                0.15f to accentColor.copy(alpha = 0.10f),
-                0.30f to accentColor.copy(alpha = 0.04f),
-                0.50f to Color.Transparent,
-            ),
+            0.0f to accentColor.copy(alpha = 0.04f),
+            0.20f to accentColor.copy(alpha = 0.02f),
+            0.45f to systemBarBackground.copy(alpha = 0.0f),
+            1.0f to systemBarBackground.copy(alpha = 0.0f),
         )
     }
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background),
-    ) {
+    Box(modifier = Modifier.fillMaxSize()) {
         Box(
             modifier = Modifier
-                .fillMaxSize()
+                .fillMaxWidth()
+                .fillMaxHeight(0.35f)
                 .background(accentGradient),
         )
 
@@ -280,8 +283,11 @@ private fun PersonDetailContent(
                     WidePersonDetailContent(
                         person = person,
                         popularCredits = popularCredits,
+                        animeTvCredits = animeTvCredits,
+                        animeMovieCredits = animeMovieCredits,
                         latestCredits = latestCredits,
                         upcomingCredits = upcomingCredits,
+                        isAnimePerson = isAnimePerson,
                         watchedKeys = watchedKeys,
                         onOpenMeta = onOpenMeta,
                         fallbackProfilePhoto = initialProfilePhoto,
@@ -310,8 +316,30 @@ private fun PersonDetailContent(
                             if (popularCredits.isNotEmpty()) {
                                 Spacer(modifier = Modifier.height(24.dp))
                                 DetailPosterRailSection(
-                                    title = stringResource(Res.string.person_popular),
+                                    title = if (isAnimePerson) "Popular Anime" else stringResource(Res.string.person_popular),
                                     items = popularCredits,
+                                    watchedKeys = watchedKeys,
+                                    headerHorizontalPadding = 20.dp,
+                                    onPosterClick = onOpenMeta,
+                                )
+                            }
+
+                            if (animeTvCredits.isNotEmpty() && isAnimePerson) {
+                                Spacer(modifier = Modifier.height(24.dp))
+                                DetailPosterRailSection(
+                                    title = "Anime Series",
+                                    items = animeTvCredits,
+                                    watchedKeys = watchedKeys,
+                                    headerHorizontalPadding = 20.dp,
+                                    onPosterClick = onOpenMeta,
+                                )
+                            }
+
+                            if (animeMovieCredits.isNotEmpty() && isAnimePerson) {
+                                Spacer(modifier = Modifier.height(24.dp))
+                                DetailPosterRailSection(
+                                    title = "Anime Movies & Specials",
+                                    items = animeMovieCredits,
                                     watchedKeys = watchedKeys,
                                     headerHorizontalPadding = 20.dp,
                                     onPosterClick = onOpenMeta,
@@ -367,8 +395,11 @@ private const val HAPTIC_TRIGGER_SCROLL_THRESHOLD_PX = 56
 private fun WidePersonDetailContent(
     person: PersonDetail,
     popularCredits: List<MetaPreview>,
+    animeTvCredits: List<MetaPreview> = emptyList(),
+    animeMovieCredits: List<MetaPreview> = emptyList(),
     latestCredits: List<MetaPreview>,
     upcomingCredits: List<MetaPreview>,
+    isAnimePerson: Boolean = false,
     watchedKeys: Set<String>,
     onOpenMeta: (MetaPreview) -> Unit,
     fallbackProfilePhoto: String?,
@@ -414,8 +445,28 @@ private fun WidePersonDetailContent(
             ) {
                 if (popularCredits.isNotEmpty()) {
                     DetailPosterRailSection(
-                        title = stringResource(Res.string.person_popular),
+                        title = if (isAnimePerson) "Popular Anime" else stringResource(Res.string.person_popular),
                         items = popularCredits,
+                        watchedKeys = watchedKeys,
+                        headerHorizontalPadding = 0.dp,
+                        onPosterClick = onOpenMeta,
+                    )
+                }
+
+                if (animeTvCredits.isNotEmpty() && isAnimePerson) {
+                    DetailPosterRailSection(
+                        title = "Anime Series",
+                        items = animeTvCredits,
+                        watchedKeys = watchedKeys,
+                        headerHorizontalPadding = 0.dp,
+                        onPosterClick = onOpenMeta,
+                    )
+                }
+
+                if (animeMovieCredits.isNotEmpty() && isAnimePerson) {
+                    DetailPosterRailSection(
+                        title = "Anime Movies & Specials",
+                        items = animeMovieCredits,
                         watchedKeys = watchedKeys,
                         headerHorizontalPadding = 0.dp,
                         onPosterClick = onOpenMeta,

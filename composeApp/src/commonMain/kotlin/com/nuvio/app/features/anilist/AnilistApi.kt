@@ -645,6 +645,32 @@ object AnilistApi {
                   }
                 }
               }
+              Character(search: ${'$'}search) {
+                id
+                name {
+                  full
+                  native
+                }
+                media(page: 1, perPage: 35, sort: POPULARITY_DESC) {
+                  nodes {
+                    id
+                    title {
+                      english
+                      romaji
+                    }
+                    coverImage {
+                      extraLarge
+                      large
+                    }
+                    bannerImage
+                    episodes
+                    format
+                    startDate {
+                      year
+                    }
+                  }
+                }
+              }
             }
         """.trimIndent()
 
@@ -653,25 +679,33 @@ object AnilistApi {
         }
 
         val root = executeGraphQL(query = graphQLQuery, variables = variables, token = null) ?: return emptyList()
-        val nodes = root.get("data")
-            .asJsonObjectOrNull()?.get("Staff")
+        val dataObj = root.get("data").asJsonObjectOrNull()
+        val staffNodes = dataObj?.get("Staff")
             .asJsonObjectOrNull()?.get("characterMedia")
             .asJsonObjectOrNull()?.get("nodes")
-            .asJsonArrayOrNull() ?: return emptyList()
+            .asJsonArrayOrNull()
+
+        val charNodes = dataObj?.get("Character")
+            .asJsonObjectOrNull()?.get("media")
+            .asJsonObjectOrNull()?.get("nodes")
+            .asJsonArrayOrNull()
+
+        val rawNodes = (staffNodes?.takeIf { it.isNotEmpty() } ?: charNodes) ?: return emptyList()
 
         val seen = mutableSetOf<Int>()
-        return nodes.mapNotNull { element ->
-            val obj = element.asJsonObjectOrNull() ?: return@mapNotNull null
-            val id = obj["id"].asIntOrNull() ?: return@mapNotNull null
-            if (!seen.add(id)) return@mapNotNull null
+        val total = rawNodes.size
+        return rawNodes.mapIndexedNotNull { idx, element ->
+            val obj = element.asJsonObjectOrNull() ?: return@mapIndexedNotNull null
+            val id = obj["id"].asIntOrNull() ?: return@mapIndexedNotNull null
+            if (!seen.add(id)) return@mapIndexedNotNull null
 
             val titleObj = obj["title"].asJsonObjectOrNull()
             val engTitle = titleObj?.get("english").asStringOrNull()
             val romTitle = titleObj?.get("romaji").asStringOrNull()
-            val displayTitle = engTitle ?: romTitle ?: return@mapNotNull null
+            val displayTitle = engTitle ?: romTitle ?: return@mapIndexedNotNull null
 
             val coverObj = obj["coverImage"].asJsonObjectOrNull()
-            val poster = coverObj?.get("extraLarge").asStringOrNull() ?: coverObj?.get("large").asStringOrNull() ?: return@mapNotNull null
+            val poster = coverObj?.get("extraLarge").asStringOrNull() ?: coverObj?.get("large").asStringOrNull() ?: return@mapIndexedNotNull null
             val banner = obj["bannerImage"].asStringOrNull()
             val format = obj["format"].asStringOrNull()
             val episodes = obj["episodes"].asIntOrNull()
@@ -687,6 +721,8 @@ object AnilistApi {
                 logo = null,
                 description = null,
                 releaseInfo = if (episodes != null) "$episodes Ep" else year?.toString(),
+                rawReleaseDate = if (year != null) "$year-01-01" else null,
+                popularity = (total - idx).toDouble(),
             )
         }
     }
@@ -735,18 +771,19 @@ object AnilistApi {
             .asJsonArrayOrNull() ?: return emptyList()
 
         val seen = mutableSetOf<Int>()
-        return nodes.mapNotNull { element ->
-            val obj = element.asJsonObjectOrNull() ?: return@mapNotNull null
-            val id = obj["id"].asIntOrNull() ?: return@mapNotNull null
-            if (!seen.add(id)) return@mapNotNull null
+        val total = nodes.size
+        return nodes.mapIndexedNotNull { idx, element ->
+            val obj = element.asJsonObjectOrNull() ?: return@mapIndexedNotNull null
+            val id = obj["id"].asIntOrNull() ?: return@mapIndexedNotNull null
+            if (!seen.add(id)) return@mapIndexedNotNull null
 
             val titleObj = obj["title"].asJsonObjectOrNull()
             val engTitle = titleObj?.get("english").asStringOrNull()
             val romTitle = titleObj?.get("romaji").asStringOrNull()
-            val displayTitle = engTitle ?: romTitle ?: return@mapNotNull null
+            val displayTitle = engTitle ?: romTitle ?: return@mapIndexedNotNull null
 
             val coverObj = obj["coverImage"].asJsonObjectOrNull()
-            val poster = coverObj?.get("extraLarge").asStringOrNull() ?: coverObj?.get("large").asStringOrNull() ?: return@mapNotNull null
+            val poster = coverObj?.get("extraLarge").asStringOrNull() ?: coverObj?.get("large").asStringOrNull() ?: return@mapIndexedNotNull null
             val banner = obj["bannerImage"].asStringOrNull()
             val format = obj["format"].asStringOrNull()
             val episodes = obj["episodes"].asIntOrNull()
@@ -762,6 +799,8 @@ object AnilistApi {
                 logo = null,
                 description = null,
                 releaseInfo = if (episodes != null) "$episodes Ep" else year?.toString(),
+                rawReleaseDate = if (year != null) "$year-01-01" else null,
+                popularity = (total - idx).toDouble(),
             )
         }
     }
