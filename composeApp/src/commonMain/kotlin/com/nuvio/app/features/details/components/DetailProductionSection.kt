@@ -91,7 +91,7 @@ fun DetailProductionSection(
                         chipHeight = chipHeight,
                         logoWidth = logoWidth,
                         logoHeight = logoHeight,
-                        onClick = if (onCompanyClick != null && item.tmdbId != null) {
+                        onClick = if (onCompanyClick != null && item.name.isNotBlank()) {
                             { onCompanyClick(item, entityKind) }
                         } else null,
                     )

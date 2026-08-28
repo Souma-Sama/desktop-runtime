@@ -80,8 +80,8 @@ fun DetailCastSection(
                     items = cast,
                     key = { index, person -> "${person.name}-${person.role.orEmpty()}-${person.photo.orEmpty()}-$index" },
                 ) { index, person ->
-                    val sharedTransitionKey = person.tmdbId
-                        ?.takeIf { it > 0 }
+                    val sharedTransitionKey = (person.tmdbId ?: (person.name.hashCode() and 0x7FFFFFFF))
+                        .takeIf { it > 0 }
                         ?.let { castAvatarSharedTransitionKey(it, occurrenceIndex = index) }
                     CastItem(
                         person = person,
@@ -89,7 +89,7 @@ fun DetailCastSection(
                         sizing = sizing,
                         sharedTransitionScope = sharedTransitionScope,
                         animatedVisibilityScope = animatedVisibilityScope,
-                        onClick = if (onCastClick != null && person.tmdbId != null && person.tmdbId > 0) {
+                        onClick = if (onCastClick != null && person.name.isNotBlank()) {
                             { onCastClick(person, sharedTransitionKey) }
                         } else {
                             null
