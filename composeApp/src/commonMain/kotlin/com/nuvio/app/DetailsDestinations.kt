@@ -137,6 +137,7 @@ internal fun DetailsDestination(
         onOpenMeta = onOpenMeta,
         onCastClick = { person, avatarTransitionKey ->
             val personId = person.tmdbId ?: 0
+            val isAnilistMedia = route.id.startsWith("ani_", ignoreCase = true) || route.id.startsWith("anilist:", ignoreCase = true)
             navController.navigate(
                 PersonDetailRoute(
                     personId = personId,
@@ -151,17 +152,20 @@ internal fun DetailsDestination(
                             it.equals("Creator", ignoreCase = true) ||
                             it.equals(creatorRole, ignoreCase = true)
                     } ?: false,
+                    isAnilist = isAnilistMedia,
                 ),
             )
         },
         onCompanyClick = { company, entityKind ->
             val entityId = company.tmdbId ?: 0
+            val isAnilistMedia = route.id.startsWith("ani_", ignoreCase = true) || route.id.startsWith("anilist:", ignoreCase = true)
             navController.navigate(
                 EntityBrowseRoute(
                     entityKind = entityKind,
                     entityId = entityId,
                     entityName = company.name,
                     sourceType = route.type,
+                    isAnilist = isAnilistMedia,
                 ),
             )
         },
@@ -186,6 +190,7 @@ internal fun PersonDestination(
         initialProfilePhoto = route.personPhoto,
         avatarTransitionKey = route.castAvatarTransitionKey,
         preferCrew = route.preferCrew,
+        isAnilist = route.isAnilist,
         onBack = onBack,
         onOpenMeta = rememberOpenMeta(navController),
         sharedTransitionScope = sharedTransitionScope,
@@ -205,6 +210,7 @@ internal fun EntityDestination(
         entityId = route.entityId,
         entityName = route.entityName,
         sourceType = route.sourceType,
+        isAnilist = route.isAnilist,
         onBack = onBack,
         onOpenMeta = rememberOpenMeta(navController),
         modifier = Modifier.fillMaxSize(),

@@ -41,11 +41,41 @@ object TmdbMetadataService {
         personId: Int,
         preferCrewCredits: Boolean? = null,
         fallbackName: String? = null,
+        isAnilist: Boolean = false,
     ): PersonDetail? = withContext(Dispatchers.Default) {
         val settings = TmdbSettingsRepository.snapshot()
         val language = normalizeTmdbLanguage(settings.language)
-        val cacheKey = "$personId:${fallbackName.orEmpty()}:${preferCrewCredits?.toString() ?: "auto"}:$language"
+        val cacheKey = "$personId:${fallbackName.orEmpty()}:${preferCrewCredits?.toString() ?: "auto"}:$language:$isAnilist"
         personCache[cacheKey]?.let { return@withContext it }
+
+        if (isAnilist) {
+            val anilistStaff = runCatching {
+                com.nuvio.app.features.anilist.AnilistApi.fetchStaffDetail(
+                    staffId = personId.takeIf { it > 0 },
+                    searchName = fallbackName,
+                )
+            }.getOrNull()
+
+            val resolved = anilistStaff ?: if (!fallbackName.isNullOrBlank()) {
+                PersonDetail(
+                    tmdbId = personId,
+                    name = fallbackName,
+                    biography = null,
+                    birthday = null,
+                    deathday = null,
+                    placeOfBirth = "Japan",
+                    profilePhoto = null,
+                    knownFor = "Voice Acting",
+                    movieCredits = emptyList(),
+                    tvCredits = emptyList(),
+                )
+            } else null
+
+            if (resolved != null) {
+                personCache[cacheKey] = resolved
+            }
+            return@withContext resolved
+        }
 
         val anilistFallback = if (personId > 0 || !fallbackName.isNullOrBlank()) {
             val staffDetail = runCatching {
@@ -70,12 +100,12 @@ object TmdbMetadataService {
             } else null
         } else null
 
-        if (!settings.enabled || !settings.hasApiKey || (anilistFallback != null && anilistFallback.movieCredits.isNotEmpty() || anilistFallback?.tvCredits?.isNotEmpty() == true)) {
+        if (!settings.enabled || !settings.hasApiKey || personId <= 0) {
             if (anilistFallback != null) {
                 personCache[cacheKey] = anilistFallback
                 return@withContext anilistFallback
             }
-            if (personId <= 0) return@withContext null
+            return@withContext null
         }
 
         try {
@@ -416,14 +446,45 @@ object TmdbMetadataService {
         entityId: Int,
         sourceType: String,
         fallbackName: String? = null,
+        isAnilist: Boolean = false,
     ): TmdbEntityBrowseData? = withContext(Dispatchers.Default) {
         val settings = TmdbSettingsRepository.snapshot()
         val language = normalizeTmdbLanguage(settings.language)
         val normalizedSourceType = normalizeEntitySourceType(sourceType)
-        val cacheKey = "${entityKind.routeValue}:$entityId:${fallbackName.orEmpty()}:$normalizedSourceType:$language"
+        val cacheKey = "${entityKind.routeValue}:$entityId:${fallbackName.orEmpty()}:$normalizedSourceType:$language:$isAnilist"
         entityBrowseCache[cacheKey]?.let { return@withContext it }
 
         val studioName = fallbackName.orEmpty()
+        if (isAnilist) {
+            val anilistStudioMedia = if (studioName.isNotBlank()) {
+                runCatching {
+                    com.nuvio.app.features.anilist.AnilistApi.fetchStudioMedia(studioName)
+                }.getOrNull().orEmpty()
+            } else emptyList()
+
+            val anilistRail = TmdbEntityRail(
+                mediaType = TmdbEntityMediaType.TV,
+                railType = TmdbEntityRailType.POPULAR,
+                items = anilistStudioMedia,
+                currentPage = 1,
+                hasMore = false,
+            )
+            val browseData = TmdbEntityBrowseData(
+                header = TmdbEntityHeader(
+                    id = entityId,
+                    kind = entityKind,
+                    name = studioName,
+                    logo = null,
+                    originCountry = "JP",
+                    secondaryLabel = null,
+                    description = null,
+                ),
+                rails = listOf(anilistRail),
+            )
+            entityBrowseCache[cacheKey] = browseData
+            return@withContext browseData
+        }
+
         val anilistStudioMedia = if (studioName.isNotBlank()) {
             runCatching {
                 com.nuvio.app.features.anilist.AnilistApi.fetchStudioMedia(studioName)

@@ -91,25 +91,27 @@ fun PersonDetailScreen(
     initialProfilePhoto: String? = null,
     avatarTransitionKey: String? = null,
     preferCrew: Boolean = false,
+    isAnilist: Boolean = false,
     onBack: () -> Unit,
     onOpenMeta: (MetaPreview) -> Unit,
     sharedTransitionScope: SharedTransitionScope? = null,
     animatedVisibilityScope: AnimatedVisibilityScope? = null,
     modifier: Modifier = Modifier,
 ) {
-    var uiState by remember(personId) { mutableStateOf<PersonDetailUiState>(PersonDetailUiState.Loading) }
+    var uiState by remember(personId, isAnilist) { mutableStateOf<PersonDetailUiState>(PersonDetailUiState.Loading) }
     val watchedUiState by remember {
         WatchedRepository.ensureLoaded()
         WatchedRepository.uiState
     }.collectAsStateWithLifecycle()
     val resolvedAvatarTransitionKey = avatarTransitionKey ?: castAvatarSharedTransitionKey(personId)
 
-    LaunchedEffect(personId, personName) {
+    LaunchedEffect(personId, personName, isAnilist) {
         uiState = PersonDetailUiState.Loading
         val detail = TmdbMetadataService.fetchPersonDetail(
             personId = personId,
             preferCrewCredits = preferCrew,
             fallbackName = personName,
+            isAnilist = isAnilist,
         )
         uiState = if (detail != null) {
             PersonDetailUiState.Success(

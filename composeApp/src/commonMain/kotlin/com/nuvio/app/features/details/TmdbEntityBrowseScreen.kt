@@ -79,11 +79,12 @@ fun TmdbEntityBrowseScreen(
     entityId: Int,
     entityName: String,
     sourceType: String,
+    isAnilist: Boolean = false,
     onBack: () -> Unit,
     onOpenMeta: (MetaPreview) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    var uiState by remember(entityKind, entityId) {
+    var uiState by remember(entityKind, entityId, isAnilist) {
         mutableStateOf<EntityBrowseUiState>(EntityBrowseUiState.Loading)
     }
     val watchedUiState by remember {
@@ -93,13 +94,14 @@ fun TmdbEntityBrowseScreen(
     val fullyWatchedSeriesKeys by WatchedRepository.fullyWatchedSeriesKeys.collectAsStateWithLifecycle()
     val loadFailedMessage = stringResource(Res.string.details_browse_load_failed, entityName)
 
-    LaunchedEffect(entityKind, entityId) {
+    LaunchedEffect(entityKind, entityId, isAnilist) {
         uiState = EntityBrowseUiState.Loading
         val data = TmdbMetadataService.fetchEntityBrowse(
             entityKind = entityKind,
             entityId = entityId,
             sourceType = sourceType,
             fallbackName = entityName,
+            isAnilist = isAnilist,
         )
         uiState = if (data != null) {
             EntityBrowseUiState.Success(data)
