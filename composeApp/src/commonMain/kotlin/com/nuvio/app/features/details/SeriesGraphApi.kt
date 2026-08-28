@@ -10,7 +10,8 @@ import kotlinx.serialization.json.Json
 internal object SeriesGraphApi {
     suspend fun getSeasonRatings(tmdbId: Int): List<SeriesGraphSeasonRatingsDto> =
         requestSeasonRatings(
-            baseUrl = ImdbEpisodeRatingsConfig.IMDB_RATINGS_API_BASE_URL,
+            baseUrl = ImdbEpisodeRatingsConfig.IMDB_RATINGS_API_BASE_URL.takeIf { it.isNotBlank() }
+                ?: "https://seriesgraph.com",
             showId = tmdbId.toString(),
         )
 }

@@ -244,16 +244,15 @@ fun DesktopDetailHero(
             }
             meta.description?.takeIf { it.isNotBlank() }?.let { synopsis ->
                 Spacer(modifier = Modifier.height(space.s16))
-                Text(
+                ExpandableDescription(
                     text = synopsis,
+                    collapsedMaxLines = 3,
                     style = MaterialTheme.typography.bodyLarge.copy(
                         fontSize = NuvioTokens.Type.bodyLg,
                         lineHeight = NuvioTokens.LineHeight.bodyLg,
                         letterSpacing = NuvioTokens.LetterSpacing.none,
                     ),
                     color = colorScheme.onSurface,
-                    maxLines = 4,
-                    overflow = TextOverflow.Ellipsis,
                 )
             }
             Spacer(modifier = Modifier.height(space.s28))

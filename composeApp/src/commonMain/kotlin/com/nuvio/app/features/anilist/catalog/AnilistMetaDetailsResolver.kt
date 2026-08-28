@@ -182,6 +182,7 @@ object AnilistMetaDetailsResolver {
                     episode = epNum,
                     overview = kitsuEp?.overview,
                     thumbnail = epThumbnail,
+                    runtime = media.duration,
                     released = null,
                     streams = emptyList(),
                 )
@@ -205,6 +206,7 @@ object AnilistMetaDetailsResolver {
                     episode = actualEpNumber,
                     overview = kitsuEp?.overview,
                     thumbnail = epThumbnail,
+                    runtime = media.duration,
                     released = null,
                     streams = emptyList(),
                 )
