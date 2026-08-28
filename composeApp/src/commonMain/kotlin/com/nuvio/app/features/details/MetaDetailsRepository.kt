@@ -606,23 +606,15 @@ object MetaDetailsRepository {
         // 3. MDBList job: External ratings (IMDb, TMDb, Trakt, RT, AniList) - Streams in independently!
         val mdbListJob = launch {
             if (isAnilist) {
-                // For anime, keep native AniList and MAL ratings, only updating MAL if MDBList fetched a verified MAL score
-                val mdbListRatings = runCatching {
-                    withTimeoutOrNull(MDBLIST_ENRICH_TIMEOUT_MS) {
-                        MdbListMetadataService.enrichMeta(
-                            meta = meta,
-                            fallbackItemId = fallbackItemId,
-                            settings = settings,
-                        )
-                    }?.externalRatings.orEmpty()
-                }.getOrNull().orEmpty()
+                // For anime, fetch genuine MAL score from Jikan/MAL API if not already present
+                val anilistId = meta.id.removePrefix("ani_").toIntOrNull()
+                val idMal = anilistId?.let { com.nuvio.app.features.anilist.AnilistApi.fetchMediaById(it)?.idMal }
+                val realMalScore = idMal?.let { com.nuvio.app.features.anilist.AnilistApi.fetchMalScore(it) }
 
-                val malRating = mdbListRatings.firstOrNull { it.source == "mal" }
-                if (malRating != null) {
+                if (realMalScore != null && realMalScore > 0) {
                     emitUpdate { current ->
-                        val updated = current.externalRatings.map { r ->
-                            if (r.source == "mal") malRating else r
-                        }
+                        val existingWithoutMal = current.externalRatings.filterNot { it.source == "mal" }
+                        val updated = existingWithoutMal + MetaExternalRating(source = "mal", value = realMalScore)
                         current.copy(externalRatings = updated)
                     }
                 }

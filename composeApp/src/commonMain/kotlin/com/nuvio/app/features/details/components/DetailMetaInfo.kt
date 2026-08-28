@@ -333,7 +333,7 @@ private val ratingVisuals = listOf(
         logo = Res.drawable.rating_mal,
         logoWidth = 16.dp,
         valueColor = Color(0xFF2E51A2),
-        format = ::formatOneDecimal,
+        format = ::formatTwoDecimals,
     ),
     RatingVisuals(
         source = PROVIDER_IMDB,
@@ -398,6 +398,13 @@ private fun formatOneDecimal(value: Double): String {
     val whole = rounded / 10
     val decimal = (rounded % 10).absoluteValue
     return "$whole.$decimal"
+}
+
+private fun formatTwoDecimals(value: Double): String {
+    val rounded = (value * 100.0).roundToInt()
+    val whole = rounded / 100
+    val decimal = (rounded % 100).absoluteValue
+    return "$whole.${decimal.toString().padStart(2, '0')}"
 }
 
 private fun formatWhole(value: Double): String = value.roundToInt().toString()

@@ -224,12 +224,18 @@ object AnilistMetaDetailsResolver {
                     value = media.averageScore.toDouble(),
                 )
             )
-            val malScore = (media.averageScore / 10.0)
-            val roundedMal = kotlin.math.round(malScore * 10.0) / 10.0
+        }
+
+        val malScore = media.idMal?.let {
+            runCatching {
+                com.nuvio.app.features.anilist.AnilistApi.fetchMalScore(it)
+            }.getOrNull()
+        }
+        if (malScore != null && malScore > 0) {
             ratings.add(
                 com.nuvio.app.features.details.MetaExternalRating(
                     source = "mal",
-                    value = roundedMal,
+                    value = malScore,
                 )
             )
         }
