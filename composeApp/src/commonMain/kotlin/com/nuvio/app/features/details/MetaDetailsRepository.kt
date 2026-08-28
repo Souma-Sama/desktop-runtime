@@ -33,6 +33,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import nuvio.composeapp.generated.resources.*
@@ -436,124 +438,156 @@ object MetaDetailsRepository {
         val tmdbSettings = TmdbSettingsRepository.snapshot()
         val fanartSettings = FanartSettingsRepository.snapshot()
 
-        val tmdbDeferred = async {
-            if (tmdbSettings.enabled && tmdbSettings.hasApiKey) {
-                withTimeoutOrNull(TMDB_ENRICH_TIMEOUT_MS) {
-                    TmdbMetadataService.enrichMeta(
-                        meta = meta,
-                        fallbackItemId = fallbackItemId,
-                        settings = tmdbSettings,
-                    )
-                } ?: meta
-            } else meta
+        var currentMeta = meta
+        val mutex = Mutex()
+
+        suspend fun emitUpdate(transform: (MetaDetails) -> MetaDetails) {
+            val updated = mutex.withLock {
+                currentMeta = transform(currentMeta)
+                currentMeta
+            }
+            if (activeRequestKey == requestKey) {
+                _uiState.value = MetaDetailsUiState(meta = updated.withUnreleasedFilter(), isLoading = false)
+            }
         }
 
-        val fanartDeferred = async {
+        // 1. Fanart job: Fast artwork resolution (~100-300ms) - Emits IMMEDIATELY without waiting for TMDB!
+        val fanartJob = launch {
             if ((fanartSettings.enabled && fanartSettings.hasApiKey) || fanartSettings.useBetterPosters) {
-                withTimeoutOrNull(TMDB_ENRICH_TIMEOUT_MS) {
-                    FanartService.enrichMetaDetails(
+                val fanartEnriched = runCatching {
+                    withTimeoutOrNull(TMDB_ENRICH_TIMEOUT_MS) {
+                        FanartService.enrichMetaDetails(
+                            meta = meta,
+                            fallbackItemId = fallbackItemId,
+                            settings = fanartSettings,
+                        )
+                    }
+                }.getOrNull()
+
+                if (fanartEnriched != null) {
+                    emitUpdate { current ->
+                        current.copy(
+                            logo = fanartEnriched.logo ?: current.logo,
+                            background = fanartEnriched.background ?: current.background,
+                            poster = fanartEnriched.poster ?: current.poster,
+                            videos = current.videos.mapIndexed { idx, vid ->
+                                val fanartVid = fanartEnriched.videos.getOrNull(idx)
+                                if (!fanartVid?.seasonPoster.isNullOrBlank()) {
+                                    vid.copy(seasonPoster = fanartVid.seasonPoster)
+                                } else vid
+                            }
+                        )
+                    }
+                }
+            }
+        }
+
+        // 2. TMDB job: Full credits, cast portraits, episodes, synopses (~1-2s) - Streams in independently!
+        val tmdbJob = launch {
+            if (tmdbSettings.enabled && tmdbSettings.hasApiKey) {
+                val tmdbEnriched = runCatching {
+                    withTimeoutOrNull(TMDB_ENRICH_TIMEOUT_MS) {
+                        TmdbMetadataService.enrichMeta(
+                            meta = meta,
+                            fallbackItemId = fallbackItemId,
+                            settings = tmdbSettings,
+                        )
+                    }
+                }.getOrNull()
+
+                if (tmdbEnriched != null) {
+                    emitUpdate { current ->
+                        val isAnilist = current.id.startsWith("ani_", ignoreCase = true) || current.id.startsWith("anilist:", ignoreCase = true)
+                        val anilistRecommendations = if (isAnilist) current.moreLikeThis else emptyList()
+
+                        val mergedVideos = if (isAnilist) {
+                            tmdbEnriched.videos.mapIndexed { idx, enrichedVid ->
+                                val baseVid = meta.videos.getOrNull(idx)
+                                val currentVid = current.videos.getOrNull(idx)
+                                var vid = enrichedVid
+                                if (vid.thumbnail.isNullOrBlank() && baseVid?.thumbnail?.isNotBlank() == true) {
+                                    vid = vid.copy(thumbnail = baseVid.thumbnail)
+                                }
+                                if (!currentVid?.seasonPoster.isNullOrBlank()) {
+                                    vid = vid.copy(seasonPoster = currentVid.seasonPoster)
+                                }
+                                vid
+                            }
+                        } else {
+                            tmdbEnriched.videos.mapIndexed { idx, enrichedVid ->
+                                val currentVid = current.videos.getOrNull(idx)
+                                if (!currentVid?.seasonPoster.isNullOrBlank()) {
+                                    enrichedVid.copy(seasonPoster = currentVid.seasonPoster)
+                                } else enrichedVid
+                            }
+                        }
+
+                        tmdbEnriched.copy(
+                            logo = current.logo ?: tmdbEnriched.logo ?: meta.logo,
+                            background = current.background ?: tmdbEnriched.background ?: meta.background,
+                            poster = current.poster ?: tmdbEnriched.poster ?: meta.poster,
+                            videos = mergedVideos,
+                            moreLikeThis = if (isAnilist && anilistRecommendations.isNotEmpty()) anilistRecommendations else tmdbEnriched.moreLikeThis,
+                            moreLikeThisSource = if (isAnilist && anilistRecommendations.isNotEmpty()) null else tmdbEnriched.moreLikeThisSource,
+                            description = if (isAnilist && !meta.description.isNullOrBlank()) meta.description else tmdbEnriched.description,
+                            releaseInfo = if (isAnilist && !meta.releaseInfo.isNullOrBlank()) meta.releaseInfo else (meta.releaseInfo ?: tmdbEnriched.releaseInfo),
+                            status = if (isAnilist && !meta.status.isNullOrBlank()) meta.status else tmdbEnriched.status,
+                            lastAirDate = if (isAnilist && !meta.lastAirDate.isNullOrBlank()) meta.lastAirDate else tmdbEnriched.lastAirDate,
+                            externalRatings = current.externalRatings.ifEmpty { tmdbEnriched.externalRatings },
+                        )
+                    }
+                }
+            }
+        }
+
+        // 3. MDBList job: External ratings (IMDb, TMDb, Trakt, RT, AniList) - Streams in independently!
+        val mdbListJob = launch {
+            val mdbListRatings = runCatching {
+                withTimeoutOrNull(MDBLIST_ENRICH_TIMEOUT_MS) {
+                    MdbListMetadataService.enrichMeta(
                         meta = meta,
                         fallbackItemId = fallbackItemId,
-                        settings = fanartSettings,
+                        settings = settings,
                     )
-                } ?: meta
-            } else meta
-        }
+                }?.externalRatings.orEmpty()
+            }.getOrNull().orEmpty()
 
-        val mdbListDeferred = async {
-            withTimeoutOrNull(MDBLIST_ENRICH_TIMEOUT_MS) {
-                MdbListMetadataService.enrichMeta(
-                    meta = meta,
-                    fallbackItemId = fallbackItemId,
-                    settings = settings,
-                )
-            }?.externalRatings.orEmpty()
-        }
-
-        val traktDeferred = async {
-            applyMoreLikeThisSource(
-                meta = meta,
-                fallbackItemId = fallbackItemId,
-                fallbackItemType = fallbackItemType,
-            )
-        }
-
-        val tmdbEnriched = tmdbDeferred.await()
-        val fanartEnriched = fanartDeferred.await()
-
-        val isAnilist = meta.id.startsWith("ani_", ignoreCase = true) || meta.id.startsWith("anilist:", ignoreCase = true)
-        val anilistRecommendations = if (isAnilist) meta.moreLikeThis else emptyList()
-
-        val mergedVideos = if (isAnilist) {
-            tmdbEnriched.videos.mapIndexed { idx, enrichedVid ->
-                val baseVid = meta.videos.getOrNull(idx)
-                val fanartVid = fanartEnriched.videos.getOrNull(idx)
-                var vid = enrichedVid
-                if (vid.thumbnail.isNullOrBlank() && baseVid?.thumbnail?.isNotBlank() == true) {
-                    vid = vid.copy(thumbnail = baseVid.thumbnail)
+            if (mdbListRatings.isNotEmpty()) {
+                emitUpdate { current ->
+                    current.copy(externalRatings = mdbListRatings)
                 }
-                if (!fanartVid?.seasonPoster.isNullOrBlank()) {
-                    vid = vid.copy(seasonPoster = fanartVid.seasonPoster)
-                }
-                vid
-            }
-        } else {
-            tmdbEnriched.videos.mapIndexed { idx, enrichedVid ->
-                val fanartVid = fanartEnriched.videos.getOrNull(idx)
-                if (!fanartVid?.seasonPoster.isNullOrBlank()) {
-                    enrichedVid.copy(seasonPoster = fanartVid.seasonPoster)
-                } else enrichedVid
             }
         }
 
-        val progressiveMeta = tmdbEnriched.copy(
-            logo = fanartEnriched.logo ?: tmdbEnriched.logo ?: meta.logo,
-            background = fanartEnriched.background ?: tmdbEnriched.background ?: meta.background,
-            poster = fanartEnriched.poster ?: tmdbEnriched.poster ?: meta.poster,
-            videos = mergedVideos,
-            moreLikeThis = if (isAnilist && anilistRecommendations.isNotEmpty()) anilistRecommendations else tmdbEnriched.moreLikeThis,
-            moreLikeThisSource = if (isAnilist && anilistRecommendations.isNotEmpty()) null else tmdbEnriched.moreLikeThisSource,
-            // Preserve per-season description, release year and air dates from AniList
-            description = if (isAnilist && !meta.description.isNullOrBlank()) meta.description else tmdbEnriched.description,
-            releaseInfo = if (isAnilist && !meta.releaseInfo.isNullOrBlank()) meta.releaseInfo else (meta.releaseInfo ?: tmdbEnriched.releaseInfo),
-            status = if (isAnilist && !meta.status.isNullOrBlank()) meta.status else tmdbEnriched.status,
-            lastAirDate = if (isAnilist && !meta.lastAirDate.isNullOrBlank()) meta.lastAirDate else tmdbEnriched.lastAirDate,
-        )
+        // 4. Trakt job: Related titles / recommendations - Streams in independently!
+        val traktJob = launch {
+            val isAnilist = meta.id.startsWith("ani_", ignoreCase = true) || meta.id.startsWith("anilist:", ignoreCase = true)
+            if (!isAnilist) {
+                val traktMeta = runCatching {
+                    applyMoreLikeThisSource(
+                        meta = meta,
+                        fallbackItemId = fallbackItemId,
+                        fallbackItemType = fallbackItemType,
+                    )
+                }.getOrNull()
 
-        // Progressively emit fast enrichments (TMDB + Fanart) without waiting for slower rating APIs
-        if (activeRequestKey == requestKey) {
-            _uiState.value = MetaDetailsUiState(meta = progressiveMeta.withUnreleasedFilter(), isLoading = false)
+                if (traktMeta != null && traktMeta.moreLikeThis.isNotEmpty()) {
+                    emitUpdate { current ->
+                        current.copy(
+                            moreLikeThis = traktMeta.moreLikeThis,
+                            moreLikeThisSource = traktMeta.moreLikeThisSource,
+                        )
+                    }
+                }
+            }
         }
 
-        val mdbListRatings = mdbListDeferred.await()
-        val traktMeta = traktDeferred.await()
+        fanartJob.join()
+        tmdbJob.join()
+        mdbListJob.join()
+        traktJob.join()
 
-        val finalMeta = progressiveMeta.copy(
-            externalRatings = mdbListRatings.ifEmpty { progressiveMeta.externalRatings },
-            moreLikeThis = if (isAnilist && anilistRecommendations.isNotEmpty()) {
-                anilistRecommendations
-            } else {
-                traktMeta.moreLikeThis.ifEmpty { progressiveMeta.moreLikeThis }
-            },
-            moreLikeThisSource = if (isAnilist && anilistRecommendations.isNotEmpty()) {
-                null
-            } else {
-                traktMeta.moreLikeThisSource ?: progressiveMeta.moreLikeThisSource
-            },
-        )
-
-        cachedMetaByRequestKey[requestKey] = cachedMetaByRequestKey[requestKey]
-            ?.copy(
-                metaScreenMeta = finalMeta,
-                metaScreenSettingsFingerprint = settingsFingerprint,
-            )
-            ?: CachedMetaEntry(
-                baseMeta = meta,
-                metaScreenMeta = finalMeta,
-                metaScreenSettingsFingerprint = settingsFingerprint,
-            )
-
-        finalMeta
+        mutex.withLock { currentMeta }
     }
 
     private suspend fun applyMoreLikeThisSource(
@@ -614,6 +648,8 @@ object MetaDetailsRepository {
         fallbackItemId: String,
         settings: com.nuvio.app.features.mdblist.MdbListSettings,
     ): Boolean {
+        val fanartSettings = FanartSettingsRepository.snapshot()
+        if ((fanartSettings.enabled && fanartSettings.hasApiKey) || fanartSettings.useBetterPosters) return true
         val tmdbSettings = TmdbSettingsRepository.snapshot()
         if (tmdbSettings.enabled && tmdbSettings.hasApiKey) return true
         if (shouldFetchMdbListOnMetaScreen(meta, fallbackItemId, settings)) return true
@@ -640,6 +676,7 @@ object MetaDetailsRepository {
         TrackingSettingsRepository.ensureLoaded()
         TraktAuthRepository.ensureLoaded()
         TmdbSettingsRepository.ensureLoaded()
+        val fanartSettings = FanartSettingsRepository.snapshot()
         val providers = settings.enabledProvidersInPriorityOrder().joinToString(",")
         val trackingSettings = TrackingSettingsRepository.uiState.value
         val traktAuthMode = TraktAuthRepository.uiState.value.mode
@@ -648,6 +685,7 @@ object MetaDetailsRepository {
             append("${settings.enabled}:${settings.apiKey.trim()}:$providers")
             append("|more_like=${trackingSettings.moreLikeThisSource}:$traktAuthMode")
             append("|tmdb=${tmdbSettings.enabled}:${tmdbSettings.useMoreLikeThis}:${tmdbSettings.hasApiKey}:${tmdbSettings.language}")
+            append("|fanart=${fanartSettings.enabled}:${fanartSettings.hasApiKey}:${fanartSettings.quality}")
         }
     }
 

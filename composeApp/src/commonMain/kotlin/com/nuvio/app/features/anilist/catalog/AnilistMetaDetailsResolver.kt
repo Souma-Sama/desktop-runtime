@@ -62,28 +62,35 @@ object AnilistMetaDetailsResolver {
             ?: media.coverImage?.large
             ?: media.coverImage?.medium
 
-        // 4. Fetch Episode Data from Kitsu
-        val episodeMap = if (!kitsuId.isNullOrBlank()) {
-            kotlinx.coroutines.withTimeoutOrNull(2000L) {
-                fetchKitsuEpisodes(kitsuId)
-            } ?: emptyMap()
-        } else emptyMap()
-
         val isMovie = media.format == "MOVIE"
         val contentType = if (isMovie) "movie" else "series"
-        val totalEpisodes = media.episodes ?: episodeMap.size.takeIf { it > 0 } ?: 12
 
-        // 5. If IMDb ID is resolved, load base Cinemeta details (Trailers, Backdrops, Logos, Episodes)
-        var cinemetaMeta: MetaDetails? = null
-        if (!armImdbId.isNullOrBlank()) {
-            val cinemetaUrl = "https://v3-cinemeta.strem.io/meta/$contentType/$armImdbId.json"
-            val cinemetaResponse = kotlinx.coroutines.withTimeoutOrNull(2500L) {
-                runCatching { httpGetText(cinemetaUrl) }.getOrNull()
+        // 4 & 5. Fetch Episode Data and Cinemeta in parallel
+        val (episodeMap, cinemetaMeta) = kotlinx.coroutines.coroutineScope {
+            val kitsuDeferred = async {
+                if (!kitsuId.isNullOrBlank()) {
+                    kotlinx.coroutines.withTimeoutOrNull(1500L) {
+                        fetchKitsuEpisodes(kitsuId)
+                    } ?: emptyMap()
+                } else emptyMap()
             }
-            if (!cinemetaResponse.isNullOrBlank()) {
-                cinemetaMeta = runCatching { com.nuvio.app.features.details.MetaDetailsParser.parse(cinemetaResponse) }.getOrNull()
+
+            val cinemetaDeferred = async {
+                if (!armImdbId.isNullOrBlank()) {
+                    val cinemetaUrl = "https://v3-cinemeta.strem.io/meta/$contentType/$armImdbId.json"
+                    val cinemetaResponse = kotlinx.coroutines.withTimeoutOrNull(1500L) {
+                        runCatching { httpGetText(cinemetaUrl) }.getOrNull()
+                    }
+                    if (!cinemetaResponse.isNullOrBlank()) {
+                        runCatching { com.nuvio.app.features.details.MetaDetailsParser.parse(cinemetaResponse) }.getOrNull()
+                    } else null
+                } else null
             }
+
+            Pair(kitsuDeferred.await(), cinemetaDeferred.await())
         }
+
+        val totalEpisodes = media.episodes ?: episodeMap.size.takeIf { it > 0 } ?: 12
 
         val cleanDescription = com.nuvio.app.core.format.cleanHtmlDescription(media.description)
             ?: com.nuvio.app.core.format.cleanHtmlDescription(cinemetaMeta?.description)
