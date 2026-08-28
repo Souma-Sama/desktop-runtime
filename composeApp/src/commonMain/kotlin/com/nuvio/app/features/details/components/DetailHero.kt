@@ -113,7 +113,7 @@ fun DetailHero(
                     .fillMaxSize(),
                 contentAlignment = Alignment.BottomCenter,
             ) {
-                val imageUrl = meta.background ?: meta.poster
+                val imageUrl = meta.background
                 val backdropScale = 1f
                 if (imageUrl != null) {
                     AsyncImage(
@@ -143,7 +143,14 @@ fun DetailHero(
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
-                            .background(MaterialTheme.colorScheme.surface),
+                            .background(
+                                Brush.verticalGradient(
+                                    colors = listOf(
+                                        heroGradientColor?.copy(alpha = 0.55f) ?: MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f),
+                                        bottomGradientColor,
+                                    ),
+                                ),
+                            ),
                     )
                 }
                 if (heroTrailerSourceUrl != null) {

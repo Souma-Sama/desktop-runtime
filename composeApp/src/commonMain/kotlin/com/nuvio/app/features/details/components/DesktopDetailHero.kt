@@ -115,7 +115,7 @@ fun DesktopDetailHero(
             .onSizeChanged { onHeightChanged(it.height) },
     ) {
         val actionHorizontalInset = fullscreenActionHorizontalInsetForWidth(maxWidth.value)
-        val imageUrl = meta.background ?: meta.poster
+        val imageUrl = meta.background
         if (imageUrl != null) {
             AsyncImage(
                 model = imageUrl,
@@ -124,8 +124,8 @@ fun DesktopDetailHero(
                     .fillMaxSize()
                     .graphicsLayer {
                         translationY = scrollOffset() * 0.38f
-                        scaleX = 1.04f
-                        scaleY = 1.04f
+                        scaleX = 1f
+                        scaleY = 1f
                     },
                 alignment = Alignment.Center,
                 contentScale = ContentScale.Crop,
