@@ -94,7 +94,7 @@ object AnilistMetaDetailsResolver {
                 name = name,
                 role = characterRole,
                 photo = photo,
-                tmdbId = null,
+                tmdbId = va?.id ?: char.id,
             )
         }
 

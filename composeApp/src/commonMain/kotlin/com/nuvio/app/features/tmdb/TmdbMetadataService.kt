@@ -47,13 +47,14 @@ object TmdbMetadataService {
         val cacheKey = "$personId:${fallbackName.orEmpty()}:${preferCrewCredits?.toString() ?: "auto"}:$language"
         personCache[cacheKey]?.let { return@withContext it }
 
-        val anilistFallback = if (!fallbackName.isNullOrBlank()) {
-            val staffMedia = runCatching {
-                com.nuvio.app.features.anilist.AnilistApi.fetchStaffMedia(fallbackName)
-            }.getOrNull().orEmpty()
-            if (staffMedia.isNotEmpty()) {
-                val anilistMovies = staffMedia.filter { it.type == "movie" }
-                val anilistTv = staffMedia.filter { it.type == "series" }
+        val anilistFallback = if (personId > 0 || !fallbackName.isNullOrBlank()) {
+            val staffDetail = runCatching {
+                com.nuvio.app.features.anilist.AnilistApi.fetchStaffDetail(
+                    staffId = personId.takeIf { it > 0 },
+                    searchName = fallbackName,
+                )
+            }.getOrNull()
+            staffDetail ?: if (!fallbackName.isNullOrBlank()) {
                 PersonDetail(
                     tmdbId = personId,
                     name = fallbackName,
@@ -63,18 +64,18 @@ object TmdbMetadataService {
                     placeOfBirth = "Japan",
                     profilePhoto = null,
                     knownFor = "Voice Acting",
-                    movieCredits = anilistMovies,
-                    tvCredits = anilistTv,
+                    movieCredits = emptyList(),
+                    tvCredits = emptyList(),
                 )
             } else null
         } else null
 
-        if (!settings.enabled || !settings.hasApiKey || personId <= 0) {
+        if (!settings.enabled || !settings.hasApiKey || (anilistFallback != null && anilistFallback.movieCredits.isNotEmpty() || anilistFallback?.tvCredits?.isNotEmpty() == true)) {
             if (anilistFallback != null) {
                 personCache[cacheKey] = anilistFallback
                 return@withContext anilistFallback
             }
-            return@withContext null
+            if (personId <= 0) return@withContext null
         }
 
         try {
