@@ -613,6 +613,159 @@ object AnilistApi {
         }
     }
 
+    suspend fun fetchStaffMedia(search: String): List<com.nuvio.app.features.home.MetaPreview> {
+        val cleanSearch = search.trim()
+        if (cleanSearch.isBlank()) return emptyList()
+
+        val graphQLQuery = """
+            query (${'$'}search: String) {
+              Staff(search: ${'$'}search) {
+                id
+                name {
+                  full
+                  native
+                }
+                characterMedia(page: 1, perPage: 35, sort: POPULARITY_DESC) {
+                  nodes {
+                    id
+                    title {
+                      english
+                      romaji
+                    }
+                    coverImage {
+                      extraLarge
+                      large
+                    }
+                    bannerImage
+                    episodes
+                    format
+                    startDate {
+                      year
+                    }
+                  }
+                }
+              }
+            }
+        """.trimIndent()
+
+        val variables = buildJsonObject {
+            put("search", cleanSearch)
+        }
+
+        val root = executeGraphQL(query = graphQLQuery, variables = variables, token = null) ?: return emptyList()
+        val nodes = root.get("data")
+            .asJsonObjectOrNull()?.get("Staff")
+            .asJsonObjectOrNull()?.get("characterMedia")
+            .asJsonObjectOrNull()?.get("nodes")
+            .asJsonArrayOrNull() ?: return emptyList()
+
+        val seen = mutableSetOf<Int>()
+        return nodes.mapNotNull { element ->
+            val obj = element.asJsonObjectOrNull() ?: return@mapNotNull null
+            val id = obj["id"].asIntOrNull() ?: return@mapNotNull null
+            if (!seen.add(id)) return@mapNotNull null
+
+            val titleObj = obj["title"].asJsonObjectOrNull()
+            val engTitle = titleObj?.get("english").asStringOrNull()
+            val romTitle = titleObj?.get("romaji").asStringOrNull()
+            val displayTitle = engTitle ?: romTitle ?: return@mapNotNull null
+
+            val coverObj = obj["coverImage"].asJsonObjectOrNull()
+            val poster = coverObj?.get("extraLarge").asStringOrNull() ?: coverObj?.get("large").asStringOrNull() ?: return@mapNotNull null
+            val banner = obj["bannerImage"].asStringOrNull()
+            val format = obj["format"].asStringOrNull()
+            val episodes = obj["episodes"].asIntOrNull()
+            val year = obj["startDate"].asJsonObjectOrNull()?.get("year").asIntOrNull()
+
+            val isMovie = format.equals("MOVIE", ignoreCase = true) || episodes == 1
+            com.nuvio.app.features.home.MetaPreview(
+                id = "ani_$id",
+                type = if (isMovie) "movie" else "series",
+                name = displayTitle,
+                poster = poster,
+                banner = banner,
+                logo = null,
+                description = null,
+                releaseInfo = if (episodes != null) "$episodes Ep" else year?.toString(),
+            )
+        }
+    }
+
+    suspend fun fetchStudioMedia(search: String): List<com.nuvio.app.features.home.MetaPreview> {
+        val cleanSearch = search.trim()
+        if (cleanSearch.isBlank()) return emptyList()
+
+        val graphQLQuery = """
+            query (${'$'}search: String) {
+              Studio(search: ${'$'}search) {
+                id
+                name
+                media(page: 1, perPage: 35, sort: POPULARITY_DESC) {
+                  nodes {
+                    id
+                    title {
+                      english
+                      romaji
+                    }
+                    coverImage {
+                      extraLarge
+                      large
+                    }
+                    bannerImage
+                    episodes
+                    format
+                    startDate {
+                      year
+                    }
+                  }
+                }
+              }
+            }
+        """.trimIndent()
+
+        val variables = buildJsonObject {
+            put("search", cleanSearch)
+        }
+
+        val root = executeGraphQL(query = graphQLQuery, variables = variables, token = null) ?: return emptyList()
+        val nodes = root.get("data")
+            .asJsonObjectOrNull()?.get("Studio")
+            .asJsonObjectOrNull()?.get("media")
+            .asJsonObjectOrNull()?.get("nodes")
+            .asJsonArrayOrNull() ?: return emptyList()
+
+        val seen = mutableSetOf<Int>()
+        return nodes.mapNotNull { element ->
+            val obj = element.asJsonObjectOrNull() ?: return@mapNotNull null
+            val id = obj["id"].asIntOrNull() ?: return@mapNotNull null
+            if (!seen.add(id)) return@mapNotNull null
+
+            val titleObj = obj["title"].asJsonObjectOrNull()
+            val engTitle = titleObj?.get("english").asStringOrNull()
+            val romTitle = titleObj?.get("romaji").asStringOrNull()
+            val displayTitle = engTitle ?: romTitle ?: return@mapNotNull null
+
+            val coverObj = obj["coverImage"].asJsonObjectOrNull()
+            val poster = coverObj?.get("extraLarge").asStringOrNull() ?: coverObj?.get("large").asStringOrNull() ?: return@mapNotNull null
+            val banner = obj["bannerImage"].asStringOrNull()
+            val format = obj["format"].asStringOrNull()
+            val episodes = obj["episodes"].asIntOrNull()
+            val year = obj["startDate"].asJsonObjectOrNull()?.get("year").asIntOrNull()
+
+            val isMovie = format.equals("MOVIE", ignoreCase = true) || episodes == 1
+            com.nuvio.app.features.home.MetaPreview(
+                id = "ani_$id",
+                type = if (isMovie) "movie" else "series",
+                name = displayTitle,
+                poster = poster,
+                banner = banner,
+                logo = null,
+                description = null,
+                releaseInfo = if (episodes != null) "$episodes Ep" else year?.toString(),
+            )
+        }
+    }
+
     suspend fun resolveArmAnilistId(source: String, id: String): Int? {
         val url = "https://arm.haglund.dev/api/v2/ids?source=$source&id=$id&include=anilist"
         return runCatching {

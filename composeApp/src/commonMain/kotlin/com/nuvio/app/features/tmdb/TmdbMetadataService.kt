@@ -161,30 +161,54 @@ object TmdbMetadataService {
                 )
             }
 
+            val resolvedPersonName = resolvePersonName(
+                localizedName = person.name,
+                originalName = person.originalName,
+                fallbackEnglishName = englishPerson?.name,
+                preferredLanguage = language,
+            ) ?: runBlocking { getString(Res.string.generic_unknown) }
+
+            // Fetch distinct standalone anime seasons for voice actors from AniList!
+            val anilistStaffMedia = coroutineScope {
+                val searchName = englishPerson?.name ?: person.name ?: resolvedPersonName
+                if (searchName.isNotBlank()) {
+                    runCatching {
+                        com.nuvio.app.features.anilist.AnilistApi.fetchStaffMedia(searchName)
+                    }.getOrNull().orEmpty()
+                } else emptyList()
+            }
+
+            val baseMovieCredits = selectPreferredCredits(
+                preferCrew = preferCrew,
+                castCredits = castMovieCredits,
+                crewCredits = crewMovieCredits,
+            )
+            val baseTvCredits = selectPreferredCredits(
+                preferCrew = preferCrew,
+                castCredits = castTvCredits,
+                crewCredits = crewTvCredits,
+            )
+
+            val (finalMovieCredits, finalTvCredits) = if (anilistStaffMedia.isNotEmpty()) {
+                val anilistMovies = anilistStaffMedia.filter { it.type == "movie" }
+                val anilistTv = anilistStaffMedia.filter { it.type == "series" }
+                (anilistMovies + baseMovieCredits).distinctBy { it.name.lowercase().trim() } to
+                    (anilistTv + baseTvCredits).distinctBy { it.name.lowercase().trim() }
+            } else {
+                baseMovieCredits to baseTvCredits
+            }
+
             val detail = PersonDetail(
                 tmdbId = person.id ?: personId,
-                name = resolvePersonName(
-                    localizedName = person.name,
-                    originalName = person.originalName,
-                    fallbackEnglishName = englishPerson?.name,
-                    preferredLanguage = language,
-                ) ?: runBlocking { getString(Res.string.generic_unknown) },
+                name = resolvedPersonName,
                 biography = biography,
                 birthday = person.birthday?.takeIf { it.isNotBlank() },
                 deathday = person.deathday?.takeIf { it.isNotBlank() },
                 placeOfBirth = person.placeOfBirth?.takeIf { it.isNotBlank() },
                 profilePhoto = buildImageUrl(person.profilePath, "w500"),
                 knownFor = person.knownForDepartment?.takeIf { it.isNotBlank() },
-                movieCredits = selectPreferredCredits(
-                    preferCrew = preferCrew,
-                    castCredits = castMovieCredits,
-                    crewCredits = crewMovieCredits,
-                ),
-                tvCredits = selectPreferredCredits(
-                    preferCrew = preferCrew,
-                    castCredits = castTvCredits,
-                    crewCredits = crewTvCredits,
-                ),
+                movieCredits = finalMovieCredits,
+                tvCredits = finalTvCredits,
             )
             personCache[cacheKey] = detail
             detail
@@ -407,19 +431,41 @@ object TmdbMetadataService {
             headerDeferred.await() to railDeferreds.awaitAll().filterNotNull()
         }
 
-        if (header == null && rails.isEmpty()) return@withContext null
+        val resolvedHeader = header ?: TmdbEntityHeader(
+            id = entityId,
+            kind = entityKind,
+            name = fallbackName?.takeIf { it.isNotBlank() } ?: runBlocking { getString(Res.string.generic_unknown) },
+            logo = null,
+            originCountry = null,
+            secondaryLabel = null,
+            description = null,
+        )
+
+        val studioName = fallbackName ?: resolvedHeader.name
+        val anilistStudioMedia = if (studioName.isNotBlank()) {
+            runCatching {
+                com.nuvio.app.features.anilist.AnilistApi.fetchStudioMedia(studioName)
+            }.getOrNull().orEmpty()
+        } else emptyList()
+
+        val finalRails = if (anilistStudioMedia.isNotEmpty()) {
+            val anilistRail = TmdbEntityRail(
+                mediaType = TmdbEntityMediaType.TV,
+                railType = TmdbEntityRailType.POPULAR,
+                items = anilistStudioMedia,
+                currentPage = 1,
+                hasMore = false,
+            )
+            listOf(anilistRail) + rails
+        } else {
+            rails
+        }
+
+        if (header == null && finalRails.isEmpty()) return@withContext null
 
         val data = TmdbEntityBrowseData(
-            header = header ?: TmdbEntityHeader(
-                id = entityId,
-                kind = entityKind,
-                name = fallbackName?.takeIf { it.isNotBlank() } ?: runBlocking { getString(Res.string.generic_unknown) },
-                logo = null,
-                originCountry = null,
-                secondaryLabel = null,
-                description = null,
-            ),
-            rails = rails,
+            header = resolvedHeader,
+            rails = finalRails,
         )
         entityBrowseCache[cacheKey] = data
         data
