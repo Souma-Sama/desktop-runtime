@@ -522,7 +522,6 @@ object MetaDetailsRepository {
                 if (tmdbEnriched != null) {
                     emitUpdate { current ->
                         val isAnilist = current.id.startsWith("ani_", ignoreCase = true) || current.id.startsWith("anilist:", ignoreCase = true)
-                        val anilistRecommendations = if (isAnilist) current.moreLikeThis else emptyList()
 
                         val mergedVideos = if (isAnilist) {
                             tmdbEnriched.videos.mapIndexed { idx, enrichedVid ->
