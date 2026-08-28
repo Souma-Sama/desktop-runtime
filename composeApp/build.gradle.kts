@@ -601,6 +601,12 @@ val generateRuntimeConfigs = tasks.register<GenerateRuntimeConfigsTask>("generat
 }
 
 val isMacHost = System.getProperty("os.name").contains("mac", ignoreCase = true)
+val isWindowsHost = System.getProperty("os.name").contains("windows", ignoreCase = true)
+val windowsPlayerBridgeArch = when (System.getProperty("os.arch").lowercase()) {
+    "amd64", "x64", "x86_64" -> "x64"
+    "aarch64", "arm64" -> "arm64"
+    else -> "x64"
+}
 val prepareMacosTorrServerResources = tasks.register<PrepareMacosTorrServerResourcesTask>("prepareMacosTorrServerResources") {
     enabled = isMacHost
     sourceDir.set(layout.projectDirectory.dir("src/desktopMain/torrserver"))
