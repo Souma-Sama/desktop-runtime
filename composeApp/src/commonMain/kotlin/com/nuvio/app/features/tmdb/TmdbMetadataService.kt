@@ -504,18 +504,20 @@ object TmdbMetadataService {
             description = null,
         )
 
-        val studioName = fallbackName ?: resolvedHeader.name
-        val anilistStudioMedia = if (studioName.isNotBlank()) {
+        val studioResolvedName = fallbackName ?: resolvedHeader.name
+        val resolvedStudioMedia = if (anilistStudioMedia.isNotEmpty()) {
+            anilistStudioMedia
+        } else if (studioResolvedName.isNotBlank() && studioResolvedName != studioName) {
             runCatching {
-                com.nuvio.app.features.anilist.AnilistApi.fetchStudioMedia(studioName)
+                com.nuvio.app.features.anilist.AnilistApi.fetchStudioMedia(studioResolvedName)
             }.getOrNull().orEmpty()
         } else emptyList()
 
-        val finalRails = if (anilistStudioMedia.isNotEmpty()) {
+        val finalRails = if (resolvedStudioMedia.isNotEmpty()) {
             val anilistRail = TmdbEntityRail(
                 mediaType = TmdbEntityMediaType.TV,
                 railType = TmdbEntityRailType.POPULAR,
-                items = anilistStudioMedia,
+                items = resolvedStudioMedia,
                 currentPage = 1,
                 hasMore = false,
             )
