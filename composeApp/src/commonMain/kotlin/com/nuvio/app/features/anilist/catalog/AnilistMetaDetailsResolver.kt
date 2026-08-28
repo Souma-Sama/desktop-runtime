@@ -11,7 +11,10 @@ import com.nuvio.app.features.details.MetaDetails
 import com.nuvio.app.features.details.MetaTrailer
 import com.nuvio.app.features.details.MetaVideo
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -66,10 +69,10 @@ object AnilistMetaDetailsResolver {
         val contentType = if (isMovie) "movie" else "series"
 
         // 4 & 5. Fetch Episode Data and Cinemeta in parallel
-        val (episodeMap, cinemetaMeta) = kotlinx.coroutines.coroutineScope {
+        val (episodeMap: Map<Int, KitsuEpisode>, cinemetaMeta: MetaDetails?) = coroutineScope {
             val kitsuDeferred = async {
                 if (!kitsuId.isNullOrBlank()) {
-                    kotlinx.coroutines.withTimeoutOrNull(1500L) {
+                    withTimeoutOrNull(1500L) {
                         fetchKitsuEpisodes(kitsuId)
                     } ?: emptyMap()
                 } else emptyMap()
@@ -78,7 +81,7 @@ object AnilistMetaDetailsResolver {
             val cinemetaDeferred = async {
                 if (!armImdbId.isNullOrBlank()) {
                     val cinemetaUrl = "https://v3-cinemeta.strem.io/meta/$contentType/$armImdbId.json"
-                    val cinemetaResponse = kotlinx.coroutines.withTimeoutOrNull(1500L) {
+                    val cinemetaResponse = withTimeoutOrNull(1500L) {
                         runCatching { httpGetText(cinemetaUrl) }.getOrNull()
                     }
                     if (!cinemetaResponse.isNullOrBlank()) {
