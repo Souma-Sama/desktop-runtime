@@ -605,19 +605,42 @@ object MetaDetailsRepository {
 
         // 3. MDBList job: External ratings (IMDb, TMDb, Trakt, RT, AniList) - Streams in independently!
         val mdbListJob = launch {
-            val mdbListRatings = runCatching {
-                withTimeoutOrNull(MDBLIST_ENRICH_TIMEOUT_MS) {
-                    MdbListMetadataService.enrichMeta(
-                        meta = meta,
-                        fallbackItemId = fallbackItemId,
-                        settings = settings,
-                    )
-                }?.externalRatings.orEmpty()
-            }.getOrNull().orEmpty()
+            if (isAnilist) {
+                // For anime, keep native AniList and MAL ratings, only updating MAL if MDBList fetched a verified MAL score
+                val mdbListRatings = runCatching {
+                    withTimeoutOrNull(MDBLIST_ENRICH_TIMEOUT_MS) {
+                        MdbListMetadataService.enrichMeta(
+                            meta = meta,
+                            fallbackItemId = fallbackItemId,
+                            settings = settings,
+                        )
+                    }?.externalRatings.orEmpty()
+                }.getOrNull().orEmpty()
 
-            if (mdbListRatings.isNotEmpty()) {
-                emitUpdate { current ->
-                    current.copy(externalRatings = mdbListRatings)
+                val malRating = mdbListRatings.firstOrNull { it.source == "mal" }
+                if (malRating != null) {
+                    emitUpdate { current ->
+                        val updated = current.externalRatings.map { r ->
+                            if (r.source == "mal") malRating else r
+                        }
+                        current.copy(externalRatings = updated)
+                    }
+                }
+            } else {
+                val mdbListRatings = runCatching {
+                    withTimeoutOrNull(MDBLIST_ENRICH_TIMEOUT_MS) {
+                        MdbListMetadataService.enrichMeta(
+                            meta = meta,
+                            fallbackItemId = fallbackItemId,
+                            settings = settings,
+                        )
+                    }?.externalRatings.orEmpty()
+                }.getOrNull().orEmpty()
+
+                if (mdbListRatings.isNotEmpty()) {
+                    emitUpdate { current ->
+                        current.copy(externalRatings = mdbListRatings)
+                    }
                 }
             }
         }

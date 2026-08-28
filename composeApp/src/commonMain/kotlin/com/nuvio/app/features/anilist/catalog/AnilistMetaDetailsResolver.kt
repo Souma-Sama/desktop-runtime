@@ -216,6 +216,24 @@ object AnilistMetaDetailsResolver {
             "${(score * 10).toInt() / 10.0}"
         } else null
 
+        val ratings = mutableListOf<com.nuvio.app.features.details.MetaExternalRating>()
+        if (media.averageScore != null && media.averageScore > 0) {
+            ratings.add(
+                com.nuvio.app.features.details.MetaExternalRating(
+                    source = "anilist",
+                    value = media.averageScore.toDouble(),
+                )
+            )
+            val malScore = (media.averageScore / 10.0)
+            val roundedMal = kotlin.math.round(malScore * 10.0) / 10.0
+            ratings.add(
+                com.nuvio.app.features.details.MetaExternalRating(
+                    source = "mal",
+                    value = roundedMal,
+                )
+            )
+        }
+
         val releaseYear = when {
             media.startDateYear != null -> "${media.startDateYear}"
             media.episodes != null -> "${media.episodes} Episodes"
@@ -234,6 +252,7 @@ object AnilistMetaDetailsResolver {
             status = media.status,
             lastAirDate = media.endDateYear?.toString() ?: releaseYear,
             imdbRating = formattedScore,
+            externalRatings = ratings,
             genres = media.genres,
             country = "JP",
             language = "ja",

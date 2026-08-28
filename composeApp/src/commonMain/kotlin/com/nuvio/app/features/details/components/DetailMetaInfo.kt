@@ -51,6 +51,7 @@ import com.nuvio.app.features.mdblist.MdbListMetadataService.PROVIDER_TMDB
 import com.nuvio.app.features.mdblist.MdbListMetadataService.PROVIDER_TOMATOES
 import com.nuvio.app.features.mdblist.MdbListMetadataService.PROVIDER_TRAKT
 import nuvio.composeapp.generated.resources.*
+import nuvio.composeapp.generated.resources.rating_anilist
 import nuvio.composeapp.generated.resources.rating_audience_score
 import nuvio.composeapp.generated.resources.rating_imdb
 import nuvio.composeapp.generated.resources.rating_letterboxd
@@ -58,6 +59,8 @@ import nuvio.composeapp.generated.resources.rating_metacritic
 import nuvio.composeapp.generated.resources.rating_rotten_tomatoes
 import nuvio.composeapp.generated.resources.rating_tmdb
 import nuvio.composeapp.generated.resources.rating_trakt
+
+const val PROVIDER_ANILIST = "anilist"
 import org.jetbrains.compose.resources.DrawableResource
 import org.jetbrains.compose.resources.getString
 import org.jetbrains.compose.resources.painterResource
@@ -316,6 +319,22 @@ private data class RatingVisuals(
 
 private val ratingVisuals = listOf(
     RatingVisuals(
+        source = PROVIDER_ANILIST,
+        displayName = "AniList",
+        logo = Res.drawable.rating_anilist,
+        logoWidth = 16.dp,
+        valueColor = Color(0xFF02A9FF),
+        format = ::formatPercent,
+    ),
+    RatingVisuals(
+        source = PROVIDER_MAL,
+        displayName = "MyAnimeList",
+        logo = Res.drawable.rating_mal,
+        logoWidth = 16.dp,
+        valueColor = Color(0xFF2E51A2),
+        format = ::formatOneDecimal,
+    ),
+    RatingVisuals(
         source = PROVIDER_IMDB,
         displayName = "IMDb",
         logo = Res.drawable.rating_imdb,
@@ -345,14 +364,6 @@ private val ratingVisuals = listOf(
         logo = Res.drawable.rating_letterboxd,
         logoWidth = 16.dp,
         valueColor = Color(0xFF00E054),
-        format = ::formatOneDecimal,
-    ),
-    RatingVisuals(
-        source = PROVIDER_MAL,
-        displayName = "MyAnimeList",
-        logo = Res.drawable.rating_mal,
-        logoWidth = 16.dp,
-        valueColor = Color(0xFF2E51A2),
         format = ::formatOneDecimal,
     ),
     RatingVisuals(

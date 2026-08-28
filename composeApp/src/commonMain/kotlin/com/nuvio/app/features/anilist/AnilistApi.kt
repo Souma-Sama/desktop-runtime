@@ -732,7 +732,7 @@ object AnilistApi {
         val nameObj = staffObj["name"].asJsonObjectOrNull()
         val fullName = nameObj?.get("full").asStringOrNull() ?: searchName.orEmpty()
         val photo = staffObj["image"].asJsonObjectOrNull()?.get("large").asStringOrNull()
-        val bio = staffObj["description"].asStringOrNull()
+        val bio = com.nuvio.app.core.format.cleanHtmlDescription(staffObj["description"].asStringOrNull())
 
         val dobObj = staffObj["dateOfBirth"].asJsonObjectOrNull()
         val dobYear = dobObj?.get("year").asIntOrNull()
@@ -897,7 +897,7 @@ object AnilistApi {
         val nameObj = charObj["name"].asJsonObjectOrNull()
         val fullName = nameObj?.get("full").asStringOrNull() ?: searchName.orEmpty()
         val photo = charObj["image"].asJsonObjectOrNull()?.get("large").asStringOrNull()
-        val bio = charObj["description"].asStringOrNull()
+        val bio = com.nuvio.app.core.format.cleanHtmlDescription(charObj["description"].asStringOrNull())
 
         val dobObj = charObj["dateOfBirth"].asJsonObjectOrNull()
         val dobYear = dobObj?.get("year").asIntOrNull()

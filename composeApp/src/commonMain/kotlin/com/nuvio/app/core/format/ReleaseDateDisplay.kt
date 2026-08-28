@@ -62,9 +62,17 @@ fun cleanHtmlDescription(raw: String?): String? {
     return raw
         .replace(Regex("<br\\s*/?>", RegexOption.IGNORE_CASE), "\n")
         .replace(Regex("<[^>]*>"), "")
-        .replace(Regex("~!.*?!~"), "")
-        .replace(Regex("\\|\\|.*?\\|\\|"), "")
+        .replace(Regex("~!.*?!~", RegexOption.DOT_MATCHES_ALL), "")
+        .replace(Regex("\\|\\|.*?\\|\\|", RegexOption.DOT_MATCHES_ALL), "")
+        // Strip lines that are just social/profile links: e.g. "[Profile](url) | [Twitter](url)"
+        .replace(Regex("(?m)^\\s*\\[[^\\]]+\\]\\([^)]+\\)(\\s*\\|\\s*\\[[^\\]]+\\]\\([^)]+\\))*\\s*$"), "")
+        // Replace remaining markdown links [Label](url) with just Label
         .replace(Regex("\\[(.*?)\\]\\(.*?\\)"), "$1")
+        // Clean bold/italic markdown underscores and asterisks
+        .replace(Regex("__(.*?)__"), "$1")
+        .replace(Regex("\\*\\*(.*?)\\*\\*"), "$1")
+        .replace(Regex("(?m)(^|\\s)_(.*?)_(?=\\s|:|\$)"), "$1$2")
+        .replace(Regex("(?m)(^|\\s)\\*(.*?)\\*(?=\\s|:|\$)"), "$1$2")
         .replace("&quot;", "\"")
         .replace("&amp;", "&")
         .replace("&lt;", "<")
@@ -72,10 +80,13 @@ fun cleanHtmlDescription(raw: String?): String? {
         .replace("&#039;", "'")
         .replace("&apos;", "'")
         .replace("&nbsp;", " ")
+        .replace("&mdash;", "—")
+        .replace("&ndash;", "–")
+        .replace("&hellip;", "…")
         .replace(Regex("(?i)\\(Source:.*?\\)"), "")
         .replace(Regex("(?i)\\[Written by.*?\\]"), "")
-        .replace(Regex("(?i)Source:.*"), "")
-        .replace(Regex("(?i)Note:.*"), "")
+        .replace(Regex("(?i)^Source:.*$", RegexOption.MULTILINE), "")
+        .replace(Regex("(?i)^Note:.*$", RegexOption.MULTILINE), "")
         .replace(Regex("\n{3,}"), "\n\n")
         .trim()
         .takeIf { it.isNotEmpty() }
