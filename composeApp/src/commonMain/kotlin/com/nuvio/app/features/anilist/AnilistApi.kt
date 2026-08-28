@@ -921,7 +921,7 @@ object AnilistApi {
                   url
                   site
                 }
-                characters(sort: RELEVANCE, role: MAIN, perPage: 16) {
+                characters(sort: RELEVANCE, perPage: 25) {
                   edges {
                     node {
                       id

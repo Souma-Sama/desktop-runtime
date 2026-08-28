@@ -552,6 +552,10 @@ object MetaDetailsRepository {
                         val anilistTrailers = if (isAnilist) (if (meta.trailers.isNotEmpty()) meta.trailers else current.trailers) else emptyList()
 
                         tmdbEnriched.copy(
+                            id = current.id,
+                            type = current.type,
+                            name = if (isAnilist) current.name else tmdbEnriched.name,
+                            genres = if (current.genres.isNotEmpty()) current.genres else tmdbEnriched.genres,
                             logo = current.logo ?: tmdbEnriched.logo ?: meta.logo,
                             background = current.background ?: tmdbEnriched.background ?: meta.background,
                             poster = current.poster ?: tmdbEnriched.poster ?: meta.poster,
