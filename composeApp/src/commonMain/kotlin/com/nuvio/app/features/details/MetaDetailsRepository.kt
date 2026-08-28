@@ -482,11 +482,9 @@ object MetaDetailsRepository {
             }
         }
 
-        val isAnilist = meta.id.startsWith("ani_", ignoreCase = true) || meta.id.startsWith("anilist:", ignoreCase = true)
-
-        // 2. TMDB job: Full credits, cast portraits, episodes, synopses (Only for standard non-anime movies/shows)
+        // 2. TMDB job: Full credits, cast portraits, episodes, synopses (~1-2s) - Streams in independently!
         val tmdbJob = launch {
-            if (!isAnilist && tmdbSettings.enabled && tmdbSettings.hasApiKey) {
+            if (tmdbSettings.enabled && tmdbSettings.hasApiKey) {
                 val tmdbEnriched = runCatching {
                     withTimeoutOrNull(TMDB_ENRICH_TIMEOUT_MS) {
                         TmdbMetadataService.enrichMeta(
@@ -499,11 +497,29 @@ object MetaDetailsRepository {
 
                 if (tmdbEnriched != null) {
                     emitUpdate { current ->
-                        val mergedVideos = tmdbEnriched.videos.mapIndexed { idx, enrichedVid ->
-                            val currentVid = current.videos.getOrNull(idx)
-                            if (!currentVid?.seasonPoster.isNullOrBlank()) {
-                                enrichedVid.copy(seasonPoster = currentVid.seasonPoster)
-                            } else enrichedVid
+                        val isAnilist = current.id.startsWith("ani_", ignoreCase = true) || current.id.startsWith("anilist:", ignoreCase = true)
+                        val anilistRecommendations = if (isAnilist) current.moreLikeThis else emptyList()
+
+                        val mergedVideos = if (isAnilist) {
+                            tmdbEnriched.videos.mapIndexed { idx, enrichedVid ->
+                                val baseVid = meta.videos.getOrNull(idx)
+                                val currentVid = current.videos.getOrNull(idx)
+                                var vid = enrichedVid
+                                if (vid.thumbnail.isNullOrBlank() && baseVid?.thumbnail?.isNotBlank() == true) {
+                                    vid = vid.copy(thumbnail = baseVid.thumbnail)
+                                }
+                                if (!currentVid?.seasonPoster.isNullOrBlank()) {
+                                    vid = vid.copy(seasonPoster = currentVid.seasonPoster)
+                                }
+                                vid
+                            }
+                        } else {
+                            tmdbEnriched.videos.mapIndexed { idx, enrichedVid ->
+                                val currentVid = current.videos.getOrNull(idx)
+                                if (!currentVid?.seasonPoster.isNullOrBlank()) {
+                                    enrichedVid.copy(seasonPoster = currentVid.seasonPoster)
+                                } else enrichedVid
+                            }
                         }
 
                         tmdbEnriched.copy(
@@ -511,6 +527,12 @@ object MetaDetailsRepository {
                             background = current.background ?: tmdbEnriched.background ?: meta.background,
                             poster = current.poster ?: tmdbEnriched.poster ?: meta.poster,
                             videos = mergedVideos,
+                            moreLikeThis = if (isAnilist && anilistRecommendations.isNotEmpty()) anilistRecommendations else tmdbEnriched.moreLikeThis,
+                            moreLikeThisSource = if (isAnilist && anilistRecommendations.isNotEmpty()) null else tmdbEnriched.moreLikeThisSource,
+                            description = if (isAnilist && !meta.description.isNullOrBlank()) meta.description else tmdbEnriched.description,
+                            releaseInfo = if (isAnilist && !meta.releaseInfo.isNullOrBlank()) meta.releaseInfo else (meta.releaseInfo ?: tmdbEnriched.releaseInfo),
+                            status = if (isAnilist && !meta.status.isNullOrBlank()) meta.status else tmdbEnriched.status,
+                            lastAirDate = if (isAnilist && !meta.lastAirDate.isNullOrBlank()) meta.lastAirDate else tmdbEnriched.lastAirDate,
                             externalRatings = current.externalRatings.ifEmpty { tmdbEnriched.externalRatings },
                         )
                     }
@@ -518,23 +540,21 @@ object MetaDetailsRepository {
             }
         }
 
-        // 3. MDBList job: External ratings (Only for standard non-anime movies/shows)
+        // 3. MDBList job: External ratings (IMDb, TMDb, Trakt, RT, AniList) - Streams in independently!
         val mdbListJob = launch {
-            if (!isAnilist) {
-                val mdbListRatings = runCatching {
-                    withTimeoutOrNull(MDBLIST_ENRICH_TIMEOUT_MS) {
-                        MdbListMetadataService.enrichMeta(
-                            meta = meta,
-                            fallbackItemId = fallbackItemId,
-                            settings = settings,
-                        )
-                    }?.externalRatings.orEmpty()
-                }.getOrNull().orEmpty()
+            val mdbListRatings = runCatching {
+                withTimeoutOrNull(MDBLIST_ENRICH_TIMEOUT_MS) {
+                    MdbListMetadataService.enrichMeta(
+                        meta = meta,
+                        fallbackItemId = fallbackItemId,
+                        settings = settings,
+                    )
+                }?.externalRatings.orEmpty()
+            }.getOrNull().orEmpty()
 
-                if (mdbListRatings.isNotEmpty()) {
-                    emitUpdate { current ->
-                        current.copy(externalRatings = mdbListRatings)
-                    }
+            if (mdbListRatings.isNotEmpty()) {
+                emitUpdate { current ->
+                    current.copy(externalRatings = mdbListRatings)
                 }
             }
         }
