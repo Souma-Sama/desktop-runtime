@@ -263,7 +263,7 @@ object AnilistMetaDetailsResolver {
             else -> null
         }
 
-        val ageRating = malMeta?.ageRating ?: if (media.isAdult == true) "18+" else "TV-14"
+        val ageRating = malMeta?.ageRating ?: if (media.genres.contains("Hentai")) "18+" else "TV-14"
         val runtime = if (media.duration != null && media.duration > 0) "${media.duration} min" else null
 
         MetaDetails(
