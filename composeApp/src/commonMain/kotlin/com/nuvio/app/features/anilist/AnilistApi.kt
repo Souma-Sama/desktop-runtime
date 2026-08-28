@@ -1252,17 +1252,26 @@ object AnilistApi {
     }
 
     private val malScoreCache = mutableMapOf<Int, Double>()
+    private val malRatingRegex = Regex("itemprop=[\"']ratingValue[\"'][^>]*>([0-9.]+)|class=[\"']score-label[^\"']*[\"']>([0-9.]+)")
 
     suspend fun fetchMalScore(idMal: Int): Double? = withContext(Dispatchers.Default) {
         if (idMal <= 0) return@withContext null
         malScoreCache[idMal]?.let { return@withContext it }
 
-        val score = runCatching {
+        val directScore = runCatching {
+            val url = "https://myanimelist.net/anime/$idMal"
+            val text = com.nuvio.app.features.addons.httpGetText(url) ?: return@runCatching null
+            val match = malRatingRegex.find(text)
+            val scoreStr = match?.groupValues?.getOrNull(1)?.takeIf { it.isNotBlank() }
+                ?: match?.groupValues?.getOrNull(2)?.takeIf { it.isNotBlank() }
+            scoreStr?.toDoubleOrNull()
+        }.getOrNull()
+
+        val score = directScore ?: runCatching {
             val url = "https://api.jikan.moe/v4/anime/$idMal"
             val text = com.nuvio.app.features.addons.httpGetText(url) ?: return@runCatching null
             val root = json.parseToJsonElement(text).asJsonObjectOrNull() ?: return@runCatching null
-            val scoreVal = root["data"]?.asJsonObjectOrNull()?.get("score")?.asDoubleOrNull()
-            scoreVal
+            root["data"]?.asJsonObjectOrNull()?.get("score")?.asDoubleOrNull()
         }.getOrNull()
 
         if (score != null && score > 0) {
