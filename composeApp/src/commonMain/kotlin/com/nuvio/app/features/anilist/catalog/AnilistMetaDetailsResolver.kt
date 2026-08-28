@@ -65,10 +65,14 @@ object AnilistMetaDetailsResolver {
         val armImdbId = cachedArm?.imdbId
         val targetSeason = cachedArm?.season ?: 1
 
+        val kitsuCover = if (media.bannerImage == null && !cachedArm?.kitsuId.isNullOrBlank()) {
+            fetchKitsuCover(cachedArm!!.kitsuId!!)
+        } else null
+
         val backdrop = if (!armImdbId.isNullOrBlank()) {
             "https://images.metahub.space/background/medium/$armImdbId/img"
         } else {
-            media.bannerImage
+            media.bannerImage ?: kitsuCover
         }
 
         val logo = if (!armImdbId.isNullOrBlank()) {
@@ -554,6 +558,19 @@ object AnilistMetaDetailsResolver {
         val overview: String?,
         val thumbnail: String?,
     )
+
+    private suspend fun fetchKitsuCover(kitsuId: String): String? = runCatching {
+        val cleanKitsuId = kitsuId.removePrefix("kitsu:")
+        val url = "https://kitsu.io/api/edge/anime/$cleanKitsuId"
+        val response = httpGetText(url) ?: return@runCatching null
+        val root = json.parseToJsonElement(response)
+        val coverObj = root.asJsonObjectOrNull()?.get("data")?.asJsonObjectOrNull()
+            ?.get("attributes")?.asJsonObjectOrNull()
+            ?.get("coverImage")?.asJsonObjectOrNull()
+        coverObj?.get("large")?.asStringOrNull()
+            ?: coverObj?.get("original")?.asStringOrNull()
+            ?: coverObj?.get("small")?.asStringOrNull()
+    }.getOrNull()
 
     private suspend fun fetchKitsuEpisodes(kitsuId: String): Map<Int, KitsuEpisodeData> = runCatching {
         val cleanKitsuId = kitsuId.removePrefix("kitsu:")
