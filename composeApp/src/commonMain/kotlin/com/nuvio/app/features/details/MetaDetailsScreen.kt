@@ -361,9 +361,20 @@ fun MetaDetailsScreen(
             return@LaunchedEffect
         }
 
-        val imdbId = extractImdbId(metaForRatings.id) ?: extractImdbId(id)
+        val isAnilistItem = metaForRatings.id.startsWith("ani_") || id.startsWith("ani_")
+        val armMapping = if (isAnilistItem) {
+            val anilistId = com.nuvio.app.features.anilist.AnilistTrackerCoordinator.extractAnilistId(metaForRatings.id)
+                ?: com.nuvio.app.features.anilist.AnilistTrackerCoordinator.extractAnilistId(id)
+            anilistId?.let { com.nuvio.app.features.anilist.catalog.AnilistMetaDetailsResolver.resolveArmMapping(it) }
+        } else null
+
+        val imdbId = extractImdbId(metaForRatings.id)
+            ?: extractImdbId(id)
+            ?: armMapping?.imdbId
+
         val tmdbId = extractTmdbId(metaForRatings.id)
             ?: extractTmdbId(id)
+            ?: armMapping?.tmdbId
             ?: TmdbService.ensureTmdbId(metaForRatings.id, metaForRatings.type)?.toIntOrNull()
             ?: TmdbService.ensureTmdbId(id, type)?.toIntOrNull()
 

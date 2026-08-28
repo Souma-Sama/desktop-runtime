@@ -168,10 +168,10 @@ object AnilistMetaDetailsResolver {
             (1..totalEps).map { epNum ->
                 val streamingEp = media.streamingEpisodes.getOrNull(epNum - 1)
                 val kitsuEp = kitsuEpisodes[epNum]
-                val epTitle = kitsuEp?.title?.takeIf { it.isNotBlank() }
+                val rawTitle = kitsuEp?.title?.takeIf { it.isNotBlank() }
                     ?: streamingEp?.title?.takeIf { it.isNotBlank() }
                     ?: media.title?.displayTitle
-                    ?: "Special $epNum"
+                val epTitle = cleanEpisodeTitle(rawTitle, epNum)
                 val epThumbnail = kitsuEp?.thumbnail?.takeIf { it.isNotBlank() }
                     ?: streamingEp?.thumbnail
                 val videoId = if (!kitsuId.isNullOrBlank()) "kitsu:$kitsuId:$epNum" else "anilist:$anilistId:$epNum"
@@ -191,9 +191,9 @@ object AnilistMetaDetailsResolver {
                 val actualEpNumber = epIdx + episodeOffset
                 val streamingEp = media.streamingEpisodes.getOrNull(epIdx - 1)
                 val kitsuEp = kitsuEpisodes[actualEpNumber] ?: kitsuEpisodes[epIdx]
-                val epTitle = kitsuEp?.title?.takeIf { it.isNotBlank() }
+                val rawTitle = kitsuEp?.title?.takeIf { it.isNotBlank() }
                     ?: streamingEp?.title?.takeIf { it.isNotBlank() }
-                    ?: "Episode $actualEpNumber"
+                val epTitle = cleanEpisodeTitle(rawTitle, actualEpNumber)
                 val epThumbnail = kitsuEp?.thumbnail?.takeIf { it.isNotBlank() }
                     ?: streamingEp?.thumbnail
                 val videoId = if (!kitsuId.isNullOrBlank()) "kitsu:$kitsuId:$actualEpNumber" else "anilist:$anilistId:$epIdx"
@@ -554,6 +554,16 @@ object AnilistMetaDetailsResolver {
                 } else null
             } else null
         }.getOrNull()
+    }
+
+    private fun cleanEpisodeTitle(rawTitle: String?, episodeNum: Int): String {
+        if (rawTitle.isNullOrBlank()) return "Episode $episodeNum"
+        val trimmed = rawTitle.trim()
+        val cleaned = trimmed
+            .replace(Regex("^(?:Episode|Ep\\.?|E|Special|#)\\s*\\d+\\s*[-:–—|~]\\s*", RegexOption.IGNORE_CASE), "")
+            .replace(Regex("^(?:Episode|Ep\\.?|E|Special|#)\\s*\\d+\\s*$", RegexOption.IGNORE_CASE), "")
+            .trim()
+        return cleaned.ifEmpty { "Episode $episodeNum" }
     }
 
     private data class KitsuEpisodeData(

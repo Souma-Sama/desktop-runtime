@@ -691,6 +691,7 @@ private fun EpisodeHorizontalCard(
     onClick: (() -> Unit)? = null,
     onLongPress: (() -> Unit)? = null,
 ) {
+    val displayTitle = remember(video.title, video.episode) { cleanDisplayEpisodeTitle(video.title, video.episode) }
     val cardShape = RoundedCornerShape(metrics.cornerRadius)
     val ratingLabel = remember(imdbRating) { imdbRating?.takeIf { it > 0.0 }?.let(::formatEpisodeRating) }
     val formattedDate = remember(video.released) { video.released?.let { formatReleaseDateForDisplay(it) } }
@@ -779,7 +780,7 @@ private fun EpisodeHorizontalCard(
             )
 
             Text(
-                text = video.title,
+                text = displayTitle,
                 style = MaterialTheme.typography.titleMedium.copy(
                     fontSize = metrics.titleTextSize,
                     fontWeight = FontWeight.ExtraBold,
@@ -1074,6 +1075,7 @@ private fun EpisodeListCard(
     onClick: (() -> Unit)? = null,
     onLongPress: (() -> Unit)? = null,
 ) {
+    val displayTitle = remember(video.title, video.episode) { cleanDisplayEpisodeTitle(video.title, video.episode) }
     val cardShape = RoundedCornerShape(sizing.cardRadius)
     val ratingLabel = remember(imdbRating) { imdbRating?.takeIf { it > 0.0 }?.let(::formatEpisodeRating) }
     val formattedDate = remember(video.released) { video.released?.let { formatReleaseDateForDisplay(it) } }
@@ -1157,7 +1159,7 @@ private fun EpisodeListCard(
                 verticalArrangement = Arrangement.spacedBy(sizing.contentSpacing),
             ) {
                 Text(
-                    text = video.title,
+                    text = displayTitle,
                     style = MaterialTheme.typography.titleMedium.copy(
                         fontSize = sizing.titleTextSize,
                         fontWeight = FontWeight.Bold,
@@ -1397,6 +1399,16 @@ private fun MetaVideo.episodeBadge(): String =
             localizedSeasonEpisodeCode(seasonNumber = season, episodeNumber = episode).orEmpty()
         else -> runBlocking { getString(Res.string.details_episode_badge_file) }
     }
+
+internal fun cleanDisplayEpisodeTitle(rawTitle: String?, episodeNum: Int?): String {
+    if (rawTitle.isNullOrBlank()) return if (episodeNum != null) "Episode $episodeNum" else ""
+    val trimmed = rawTitle.trim()
+    val cleaned = trimmed
+        .replace(Regex("^(?:Episode|Ep\\.?|E|Special|#)\\s*\\d+\\s*[-:–—|~]\\s*", RegexOption.IGNORE_CASE), "")
+        .replace(Regex("^(?:Episode|Ep\\.?|E|Special|#)\\s*\\d+\\s*$", RegexOption.IGNORE_CASE), "")
+        .trim()
+    return cleaned.ifEmpty { if (episodeNum != null) "Episode $episodeNum" else trimmed }
+}
 
 private fun MetaVideo.seasonEpisodeKey(): Pair<Int, Int>? {
     val seasonNumber = season ?: return null
