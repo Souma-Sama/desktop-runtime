@@ -39,14 +39,10 @@ object AnilistMetaDetailsResolver {
 
         // 1. Fetch base AniList media details
         val cached = AnilistApi.getCachedMedia(anilistId)
-        val media: AnilistMedia = if (cached != null && cached.characters.isNotEmpty() && cached.recommendations.isNotEmpty()) {
+        val media: AnilistMedia = if (cached != null && cached.characters.isNotEmpty() && cached.recommendations.isNotEmpty() && cached.studios.isNotEmpty()) {
             cached
         } else {
-            runCatching {
-                kotlinx.coroutines.withTimeoutOrNull(4000L) {
-                    AnilistApi.fetchMediaById(anilistId, token = token)
-                }
-            }.getOrNull() ?: cached
+            AnilistApi.fetchMediaById(anilistId, token = token) ?: cached
         } ?: return@withContext null
 
         // 2. Fast cache check for ARM mapping (0ms)
