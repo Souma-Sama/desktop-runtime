@@ -233,15 +233,17 @@ internal fun DetailRatingsRow(
             .horizontalScroll(scrollState)
             .padding(horizontal = horizontalScrollPadding),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(14.dp),
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         orderedRatings.forEach { (visuals, rating) ->
-            val ratingTextStyle = MaterialTheme.typography.titleSmall.copy(
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 0.sp,
+            val ratingTextStyle = MaterialTheme.typography.titleMedium.copy(
+                fontSize = 15.sp,
+                fontWeight = FontWeight.ExtraBold,
+                letterSpacing = (-0.2).sp,
             )
             Row(
                 verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 if (visuals.source == PROVIDER_IMDB && !AppFeaturePolicy.imdbRatingLogoEnabled) {
                     ImdbRatingSourceLabel(
@@ -252,10 +254,9 @@ internal fun DetailRatingsRow(
                     Image(
                         painter = painterResource(visuals.logo),
                         contentDescription = visuals.displayName,
-                        modifier = Modifier.size(width = visuals.logoWidth, height = 16.dp),
+                        modifier = Modifier.size(width = visuals.logoWidth, height = 20.dp),
                     )
                 }
-                Spacer(modifier = Modifier.width(4.dp))
                 Text(
                     text = visuals.format(rating.value),
                     style = ratingTextStyle,
@@ -358,7 +359,7 @@ private val ratingVisuals = listOf(
         source = PROVIDER_ANILIST,
         displayName = "AniList",
         logo = Res.drawable.rating_anilist,
-        logoWidth = 16.dp,
+        logoWidth = 20.dp,
         valueColor = Color(0xFF02A9FF),
         format = ::formatPercent,
     ),
@@ -366,7 +367,7 @@ private val ratingVisuals = listOf(
         source = PROVIDER_MAL,
         displayName = "MyAnimeList",
         logo = Res.drawable.rating_mal,
-        logoWidth = 16.dp,
+        logoWidth = 20.dp,
         valueColor = Color(0xFF2E51A2),
         format = ::formatTwoDecimals,
     ),
@@ -374,7 +375,7 @@ private val ratingVisuals = listOf(
         source = PROVIDER_IMDB,
         displayName = "IMDb",
         logo = Res.drawable.rating_imdb,
-        logoWidth = 30.dp,
+        logoWidth = 36.dp,
         valueColor = Color(0xFFF5C518),
         format = ::formatOneDecimal,
     ),
@@ -382,7 +383,7 @@ private val ratingVisuals = listOf(
         source = PROVIDER_TMDB,
         displayName = "TMDB",
         logo = Res.drawable.rating_tmdb,
-        logoWidth = 16.dp,
+        logoWidth = 20.dp,
         valueColor = Color(0xFF01B4E4),
         format = ::formatWhole,
     ),
@@ -390,7 +391,7 @@ private val ratingVisuals = listOf(
         source = PROVIDER_TRAKT,
         displayName = "Trakt",
         logo = Res.drawable.rating_trakt,
-        logoWidth = 16.dp,
+        logoWidth = 20.dp,
         valueColor = Color(0xFFED1C24),
         format = ::formatWhole,
     ),
@@ -398,7 +399,7 @@ private val ratingVisuals = listOf(
         source = PROVIDER_LETTERBOXD,
         displayName = "Letterboxd",
         logo = Res.drawable.rating_letterboxd,
-        logoWidth = 16.dp,
+        logoWidth = 20.dp,
         valueColor = Color(0xFF00E054),
         format = ::formatOneDecimal,
     ),
@@ -406,7 +407,7 @@ private val ratingVisuals = listOf(
         source = PROVIDER_TOMATOES,
         displayName = "Rotten Tomatoes",
         logo = Res.drawable.rating_rotten_tomatoes,
-        logoWidth = 16.dp,
+        logoWidth = 20.dp,
         valueColor = Color(0xFFFA320A),
         format = ::formatPercent,
     ),
@@ -414,7 +415,7 @@ private val ratingVisuals = listOf(
         source = PROVIDER_AUDIENCE,
         displayName = runBlocking { getString(Res.string.rating_audience_score) },
         logo = Res.drawable.rating_audience_score,
-        logoWidth = 16.dp,
+        logoWidth = 20.dp,
         valueColor = Color(0xFFFA320A),
         format = ::formatPercent,
     ),
@@ -422,7 +423,7 @@ private val ratingVisuals = listOf(
         source = PROVIDER_METACRITIC,
         displayName = "Metacritic",
         logo = Res.drawable.rating_metacritic,
-        logoWidth = 16.dp,
+        logoWidth = 20.dp,
         valueColor = Color(0xFFFFCC33),
         format = ::formatWhole,
     ),
