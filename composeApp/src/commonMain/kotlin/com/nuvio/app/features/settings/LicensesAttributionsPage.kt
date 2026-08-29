@@ -134,6 +134,18 @@ private fun LicensesAttributionsBody(
                 isTablet = isTablet,
             )
         }
+
+        PlainSettingsStack(
+            title = "Trademarks & Brand Assets",
+            isTablet = isTablet,
+        ) {
+            Text(
+                text = "All studio, network, and company trademarks and logos displayed in this application are the property of their respective owners and are used solely for informational identification purposes under nominative fair use. Nuvio is not endorsed by or affiliated with any of these entities.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(vertical = 4.dp),
+            )
+        }
     }
 }
 
