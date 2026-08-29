@@ -1,5 +1,6 @@
 package com.nuvio.app.features.anilist.catalog
 
+import co.touchlab.kermit.Logger
 import com.nuvio.app.features.addons.encodeUnsafeHttpUrlCharacters
 import com.nuvio.app.features.addons.httpGetText
 import com.nuvio.app.features.addons.httpGetTextWithHeaders

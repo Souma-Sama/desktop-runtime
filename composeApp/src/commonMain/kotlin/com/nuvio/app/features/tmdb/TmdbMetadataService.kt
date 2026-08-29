@@ -468,14 +468,22 @@ object TmdbMetadataService {
 
             if (anilistStudioMedia.isEmpty() && cleanName.isNotBlank()) {
                 // Secondary fallback: search AniList by keyword
-                anilistStudioMedia = runCatching {
-                    com.nuvio.app.features.anilist.AnilistApi.fetchCatalogPage(
-                        catalogId = "search",
-                        page = 1,
-                        perPage = 30,
-                        search = cleanName,
-                    ).items
+                val searchResults = runCatching {
+                    com.nuvio.app.features.anilist.AnilistApi.searchAnime(cleanName)
                 }.getOrNull().orEmpty()
+                anilistStudioMedia = searchResults.mapNotNull { media ->
+                    val poster = media.coverImage?.extraLarge ?: media.coverImage?.large ?: return@mapNotNull null
+                    com.nuvio.app.features.home.MetaPreview(
+                        id = "ani_${media.id}",
+                        type = if (media.format == "MOVIE" || media.episodes == 1) "movie" else "series",
+                        name = media.title?.displayTitle.orEmpty(),
+                        poster = poster,
+                        banner = media.bannerImage,
+                        logo = null,
+                        description = media.description,
+                        releaseInfo = media.startDateYear?.toString() ?: (if (media.episodes != null) "${media.episodes} Ep" else null),
+                    )
+                }
             }
 
             val seriesList = anilistStudioMedia.filter { it.type == "series" }
