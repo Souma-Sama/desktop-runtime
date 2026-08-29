@@ -38,7 +38,7 @@ jobs:
         env:
           NUVIO_MACOS_ARCH: arm64
         run: |
-          ./gradlew :composeApp:packageReleaseDmg \
+          ./gradlew clean :composeApp:packageReleaseDmg \
             -Pnuvio.macos.arch=arm64 \
             -Pcompose.desktop.packaging.checkJdkVendor=false \
             --no-configuration-cache \
@@ -60,6 +60,7 @@ jobs:
           name: Nuvio Kai Latest Release
           body: "Direct download of the latest Nuvio Kai macOS DMG."
           prerelease: true
+          overwrite: true
           files: composeApp/build/compose/release-dmgs/*.dmg
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
