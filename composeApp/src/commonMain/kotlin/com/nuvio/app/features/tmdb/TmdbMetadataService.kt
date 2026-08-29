@@ -571,9 +571,7 @@ object TmdbMetadataService {
         )
 
         val studioResolvedName = fallbackName ?: resolvedHeader.name
-        val resolvedStudioMedia = if (anilistStudioMedia.isNotEmpty()) {
-            anilistStudioMedia
-        } else if (studioResolvedName.isNotBlank() && studioResolvedName != studioName) {
+        val resolvedStudioMedia = if (studioResolvedName.isNotBlank() && rails.isEmpty()) {
             runCatching {
                 com.nuvio.app.features.anilist.AnilistApi.fetchStudioMedia(studioResolvedName)
             }.getOrNull().orEmpty()
