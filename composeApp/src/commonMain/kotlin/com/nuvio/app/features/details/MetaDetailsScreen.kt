@@ -2298,6 +2298,23 @@ private fun ConfiguredMetaSections(
                 }
             }
             MetaScreenSectionKey.MORE_LIKE_THIS -> {
+                if (meta.relations.isNotEmpty()) {
+                    com.nuvio.app.features.details.components.DetailRelationsSection(
+                        relations = meta.relations,
+                        showHeader = showHeader,
+                        horizontalScrollPadding = horizontalScrollPadding,
+                        onRelationClick = { relation ->
+                            onOpenMeta(
+                                com.nuvio.app.features.home.MetaPreview(
+                                    id = relation.id,
+                                    type = relation.type,
+                                    name = relation.title,
+                                    poster = relation.poster,
+                                )
+                            )
+                        },
+                    )
+                }
                 if (hasMoreLikeThisSection) {
                     val sourceLabel = when (meta.moreLikeThisSource) {
                         MoreLikeThisSource.TMDB -> stringResource(Res.string.detail_more_like_this_powered_by_tmdb)

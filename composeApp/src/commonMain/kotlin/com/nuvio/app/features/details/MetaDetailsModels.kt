@@ -36,8 +36,21 @@ data class MetaDetails(
     val collectionName: String? = null,
     val collectionItems: List<MetaPreview> = emptyList(),
     val trailers: List<MetaTrailer> = emptyList(),
+    val relations: List<MetaRelation> = emptyList(),
+    val nextAiringEpisode: String? = null,
     val links: List<MetaLink> = emptyList(),
     val videos: List<MetaVideo> = emptyList(),
+)
+
+data class MetaRelation(
+    val id: String,
+    val type: String,
+    val relationType: String,
+    val title: String,
+    val poster: String? = null,
+    val format: String? = null,
+    val episodes: Int? = null,
+    val status: String? = null,
 )
 
 enum class MoreLikeThisSource {

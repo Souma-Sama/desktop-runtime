@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -256,6 +257,13 @@ internal fun AppTabHost(
                             )
                         }
 
+                        AppScreenTab.AniChart -> {
+                            com.nuvio.app.features.anilist.anichart.AniChartScreen(
+                                onAnimeClick = { preview -> actions.onPosterClick?.invoke(preview) },
+                                topChromePadding = state.topChromePadding,
+                            )
+                        }
+
                         AppScreenTab.Library -> {
                             LibraryScreen(
                                 modifier = Modifier.fillMaxSize(),
@@ -356,6 +364,23 @@ internal fun TabletFloatingTopBar(
                             contentDescription = stringResource(Res.string.compose_nav_search),
                             modifier = Modifier.size(NuvioTokens.Space.s18),
                             tint = if (selectedTab == AppScreenTab.Search) {
+                                tokens.colors.textPrimary
+                            } else {
+                                tokens.colors.textMuted
+                            },
+                        )
+                    },
+                )
+                TabletTopPillItem(
+                    label = "AniChart",
+                    selected = selectedTab == AppScreenTab.AniChart,
+                    onClick = { onTabSelected(AppScreenTab.AniChart) },
+                    icon = {
+                        Icon(
+                            imageVector = Icons.Rounded.CalendarMonth,
+                            contentDescription = "AniChart",
+                            modifier = Modifier.size(NuvioTokens.Space.s18),
+                            tint = if (selectedTab == AppScreenTab.AniChart) {
                                 tokens.colors.textPrimary
                             } else {
                                 tokens.colors.textMuted
@@ -622,6 +647,19 @@ internal fun DesktopHoverSidebar(
                     Icon(
                         painter = painterResource(Res.drawable.sidebar_search),
                         contentDescription = stringResource(Res.string.compose_nav_search),
+                        modifier = Modifier.size(DesktopSidebarIconSize),
+                        tint = color,
+                    )
+                }
+                DesktopSidebarItem(
+                    label = "AniChart",
+                    selected = selectedTab == AppScreenTab.AniChart,
+                    expanded = sidebarExpanded,
+                    onClick = { selectTab(AppScreenTab.AniChart) },
+                ) { color ->
+                    Icon(
+                        imageVector = Icons.Rounded.CalendarMonth,
+                        contentDescription = "AniChart",
                         modifier = Modifier.size(DesktopSidebarIconSize),
                         tint = color,
                     )

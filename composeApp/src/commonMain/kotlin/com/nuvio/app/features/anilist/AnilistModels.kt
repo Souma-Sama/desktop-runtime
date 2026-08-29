@@ -157,6 +157,9 @@ data class AnilistRelation(
     val title: AnilistTitle? = null,
     val format: String? = null,
     val episodes: Int? = null,
+    val status: String? = null,
+    val coverImage: AnilistCoverImage? = null,
+    val bannerImage: String? = null,
     val relations: List<AnilistRelation> = emptyList(),
 )
 

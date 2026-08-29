@@ -392,5 +392,38 @@ private fun DesktopHeroMetaRow(meta: MetaDetails) {
                 )
             }
         }
+        meta.nextAiringEpisode?.takeIf { it.isNotBlank() }?.let { countdown ->
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(androidx.compose.ui.graphics.Color(0xFF10B981).copy(alpha = 0.18f))
+                    .border(
+                        1.dp,
+                        androidx.compose.ui.graphics.Color(0xFF10B981).copy(alpha = 0.5f),
+                        RoundedCornerShape(6.dp),
+                    )
+                    .padding(horizontal = 8.dp, vertical = 3.dp),
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(5.dp),
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(6.dp)
+                            .clip(RoundedCornerShape(3.dp))
+                            .background(androidx.compose.ui.graphics.Color(0xFF10B981))
+                    )
+                    Text(
+                        text = countdown,
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 11.sp,
+                        ),
+                        color = androidx.compose.ui.graphics.Color(0xFF34D399),
+                    )
+                }
+            }
+        }
     }
 }

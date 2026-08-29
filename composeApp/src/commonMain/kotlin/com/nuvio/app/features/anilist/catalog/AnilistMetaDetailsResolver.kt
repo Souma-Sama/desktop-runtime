@@ -161,6 +161,53 @@ object AnilistMetaDetailsResolver {
             )
         }
 
+        val relations = media.relations.mapNotNull { rel ->
+            val relTitle = rel.title?.displayTitle?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
+            val relPoster = rel.coverImage?.extraLarge ?: rel.coverImage?.large
+            val isRelMovie = rel.format == "MOVIE" || rel.episodes == 1
+            val relType = if (isRelMovie) "movie" else "series"
+            val relationLabel = when (rel.relationType?.uppercase()) {
+                "PREQUEL" -> "Prequel"
+                "SEQUEL" -> "Sequel"
+                "PARENT" -> "Parent Story"
+                "SIDE_STORY" -> "Side Story"
+                "SPIN_OFF" -> "Spin-Off"
+                "ALTERNATIVE" -> "Alternative"
+                "SUMMARY" -> "Summary"
+                "CHARACTER" -> "Character"
+                "OTHER" -> "Other"
+                else -> rel.relationType?.replace('_', ' ')?.lowercase()?.replaceFirstChar { it.uppercase() } ?: "Related"
+            }
+            com.nuvio.app.features.details.MetaRelation(
+                id = "ani_${rel.id}",
+                type = relType,
+                relationType = relationLabel,
+                title = relTitle,
+                poster = relPoster,
+                format = rel.format,
+                episodes = rel.episodes,
+                status = rel.status,
+            )
+        }
+
+        val nextAiringCountdown = media.nextAiringEpisode?.let { nextEp ->
+            val epNum = nextEp.episode ?: return@let null
+            val timeUntil = nextEp.timeUntilAiring
+            if (timeUntil != null && timeUntil > 0) {
+                val days = timeUntil / 86400
+                val hours = (timeUntil % 86400) / 3600
+                val mins = (timeUntil % 3600) / 60
+                val timeFormatted = when {
+                    days > 0 -> "${days}d ${hours}h"
+                    hours > 0 -> "${hours}h ${mins}m"
+                    else -> "${mins}m"
+                }
+                "Ep $epNum in $timeFormatted"
+            } else {
+                "Ep $epNum Airing Soon"
+            }
+        }
+
         val primaryTrailer = if (media.trailer != null && media.trailer.id != null) {
             com.nuvio.app.features.details.MetaTrailer(
                 id = media.trailer.id,
@@ -322,6 +369,8 @@ object AnilistMetaDetailsResolver {
             productionCompanies = animationStudios,
             networks = networks,
             moreLikeThis = recommendations,
+            relations = relations,
+            nextAiringEpisode = nextAiringCountdown,
             trailers = trailers,
             director = directors,
             writer = writers,
@@ -599,6 +648,53 @@ object AnilistMetaDetailsResolver {
 
         val anilistCast = media?.let { buildCategorizedCast(it) }.orEmpty()
 
+        val relations = media?.relations?.mapNotNull { rel ->
+            val relTitle = rel.title?.displayTitle?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
+            val relPoster = rel.coverImage?.extraLarge ?: rel.coverImage?.large
+            val isRelMovie = rel.format == "MOVIE" || rel.episodes == 1
+            val relType = if (isRelMovie) "movie" else "series"
+            val relationLabel = when (rel.relationType?.uppercase()) {
+                "PREQUEL" -> "Prequel"
+                "SEQUEL" -> "Sequel"
+                "PARENT" -> "Parent Story"
+                "SIDE_STORY" -> "Side Story"
+                "SPIN_OFF" -> "Spin-Off"
+                "ALTERNATIVE" -> "Alternative"
+                "SUMMARY" -> "Summary"
+                "CHARACTER" -> "Character"
+                "OTHER" -> "Other"
+                else -> rel.relationType?.replace('_', ' ')?.lowercase()?.replaceFirstChar { it.uppercase() } ?: "Related"
+            }
+            com.nuvio.app.features.details.MetaRelation(
+                id = "ani_${rel.id}",
+                type = relType,
+                relationType = relationLabel,
+                title = relTitle,
+                poster = relPoster,
+                format = rel.format,
+                episodes = rel.episodes,
+                status = rel.status,
+            )
+        }.orEmpty()
+
+        val nextAiringCountdown = media?.nextAiringEpisode?.let { nextEp ->
+            val epNum = nextEp.episode ?: return@let null
+            val timeUntil = nextEp.timeUntilAiring
+            if (timeUntil != null && timeUntil > 0) {
+                val days = timeUntil / 86400
+                val hours = (timeUntil % 86400) / 3600
+                val mins = (timeUntil % 3600) / 60
+                val timeFormatted = when {
+                    days > 0 -> "${days}d ${hours}h"
+                    hours > 0 -> "${hours}h ${mins}m"
+                    else -> "${mins}m"
+                }
+                "Ep $epNum in $timeFormatted"
+            } else {
+                "Ep $epNum Airing Soon"
+            }
+        }
+
         cinemetaMeta.copy(
             id = rawId,
             name = media?.title?.displayTitle ?: cinemetaMeta.name,
@@ -610,6 +706,8 @@ object AnilistMetaDetailsResolver {
             background = cinemetaMeta.background ?: "https://images.metahub.space/background/medium/$effectiveImdbId/img",
             logo = cinemetaMeta.logo ?: "https://images.metahub.space/logo/medium/$effectiveImdbId/img",
             cast = if (anilistCast.isNotEmpty()) anilistCast else cinemetaMeta.cast,
+            relations = relations,
+            nextAiringEpisode = nextAiringCountdown,
             videos = seasonVideos,
             moreLikeThis = recommendations.ifEmpty { cinemetaMeta.moreLikeThis },
         )
