@@ -1429,9 +1429,17 @@ object AnilistApi {
                 }
                 startDate {
                   year
+                  month
+                  day
                 }
                 endDate {
                   year
+                }
+                airingSchedule(perPage: 50) {
+                  nodes {
+                    episode
+                    airingAt
+                  }
                 }
                 staff(perPage: 15) {
                   edges {
@@ -1683,8 +1691,19 @@ object AnilistApi {
                 if (sName != null) AnilistStaff(name = sName, role = sRole) else null
             }.orEmpty()
 
-        val startYear = obj["startDate"].asJsonObjectOrNull()?.get("year").asIntOrNull()
+        val startDateObj = obj["startDate"].asJsonObjectOrNull()
+        val startYear = startDateObj?.get("year").asIntOrNull()
+        val startMonth = startDateObj?.get("month").asIntOrNull()
+        val startDay = startDateObj?.get("day").asIntOrNull()
         val endYear = obj["endDate"].asJsonObjectOrNull()?.get("year").asIntOrNull()
+
+        val scheduleNodes = obj["airingSchedule"].asJsonObjectOrNull()?.get("nodes").asJsonArrayOrNull()
+        val airingScheduleMap = scheduleNodes?.mapNotNull { item ->
+            val node = item.asJsonObjectOrNull() ?: return@mapNotNull null
+            val ep = node["episode"].asIntOrNull() ?: return@mapNotNull null
+            val airingAt = node["airingAt"].asLongOrNull() ?: return@mapNotNull null
+            ep to airingAt
+        }?.toMap().orEmpty()
 
         val relations = parseRelations(obj)
 
@@ -1712,7 +1731,10 @@ object AnilistApi {
             trailer = trailer,
             staff = staff,
             startDateYear = startYear,
+            startDateMonth = startMonth,
+            startDateDay = startDay,
             endDateYear = endYear,
+            airingSchedule = airingScheduleMap,
             mediaListEntry = mediaListEntry,
             relations = relations,
         )

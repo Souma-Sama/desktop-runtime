@@ -139,7 +139,10 @@ data class AnilistMedia(
     val trailer: AnilistTrailerInfo? = null,
     val staff: List<AnilistStaff> = emptyList(),
     val startDateYear: Int? = null,
+    val startDateMonth: Int? = null,
+    val startDateDay: Int? = null,
     val endDateYear: Int? = null,
+    val airingSchedule: Map<Int, Long> = emptyMap(),
     val mediaListEntry: AnilistMediaListEntry? = null,
     val relations: List<AnilistRelation> = emptyList(),
 )

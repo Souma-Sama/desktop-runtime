@@ -353,9 +353,8 @@ fun MetaDetailsScreen(
         isCommentsLoading = false
     }
 
-    LaunchedEffect(displayedMeta?.id, displayedMeta?.videos, deferredMetaWorkAllowed) {
+    LaunchedEffect(displayedMeta?.id, id) {
         val metaForRatings = displayedMeta
-        if (!deferredMetaWorkAllowed) return@LaunchedEffect
         if (metaForRatings == null || !metaForRatings.isSeriesLikeForEpisodeRatings()) {
             episodeImdbRatings = emptyMap()
             return@LaunchedEffect
@@ -375,8 +374,6 @@ fun MetaDetailsScreen(
         val tmdbId = extractTmdbId(metaForRatings.id)
             ?: extractTmdbId(id)
             ?: armMapping?.tmdbId
-            ?: TmdbService.ensureTmdbId(metaForRatings.id, metaForRatings.type)?.toIntOrNull()
-            ?: TmdbService.ensureTmdbId(id, type)?.toIntOrNull()
 
         if (imdbId == null && tmdbId == null) {
             episodeImdbRatings = emptyMap()
@@ -389,27 +386,8 @@ fun MetaDetailsScreen(
         )
     }
 
-    LaunchedEffect(type, id, displayedMeta, uiState.isLoading, autoLoadAttempted) {
-        if (!autoLoadAttempted && displayedMeta == null && !uiState.isLoading) {
-            autoLoadAttempted = true
-            MetaDetailsRepository.load(type, id)
-        }
-    }
-
-    LaunchedEffect(
-        type,
-        id,
-        displayedMeta?.id,
-        uiState.isLoading,
-        trackingSettingsUiState.moreLikeThisSource,
-        traktAuthUiState.mode,
-        tmdbSettingsUiState.enabled,
-        tmdbSettingsUiState.useMoreLikeThis,
-        tmdbSettingsUiState.language,
-    ) {
-        if (displayedMeta != null && !uiState.isLoading) {
-            MetaDetailsRepository.load(type, id)
-        }
+    LaunchedEffect(type, id) {
+        MetaDetailsRepository.load(type, id)
     }
 
     LaunchedEffect(networkStatusUiState.condition, displayedMeta, uiState.isLoading, type, id) {

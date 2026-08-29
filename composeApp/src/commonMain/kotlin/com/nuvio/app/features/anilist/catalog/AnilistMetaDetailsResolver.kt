@@ -236,7 +236,7 @@ object AnilistMetaDetailsResolver {
                     overview = kitsuEp?.overview,
                     thumbnail = epThumbnail,
                     runtime = media.duration,
-                    released = kitsuEp?.airdate,
+                    released = resolveEpisodeAirDate(epNum, kitsuEp?.airdate, null, media),
                     streams = emptyList(),
                 )
             }
@@ -264,7 +264,7 @@ object AnilistMetaDetailsResolver {
                     overview = kitsuEp?.overview,
                     thumbnail = epThumbnail,
                     runtime = media.duration,
-                    released = kitsuEp?.airdate,
+                    released = resolveEpisodeAirDate(actualEpNumber, kitsuEp?.airdate, null, media),
                     streams = emptyList(),
                 )
             }
@@ -468,7 +468,7 @@ object AnilistMetaDetailsResolver {
                         title = matchedSpecial.title?.takeIf { it.isNotBlank() } ?: media?.title?.displayTitle ?: "Special",
                         thumbnail = matchedSpecial.thumbnail?.takeIf { it.isNotBlank() }
                             ?: "https://episodes.metahub.space/$effectiveImdbId/0/$epNum/w780.jpg",
-                        released = kitsuEp?.airdate ?: matchedSpecial.released,
+                        released = resolveEpisodeAirDate(epNum, kitsuEp?.airdate, matchedSpecial.released, media),
                     )
                 )
             } else {
@@ -483,7 +483,7 @@ object AnilistMetaDetailsResolver {
                         title = v.title?.takeIf { it.isNotBlank() } ?: "Special $epNum",
                         thumbnail = v.thumbnail?.takeIf { it.isNotBlank() }
                             ?: "https://episodes.metahub.space/$effectiveImdbId/0/$epNum/w780.jpg",
-                        released = kitsuEp?.airdate ?: v.released,
+                        released = resolveEpisodeAirDate(epNum, kitsuEp?.airdate, v.released, media),
                     )
                 }
             }
@@ -512,7 +512,7 @@ object AnilistMetaDetailsResolver {
                     thumbnail = epThumbnail,
                     overview = kitsuEp?.overview,
                     runtime = media?.duration,
-                    released = kitsuEp?.airdate,
+                    released = resolveEpisodeAirDate(epNum, kitsuEp?.airdate, null, media),
                 )
             }
         } else if (targetSeason > 1 && cinemetaMeta.videos.any { it.season == targetSeason }) {
@@ -540,7 +540,7 @@ object AnilistMetaDetailsResolver {
                     title = epTitle,
                     thumbnail = epThumbnail,
                     overview = kitsuEp?.overview ?: cinemetaEp?.overview,
-                    released = kitsuEp?.airdate ?: cinemetaEp?.released,
+                    released = resolveEpisodeAirDate(actualEpNumber, kitsuEp?.airdate, cinemetaEp?.released, media),
                     streams = cinemetaEp?.streams.orEmpty(),
                     runtime = media?.duration ?: cinemetaEp?.runtime,
                 )
@@ -565,7 +565,7 @@ object AnilistMetaDetailsResolver {
                     thumbnail = epThumbnail,
                     overview = kitsuEp?.overview,
                     runtime = media.duration,
-                    released = kitsuEp?.airdate,
+                    released = resolveEpisodeAirDate(actualEpNumber, kitsuEp?.airdate, null, media),
                 )
             }
         } else {
@@ -593,7 +593,7 @@ object AnilistMetaDetailsResolver {
                     title = epTitle,
                     thumbnail = epThumbnail,
                     overview = kitsuEp?.overview ?: cinemetaEp?.overview,
-                    released = kitsuEp?.airdate ?: cinemetaEp?.released,
+                    released = resolveEpisodeAirDate(actualEpNumber, kitsuEp?.airdate, cinemetaEp?.released, media),
                     streams = cinemetaEp?.streams.orEmpty(),
                     runtime = media?.duration ?: cinemetaEp?.runtime,
                 )
@@ -621,6 +621,44 @@ object AnilistMetaDetailsResolver {
             videos = seasonVideos,
             moreLikeThis = recommendations.ifEmpty { cinemetaMeta.moreLikeThis },
         )
+    }
+
+    private fun resolveEpisodeAirDate(
+        actualEpNumber: Int,
+        kitsuAirdate: String?,
+        cinemetaReleased: String?,
+        media: AnilistMedia?,
+    ): String? {
+        // 1. Genuine airdate from Kitsu
+        if (!kitsuAirdate.isNullOrBlank()) return kitsuAirdate
+
+        // 2. Genuine release date from Cinemeta
+        if (!cinemetaReleased.isNullOrBlank()) return cinemetaReleased
+
+        // 3. AniList airing schedule (exact epoch timestamp for each episode)
+        val airingAt = media?.airingSchedule?.get(actualEpNumber)
+        if (airingAt != null && airingAt > 0) {
+            val isoDate = com.nuvio.app.core.time.EpisodeReleaseDatePlatform.localIsoDateAtEpochMs(airingAt * 1000L)
+            if (!isoDate.isNullOrBlank()) return isoDate
+        }
+
+        // 4. AniList startDate calculation (exact broadcast schedule for weekly airing series)
+        val startYear = media?.startDateYear
+        val startMonth = media?.startDateMonth
+        val startDay = media?.startDateDay
+        if (startYear != null && startMonth != null && startDay != null && startYear in 1900..2100 && startMonth in 1..12 && startDay in 1..31) {
+            val formattedStartDate = "${startYear.toString().padStart(4, '0')}-${startMonth.toString().padStart(2, '0')}-${startDay.toString().padStart(2, '0')}"
+            if (actualEpNumber <= 1) {
+                return formattedStartDate
+            } else {
+                val startEpochMs = com.nuvio.app.core.time.isoEpochDay(formattedStartDate) * 86_400_000L
+                val epEpochMs = startEpochMs + (actualEpNumber - 1) * 7L * 86_400_000L
+                val epIsoDate = com.nuvio.app.core.time.EpisodeReleaseDatePlatform.localIsoDateAtEpochMs(epEpochMs)
+                if (!epIsoDate.isNullOrBlank()) return epIsoDate
+            }
+        }
+
+        return null
     }
 
     private fun String.cleanAnilistDescription(): String {
