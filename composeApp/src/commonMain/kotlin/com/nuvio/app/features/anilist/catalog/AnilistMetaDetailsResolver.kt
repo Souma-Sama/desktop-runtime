@@ -46,7 +46,7 @@ object AnilistMetaDetailsResolver {
         // ── Step 1: Fetch AniList media (the single source of truth) ──
         // This is the ONLY required network call. Everything else is optional enrichment.
         val cached = AnilistApi.getCachedMedia(anilistId)
-        val media: AnilistMedia = if (cached != null && cached.characters.isNotEmpty() && cached.recommendations.isNotEmpty() && cached.studios.isNotEmpty()) {
+        val media: AnilistMedia = if (cached != null && cached.isFullDetails) {
             cached
         } else {
             runCatching {
@@ -390,7 +390,9 @@ object AnilistMetaDetailsResolver {
                 videos = mappedVideos,
                 defaultVideoId = if (isMovie) (if (!kitsuId.isNullOrBlank()) "kitsu:$kitsuId" else "anilist:$anilistId") else mappedVideos.firstOrNull()?.id,
             ).also { resolvedDetails ->
-                resolvedMetaDetailsCache[rawId] = resolvedDetails
+                if (media.isFullDetails) {
+                    resolvedMetaDetailsCache[rawId] = resolvedDetails
+                }
             }
         }
     }
@@ -443,7 +445,8 @@ object AnilistMetaDetailsResolver {
     ): MetaDetails = withContext(Dispatchers.Default) {
         val anilistId = AnilistTrackerCoordinator.extractAnilistId(rawId) ?: return@withContext cinemetaMeta
         val token = AnilistAuthRepository.token.value
-        val media: AnilistMedia? = AnilistApi.getCachedMedia(anilistId) ?: AnilistApi.fetchMediaById(anilistId, token = token)
+        val media: AnilistMedia? = AnilistApi.getCachedMedia(anilistId)?.takeIf { it.isFullDetails }
+            ?: AnilistApi.fetchMediaById(anilistId, token = token)
         val mapping = resolveArmMapping(anilistId)
 
         val anilistPoster = media?.coverImage?.extraLarge
@@ -488,13 +491,93 @@ object AnilistMetaDetailsResolver {
             fetchKitsuEpisodes(kitsuId)
         } else emptyMap()
 
+        val releaseYear = when {
+            media?.startDateYear != null -> "${media.startDateYear}"
+            else -> cinemetaMeta.releaseInfo
+        }
+
+        val cleanDesc = com.nuvio.app.core.format.cleanHtmlDescription(media?.description)
+            ?: cinemetaMeta.description
+
+        val anilistCast = media?.let { buildCategorizedCast(it) }.orEmpty()
+
+        val animationStudios = media?.studios?.filter { it.isAnimationStudio }?.mapNotNull { studio ->
+            studio.name?.takeIf { it.isNotBlank() }?.let { name ->
+                com.nuvio.app.features.details.MetaCompany(
+                    name = name,
+                    logo = AnimeStudioLogos.findLogo(name),
+                )
+            }
+        }.orEmpty()
+
+        val networks = media?.studios?.filter { !it.isAnimationStudio }?.mapNotNull { studio ->
+            studio.name?.takeIf { it.isNotBlank() }?.let { name ->
+                com.nuvio.app.features.details.MetaCompany(
+                    name = name,
+                    logo = AnimeStudioLogos.findLogo(name),
+                )
+            }
+        }.orEmpty()
+
+        val relations = media?.relations?.mapNotNull { rel ->
+            val relTitle = rel.title?.displayTitle?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
+            val relPoster = rel.coverImage?.extraLarge ?: rel.coverImage?.large
+            val isRelMovie = rel.format == "MOVIE" || rel.episodes == 1
+            val relType = if (isRelMovie) "movie" else "series"
+            val relationLabel = when (rel.relationType?.uppercase()) {
+                "PREQUEL" -> "Prequel"
+                "SEQUEL" -> "Sequel"
+                "PARENT" -> "Parent Story"
+                "SIDE_STORY" -> "Side Story"
+                "SPIN_OFF" -> "Spin-Off"
+                "ALTERNATIVE" -> "Alternative"
+                "SUMMARY" -> "Summary"
+                "CHARACTER" -> "Character"
+                "OTHER" -> "Other"
+                else -> rel.relationType?.replace('_', ' ')?.lowercase()?.replaceFirstChar { it.uppercase() } ?: "Related"
+            }
+            com.nuvio.app.features.details.MetaRelation(
+                id = "ani_${rel.id}",
+                type = relType,
+                relationType = relationLabel,
+                title = relTitle,
+                poster = relPoster,
+                format = rel.format,
+                episodes = rel.episodes,
+                status = rel.status,
+            )
+        }.orEmpty()
+
+        val trailers = if (media?.trailer?.id != null) {
+            listOf(
+                com.nuvio.app.features.details.MetaTrailer(
+                    id = media.trailer.id,
+                    key = media.trailer.id,
+                    name = "Official Trailer",
+                    site = media.trailer.site ?: "YouTube",
+                    type = "Trailer",
+                    official = true,
+                )
+            )
+        } else cinemetaMeta.trailers
+
         if (isMovie) {
             return@withContext cinemetaMeta.copy(
                 id = rawId,
                 type = "movie",
                 name = media?.title?.displayTitle ?: cinemetaMeta.name,
                 poster = anilistPoster,
-                releaseInfo = media?.startDateYear?.toString() ?: cinemetaMeta.releaseInfo,
+                description = cleanDesc,
+                releaseInfo = releaseYear,
+                status = media?.status ?: cinemetaMeta.status,
+                lastAirDate = media?.endDateYear?.toString() ?: releaseYear,
+                background = cinemetaMeta.background ?: "https://images.metahub.space/background/medium/$effectiveImdbId/img",
+                logo = cinemetaMeta.logo ?: "https://images.metahub.space/logo/medium/$effectiveImdbId/img",
+                cast = if (anilistCast.isNotEmpty()) anilistCast else cinemetaMeta.cast,
+                productionCompanies = if (animationStudios.isNotEmpty()) animationStudios else cinemetaMeta.productionCompanies,
+                networks = if (networks.isNotEmpty()) networks else cinemetaMeta.networks,
+                relations = relations,
+                trailers = trailers,
                 defaultVideoId = if (!kitsuId.isNullOrBlank()) "kitsu:$kitsuId" else "anilist:$anilistId",
                 moreLikeThis = recommendations.ifEmpty { cinemetaMeta.moreLikeThis },
             )
@@ -654,45 +737,6 @@ object AnilistMetaDetailsResolver {
             }
         }
 
-        val releaseYear = when {
-            media?.startDateYear != null -> "${media.startDateYear}"
-            else -> cinemetaMeta.releaseInfo
-        }
-
-        val cleanDesc = com.nuvio.app.core.format.cleanHtmlDescription(media?.description)
-            ?: cinemetaMeta.description
-
-        val anilistCast = media?.let { buildCategorizedCast(it) }.orEmpty()
-
-        val relations = media?.relations?.mapNotNull { rel ->
-            val relTitle = rel.title?.displayTitle?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
-            val relPoster = rel.coverImage?.extraLarge ?: rel.coverImage?.large
-            val isRelMovie = rel.format == "MOVIE" || rel.episodes == 1
-            val relType = if (isRelMovie) "movie" else "series"
-            val relationLabel = when (rel.relationType?.uppercase()) {
-                "PREQUEL" -> "Prequel"
-                "SEQUEL" -> "Sequel"
-                "PARENT" -> "Parent Story"
-                "SIDE_STORY" -> "Side Story"
-                "SPIN_OFF" -> "Spin-Off"
-                "ALTERNATIVE" -> "Alternative"
-                "SUMMARY" -> "Summary"
-                "CHARACTER" -> "Character"
-                "OTHER" -> "Other"
-                else -> rel.relationType?.replace('_', ' ')?.lowercase()?.replaceFirstChar { it.uppercase() } ?: "Related"
-            }
-            com.nuvio.app.features.details.MetaRelation(
-                id = "ani_${rel.id}",
-                type = relType,
-                relationType = relationLabel,
-                title = relTitle,
-                poster = relPoster,
-                format = rel.format,
-                episodes = rel.episodes,
-                status = rel.status,
-            )
-        }.orEmpty()
-
         val nextAiringCountdown = media?.nextAiringEpisode?.let { nextEp ->
             val epNum = nextEp.episode ?: return@let null
             val timeUntil = nextEp.timeUntilAiring
@@ -722,7 +766,10 @@ object AnilistMetaDetailsResolver {
             background = cinemetaMeta.background ?: "https://images.metahub.space/background/medium/$effectiveImdbId/img",
             logo = cinemetaMeta.logo ?: "https://images.metahub.space/logo/medium/$effectiveImdbId/img",
             cast = if (anilistCast.isNotEmpty()) anilistCast else cinemetaMeta.cast,
+            productionCompanies = if (animationStudios.isNotEmpty()) animationStudios else cinemetaMeta.productionCompanies,
+            networks = if (networks.isNotEmpty()) networks else cinemetaMeta.networks,
             relations = relations,
+            trailers = if (trailers.isNotEmpty()) trailers else cinemetaMeta.trailers,
             nextAiringEpisode = nextAiringCountdown,
             videos = seasonVideos,
             moreLikeThis = recommendations.ifEmpty { cinemetaMeta.moreLikeThis },

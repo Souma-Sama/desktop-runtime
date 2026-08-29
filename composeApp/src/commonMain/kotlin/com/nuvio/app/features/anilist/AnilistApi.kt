@@ -1324,7 +1324,7 @@ object AnilistApi {
         token: String? = null,
     ): AnilistMedia? {
         val cached = mediaCache[mediaId]
-        if (cached != null && cached.characters.isNotEmpty() && cached.recommendations.isNotEmpty() && (!token.isNullOrBlank() == (cached.mediaListEntry != null) || token.isNullOrBlank())) {
+        if (cached != null && cached.isFullDetails && (!token.isNullOrBlank() == (cached.mediaListEntry != null) || token.isNullOrBlank())) {
             return cached
         }
         val hasAuth = !token.isNullOrBlank()
@@ -1485,7 +1485,7 @@ object AnilistApi {
         val variables = buildJsonObject { put("id", mediaId) }
         val root = executeGraphQL(query = query, variables = variables, token = token)
         val mediaObj = root?.get("data").asJsonObjectOrNull()?.get("Media").asJsonObjectOrNull() ?: return null
-        return parseMedia(mediaObj)
+        return parseMedia(mediaObj, isFullDetails = true)
     }
 
     suspend fun saveMediaListEntry(
@@ -1544,7 +1544,7 @@ object AnilistApi {
         return root?.get("data").asJsonObjectOrNull()?.get("DeleteMediaListEntry").asJsonObjectOrNull()?.get("deleted").asStringOrNull() == "true"
     }
 
-    private fun parseMedia(obj: JsonObject): AnilistMedia? = runCatching {
+    private fun parseMedia(obj: JsonObject, isFullDetails: Boolean = false): AnilistMedia? = runCatching {
         val id = obj["id"].asIntOrNull() ?: return null
         val idMal = obj["idMal"].asIntOrNull()
         val format = obj["format"].asStringOrNull()
@@ -1722,8 +1722,12 @@ object AnilistApi {
             airingSchedule = airingScheduleMap,
             mediaListEntry = mediaListEntry,
             relations = relations,
+            isFullDetails = isFullDetails,
         )
-        mediaCache[id] = media
+        val existing = mediaCache[id]
+        if (isFullDetails || existing == null || !existing.isFullDetails) {
+            mediaCache[id] = media
+        }
         media
     }.getOrNull()
 

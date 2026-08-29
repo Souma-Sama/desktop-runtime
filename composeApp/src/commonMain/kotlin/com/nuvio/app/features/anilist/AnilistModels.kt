@@ -146,8 +146,8 @@ data class AnilistMedia(
     val startDateDay: Int? = null,
     val endDateYear: Int? = null,
     val airingSchedule: Map<Int, Long> = emptyMap(),
-    val mediaListEntry: AnilistMediaListEntry? = null,
     val relations: List<AnilistRelation> = emptyList(),
+    val isFullDetails: Boolean = false,
 )
 
 @Serializable
