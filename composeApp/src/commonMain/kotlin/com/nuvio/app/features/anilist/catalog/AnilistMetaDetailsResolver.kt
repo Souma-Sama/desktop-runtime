@@ -459,6 +459,7 @@ object AnilistMetaDetailsResolver {
             if (matchedSpecial != null) {
                 val epNum = matchedSpecial.episode ?: 1
                 val videoId = if (!kitsuId.isNullOrBlank()) "kitsu:$kitsuId:$epNum" else "anilist:$anilistId:$epNum"
+                val kitsuEp = kitsuEpisodes[epNum] ?: (if (epNum == 0) kitsuEpisodes[0] else null)
                 listOf(
                     matchedSpecial.copy(
                         id = videoId,
