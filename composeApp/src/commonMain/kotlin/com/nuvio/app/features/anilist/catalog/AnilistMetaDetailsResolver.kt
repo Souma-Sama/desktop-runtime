@@ -90,7 +90,6 @@ object AnilistMetaDetailsResolver {
         val kitsuId = armMapping.kitsuId?.removePrefix("kitsu:")?.takeIf { it.isNotBlank() }
             ?: resolveKitsuId(anilistId, media.title?.displayTitle.orEmpty())
 
-        // Fetch Kitsu episodes and MAL score concurrently!
         val kitsuDeferred = async {
             if (!kitsuId.isNullOrBlank()) {
                 runCatching {
@@ -108,6 +107,10 @@ object AnilistMetaDetailsResolver {
                     }
                 }.getOrNull()
             } else null
+        }
+
+        val ytTrailersDeferred = async {
+            fetchYoutubeAnimeTrailers(media.title?.displayTitle.orEmpty())
         }
 
         val kitsuEpisodes = kitsuDeferred.await()
@@ -194,7 +197,7 @@ object AnilistMetaDetailsResolver {
             )
         } else null
 
-        val ytTrailers = fetchYoutubeAnimeTrailers(media.title?.displayTitle.orEmpty())
+        val ytTrailers = ytTrailersDeferred.await()
 
         val seenTrailerKeys = mutableSetOf<String>()
         val trailers = mutableListOf<com.nuvio.app.features.details.MetaTrailer>()
@@ -848,12 +851,16 @@ object AnilistMetaDetailsResolver {
             (format == "ONA" && (fullText.contains("short") || fullText.contains("sp") || (media.episodes != null && media.episodes <= 13 && media.duration != null && media.duration <= 10)))
     }
 
+    private val trailerCache = mutableMapOf<String, List<com.nuvio.app.features.details.MetaTrailer>>()
+
     private suspend fun fetchYoutubeAnimeTrailers(animeTitle: String): List<com.nuvio.app.features.details.MetaTrailer> {
         val cleanTitle = animeTitle.trim()
         if (cleanTitle.isBlank()) return emptyList()
 
+        trailerCache[cleanTitle]?.let { return it }
+
         return runCatching {
-            withTimeoutOrNull(2500L) {
+            withTimeoutOrNull(2000L) {
                 val encodedQuery = cleanTitle.encodeUnsafeHttpUrlCharacters()
                 val url = "https://www.youtube.com/results?search_query=$encodedQuery+anime+official+trailer"
                 val html = httpGetTextWithHeaders(
@@ -909,6 +916,7 @@ object AnilistMetaDetailsResolver {
                         if (trailers.size >= 8) break
                     }
                 }
+                trailerCache[cleanTitle] = trailers
                 trailers
             }
         }.getOrNull().orEmpty()

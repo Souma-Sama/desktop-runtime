@@ -1,8 +1,12 @@
 package com.nuvio.app.features.details.components
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import nuvio.composeapp.generated.resources.Res
+import nuvio.composeapp.generated.resources.rating_anilist
+import org.jetbrains.compose.resources.painterResource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -128,15 +132,10 @@ fun AnimeTrackerButton(
                         color = MaterialTheme.colorScheme.primary,
                     )
                 } else {
-                    Icon(
-                        imageVector = com.nuvio.app.features.anilist.AnilistLogoVector,
+                    Image(
+                        painter = painterResource(Res.drawable.rating_anilist),
                         contentDescription = "AniList Tracker",
                         modifier = Modifier.size(20.dp),
-                        tint = if (isTrackingActive) {
-                            MaterialTheme.colorScheme.onPrimary
-                        } else {
-                            com.nuvio.app.features.anilist.AnilistBrandBlue
-                        },
                     )
                 }
             }
@@ -189,11 +188,10 @@ fun AnimeTrackerDropdownContent(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Icon(
-                    imageVector = com.nuvio.app.features.anilist.AnilistLogoVector,
+                Image(
+                    painter = painterResource(Res.drawable.rating_anilist),
                     contentDescription = null,
                     modifier = Modifier.size(22.dp),
-                    tint = com.nuvio.app.features.anilist.AnilistBrandBlue,
                 )
                 Text(
                     text = "AniList",
