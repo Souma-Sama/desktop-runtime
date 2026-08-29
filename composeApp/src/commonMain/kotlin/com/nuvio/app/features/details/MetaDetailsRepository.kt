@@ -132,11 +132,10 @@ object MetaDetailsRepository {
                     com.nuvio.app.features.anilist.catalog.AnilistMetaDetailsResolver.resolveMetaDetails("ani_$anilistId")
                 }.getOrNull()
                 if (anilistMeta != null) {
-                    val metaLookupId = resolveMetaLookupId(itemId = "ani_$anilistId", itemType = type)
                     publishLoadedMeta(
                         requestKey = requestKey,
                         meta = anilistMeta,
-                        fallbackItemId = metaLookupId,
+                        fallbackItemId = "ani_$anilistId",
                         fallbackItemType = effectiveType,
                         mdbListSettings = mdbListSettings,
                         metaScreenSettingsFingerprint = metaScreenSettingsFingerprint,
@@ -477,6 +476,14 @@ object MetaDetailsRepository {
             }
         }
 
+        if (isAnilist) {
+            com.nuvio.app.features.anilist.catalog.AnilistMetaDetailsResolver.enrichAnimeForMetaScreen(
+                meta = meta,
+                onUpdate = { transform -> emitUpdate(transform) },
+            )
+            return@coroutineScope mutex.withLock { currentMeta }
+        }
+
         // 1. TMDB job: Full credits, cast portraits, episodes, synopses (~1-2s) - Streams in independently!
         // TMDb enrichment is completely shut down for the native AniList addon. It only runs for non-AniList addons (Cinemeta, Stremio, etc.).
         val tmdbJob = launch {
@@ -526,39 +533,19 @@ object MetaDetailsRepository {
 
         // 3. MDBList job: External ratings (IMDb, TMDb, Trakt, RT, AniList) - Streams in independently!
         val mdbListJob = launch {
-            if (isAnilist) {
-                // For anime, fetch genuine MAL score and certification from MAL/Jikan if not already present
-                val anilistId = meta.id.removePrefix("ani_").toIntOrNull()
-                val idMal = anilistId?.let { com.nuvio.app.features.anilist.AnilistApi.fetchMediaById(it)?.idMal }
-                val malMeta = idMal?.let { com.nuvio.app.features.anilist.AnilistApi.fetchMalMetadata(it) }
-                val realMalScore = malMeta?.score
-                val ageRating = malMeta?.ageRating
+            val mdbListRatings = runCatching {
+                withTimeoutOrNull(MDBLIST_ENRICH_TIMEOUT_MS) {
+                    MdbListMetadataService.enrichMeta(
+                        meta = meta,
+                        fallbackItemId = fallbackItemId,
+                        settings = settings,
+                    )
+                }?.externalRatings.orEmpty()
+            }.getOrNull().orEmpty()
 
-                if (realMalScore != null && realMalScore > 0) {
-                    emitUpdate { current ->
-                        val existingWithoutMal = current.externalRatings.filterNot { it.source == "mal" }
-                        val updated = existingWithoutMal + MetaExternalRating(source = "mal", value = realMalScore)
-                        current.copy(
-                            externalRatings = updated,
-                            ageRating = current.ageRating ?: ageRating,
-                        )
-                    }
-                }
-            } else {
-                val mdbListRatings = runCatching {
-                    withTimeoutOrNull(MDBLIST_ENRICH_TIMEOUT_MS) {
-                        MdbListMetadataService.enrichMeta(
-                            meta = meta,
-                            fallbackItemId = fallbackItemId,
-                            settings = settings,
-                        )
-                    }?.externalRatings.orEmpty()
-                }.getOrNull().orEmpty()
-
-                if (mdbListRatings.isNotEmpty()) {
-                    emitUpdate { current ->
-                        current.copy(externalRatings = mdbListRatings)
-                    }
+            if (mdbListRatings.isNotEmpty()) {
+                emitUpdate { current ->
+                    current.copy(externalRatings = mdbListRatings)
                 }
             }
         }
@@ -655,6 +642,7 @@ object MetaDetailsRepository {
         fallbackItemId: String,
         settings: com.nuvio.app.features.mdblist.MdbListSettings,
     ): Boolean {
+        if (meta.id.startsWith("ani_", ignoreCase = true) || meta.id.startsWith("anilist:", ignoreCase = true)) return true
         val tmdbSettings = TmdbSettingsRepository.snapshot()
         if (tmdbSettings.enabled && tmdbSettings.hasApiKey) return true
         if (shouldFetchMdbListOnMetaScreen(meta, fallbackItemId, settings)) return true
