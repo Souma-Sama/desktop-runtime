@@ -8,6 +8,7 @@ object AnimeStudioLogos {
         if (rawName.isNullOrBlank()) return null
         val normalized = rawName.trim().lowercase()
         when {
+            // Major Animation Studios & Brands
             normalized.contains("toho animation") -> Res.drawable.logo_studio_toho_animation
             normalized.contains("toho") -> Res.drawable.logo_studio_toho
             normalized.contains("aniplex") -> Res.drawable.logo_studio_aniplex
@@ -29,15 +30,6 @@ object AnimeStudioLogos {
             normalized.contains("david production") -> Res.drawable.logo_studio_david_production
             normalized.contains("studio ghibli") || normalized == "ghibli" -> Res.drawable.logo_studio_studio_ghibli
             normalized.contains("sunrise") || normalized.contains("bandai namco filmworks") -> Res.drawable.logo_studio_sunrise
-            normalized.contains("mbs") || normalized.contains("mainichi broadcasting") -> Res.drawable.logo_studio_mbs
-            normalized.contains("tv tokyo") || normalized.contains("television tokyo") -> Res.drawable.logo_studio_tv_tokyo
-            normalized.contains("tokyo mx") || normalized.contains("tokyo metropolitan television") -> Res.drawable.logo_studio_tokyo_mx
-            normalized.contains("tbs") || normalized.contains("tokyo broadcasting system") -> Res.drawable.logo_studio_tbs
-            normalized.contains("fuji tv") || normalized.contains("fuji television") -> Res.drawable.logo_studio_fuji_tv
-            normalized.contains("netflix") -> Res.drawable.logo_studio_netflix
-            normalized.contains("nhk") -> Res.drawable.logo_studio_nhk
-            normalized.contains("at-x") || normalized == "atx" -> Res.drawable.logo_studio_at_x
-            normalized.contains("bs11") -> Res.drawable.logo_studio_bs11
             normalized.contains("p.a. works") || normalized.contains("pa works") || normalized.contains("p.a.works") -> Res.drawable.logo_studio_pa_works
             normalized.contains("science saru") -> Res.drawable.logo_studio_science_saru
             normalized.contains("studio bind") -> Res.drawable.logo_studio_studio_bind
@@ -49,7 +41,51 @@ object AnimeStudioLogos {
             normalized.contains("passione") -> Res.drawable.logo_studio_passione
             normalized.contains("comix wave") -> Res.drawable.logo_studio_comix_wave
             normalized.contains("orange") -> Res.drawable.logo_studio_orange
+            normalized.contains("shaft") -> Res.drawable.logo_studio_shaft
+            normalized.contains("tms entertainment") || normalized.contains("tms") -> Res.drawable.logo_studio_tms
+            normalized.contains("olm") -> Res.drawable.logo_studio_olm
+            normalized.contains("nippon animation") -> Res.drawable.logo_studio_nippon_animation
+            normalized.contains("gonzo") -> Res.drawable.logo_studio_gonzo
+            normalized.contains("8bit") || normalized.contains("eight bit") -> Res.drawable.logo_studio_eight_bit
+            normalized.contains("feel.") || normalized == "feel" -> Res.drawable.logo_studio_feel
+            normalized.contains("tatsunoko") -> Res.drawable.logo_studio_tatsunoko
+            normalized.contains("gainax") -> Res.drawable.logo_studio_gainax
+            normalized.contains("bibury") -> Res.drawable.logo_studio_bibury
+            normalized.contains("studio kai") -> Res.drawable.logo_studio_kai
+            normalized.contains("brain's base") || normalized.contains("brains base") -> Res.drawable.logo_studio_brains_base
+            normalized.contains("c-station") || normalized.contains("c station") -> Res.drawable.logo_studio_c_station
+            normalized.contains("colorido") -> Res.drawable.logo_studio_colorido
+            normalized.contains("gohands") || normalized.contains("go hands") -> Res.drawable.logo_studio_gohands
+            normalized.contains("project no.9") || normalized.contains("project no 9") -> Res.drawable.logo_studio_project_no9
+            normalized.contains("nexus") -> Res.drawable.logo_studio_nexus
+            normalized.contains("engi") -> Res.drawable.logo_studio_engi
+            normalized.contains("cygames") -> Res.drawable.logo_studio_cygames
+
+            // Publishers, Producers & Music
+            normalized.contains("pony canyon") -> Res.drawable.logo_studio_pony_canyon
+            normalized.contains("bandai namco") || normalized.contains("bandai visual") -> Res.drawable.logo_studio_bandai_namco
+            normalized.contains("square enix") -> Res.drawable.logo_studio_square_enix
+            normalized.contains("shueisha") -> Res.drawable.logo_studio_shueisha
+            normalized.contains("kodansha") -> Res.drawable.logo_studio_kodansha
+            normalized.contains("shogakukan") -> Res.drawable.logo_studio_shogakukan
+            normalized.contains("bushiroad") -> Res.drawable.logo_studio_bushiroad
+            normalized.contains("lantis") -> Res.drawable.logo_studio_lantis
+            normalized.contains("sentai filmworks") || normalized.contains("sentai") -> Res.drawable.logo_studio_sentai
+
+            // TV Broadcast Networks & Streaming
+            normalized.contains("mbs") || normalized.contains("mainichi broadcasting") -> Res.drawable.logo_studio_mbs
+            normalized.contains("tv tokyo") || normalized.contains("television tokyo") -> Res.drawable.logo_studio_tv_tokyo
+            normalized.contains("tokyo mx") || normalized.contains("tokyo metropolitan television") -> Res.drawable.logo_studio_tokyo_mx
+            normalized.contains("tbs") || normalized.contains("tokyo broadcasting system") -> Res.drawable.logo_studio_tbs
+            normalized.contains("fuji tv") || normalized.contains("fuji television") -> Res.drawable.logo_studio_fuji_tv
+            normalized.contains("nippon television") || normalized.contains("nippon tv") || normalized == "ntv" -> Res.drawable.logo_studio_ntv
+            normalized.contains("netflix") -> Res.drawable.logo_studio_netflix
+            normalized.contains("nhk") -> Res.drawable.logo_studio_nhk
+            normalized.contains("at-x") || normalized == "atx" -> Res.drawable.logo_studio_at_x
+            normalized.contains("bs11") -> Res.drawable.logo_studio_bs11
             normalized.contains("crunchyroll") -> Res.drawable.logo_studio_crunchyroll
+            normalized.contains("hidive") -> Res.drawable.logo_studio_hidive
+            normalized.contains("disney+") || normalized.contains("disney plus") -> Res.drawable.logo_studio_disney_plus
             else -> null
         }
     }.getOrNull()
