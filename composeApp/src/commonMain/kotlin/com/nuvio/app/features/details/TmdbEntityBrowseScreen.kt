@@ -550,8 +550,23 @@ private fun EntityHeroSection(
     header: com.nuvio.app.features.tmdb.TmdbEntityHeader,
     modifier: Modifier = Modifier,
 ) {
-        val localLogo = com.nuvio.app.features.anilist.catalog.AnimeStudioLogos.findLogoResource(header.name)
-        val hasLogo = localLogo != null || !header.logo.isNullOrBlank()
+    val localLogo = com.nuvio.app.features.anilist.catalog.AnimeStudioLogos.findLogoResource(header.name)
+    val hasLogo = localLogo != null || !header.logo.isNullOrBlank()
+
+    Column(modifier = modifier.padding(horizontal = 20.dp)) {
+        Text(
+            text = when (header.kind) {
+                TmdbEntityKind.COMPANY -> stringResource(Res.string.details_browse_kind_company)
+                TmdbEntityKind.NETWORK -> stringResource(Res.string.details_browse_kind_network)
+            },
+            style = MaterialTheme.typography.labelLarge.copy(
+                fontWeight = FontWeight.Medium,
+                letterSpacing = 0.4.sp,
+            ),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
 
         if (localLogo != null) {
             Box(
