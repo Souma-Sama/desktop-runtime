@@ -37,10 +37,10 @@ object AnilistMetaDetailsResolver {
 
     private val resolvedMetaDetailsCache = mutableMapOf<String, MetaDetails>()
 
-    suspend fun resolveMetaDetails(rawId: String): MetaDetails? = coroutineScope {
-        resolvedMetaDetailsCache[rawId]?.let { return@coroutineScope it }
+    suspend fun resolveMetaDetails(rawId: String): MetaDetails? = kotlinx.coroutines.supervisorScope {
+        resolvedMetaDetailsCache[rawId]?.let { return@supervisorScope it }
 
-        val anilistId = AnilistTrackerCoordinator.extractAnilistId(rawId) ?: return@coroutineScope null
+        val anilistId = AnilistTrackerCoordinator.extractAnilistId(rawId) ?: return@supervisorScope null
         val token = AnilistAuthRepository.token.value
 
         // 1. Fast cache check for ARM mapping (0ms)
@@ -49,17 +49,21 @@ object AnilistMetaDetailsResolver {
         // Fetch ARM mapping concurrently with AniList media fetch!
         val armDeferred = async {
             cachedArm ?: runCatching {
-                kotlinx.coroutines.withTimeoutOrNull(900L) { resolveArmMapping(anilistId) }
+                kotlinx.coroutines.withTimeoutOrNull(600L) { resolveArmMapping(anilistId) }
             }.getOrNull() ?: ArmMapping(null, null, null, null, 1)
         }
 
-        // Fetch base AniList media details
+        // Fetch base AniList media details (with timeout protection)
         val cached = AnilistApi.getCachedMedia(anilistId)
         val media: AnilistMedia = if (cached != null && cached.characters.isNotEmpty() && cached.recommendations.isNotEmpty() && cached.studios.isNotEmpty()) {
             cached
         } else {
-            AnilistApi.fetchMediaById(anilistId, token = token) ?: cached
-        } ?: return@coroutineScope null
+            runCatching {
+                kotlinx.coroutines.withTimeoutOrNull(3000L) {
+                    AnilistApi.fetchMediaById(anilistId, token = token)
+                }
+            }.getOrNull() ?: cached
+        } ?: return@supervisorScope null
 
         val armMapping = armDeferred.await()
         val effectiveImdbId = armMapping.imdbId
@@ -72,12 +76,11 @@ object AnilistMetaDetailsResolver {
         }
 
         val kitsuId = armMapping.kitsuId?.removePrefix("kitsu:")?.takeIf { it.isNotBlank() }
-            ?: resolveKitsuId(anilistId, media.title?.displayTitle.orEmpty())
 
         val kitsuDeferred = async {
             if (!kitsuId.isNullOrBlank()) {
                 runCatching {
-                    kotlinx.coroutines.withTimeoutOrNull(900L) { fetchKitsuEpisodes(kitsuId) }
+                    kotlinx.coroutines.withTimeoutOrNull(600L) { fetchKitsuEpisodes(kitsuId) }
                 }.getOrNull() ?: emptyMap()
             } else emptyMap()
         }

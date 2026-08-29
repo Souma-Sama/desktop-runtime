@@ -29,7 +29,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -44,7 +43,6 @@ import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.rounded.CalendarMonth
-import androidx.compose.material.icons.rounded.LocalFireDepartment
 import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -66,7 +64,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -75,9 +72,18 @@ import com.nuvio.app.core.ui.NuvioAsyncImage as AsyncImage
 import com.nuvio.app.core.ui.NuvioCardDepthSurface
 import com.nuvio.app.core.ui.nuvioCardDepth
 import com.nuvio.app.core.ui.nuvioDesktopDragScroll
-import com.nuvio.app.core.ui.nuvioHorizontalScrollBleed
+import com.nuvio.app.core.ui.rememberPosterCardStyleUiState
 import com.nuvio.app.features.home.MetaPreview
 import kotlinx.coroutines.launch
+
+private fun aniChartColumnCountForWidth(screenWidth: Dp): Int =
+    when {
+        screenWidth >= 1400.dp -> 7
+        screenWidth >= 1200.dp -> 6
+        screenWidth >= 1000.dp -> 5
+        screenWidth >= 840.dp -> 4
+        else -> 3
+    }
 
 @Composable
 fun AniChartScreen(
@@ -87,6 +93,7 @@ fun AniChartScreen(
 ) {
     val state by AniChartRepository.uiState.collectAsState()
     val scope = rememberCoroutineScope()
+    val posterCardStyle = rememberPosterCardStyleUiState()
 
     LaunchedEffect(state.mode, state.selectedSeason, state.selectedYear) {
         if (state.mode == AniChartMode.SEASONAL) {
@@ -104,7 +111,7 @@ fun AniChartScreen(
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background),
     ) {
-        // Premium Top Header
+        // Top Bar
         AniChartHeader(
             mode = state.mode,
             onModeSelected = { AniChartRepository.setMode(it) },
@@ -141,13 +148,15 @@ fun AniChartScreen(
 
         Spacer(modifier = Modifier.height(10.dp))
 
-        // Content Area
-        Box(
+        // Content Area with Screen-Width-Aware Columns
+        BoxWithConstraints(
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f),
             contentAlignment = Alignment.Center,
         ) {
+            val columns = remember(maxWidth) { aniChartColumnCountForWidth(maxWidth) }
+
             if (state.isLoading && (if (state.mode == AniChartMode.SEASONAL) state.seasonalItems.isEmpty() else state.scheduleItems.isEmpty())) {
                 CircularProgressIndicator(
                     color = MaterialTheme.colorScheme.primary,
@@ -198,12 +207,16 @@ fun AniChartScreen(
                     }
                     AniChartSeasonalGrid(
                         items = filteredItems,
+                        columns = columns,
+                        cornerRadiusDp = posterCardStyle.cornerRadiusDp,
                         onAnimeClick = onAnimeClick,
                     )
                 } else {
                     val dayItems = state.scheduleItems[state.selectedDay].orEmpty()
                     AniChartScheduleGrid(
                         items = dayItems,
+                        columns = columns,
+                        cornerRadiusDp = posterCardStyle.cornerRadiusDp,
                         onAnimeClick = onAnimeClick,
                     )
                 }
@@ -367,13 +380,6 @@ private fun SeasonalControlsBar(
                         if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
                     )
 
-                    val seasonEmoji = when (season) {
-                        AniChartSeason.WINTER -> "❄️"
-                        AniChartSeason.SPRING -> "🌸"
-                        AniChartSeason.SUMMER -> "☀️"
-                        AniChartSeason.FALL -> "🍁"
-                    }
-
                     Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(10.dp))
@@ -388,7 +394,7 @@ private fun SeasonalControlsBar(
                         contentAlignment = Alignment.Center,
                     ) {
                         Text(
-                            text = "$seasonEmoji ${season.label} $selectedYear",
+                            text = "${season.label} $selectedYear",
                             style = MaterialTheme.typography.labelMedium.copy(
                                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                                 fontSize = 12.sp,
@@ -528,6 +534,8 @@ private fun WeeklyScheduleDayTabs(
 @Composable
 private fun AniChartSeasonalGrid(
     items: List<AniChartMedia>,
+    columns: Int,
+    cornerRadiusDp: Int,
     onAnimeClick: (MetaPreview) -> Unit,
 ) {
     if (items.isEmpty()) {
@@ -546,12 +554,12 @@ private fun AniChartSeasonalGrid(
 
     val gridState = rememberLazyGridState()
     LazyVerticalGrid(
-        columns = GridCells.Adaptive(minSize = 145.dp),
+        columns = GridCells.Fixed(columns),
         state = gridState,
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 10.dp),
-        horizontalArrangement = Arrangement.spacedBy(14.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(18.dp),
     ) {
         items(
             items = items,
@@ -559,6 +567,7 @@ private fun AniChartSeasonalGrid(
         ) { anime ->
             AniChartCard(
                 media = anime,
+                cornerRadiusDp = cornerRadiusDp,
                 onClick = {
                     val isMovie = anime.format == "MOVIE" || anime.episodes == 1
                     onAnimeClick(
@@ -579,6 +588,8 @@ private fun AniChartSeasonalGrid(
 @Composable
 private fun AniChartScheduleGrid(
     items: List<AniChartMedia>,
+    columns: Int,
+    cornerRadiusDp: Int,
     onAnimeClick: (MetaPreview) -> Unit,
 ) {
     if (items.isEmpty()) {
@@ -597,12 +608,12 @@ private fun AniChartScheduleGrid(
 
     val gridState = rememberLazyGridState()
     LazyVerticalGrid(
-        columns = GridCells.Adaptive(minSize = 145.dp),
+        columns = GridCells.Fixed(columns),
         state = gridState,
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 10.dp),
-        horizontalArrangement = Arrangement.spacedBy(14.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(18.dp),
     ) {
         items(
             items = items,
@@ -610,6 +621,7 @@ private fun AniChartScheduleGrid(
         ) { anime ->
             AniChartCard(
                 media = anime,
+                cornerRadiusDp = cornerRadiusDp,
                 showAiringTime = true,
                 onClick = {
                     val isMovie = anime.format == "MOVIE" || anime.episodes == 1
@@ -631,6 +643,7 @@ private fun AniChartScheduleGrid(
 @Composable
 private fun AniChartCard(
     media: AniChartMedia,
+    cornerRadiusDp: Int,
     modifier: Modifier = Modifier,
     showAiringTime: Boolean = false,
     onClick: () -> Unit,
@@ -642,7 +655,7 @@ private fun AniChartCard(
         animationSpec = tween(durationMillis = 140),
         label = "anichart_card_scale",
     )
-    val cardShape = RoundedCornerShape(14.dp)
+    val cardShape = RoundedCornerShape(cornerRadiusDp.dp)
 
     Column(
         modifier = modifier
@@ -661,7 +674,7 @@ private fun AniChartCard(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .aspectRatio(0.70f)
+                .aspectRatio(0.68f)
                 .clip(cardShape)
                 .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.40f))
                 .border(
@@ -692,7 +705,7 @@ private fun AniChartCard(
                     .background(
                         Brush.verticalGradient(
                             colors = listOf(
-                                Color.Black.copy(alpha = 0.50f),
+                                Color.Black.copy(alpha = 0.45f),
                                 Color.Transparent,
                                 Color.Black.copy(alpha = 0.88f),
                             ),
