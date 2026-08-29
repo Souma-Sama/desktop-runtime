@@ -120,22 +120,13 @@ actual object AppUpdaterPlatform {
         File(DesktopStorage.rootDir.resolve("updates").also { it.createDirectories() }.toUri())
 
     private fun launchInstaller(updateFile: File) {
-        val openedViaDesktop = runCatching {
-            if (java.awt.Desktop.isDesktopSupported() && java.awt.Desktop.getDesktop().isSupported(java.awt.Desktop.Action.OPEN)) {
-                java.awt.Desktop.getDesktop().open(updateFile)
-                true
-            } else false
-        }.getOrDefault(false)
-
-        if (!openedViaDesktop) {
-            val command = when (currentOs) {
-                DesktopUpdaterOs.WINDOWS -> windowsInstallerCommand(updateFile)
-                DesktopUpdaterOs.MACOS -> listOf("open", updateFile.absolutePath)
-                DesktopUpdaterOs.LINUX -> listOf("xdg-open", updateFile.absolutePath)
-                DesktopUpdaterOs.UNKNOWN -> error("Desktop updates are not supported on this operating system.")
-            }
-            ProcessBuilder(command).start()
+        val command = when (currentOs) {
+            DesktopUpdaterOs.WINDOWS -> windowsInstallerCommand(updateFile)
+            DesktopUpdaterOs.MACOS -> listOf("open", updateFile.absolutePath)
+            DesktopUpdaterOs.LINUX -> listOf("xdg-open", updateFile.absolutePath)
+            DesktopUpdaterOs.UNKNOWN -> error("Desktop updates are not supported on this operating system.")
         }
+        ProcessBuilder(command).start()
     }
 
     private fun scheduleAppExit() {
