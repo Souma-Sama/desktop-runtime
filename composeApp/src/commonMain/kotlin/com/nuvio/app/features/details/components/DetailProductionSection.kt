@@ -50,8 +50,21 @@ fun DetailProductionSection(
 ) {
     val isAnilist = meta.id.startsWith("ani_", ignoreCase = true) || meta.id.startsWith("anilist:", ignoreCase = true)
 
-    val companies = meta.productionCompanies.take(10)
-    val networks = meta.networks.take(10)
+    fun hasLogo(item: MetaCompany): Boolean {
+        return com.nuvio.app.features.anilist.catalog.AnimeStudioLogos.findLogoResource(item.name) != null ||
+            !item.logo.isNullOrBlank()
+    }
+
+    // Sort logos first, then text-only items!
+    val companies = meta.productionCompanies
+        .distinctBy { it.name.trim().lowercase() }
+        .sortedByDescending { hasLogo(it) }
+        .take(12)
+
+    val networks = meta.networks
+        .distinctBy { it.name.trim().lowercase() }
+        .sortedByDescending { hasLogo(it) }
+        .take(12)
 
     if (companies.isEmpty() && networks.isEmpty()) return
 
@@ -110,29 +123,32 @@ private fun ProductionChip(
 ) {
     val localLogo = com.nuvio.app.features.anilist.catalog.AnimeStudioLogos.findLogoResource(item.name)
     var hasLogoError by remember(item.logo) { mutableStateOf(false) }
+    val hasValidLogo = localLogo != null || (!item.logo.isNullOrBlank() && !hasLogoError)
 
     Column(
         modifier = Modifier
-            .width(136.dp)
-            .clip(RoundedCornerShape(12.dp))
+            .width(150.dp)
+            .clip(RoundedCornerShape(14.dp))
             .then(
                 if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier
             ),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        // Logo image badge
+        // Logo image badge / text card (bigger and more spacious)
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(60.dp)
-                .clip(RoundedCornerShape(12.dp))
-                .background(Color(0xFFF5F5F5))
+                .height(68.dp)
+                .clip(RoundedCornerShape(14.dp))
+                .background(
+                    if (hasValidLogo) Color(0xFFF5F5F5) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f)
+                )
                 .border(
                     width = 1.dp,
-                    color = Color(0x26000000),
-                    shape = RoundedCornerShape(12.dp),
+                    color = if (hasValidLogo) Color(0x26000000) else MaterialTheme.colorScheme.outline.copy(alpha = 0.20f),
+                    shape = RoundedCornerShape(14.dp),
                 )
-                .padding(horizontal = 10.dp, vertical = 8.dp),
+                .padding(horizontal = 14.dp, vertical = 10.dp),
             contentAlignment = Alignment.Center,
         ) {
             if (localLogo != null) {
@@ -154,10 +170,10 @@ private fun ProductionChip(
                 Text(
                     text = item.name,
                     style = MaterialTheme.typography.labelMedium.copy(
-                        fontSize = 12.sp,
+                        fontSize = 12.5.sp,
                         fontWeight = FontWeight.SemiBold,
                     ),
-                    color = Color(0xFF222222),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
@@ -165,19 +181,21 @@ private fun ProductionChip(
             }
         }
 
-        // Caption UNDER the image
-        Spacer(modifier = Modifier.height(6.dp))
-        Text(
-            text = item.name,
-            style = MaterialTheme.typography.labelSmall.copy(
-                fontSize = 11.5.sp,
-                fontWeight = FontWeight.Medium,
-            ),
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 2.dp),
-        )
+        // Caption UNDER the image ONLY when a logo image is present!
+        if (hasValidLogo) {
+            Spacer(modifier = Modifier.height(6.dp))
+            Text(
+                text = item.name,
+                style = MaterialTheme.typography.labelSmall.copy(
+                    fontSize = 11.5.sp,
+                    fontWeight = FontWeight.Medium,
+                ),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 2.dp),
+            )
+        }
     }
 }
