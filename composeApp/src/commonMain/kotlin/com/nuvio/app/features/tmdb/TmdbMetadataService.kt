@@ -1354,7 +1354,7 @@ object TmdbMetadataService {
         }
     }
 
-    internal suspend fun fetchEpisodeEnrichment(
+    private suspend fun fetchEpisodeEnrichment(
         tmdbId: String,
         seasonNumbers: List<Int>,
         language: String,
