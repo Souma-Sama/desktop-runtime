@@ -512,8 +512,10 @@ object MetaDetailsRepository {
         }
 
         // 2. TMDB job: Full credits, cast portraits, episodes, synopses (~1-2s) - Streams in independently!
+        // Pull the plug on TMDb for AniList / anime addon. TMDb enrichment only runs for non-AniList addons.
         val tmdbJob = launch {
-            if (tmdbSettings.enabled && tmdbSettings.hasApiKey) {
+            val isAnilistItem = itemId.startsWith("ani_", ignoreCase = true) || itemId.startsWith("anilist:", ignoreCase = true)
+            if (!isAnilistItem && tmdbSettings.enabled && tmdbSettings.hasApiKey) {
                 val tmdbEnriched = runCatching {
                     withTimeoutOrNull(TMDB_ENRICH_TIMEOUT_MS) {
                         TmdbMetadataService.enrichMeta(
@@ -526,103 +528,30 @@ object MetaDetailsRepository {
 
                 if (tmdbEnriched != null) {
                     emitUpdate { current ->
-                        val isAnilist = current.id.startsWith("ani_", ignoreCase = true) || current.id.startsWith("anilist:", ignoreCase = true)
-
-                        val mergedVideos = if (isAnilist) {
-                            tmdbEnriched.videos.mapIndexed { idx, enrichedVid ->
-                                val baseVid = meta.videos.getOrNull(idx)
-                                val currentVid = current.videos.getOrNull(idx)
-                                var vid = enrichedVid
-                                if (vid.thumbnail.isNullOrBlank() && baseVid?.thumbnail?.isNotBlank() == true) {
-                                    vid = vid.copy(thumbnail = baseVid.thumbnail)
-                                }
-                                if (!currentVid?.seasonPoster.isNullOrBlank()) {
-                                    vid = vid.copy(seasonPoster = currentVid.seasonPoster)
-                                }
-                                vid
-                            }
-                        } else {
-                            tmdbEnriched.videos.mapIndexed { idx, enrichedVid ->
-                                val currentVid = current.videos.getOrNull(idx)
-                                if (!currentVid?.seasonPoster.isNullOrBlank()) {
-                                    enrichedVid.copy(seasonPoster = currentVid.seasonPoster)
-                                } else enrichedVid
-                            }
-                        }
-
-                        val anilistRecommendations = if (isAnilist) (if (meta.moreLikeThis.isNotEmpty()) meta.moreLikeThis else current.moreLikeThis) else emptyList()
-                        val anilistCast = if (isAnilist) (if (meta.cast.isNotEmpty()) meta.cast else current.cast) else emptyList()
-                        val anilistCompanies = if (isAnilist) (if (meta.productionCompanies.isNotEmpty()) meta.productionCompanies else current.productionCompanies) else emptyList()
-                        val anilistNetworks = if (isAnilist) (if (meta.networks.isNotEmpty()) meta.networks else current.networks) else emptyList()
-                        val anilistTrailers = if (isAnilist) (if (meta.trailers.isNotEmpty()) meta.trailers else current.trailers) else emptyList()
-
-                        val mergedCompanies = if (isAnilist && anilistCompanies.isNotEmpty()) {
-                            anilistCompanies.map { aniComp ->
-                                val match = tmdbEnriched.productionCompanies.firstOrNull { it.name.equals(aniComp.name, ignoreCase = true) }
-                                    ?: tmdbEnriched.networks.firstOrNull { it.name.equals(aniComp.name, ignoreCase = true) }
-                                if (match != null) {
-                                    aniComp.copy(
-                                        logo = match.logo ?: aniComp.logo,
-                                        tmdbId = match.tmdbId ?: aniComp.tmdbId,
-                                    )
-                                } else aniComp
-                            }
-                        } else tmdbEnriched.productionCompanies
-
-                        val mergedNetworks = if (isAnilist && anilistNetworks.isNotEmpty()) {
-                            anilistNetworks.map { aniNet ->
-                                val match = tmdbEnriched.networks.firstOrNull { it.name.equals(aniNet.name, ignoreCase = true) }
-                                    ?: tmdbEnriched.productionCompanies.firstOrNull { it.name.equals(aniNet.name, ignoreCase = true) }
-                                if (match != null) {
-                                    aniNet.copy(
-                                        logo = match.logo ?: aniNet.logo,
-                                        tmdbId = match.tmdbId ?: aniNet.tmdbId,
-                                    )
-                                } else aniNet
-                            }
-                        } else (if (isAnilist && tmdbEnriched.networks.isNotEmpty()) tmdbEnriched.networks else tmdbEnriched.networks)
-
-                        val mergedTrailers = if (tmdbEnriched.trailers.isNotEmpty()) {
-                            val seen = mutableSetOf<String>()
-                            val combined = mutableListOf<MetaTrailer>()
-                            for (t in tmdbEnriched.trailers) {
-                                val key = t.key.ifBlank { t.id }
-                                if (key.isNotBlank() && seen.add(key)) {
-                                    combined.add(t)
-                                }
-                            }
-                            for (t in anilistTrailers) {
-                                val key = t.key.ifBlank { t.id }
-                                if (key.isNotBlank() && seen.add(key)) {
-                                    combined.add(t)
-                                }
-                            }
-                            combined
-                        } else if (isAnilist && anilistTrailers.isNotEmpty()) {
-                            anilistTrailers
-                        } else {
-                            if (tmdbEnriched.trailers.isNotEmpty()) tmdbEnriched.trailers else current.trailers
-                        }
-
                         tmdbEnriched.copy(
                             id = current.id,
                             type = current.type,
-                            name = if (isAnilist) current.name else tmdbEnriched.name,
+                            name = tmdbEnriched.name,
                             genres = if (current.genres.isNotEmpty()) current.genres else tmdbEnriched.genres,
                             logo = current.logo ?: tmdbEnriched.logo ?: meta.logo,
                             background = tmdbEnriched.background ?: current.background ?: meta.background,
                             poster = current.poster ?: tmdbEnriched.poster ?: meta.poster,
-                            videos = mergedVideos,
-                            cast = if (isAnilist && anilistCast.isNotEmpty()) anilistCast else tmdbEnriched.cast,
-                            productionCompanies = mergedCompanies,
-                            networks = mergedNetworks,
-                            trailers = mergedTrailers,
-                            moreLikeThis = if (isAnilist && anilistRecommendations.isNotEmpty()) anilistRecommendations else tmdbEnriched.moreLikeThis,
-                            moreLikeThisSource = if (isAnilist && anilistRecommendations.isNotEmpty()) null else tmdbEnriched.moreLikeThisSource,
-                            description = if (isAnilist && !meta.description.isNullOrBlank()) meta.description else tmdbEnriched.description,
-                            releaseInfo = if (isAnilist && !meta.releaseInfo.isNullOrBlank()) meta.releaseInfo else (meta.releaseInfo ?: tmdbEnriched.releaseInfo),
-                            status = if (isAnilist && !meta.status.isNullOrBlank()) meta.status else tmdbEnriched.status,
-                            lastAirDate = if (isAnilist && !meta.lastAirDate.isNullOrBlank()) meta.lastAirDate else tmdbEnriched.lastAirDate,
+                            videos = tmdbEnriched.videos.mapIndexed { idx, enrichedVid ->
+                                val currentVid = current.videos.getOrNull(idx)
+                                if (!currentVid?.seasonPoster.isNullOrBlank()) {
+                                    enrichedVid.copy(seasonPoster = currentVid.seasonPoster)
+                                } else enrichedVid
+                            },
+                            cast = tmdbEnriched.cast,
+                            productionCompanies = tmdbEnriched.productionCompanies,
+                            networks = tmdbEnriched.networks,
+                            trailers = if (tmdbEnriched.trailers.isNotEmpty()) tmdbEnriched.trailers else current.trailers,
+                            moreLikeThis = tmdbEnriched.moreLikeThis,
+                            moreLikeThisSource = tmdbEnriched.moreLikeThisSource,
+                            description = tmdbEnriched.description,
+                            releaseInfo = meta.releaseInfo ?: tmdbEnriched.releaseInfo,
+                            status = tmdbEnriched.status,
+                            lastAirDate = tmdbEnriched.lastAirDate,
                             externalRatings = current.externalRatings.ifEmpty { tmdbEnriched.externalRatings },
                         )
                     }

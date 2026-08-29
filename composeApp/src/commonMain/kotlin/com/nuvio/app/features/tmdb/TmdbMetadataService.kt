@@ -2,6 +2,7 @@ package com.nuvio.app.features.tmdb
 
 import co.touchlab.kermit.Logger
 import com.nuvio.app.features.addons.httpGetText
+import com.nuvio.app.features.addons.httpGetTextWithHeaders
 import com.nuvio.app.features.details.MetaCompany
 import com.nuvio.app.features.details.MetaDetails
 import com.nuvio.app.features.details.MetaPerson
@@ -617,6 +618,9 @@ object TmdbMetadataService {
         val cleanName = name.trim()
         if (cleanName.isBlank()) return null
 
+        val localDesc = com.nuvio.app.features.anilist.catalog.AnimeStudioDescriptions.findDescription(cleanName)
+        if (!localDesc.isNullOrBlank()) return localDesc
+
         val candidates = listOf(
             cleanName,
             "$cleanName (company)",
@@ -628,7 +632,13 @@ object TmdbMetadataService {
         for (candidate in candidates) {
             val url = "https://en.wikipedia.org/api/rest_v1/page/summary/${candidate.replace(" ", "_")}"
             val text = runCatching {
-                httpGetText(url)
+                httpGetTextWithHeaders(
+                    url = url,
+                    headers = mapOf(
+                        "User-Agent" to "NuvioApp/1.0 (https://nuvio.app; contact@nuvio.app)",
+                        "Accept" to "application/json",
+                    ),
+                )
             }.getOrNull() ?: continue
 
             val extract = runCatching {
