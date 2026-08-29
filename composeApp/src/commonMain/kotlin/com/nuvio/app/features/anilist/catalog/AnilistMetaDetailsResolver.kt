@@ -63,7 +63,13 @@ object AnilistMetaDetailsResolver {
         }.getOrNull()
 
         val armImdbId = cachedArm?.imdbId
-        val targetSeason = cachedArm?.season ?: 1
+        val isSpecial = isSpecialAnime(media)
+        val targetSeason = when {
+            cachedArm?.season == 0 -> 0
+            isSpecial -> 0
+            cachedArm?.season != null -> cachedArm.season
+            else -> 1
+        }
 
         val kitsuId = cachedArm?.kitsuId?.removePrefix("kitsu:")?.takeIf { it.isNotBlank() }
             ?: resolveArmMapping(anilistId).kitsuId?.removePrefix("kitsu:")?.takeIf { it.isNotBlank() }
@@ -367,7 +373,12 @@ object AnilistMetaDetailsResolver {
             ?: media?.coverImage?.large
             ?: cinemetaMeta.poster
 
-        val targetSeason = mapping.season
+        val isSpecial = isSpecialAnime(media)
+        val targetSeason = when {
+            mapping.season == 0 -> 0
+            isSpecial -> 0
+            else -> mapping.season
+        }
         val effectiveImdbId = mapping.imdbId ?: cinemetaMeta.id
 
         val isMovie = media?.format == "MOVIE"
@@ -701,5 +712,20 @@ object AnilistMetaDetailsResolver {
         }
 
         return specials.firstOrNull()
+    }
+
+    private fun isSpecialAnime(media: AnilistMedia?): Boolean {
+        if (media == null) return false
+        val format = media.format?.uppercase()
+        if (format == "SPECIAL" || format == "OVA") return true
+        val title = (media.title?.displayTitle.orEmpty() + " " + media.title?.romaji.orEmpty() + " " + media.title?.english.orEmpty()).lowercase()
+        return title.contains("mahou") ||
+            title.contains("special") ||
+            title.contains("mini anime") ||
+            title.contains("chibi") ||
+            title.contains("picture drama") ||
+            title.contains("omake") ||
+            title.contains("bonus") ||
+            (format == "ONA" && (title.contains("short") || title.contains("sp") || (media.episodes != null && media.episodes <= 12 && media.duration != null && media.duration <= 10)))
     }
 }

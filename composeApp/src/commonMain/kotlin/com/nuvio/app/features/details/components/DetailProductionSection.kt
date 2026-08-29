@@ -109,21 +109,29 @@ private fun ProductionChip(
     logoHeight: androidx.compose.ui.unit.Dp,
     onClick: (() -> Unit)? = null,
 ) {
+    var hasLogoError by androidx.compose.runtime.remember(item.logo) { androidx.compose.runtime.mutableStateOf(false) }
+
     Box(
         modifier = Modifier
             .clip(RoundedCornerShape(12.dp))
-            .background(color = ProductionChipBackground)
+            .background(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.70f))
+            .androidx.compose.foundation.border(
+                width = 1.dp,
+                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.20f),
+                shape = RoundedCornerShape(12.dp),
+            )
             .then(
                 if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier
             )
-            .padding(horizontal = 12.dp, vertical = 8.dp)
+            .padding(horizontal = 12.dp, vertical = 6.dp)
             .height(chipHeight),
         contentAlignment = Alignment.Center,
     ) {
-        if (!item.logo.isNullOrBlank()) {
+        if (!item.logo.isNullOrBlank() && !hasLogoError) {
             AsyncImage(
                 model = item.logo,
                 contentDescription = item.name,
+                onError = { hasLogoError = true },
                 modifier = Modifier
                     .width(logoWidth)
                     .height(logoHeight),
@@ -136,11 +144,8 @@ private fun ProductionChip(
                     fontSize = 12.sp,
                     fontWeight = FontWeight.SemiBold,
                 ),
-                color = ProductionTextColor,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
     }
 }
-
-private val ProductionChipBackground = androidx.compose.ui.graphics.Color(0xE6F5F5F5)
-private val ProductionTextColor = androidx.compose.ui.graphics.Color(0xFF333333)
