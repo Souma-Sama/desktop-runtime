@@ -144,6 +144,7 @@ internal fun isTrackingBrandAvailable(
 ): Boolean = when (brand) {
     TrackingBrand.NUVIO,
     TrackingBrand.TMDB,
+    TrackingBrand.ANILIST,
     -> true
     TrackingBrand.TRAKT -> traktConnected
     TrackingBrand.SIMKL -> simklConnected
