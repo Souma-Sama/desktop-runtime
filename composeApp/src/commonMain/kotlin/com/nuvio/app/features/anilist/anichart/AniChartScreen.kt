@@ -6,6 +6,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -43,6 +44,7 @@ import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.rounded.CalendarMonth
+import androidx.compose.material.icons.rounded.LocalFireDepartment
 import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -95,14 +97,14 @@ fun AniChartScreen(
     }
 
     val statusBarPadding = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
-    val totalTopPadding = maxOf(topChromePadding, statusBarPadding + 16.dp)
+    val totalTopPadding = maxOf(topChromePadding, statusBarPadding + 14.dp)
 
     Column(
         modifier = modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background),
     ) {
-        // Top Header
+        // Premium Top Header
         AniChartHeader(
             mode = state.mode,
             onModeSelected = { AniChartRepository.setMode(it) },
@@ -132,11 +134,12 @@ fun AniChartScreen(
         } else {
             WeeklyScheduleDayTabs(
                 selectedDay = state.selectedDay,
+                scheduleItems = state.scheduleItems,
                 onDaySelected = { AniChartRepository.setDay(it) },
             )
         }
 
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(10.dp))
 
         // Content Area
         Box(
@@ -145,7 +148,7 @@ fun AniChartScreen(
                 .weight(1f),
             contentAlignment = Alignment.Center,
         ) {
-            if (state.isLoading) {
+            if (state.isLoading && (if (state.mode == AniChartMode.SEASONAL) state.seasonalItems.isEmpty() else state.scheduleItems.isEmpty())) {
                 CircularProgressIndicator(
                     color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(44.dp),
@@ -153,7 +156,7 @@ fun AniChartScreen(
             } else if (state.errorMessage != null && (if (state.mode == AniChartMode.SEASONAL) state.seasonalItems.isEmpty() else state.scheduleItems.isEmpty())) {
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
                     Text(
                         text = state.errorMessage ?: "Unable to load anime chart",
@@ -173,7 +176,7 @@ fun AniChartScreen(
                                     }
                                 }
                             }
-                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                            .padding(horizontal = 18.dp, vertical = 8.dp),
                     ) {
                         Text(
                             text = "Retry",
@@ -225,19 +228,29 @@ private fun AniChartHeader(
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Icon(
-                imageVector = Icons.Rounded.CalendarMonth,
-                contentDescription = "AniChart",
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(26.dp),
-            )
+            Box(
+                modifier = Modifier
+                    .size(34.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.18f))
+                    .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.35f), RoundedCornerShape(10.dp)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.CalendarMonth,
+                    contentDescription = "AniChart",
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(20.dp),
+                )
+            }
             Text(
                 text = "AniChart",
                 style = MaterialTheme.typography.headlineMedium.copy(
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 22.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    fontSize = 23.sp,
+                    letterSpacing = (-0.3).sp,
                 ),
                 color = MaterialTheme.colorScheme.onBackground,
             )
@@ -245,39 +258,40 @@ private fun AniChartHeader(
 
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            // Mode Switcher Pill
+            // Mode Switcher Glass Pill
             Surface(
-                shape = RoundedCornerShape(20.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                shape = RoundedCornerShape(22.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f)),
             ) {
                 Row(
-                    modifier = Modifier.padding(3.dp),
-                    horizontalArrangement = Arrangement.spacedBy(2.dp),
+                    modifier = Modifier.padding(4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(3.dp),
                 ) {
                     AniChartMode.entries.forEach { entry ->
                         val isSelected = entry == mode
                         val bg by animateColorAsState(
                             targetValue = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
-                            animationSpec = tween(160),
+                            animationSpec = tween(180),
                         )
                         val textColor by animateColorAsState(
                             targetValue = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
-                            animationSpec = tween(160),
+                            animationSpec = tween(180),
                         )
                         Box(
                             modifier = Modifier
-                                .clip(RoundedCornerShape(16.dp))
+                                .clip(RoundedCornerShape(18.dp))
                                 .background(bg)
                                 .clickable { onModeSelected(entry) }
-                                .padding(horizontal = 12.dp, vertical = 6.dp),
+                                .padding(horizontal = 14.dp, vertical = 7.dp),
                             contentAlignment = Alignment.Center,
                         ) {
                             Text(
                                 text = entry.label,
                                 style = MaterialTheme.typography.labelMedium.copy(
-                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                                     fontSize = 12.sp,
                                 ),
                                 color = textColor,
@@ -287,12 +301,18 @@ private fun AniChartHeader(
                 }
             }
 
-            IconButton(onClick = onRefresh, modifier = Modifier.size(36.dp)) {
+            IconButton(
+                onClick = onRefresh,
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)),
+            ) {
                 Icon(
                     imageVector = Icons.Default.Refresh,
                     contentDescription = "Refresh",
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(20.dp),
+                    modifier = Modifier.size(18.dp),
                 )
             }
         }
@@ -315,7 +335,7 @@ private fun SeasonalControlsBar(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp),
+                .padding(horizontal = 20.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
@@ -347,16 +367,28 @@ private fun SeasonalControlsBar(
                         if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
                     )
 
+                    val seasonEmoji = when (season) {
+                        AniChartSeason.WINTER -> "❄️"
+                        AniChartSeason.SPRING -> "🌸"
+                        AniChartSeason.SUMMER -> "☀️"
+                        AniChartSeason.FALL -> "🍁"
+                    }
+
                     Box(
                         modifier = Modifier
-                            .clip(RoundedCornerShape(8.dp))
+                            .clip(RoundedCornerShape(10.dp))
                             .background(containerColor)
+                            .border(
+                                width = if (isSelected) 1.dp else 0.dp,
+                                color = if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.5f) else Color.Transparent,
+                                shape = RoundedCornerShape(10.dp),
+                            )
                             .clickable { onSeasonChange(season, selectedYear) }
-                            .padding(horizontal = 10.dp, vertical = 6.dp),
+                            .padding(horizontal = 11.dp, vertical = 6.dp),
                         contentAlignment = Alignment.Center,
                     ) {
                         Text(
-                            text = "${season.label} $selectedYear",
+                            text = "$seasonEmoji ${season.label} $selectedYear",
                             style = MaterialTheme.typography.labelMedium.copy(
                                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                                 fontSize = 12.sp,
@@ -402,10 +434,10 @@ private fun SeasonalControlsBar(
                 )
                 Box(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(6.dp))
+                        .clip(RoundedCornerShape(8.dp))
                         .background(bg)
                         .clickable { onFormatChange(filter) }
-                        .padding(horizontal = 10.dp, vertical = 4.dp),
+                        .padding(horizontal = 12.dp, vertical = 5.dp),
                 ) {
                     Text(
                         text = filter.label,
@@ -424,6 +456,7 @@ private fun SeasonalControlsBar(
 @Composable
 private fun WeeklyScheduleDayTabs(
     selectedDay: AniChartDay,
+    scheduleItems: Map<AniChartDay, List<AniChartMedia>>,
     onDaySelected: (AniChartDay) -> Unit,
 ) {
     val today = remember { AniChartDay.today() }
@@ -440,6 +473,8 @@ private fun WeeklyScheduleDayTabs(
         items(AniChartDay.entries) { day ->
             val isSelected = day == selectedDay
             val isToday = day == today
+            val count = scheduleItems[day]?.size ?: 0
+
             val bg by animateColorAsState(
                 if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
             )
@@ -460,7 +495,7 @@ private fun WeeklyScheduleDayTabs(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
                     Text(
-                        text = day.label,
+                        text = "${day.label}${if (count > 0) " ($count)" else ""}",
                         style = MaterialTheme.typography.labelMedium.copy(
                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                             fontSize = 13.sp,
@@ -471,8 +506,8 @@ private fun WeeklyScheduleDayTabs(
                         Box(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(4.dp))
-                                .background(if (isSelected) MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.25f) else MaterialTheme.colorScheme.primary.copy(alpha = 0.18f))
-                                .padding(horizontal = 4.dp, vertical = 1.dp),
+                                .background(if (isSelected) MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.25f) else Color(0xFF10B981).copy(alpha = 0.20f))
+                                .padding(horizontal = 5.dp, vertical = 2.dp),
                         ) {
                             Text(
                                 text = "Today",
@@ -480,7 +515,7 @@ private fun WeeklyScheduleDayTabs(
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 9.sp,
                                 ),
-                                color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.primary,
+                                color = if (isSelected) MaterialTheme.colorScheme.onPrimary else Color(0xFF10B981),
                             )
                         }
                     }
@@ -511,7 +546,7 @@ private fun AniChartSeasonalGrid(
 
     val gridState = rememberLazyGridState()
     LazyVerticalGrid(
-        columns = GridCells.Adaptive(minSize = 140.dp),
+        columns = GridCells.Adaptive(minSize = 145.dp),
         state = gridState,
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(horizontal = 20.dp, vertical = 10.dp),
@@ -562,7 +597,7 @@ private fun AniChartScheduleGrid(
 
     val gridState = rememberLazyGridState()
     LazyVerticalGrid(
-        columns = GridCells.Adaptive(minSize = 140.dp),
+        columns = GridCells.Adaptive(minSize = 145.dp),
         state = gridState,
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(horizontal = 20.dp, vertical = 10.dp),
@@ -601,11 +636,21 @@ private fun AniChartCard(
     onClick: () -> Unit,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
-    val cardShape = RoundedCornerShape(12.dp)
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (isPressed) 0.96f else 1f,
+        animationSpec = tween(durationMillis = 140),
+        label = "anichart_card_scale",
+    )
+    val cardShape = RoundedCornerShape(14.dp)
 
     Column(
         modifier = modifier
             .fillMaxWidth()
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
             .clip(cardShape)
             .clickable(
                 interactionSource = interactionSource,
@@ -618,7 +663,14 @@ private fun AniChartCard(
                 .fillMaxWidth()
                 .aspectRatio(0.70f)
                 .clip(cardShape)
-                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
+                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.40f))
+                .border(
+                    BorderStroke(
+                        width = 1.dp,
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.20f),
+                    ),
+                    shape = cardShape,
+                )
                 .nuvioCardDepth(
                     shape = cardShape,
                     surface = NuvioCardDepthSurface.Posters,
@@ -633,23 +685,23 @@ private fun AniChartCard(
                 )
             }
 
-            // Overlay gradient
+            // Multi-stop overlay gradient for readability
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(
                         Brush.verticalGradient(
                             colors = listOf(
-                                Color.Black.copy(alpha = 0.45f),
+                                Color.Black.copy(alpha = 0.50f),
                                 Color.Transparent,
-                                Color.Black.copy(alpha = 0.85f),
+                                Color.Black.copy(alpha = 0.88f),
                             ),
                             startY = 0f,
                         )
                     )
             )
 
-            // Top Left: Airing countdown badge or Airing time badge
+            // Top Left: Airing countdown badge or Continuing badge
             val timeUntil = media.timeUntilAiring
             val nextEp = media.nextEpisode
             if (nextEp != null && timeUntil != null && timeUntil > 0) {
@@ -667,18 +719,29 @@ private fun AniChartCard(
                         .align(Alignment.TopStart)
                         .padding(6.dp)
                         .clip(RoundedCornerShape(6.dp))
-                        .background(Color(0xFF10B981).copy(alpha = 0.90f))
+                        .background(Color(0xFF10B981).copy(alpha = 0.92f))
                         .padding(horizontal = 6.dp, vertical = 2.dp),
                 ) {
-                    Text(
-                        text = "Ep $nextEp in $timeStr",
-                        style = MaterialTheme.typography.labelSmall.copy(
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 9.sp,
-                        ),
-                        color = Color.White,
-                        maxLines = 1,
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(5.dp)
+                                .clip(CircleShape)
+                                .background(Color.White)
+                        )
+                        Text(
+                            text = "Ep $nextEp in $timeStr",
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 9.sp,
+                            ),
+                            color = Color.White,
+                            maxLines = 1,
+                        )
+                    }
                 }
             } else if (media.isContinuing) {
                 Box(
@@ -737,19 +800,27 @@ private fun AniChartCard(
             Column(
                 modifier = Modifier
                     .align(Alignment.BottomStart)
-                    .padding(horizontal = 6.dp, vertical = 6.dp),
+                    .padding(horizontal = 7.dp, vertical = 7.dp),
             ) {
                 if (!media.studio.isNullOrBlank()) {
-                    Text(
-                        text = media.studio,
-                        style = MaterialTheme.typography.labelSmall.copy(
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 10.sp,
-                        ),
-                        color = MaterialTheme.colorScheme.primary,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.25f))
+                            .padding(horizontal = 5.dp, vertical = 1.dp),
+                    ) {
+                        Text(
+                            text = media.studio,
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 9.sp,
+                            ),
+                            color = MaterialTheme.colorScheme.primary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(2.dp))
                 }
                 val formatText = listOfNotNull(
                     media.format?.takeIf { it.isNotBlank() },
@@ -776,6 +847,7 @@ private fun AniChartCard(
             style = MaterialTheme.typography.bodySmall.copy(
                 fontWeight = FontWeight.SemiBold,
                 fontSize = 12.sp,
+                lineHeight = 15.sp,
             ),
             color = MaterialTheme.colorScheme.onBackground,
             maxLines = 2,

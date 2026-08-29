@@ -35,7 +35,11 @@ object AnilistMetaDetailsResolver {
     private fun JsonElement?.asStringOrNull(): String? = if (this is JsonPrimitive && this !is JsonNull) this.contentOrNull else null
     private fun JsonElement?.asIntOrNull(): Int? = if (this is JsonPrimitive && this !is JsonNull) (this.intOrNull ?: this.contentOrNull?.toIntOrNull()) else null
 
+    private val resolvedMetaDetailsCache = mutableMapOf<String, MetaDetails>()
+
     suspend fun resolveMetaDetails(rawId: String): MetaDetails? = coroutineScope {
+        resolvedMetaDetailsCache[rawId]?.let { return@coroutineScope it }
+
         val anilistId = AnilistTrackerCoordinator.extractAnilistId(rawId) ?: return@coroutineScope null
         val token = AnilistAuthRepository.token.value
 
@@ -45,7 +49,7 @@ object AnilistMetaDetailsResolver {
         // Fetch ARM mapping concurrently with AniList media fetch!
         val armDeferred = async {
             cachedArm ?: runCatching {
-                kotlinx.coroutines.withTimeoutOrNull(2000L) { resolveArmMapping(anilistId) }
+                kotlinx.coroutines.withTimeoutOrNull(900L) { resolveArmMapping(anilistId) }
             }.getOrNull() ?: ArmMapping(null, null, null, null, 1)
         }
 
@@ -58,13 +62,7 @@ object AnilistMetaDetailsResolver {
         } ?: return@coroutineScope null
 
         val armMapping = armDeferred.await()
-
         val effectiveImdbId = armMapping.imdbId
-            ?: media.relations.firstOrNull { it.relationType in listOf("PARENT", "PREQUEL", "SOURCE", "MAIN", "ALTERNATIVE") }?.let {
-                armMappingCache[it.id]?.imdbId ?: runCatching {
-                    kotlinx.coroutines.withTimeoutOrNull(1200L) { resolveArmMapping(it.id) }
-                }.getOrNull()?.imdbId
-            }
 
         val isSpecial = isSpecialAnime(media)
         val targetSeason = when {
@@ -79,24 +77,30 @@ object AnilistMetaDetailsResolver {
         val kitsuDeferred = async {
             if (!kitsuId.isNullOrBlank()) {
                 runCatching {
-                    kotlinx.coroutines.withTimeoutOrNull(2000L) { fetchKitsuEpisodes(kitsuId) }
+                    kotlinx.coroutines.withTimeoutOrNull(900L) { fetchKitsuEpisodes(kitsuId) }
                 }.getOrNull() ?: emptyMap()
             } else emptyMap()
         }
 
-        val malDeferred = async {
-            val idMal = media.idMal
-            if (idMal != null) {
-                runCatching {
-                    kotlinx.coroutines.withTimeoutOrNull(1500L) {
-                        com.nuvio.app.features.anilist.AnilistApi.fetchMalMetadata(idMal)
-                    }
-                }.getOrNull()
-            } else null
-        }
+        val primaryTrailer = if (media.trailer != null && media.trailer.id != null) {
+            com.nuvio.app.features.details.MetaTrailer(
+                id = media.trailer.id,
+                key = media.trailer.id,
+                name = "Official Trailer",
+                site = media.trailer.site ?: "YouTube",
+                type = "Trailer",
+                official = true,
+            )
+        } else null
 
         val ytTrailersDeferred = async {
-            fetchYoutubeAnimeTrailers(media.title?.displayTitle.orEmpty())
+            if (primaryTrailer == null) {
+                runCatching {
+                    kotlinx.coroutines.withTimeoutOrNull(800L) {
+                        fetchYoutubeAnimeTrailers(media.title?.displayTitle.orEmpty())
+                    }
+                }.getOrNull() ?: emptyList()
+            } else emptyList()
         }
 
         val kitsuEpisodes = kitsuDeferred.await()
@@ -376,7 +380,9 @@ object AnilistMetaDetailsResolver {
             writer = writers,
             videos = mappedVideos,
             defaultVideoId = if (isMovie) (if (!kitsuId.isNullOrBlank()) "kitsu:$kitsuId" else "anilist:$anilistId") else mappedVideos.firstOrNull()?.id,
-        )
+        ).also { resolvedDetails ->
+            resolvedMetaDetailsCache[rawId] = resolvedDetails
+        }
     }
 
     data class ArmMapping(
