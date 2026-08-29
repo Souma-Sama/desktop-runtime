@@ -20,6 +20,8 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import nuvio.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.getString
 
@@ -491,11 +493,15 @@ object TmdbMetadataService {
                     }
                 }
 
-                val studioLogo = com.nuvio.app.features.anilist.catalog.AnimeStudioLogos.findLogo(studioName)
+                val wikiSummary = runCatching {
+                    kotlinx.coroutines.withTimeoutOrNull(2000L) {
+                        fetchWikipediaSummary(studioName)
+                    }
+                }.getOrNull()
 
-                val studioDescription = when (entityKind) {
-                    TmdbEntityKind.NETWORK -> "Major Japanese broadcast and television network delivering acclaimed anime series, seasonal blocks, and nationwide television broadcasts."
-                    else -> "Renowned Japanese animation studio and production company, celebrated for producing critically acclaimed television series, feature films, and animations."
+                val studioDescription = wikiSummary ?: when (entityKind) {
+                    TmdbEntityKind.NETWORK -> "Japanese broadcast and television network delivering popular anime broadcasts and seasonal programming."
+                    else -> "Japanese animation studio and production company."
                 }
 
                 val browseData = TmdbEntityBrowseData(
@@ -504,7 +510,7 @@ object TmdbMetadataService {
                         kind = entityKind,
                         name = studioName,
                         logo = studioLogo,
-                        originCountry = "Japan \uD83C\uDDEF\uD83C\uDDF5",
+                        originCountry = "Japan",
                         secondaryLabel = if (entityKind == TmdbEntityKind.NETWORK) "Broadcaster / Network" else "Animation Studio",
                         description = studioDescription,
                     ),
@@ -603,6 +609,36 @@ object TmdbMetadataService {
         )
         entityBrowseCache[cacheKey] = data
         data
+    }
+
+    private suspend fun fetchWikipediaSummary(name: String): String? {
+        val cleanName = name.trim()
+        if (cleanName.isBlank()) return null
+
+        val candidates = listOf(
+            cleanName,
+            "$cleanName (company)",
+            "$cleanName (studio)",
+            "$cleanName (animation studio)",
+            cleanName.replace(" ", "_")
+        )
+
+        for (candidate in candidates) {
+            val url = "https://en.wikipedia.org/api/rest_v1/page/summary/${candidate.replace(" ", "_")}"
+            val text = runCatching {
+                httpGetText(url)
+            }.getOrNull() ?: continue
+
+            val extract = runCatching {
+                val jsonElement = json.parseToJsonElement(text)
+                jsonElement.jsonObject["extract"]?.jsonPrimitive?.content
+            }.getOrNull()
+
+            if (!extract.isNullOrBlank() && !extract.contains("may refer to:", ignoreCase = true) && !extract.contains("disambiguation", ignoreCase = true)) {
+                return extract
+            }
+        }
+        return null
     }
 
     suspend fun fetchEntityRailPage(
