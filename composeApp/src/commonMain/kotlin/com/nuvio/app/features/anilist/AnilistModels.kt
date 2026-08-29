@@ -83,6 +83,7 @@ data class AnilistCharacterVoiceActor(
 data class AnilistCharacter(
     val id: Int? = null,
     val name: String? = null,
+    val role: String? = null,
     val image: String? = null,
     val voiceActor: AnilistCharacterVoiceActor? = null,
 )
@@ -113,8 +114,10 @@ data class AnilistTrailerInfo(
 
 @Serializable
 data class AnilistStaff(
+    val id: Int? = null,
     val name: String? = null,
     val role: String? = null,
+    val image: String? = null,
 )
 
 @Serializable

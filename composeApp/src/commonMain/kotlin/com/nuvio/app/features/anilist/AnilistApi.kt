@@ -1375,8 +1375,9 @@ object AnilistApi {
                   url
                   site
                 }
-                characters(sort: RELEVANCE, perPage: 25) {
+                characters(sort: RELEVANCE, perPage: 35) {
                   edges {
+                    role
                     node {
                       id
                       name {
@@ -1441,12 +1442,16 @@ object AnilistApi {
                     airingAt
                   }
                 }
-                staff(perPage: 15) {
+                staff(perPage: 25) {
                   edges {
                     role
                     node {
+                      id
                       name {
                         full
+                      }
+                      image {
+                        large
                       }
                     }
                   }
@@ -1619,6 +1624,7 @@ object AnilistApi {
             ?.get("edges").asJsonArrayOrNull()
             ?.mapNotNull { edgeElem ->
                 val edge = edgeElem.asJsonObjectOrNull() ?: return@mapNotNull null
+                val role = edge["role"].asStringOrNull()
                 val node = edge["node"].asJsonObjectOrNull()
                 val charId = node?.get("id").asIntOrNull()
                 val charName = node?.get("name").asJsonObjectOrNull()?.get("full").asStringOrNull()
@@ -1631,7 +1637,7 @@ object AnilistApi {
 
                 val va = if (vaName != null) AnilistCharacterVoiceActor(id = vaId, name = vaName, image = vaImg) else null
                 if (charName != null || vaName != null) {
-                    AnilistCharacter(id = charId, name = charName, image = charImg, voiceActor = va)
+                    AnilistCharacter(id = charId, name = charName, role = role, image = charImg, voiceActor = va)
                 } else null
             }.orEmpty()
 
@@ -1687,8 +1693,11 @@ object AnilistApi {
             ?.mapNotNull { staffElem ->
                 val sObj = staffElem.asJsonObjectOrNull() ?: return@mapNotNull null
                 val sRole = sObj["role"].asStringOrNull()
-                val sName = sObj["node"].asJsonObjectOrNull()?.get("name").asJsonObjectOrNull()?.get("full").asStringOrNull()
-                if (sName != null) AnilistStaff(name = sName, role = sRole) else null
+                val sNode = sObj["node"].asJsonObjectOrNull()
+                val sId = sNode?.get("id").asIntOrNull()
+                val sName = sNode?.get("name").asJsonObjectOrNull()?.get("full").asStringOrNull()
+                val sImg = sNode?.get("image").asJsonObjectOrNull()?.get("large").asStringOrNull()
+                if (sName != null) AnilistStaff(id = sId, name = sName, role = sRole, image = sImg) else null
             }.orEmpty()
 
         val startDateObj = obj["startDate"].asJsonObjectOrNull()

@@ -33,9 +33,20 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.nuvio.app.core.ui.NuvioAsyncImage as AsyncImage
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.padding
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.graphics.graphicsLayer
 import coil3.compose.LocalPlatformContext
 import coil3.request.ImageRequest
+import com.nuvio.app.core.ui.NuvioAsyncImage as AsyncImage
 import com.nuvio.app.core.ui.NuvioCardDepthSurface
 import com.nuvio.app.core.ui.nuvioHorizontalScrollBleed
 import com.nuvio.app.core.ui.nuvioCardDepth
@@ -58,46 +69,154 @@ fun DetailCastSection(
 ) {
     if (cast.isEmpty()) return
 
+    val categories = remember(cast) {
+        val distinctCats = cast.mapNotNull { it.category?.takeIf { c -> c.isNotBlank() } }.distinct()
+        if (distinctCats.size > 1) {
+            listOf("All") + distinctCats
+        } else {
+            emptyList()
+        }
+    }
+
+    var selectedCategory by remember(cast) { mutableStateOf("All") }
+
+    val filteredCast = remember(cast, selectedCategory) {
+        if (selectedCategory == "All" || categories.isEmpty()) {
+            cast
+        } else {
+            cast.filter { it.category == selectedCategory }
+        }
+    }
+
     DetailSection(
         title = stringResource(Res.string.settings_meta_cast),
         modifier = modifier,
         showHeader = showHeader,
     ) {
-        BoxWithConstraints {
-            val sizing = castSectionSizing(maxWidth.value)
-            val rowState = rememberLazyListState()
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            if (categories.isNotEmpty()) {
+                val chipRowState = rememberLazyListState()
+                LazyRow(
+                    state = chipRowState,
+                    modifier = Modifier
+                        .nuvioHorizontalScrollBleed(horizontalScrollPadding)
+                        .fillMaxWidth()
+                        .nuvioDesktopDragScroll(chipRowState),
+                    contentPadding = PaddingValues(horizontal = horizontalScrollPadding),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    items(
+                        items = categories,
+                        key = { it },
+                    ) { cat ->
+                        CastCategoryFilterChip(
+                            label = cat,
+                            isSelected = cat == selectedCategory,
+                            onClick = { selectedCategory = cat },
+                        )
+                    }
+                }
+            }
 
-            LazyRow(
-                state = rowState,
-                modifier = Modifier
-                    .nuvioHorizontalScrollBleed(horizontalScrollPadding)
-                    .fillMaxWidth()
-                    .nuvioDesktopDragScroll(rowState),
-                contentPadding = PaddingValues(horizontal = horizontalScrollPadding),
-                horizontalArrangement = Arrangement.spacedBy(sizing.avatarGap),
-            ) {
-                itemsIndexed(
-                    items = cast,
-                    key = { index, person -> "${person.name}-${person.role.orEmpty()}-${person.photo.orEmpty()}-$index" },
-                ) { index, person ->
-                    val sharedTransitionKey = (person.tmdbId ?: (person.name.hashCode() and 0x7FFFFFFF))
-                        .takeIf { it > 0 }
-                        ?.let { castAvatarSharedTransitionKey(it, occurrenceIndex = index) }
-                    CastItem(
-                        person = person,
-                        sharedTransitionKey = sharedTransitionKey,
-                        sizing = sizing,
-                        sharedTransitionScope = sharedTransitionScope,
-                        animatedVisibilityScope = animatedVisibilityScope,
-                        onClick = if (onCastClick != null && person.name.isNotBlank()) {
-                            { onCastClick(person, sharedTransitionKey) }
-                        } else {
-                            null
-                        },
-                    )
+            BoxWithConstraints {
+                val sizing = castSectionSizing(maxWidth.value)
+                val rowState = rememberLazyListState()
+
+                LazyRow(
+                    state = rowState,
+                    modifier = Modifier
+                        .nuvioHorizontalScrollBleed(horizontalScrollPadding)
+                        .fillMaxWidth()
+                        .nuvioDesktopDragScroll(rowState),
+                    contentPadding = PaddingValues(horizontal = horizontalScrollPadding),
+                    horizontalArrangement = Arrangement.spacedBy(sizing.avatarGap),
+                ) {
+                    itemsIndexed(
+                        items = filteredCast,
+                        key = { index, person -> "${person.name}-${person.role.orEmpty()}-${person.photo.orEmpty()}-$index" },
+                    ) { index, person ->
+                        val sharedTransitionKey = (person.tmdbId ?: (person.name.hashCode() and 0x7FFFFFFF))
+                            .takeIf { it > 0 }
+                            ?.let { castAvatarSharedTransitionKey(it, occurrenceIndex = index) }
+                        CastItem(
+                            person = person,
+                            sharedTransitionKey = sharedTransitionKey,
+                            sizing = sizing,
+                            sharedTransitionScope = sharedTransitionScope,
+                            animatedVisibilityScope = animatedVisibilityScope,
+                            onClick = if (onCastClick != null && person.name.isNotBlank()) {
+                                { onCastClick(person, sharedTransitionKey) }
+                            } else {
+                                null
+                            },
+                        )
+                    }
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun CastCategoryFilterChip(
+    label: String,
+    isSelected: Boolean,
+    onClick: () -> Unit,
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (isPressed) 0.96f else 1f,
+        animationSpec = tween(durationMillis = 140),
+        label = "cast_filter_chip_scale",
+    )
+    val containerColor by animateColorAsState(
+        targetValue = if (isSelected) {
+            MaterialTheme.colorScheme.primary
+        } else {
+            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
+        },
+        animationSpec = tween(durationMillis = 180),
+        label = "cast_filter_chip_container",
+    )
+    val contentColor by animateColorAsState(
+        targetValue = if (isSelected) {
+            MaterialTheme.colorScheme.onPrimary
+        } else {
+            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f)
+        },
+        animationSpec = tween(durationMillis = 180),
+        label = "cast_filter_chip_content",
+    )
+
+    Box(
+        modifier = Modifier
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
+            .clip(RoundedCornerShape(8.dp))
+            .background(containerColor)
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = onClick,
+            )
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelMedium.copy(
+                fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
+                fontSize = 12.sp,
+            ),
+            color = contentColor,
+            maxLines = 1,
+        )
     }
 }
 

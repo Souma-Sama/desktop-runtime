@@ -124,18 +124,7 @@ object AnilistMetaDetailsResolver {
 
         val cleanDescription = com.nuvio.app.core.format.cleanHtmlDescription(media.description)
 
-        val castPersons = media.characters.mapNotNull { char ->
-            val va = char.voiceActor
-            val name = va?.name ?: char.name ?: return@mapNotNull null
-            val characterRole = if (char.name != null && va?.name != null) "${char.name} (VA)" else char.name ?: "Cast"
-            val photo = va?.image ?: char.image
-            com.nuvio.app.features.details.MetaPerson(
-                name = name,
-                role = characterRole,
-                photo = photo,
-                tmdbId = va?.id ?: char.id,
-            )
-        }
+        val castPersons = buildCategorizedCast(media)
 
         val animationStudios = media.studios.filter { it.isAnimationStudio }.mapNotNull { studio ->
             studio.name?.takeIf { it.isNotBlank() }?.let { name ->
@@ -608,6 +597,8 @@ object AnilistMetaDetailsResolver {
         val cleanDesc = com.nuvio.app.core.format.cleanHtmlDescription(media?.description)
             ?: cinemetaMeta.description
 
+        val anilistCast = media?.let { buildCategorizedCast(it) }.orEmpty()
+
         cinemetaMeta.copy(
             id = rawId,
             name = media?.title?.displayTitle ?: cinemetaMeta.name,
@@ -618,10 +609,62 @@ object AnilistMetaDetailsResolver {
             lastAirDate = media?.endDateYear?.toString() ?: releaseYear,
             background = cinemetaMeta.background ?: "https://images.metahub.space/background/medium/$effectiveImdbId/img",
             logo = cinemetaMeta.logo ?: "https://images.metahub.space/logo/medium/$effectiveImdbId/img",
+            cast = if (anilistCast.isNotEmpty()) anilistCast else cinemetaMeta.cast,
             videos = seasonVideos,
             moreLikeThis = recommendations.ifEmpty { cinemetaMeta.moreLikeThis },
         )
     }
+
+    private fun buildCategorizedCast(media: AnilistMedia): List<com.nuvio.app.features.details.MetaPerson> =
+        buildList {
+            // 1. Main Cast (Main Characters & Voice Actors)
+            media.characters.filter { it.role?.equals("MAIN", ignoreCase = true) == true }.forEach { char ->
+                val va = char.voiceActor
+                val name = va?.name ?: char.name ?: return@forEach
+                val characterRole = if (char.name != null && va?.name != null) "${char.name} (VA)" else char.name ?: "Main Cast"
+                val photo = va?.image ?: char.image
+                add(
+                    com.nuvio.app.features.details.MetaPerson(
+                        name = name,
+                        role = characterRole,
+                        photo = photo,
+                        tmdbId = va?.id ?: char.id,
+                        category = "Main Cast",
+                    )
+                )
+            }
+
+            // 2. Supporting Cast (Supporting Characters & Voice Actors)
+            media.characters.filter { it.role?.equals("MAIN", ignoreCase = true) != true }.forEach { char ->
+                val va = char.voiceActor
+                val name = va?.name ?: char.name ?: return@forEach
+                val characterRole = if (char.name != null && va?.name != null) "${char.name} (VA)" else char.name ?: "Supporting Cast"
+                val photo = va?.image ?: char.image
+                add(
+                    com.nuvio.app.features.details.MetaPerson(
+                        name = name,
+                        role = characterRole,
+                        photo = photo,
+                        tmdbId = va?.id ?: char.id,
+                        category = "Supporting Cast",
+                    )
+                )
+            }
+
+            // 3. Staff & Production Crew
+            media.staff.forEach { st ->
+                val name = st.name ?: return@forEach
+                add(
+                    com.nuvio.app.features.details.MetaPerson(
+                        name = name,
+                        role = st.role ?: "Staff",
+                        photo = st.image,
+                        tmdbId = st.id,
+                        category = "Staff & Crew",
+                    )
+                )
+            }
+        }
 
     private fun resolveEpisodeAirDate(
         actualEpNumber: Int,
