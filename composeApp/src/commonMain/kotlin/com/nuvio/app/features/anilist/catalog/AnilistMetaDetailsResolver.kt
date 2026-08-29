@@ -62,7 +62,12 @@ object AnilistMetaDetailsResolver {
             } else null
         }.getOrNull()
 
-        val armImdbId = cachedArm?.imdbId
+        val effectiveImdbId = cachedArm?.imdbId
+            ?: resolveArmMapping(anilistId).imdbId
+            ?: media.relations.firstOrNull { it.relationType in listOf("PARENT", "PREQUEL", "SOURCE", "MAIN", "ALTERNATIVE") }?.let {
+                resolveArmMapping(it.id).imdbId
+            }
+
         val isSpecial = isSpecialAnime(media)
         val targetSeason = when {
             cachedArm?.season == 0 -> 0
@@ -85,14 +90,14 @@ object AnilistMetaDetailsResolver {
         val episode1Thumb = kitsuEpisodes[1]?.thumbnail?.takeIf { it.isNotBlank() }
             ?: media.streamingEpisodes.firstOrNull()?.thumbnail?.takeIf { it.isNotBlank() }
 
-        val backdrop = if (!armImdbId.isNullOrBlank()) {
-            "https://images.metahub.space/background/medium/$armImdbId/img"
+        val backdrop = if (!effectiveImdbId.isNullOrBlank()) {
+            "https://images.metahub.space/background/medium/$effectiveImdbId/img"
         } else {
             media.bannerImage ?: episode1Thumb ?: poster
         }
 
-        val logo = if (!armImdbId.isNullOrBlank()) {
-            "https://images.metahub.space/logo/medium/$armImdbId/img"
+        val logo = if (!effectiveImdbId.isNullOrBlank()) {
+            "https://images.metahub.space/logo/medium/$effectiveImdbId/img"
         } else null
 
         val isMovie = media.format == "MOVIE"
@@ -186,8 +191,12 @@ object AnilistMetaDetailsResolver {
                     ?: streamingEp?.title?.takeIf { it.isNotBlank() }
                     ?: if (epNum == 0) "Episode 0" else media.title?.displayTitle
                 val epTitle = cleanEpisodeTitle(rawTitle, epNum)
+                val metahubEpThumb = if (!effectiveImdbId.isNullOrBlank()) {
+                    "https://episodes.metahub.space/$effectiveImdbId/0/$epNum/w780.jpg"
+                } else null
                 val epThumbnail = kitsuEp?.thumbnail?.takeIf { it.isNotBlank() }
-                    ?: streamingEp?.thumbnail
+                    ?: streamingEp?.thumbnail?.takeIf { it.isNotBlank() }
+                    ?: metahubEpThumb
                 val videoId = if (!kitsuId.isNullOrBlank()) "kitsu:$kitsuId:$epNum" else "anilist:$anilistId:$epNum"
                 MetaVideo(
                     id = videoId,
@@ -209,8 +218,12 @@ object AnilistMetaDetailsResolver {
                 val rawTitle = kitsuEp?.title?.takeIf { it.isNotBlank() }
                     ?: streamingEp?.title?.takeIf { it.isNotBlank() }
                 val epTitle = cleanEpisodeTitle(rawTitle, actualEpNumber)
+                val metahubEpThumb = if (!effectiveImdbId.isNullOrBlank()) {
+                    "https://episodes.metahub.space/$effectiveImdbId/$targetSeason/$actualEpNumber/w780.jpg"
+                } else null
                 val epThumbnail = kitsuEp?.thumbnail?.takeIf { it.isNotBlank() }
-                    ?: streamingEp?.thumbnail
+                    ?: streamingEp?.thumbnail?.takeIf { it.isNotBlank() }
+                    ?: metahubEpThumb
                 val videoId = if (!kitsuId.isNullOrBlank()) "kitsu:$kitsuId:$actualEpNumber" else "anilist:$anilistId:$epIdx"
 
                 MetaVideo(
@@ -382,7 +395,11 @@ object AnilistMetaDetailsResolver {
             isSpecial -> 0
             else -> mapping.season
         }
-        val effectiveImdbId = mapping.imdbId ?: cinemetaMeta.id
+        val effectiveImdbId = mapping.imdbId
+            ?: cinemetaMeta.id.takeIf { it.startsWith("tt") }
+            ?: media?.relations?.firstOrNull { it.relationType in listOf("PARENT", "PREQUEL", "SOURCE", "MAIN", "ALTERNATIVE") }?.let {
+                resolveArmMapping(it.id).imdbId
+            }
 
         val isMovie = media?.format == "MOVIE"
 
