@@ -135,7 +135,7 @@ fun AnimeTrackerButton(
                     Image(
                         painter = painterResource(Res.drawable.rating_anilist),
                         contentDescription = "AniList Tracker",
-                        modifier = Modifier.size(20.dp),
+                        modifier = Modifier.size(26.dp),
                     )
                 }
             }

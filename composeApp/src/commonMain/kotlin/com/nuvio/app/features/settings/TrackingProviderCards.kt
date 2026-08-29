@@ -241,6 +241,10 @@ private fun AnilistProviderCard(
         openLoginLabel = "Connect AniList",
         disconnectLabel = stringResource(Res.string.settings_simkl_disconnect),
         missingCredentialsMessage = "",
+        syncLabel = if (onConfigureClick != null) "Configure Preferences" else null,
+        onSyncRequested = onConfigureClick,
+        infoLabel = if (onConfigureClick != null) "Preferences & Options" else null,
+        onInfoRequested = onConfigureClick,
         websiteLabel = "Visit AniList",
         websiteUrl = "https://anilist.co",
         onConnectRequested = {
@@ -651,8 +655,7 @@ private fun TrackingProviderCard(
 
             val hasWebsiteAction = !websiteLabel.isNullOrBlank() && !websiteUrl.isNullOrBlank()
             val hasDisconnectAction = mode == TrackingConnectionCardMode.CONNECTED
-            val hasInfoAction = mode == TrackingConnectionCardMode.CONNECTED &&
-                infoLabel != null && onInfoRequested != null
+            val hasInfoAction = infoLabel != null && onInfoRequested != null
             val footerActionCount = listOf(
                 hasWebsiteAction,
                 hasDisconnectAction,
