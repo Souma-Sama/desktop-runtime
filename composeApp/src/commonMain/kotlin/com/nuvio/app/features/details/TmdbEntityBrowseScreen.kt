@@ -550,28 +550,31 @@ private fun EntityHeroSection(
     header: com.nuvio.app.features.tmdb.TmdbEntityHeader,
     modifier: Modifier = Modifier,
 ) {
-    val hasLogo = !header.logo.isNullOrBlank()
+        val localLogo = com.nuvio.app.features.anilist.catalog.AnimeStudioLogos.findLogoResource(header.name)
+        val hasLogo = localLogo != null || !header.logo.isNullOrBlank()
 
-    Column(modifier = modifier.padding(horizontal = 20.dp)) {
-        Text(
-            text = when (header.kind) {
-                TmdbEntityKind.COMPANY -> stringResource(Res.string.details_browse_kind_company)
-                TmdbEntityKind.NETWORK -> stringResource(Res.string.details_browse_kind_network)
-            },
-            style = MaterialTheme.typography.labelLarge.copy(
-                fontWeight = FontWeight.Medium,
-                letterSpacing = 0.4.sp,
-            ),
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        if (hasLogo) {
+        if (localLogo != null) {
             Box(
                 modifier = Modifier
-                    .height(60.dp)
-                    .clip(RoundedCornerShape(8.dp))
+                    .height(64.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(Color.White)
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                androidx.compose.foundation.Image(
+                    painter = org.jetbrains.compose.resources.painterResource(localLogo),
+                    contentDescription = header.name,
+                    modifier = Modifier.height(48.dp),
+                    contentScale = ContentScale.Fit,
+                )
+            }
+            Spacer(modifier = Modifier.height(12.dp))
+        } else if (!header.logo.isNullOrBlank()) {
+            Box(
+                modifier = Modifier
+                    .height(64.dp)
+                    .clip(RoundedCornerShape(12.dp))
                     .background(Color.White)
                     .padding(horizontal = 16.dp, vertical = 8.dp),
                 contentAlignment = Alignment.Center,
@@ -579,7 +582,7 @@ private fun EntityHeroSection(
                 AsyncImage(
                     model = header.logo,
                     contentDescription = header.name,
-                    modifier = Modifier.height(44.dp),
+                    modifier = Modifier.height(48.dp),
                     contentScale = ContentScale.Fit,
                 )
             }

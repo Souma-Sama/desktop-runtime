@@ -60,6 +60,25 @@ object AnimeStudioLogos {
             normalized.contains("nexus") -> Res.drawable.logo_studio_nexus
             normalized.contains("engi") -> Res.drawable.logo_studio_engi
             normalized.contains("cygames") -> Res.drawable.logo_studio_cygames
+            normalized.contains("diomedéa") || normalized.contains("diomedea") -> Res.drawable.logo_studio_diomedea
+            normalized.contains("satelight") -> Res.drawable.logo_studio_satelight
+            normalized.contains("manglobe") -> Res.drawable.logo_studio_manglobe
+            normalized.contains("actas") -> Res.drawable.logo_studio_actas
+            normalized.contains("millepensee") -> Res.drawable.logo_studio_millepensee
+            normalized.contains("studio nut") || normalized.contains(" nut") -> Res.drawable.logo_studio_nut
+            normalized.contains("studio 3hz") || normalized.contains("3hz") -> Res.drawable.logo_studio_3hz
+            normalized.contains("lay-duce") || normalized.contains("layduce") -> Res.drawable.logo_studio_layduce
+            normalized.contains("studio gokumi") || normalized.contains("gokumi") -> Res.drawable.logo_studio_gokumi
+            normalized.contains("seven arcs") -> Res.drawable.logo_studio_seven_arcs
+            normalized.contains("graphinica") -> Res.drawable.logo_studio_graphinica
+            normalized.contains("ajia-do") || normalized.contains("ajiado") -> Res.drawable.logo_studio_ajiado
+            normalized.contains("troyca") -> Res.drawable.logo_studio_troyca
+            normalized.contains("pine jam") -> Res.drawable.logo_studio_pine_jam
+            normalized.contains("zero-g") || normalized.contains("zero g") -> Res.drawable.logo_studio_zero_g
+            normalized.contains("yokohama animation") -> Res.drawable.logo_studio_yokohama
+            normalized.contains("pontdarc") || normalized.contains("atelierpontdarc") -> Res.drawable.logo_studio_pontdarc
+            normalized.contains("felix film") || normalized.contains("felixfilm") -> Res.drawable.logo_studio_felix
+            normalized.contains("tezuka") -> Res.drawable.logo_studio_tezuka
 
             // Publishers, Producers & Music
             normalized.contains("pony canyon") -> Res.drawable.logo_studio_pony_canyon

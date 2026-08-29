@@ -1087,7 +1087,7 @@ object AnilistApi {
               Studio(search: ${'$'}search) {
                 id
                 name
-                media(page: 1, perPage: 35, sort: POPULARITY_DESC) {
+                media(page: 1, perPage: 50, sort: POPULARITY_DESC) {
                   nodes {
                     id
                     title {

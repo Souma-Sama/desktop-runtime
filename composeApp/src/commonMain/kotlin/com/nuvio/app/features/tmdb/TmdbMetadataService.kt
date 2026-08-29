@@ -493,15 +493,20 @@ object TmdbMetadataService {
 
                 val studioLogo = com.nuvio.app.features.anilist.catalog.AnimeStudioLogos.findLogo(studioName)
 
+                val studioDescription = when (entityKind) {
+                    TmdbEntityKind.NETWORK -> "Major Japanese broadcast and television network delivering acclaimed anime series, seasonal blocks, and nationwide television broadcasts."
+                    else -> "Renowned Japanese animation studio and production company, celebrated for producing critically acclaimed television series, feature films, and animations."
+                }
+
                 val browseData = TmdbEntityBrowseData(
                     header = TmdbEntityHeader(
                         id = entityId,
                         kind = entityKind,
                         name = studioName,
                         logo = studioLogo,
-                        originCountry = "JP",
+                        originCountry = "Japan \uD83C\uDDEF\uD83C\uDDF5",
                         secondaryLabel = if (entityKind == TmdbEntityKind.NETWORK) "Broadcaster / Network" else "Animation Studio",
-                        description = null,
+                        description = studioDescription,
                     ),
                     rails = rails.ifEmpty {
                         listOf(
