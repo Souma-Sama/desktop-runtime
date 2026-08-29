@@ -364,7 +364,8 @@ private fun EntityIdentitySidebar(
             )
 
             val localLogo = com.nuvio.app.features.anilist.catalog.AnimeStudioLogos.findLogoResource(header.name)
-            if (localLogo != null) {
+            val localPainter = localLogo?.let { runCatching { org.jetbrains.compose.resources.painterResource(it) }.getOrNull() }
+            if (localPainter != null) {
                 Box(
                     modifier = Modifier
                         .width(184.dp)
@@ -375,7 +376,7 @@ private fun EntityIdentitySidebar(
                     contentAlignment = Alignment.Center,
                 ) {
                     androidx.compose.foundation.Image(
-                        painter = org.jetbrains.compose.resources.painterResource(localLogo),
+                        painter = localPainter,
                         contentDescription = header.name,
                         modifier = Modifier.matchParentSize(),
                         contentScale = ContentScale.Fit,

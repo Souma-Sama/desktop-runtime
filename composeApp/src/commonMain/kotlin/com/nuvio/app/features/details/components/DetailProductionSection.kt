@@ -115,8 +115,11 @@ private fun ProductionChip(
     onClick: (() -> Unit)? = null,
 ) {
     val localLogo = com.nuvio.app.features.anilist.catalog.AnimeStudioLogos.findLogoResource(item.name)
+    val localPainter = localLogo?.let {
+        runCatching { painterResource(it) }.getOrNull()
+    }
     var hasLogoError by remember(item.logo) { mutableStateOf(false) }
-    val hasLogo = localLogo != null || (!item.logo.isNullOrBlank() && !hasLogoError)
+    val hasLogo = localPainter != null || (!item.logo.isNullOrBlank() && !hasLogoError)
 
     val chipBackground = if (hasLogo) {
         Color(0xFFF5F5F5)
@@ -140,9 +143,9 @@ private fun ProductionChip(
             .height(chipHeight),
         contentAlignment = Alignment.Center,
     ) {
-        if (localLogo != null) {
+        if (localPainter != null) {
             Image(
-                painter = painterResource(localLogo),
+                painter = localPainter,
                 contentDescription = item.name,
                 modifier = Modifier
                     .width(logoWidth)
