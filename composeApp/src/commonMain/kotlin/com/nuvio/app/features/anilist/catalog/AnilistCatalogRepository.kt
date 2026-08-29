@@ -241,6 +241,16 @@ object AnilistCatalogRepository {
             else -> emptyList()
         }
 
+        if (page == 1 && mediaList.isNotEmpty()) {
+            coroutineScope {
+                mediaList.take(12).map { media ->
+                    async {
+                        MetaHubArtwork.resolveImdbId("ani_${media.id}")
+                    }
+                }.awaitAll()
+            }
+        }
+
         val previews = mediaList.map { media ->
             val itemId = "ani_${media.id}"
             val itemType = if (media.format == "MOVIE") "movie" else "series"
@@ -272,9 +282,11 @@ object AnilistCatalogRepository {
             )
         }
 
-        CoroutineScope(Dispatchers.Default).launch {
-            previews.take(12).forEach { preview ->
-                MetaHubArtwork.resolveImdbId(preview.id)
+        if (mediaList.size > 12) {
+            CoroutineScope(Dispatchers.Default).launch {
+                mediaList.drop(12).forEach { media ->
+                    MetaHubArtwork.resolveImdbId("ani_${media.id}")
+                }
             }
         }
 
