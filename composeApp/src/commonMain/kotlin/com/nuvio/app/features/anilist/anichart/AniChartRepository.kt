@@ -167,7 +167,7 @@ object AniChartRepository {
             ?.get("media").asJsonArrayOrNull()
             ?: return@withContext emptyList()
 
-        val preferredLang = AnilistPreferencesRepository.getPreferences().preferredTitleLanguage
+        val preferredLang = AnilistPreferencesRepository.snapshot().preferredTitleLanguage.name
 
         mediaArray.mapNotNull { itemElem ->
             val obj = itemElem.asJsonObjectOrNull() ?: return@mapNotNull null
@@ -233,7 +233,7 @@ object AniChartRepository {
             ?.get("airingSchedules").asJsonArrayOrNull()
             ?: return@withContext emptyMap()
 
-        val preferredLang = AnilistPreferencesRepository.getPreferences().preferredTitleLanguage
+        val preferredLang = AnilistPreferencesRepository.snapshot().preferredTitleLanguage.name
         val resultMap = mutableMapOf<AniChartDay, MutableList<AniChartMedia>>()
         AniChartDay.entries.forEach { resultMap[it] = mutableListOf() }
 

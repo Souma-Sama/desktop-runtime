@@ -106,7 +106,7 @@ private fun RelationCard(
                 .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
                 .nuvioCardDepth(
                     shape = cardShape,
-                    surface = NuvioCardDepthSurface.Cards,
+                    surface = NuvioCardDepthSurface.Posters,
                 ),
         ) {
             if (!relation.poster.isNullOrBlank()) {

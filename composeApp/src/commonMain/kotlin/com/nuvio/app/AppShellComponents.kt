@@ -260,7 +260,7 @@ internal fun AppTabHost(
                         AppScreenTab.AniChart -> {
                             com.nuvio.app.features.anilist.anichart.AniChartScreen(
                                 onAnimeClick = { preview -> actions.onPosterClick?.invoke(preview) },
-                                topChromePadding = state.topChromePadding,
+                                topChromePadding = state.topChromePadding ?: 0.dp,
                             )
                         }
 

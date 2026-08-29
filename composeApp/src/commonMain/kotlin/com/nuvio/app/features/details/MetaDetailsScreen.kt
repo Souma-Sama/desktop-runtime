@@ -2304,7 +2304,7 @@ private fun ConfiguredMetaSections(
                         showHeader = showHeader,
                         horizontalScrollPadding = horizontalScrollPadding,
                         onRelationClick = { relation ->
-                            onOpenMeta(
+                            onOpenMeta?.invoke(
                                 com.nuvio.app.features.home.MetaPreview(
                                     id = relation.id,
                                     type = relation.type,

@@ -513,9 +513,7 @@ private fun AniChartSeasonalGrid(
     LazyVerticalGrid(
         columns = GridCells.Adaptive(minSize = 140.dp),
         state = gridState,
-        modifier = Modifier
-            .fillMaxSize()
-            .nuvioDesktopDragScroll(gridState),
+        modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(horizontal = 20.dp, vertical = 10.dp),
         horizontalArrangement = Arrangement.spacedBy(14.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -566,9 +564,7 @@ private fun AniChartScheduleGrid(
     LazyVerticalGrid(
         columns = GridCells.Adaptive(minSize = 140.dp),
         state = gridState,
-        modifier = Modifier
-            .fillMaxSize()
-            .nuvioDesktopDragScroll(gridState),
+        modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(horizontal = 20.dp, vertical = 10.dp),
         horizontalArrangement = Arrangement.spacedBy(14.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -625,7 +621,7 @@ private fun AniChartCard(
                 .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
                 .nuvioCardDepth(
                     shape = cardShape,
-                    surface = NuvioCardDepthSurface.Cards,
+                    surface = NuvioCardDepthSurface.Posters,
                 ),
         ) {
             if (!media.poster.isNullOrBlank()) {
