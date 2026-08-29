@@ -33,19 +33,11 @@ object AnilistMetaDetailsResolver {
     private fun JsonElement?.asStringOrNull(): String? = if (this is JsonPrimitive && this !is JsonNull) this.contentOrNull else null
     private fun JsonElement?.asIntOrNull(): Int? = if (this is JsonPrimitive && this !is JsonNull) (this.intOrNull ?: this.contentOrNull?.toIntOrNull()) else null
 
-    suspend fun resolveMetaDetails(rawId: String): MetaDetails? = withContext(Dispatchers.Default) {
-        val anilistId = AnilistTrackerCoordinator.extractAnilistId(rawId) ?: return@withContext null
+    suspend fun resolveMetaDetails(rawId: String): MetaDetails? = coroutineScope {
+        val anilistId = AnilistTrackerCoordinator.extractAnilistId(rawId) ?: return@coroutineScope null
         val token = AnilistAuthRepository.token.value
 
-        // 1. Fetch base AniList media details
-        val cached = AnilistApi.getCachedMedia(anilistId)
-        val media: AnilistMedia = if (cached != null && cached.characters.isNotEmpty() && cached.recommendations.isNotEmpty() && cached.studios.isNotEmpty()) {
-            cached
-        } else {
-            AnilistApi.fetchMediaById(anilistId, token = token) ?: cached
-        } ?: return@withContext null
-
-        // 2. Fast cache check for ARM mapping (0ms)
+        // 1. Fast cache check for ARM mapping (0ms)
         val cachedArm = armMappingCache[anilistId] ?: runCatching {
             val diskCached = com.nuvio.app.features.fanart.FanartCacheStorage.get("arm:$anilistId")
             if (!diskCached.isNullOrBlank()) {
@@ -62,14 +54,27 @@ object AnilistMetaDetailsResolver {
             } else null
         }.getOrNull()
 
-        val armMapping = cachedArm ?: runCatching {
-            kotlinx.coroutines.withTimeoutOrNull(2500L) { resolveArmMapping(anilistId) }
-        }.getOrNull() ?: ArmMapping(null, null, null, null, 1)
+        // Fetch ARM mapping concurrently with AniList media fetch!
+        val armDeferred = async {
+            cachedArm ?: runCatching {
+                kotlinx.coroutines.withTimeoutOrNull(2000L) { resolveArmMapping(anilistId) }
+            }.getOrNull() ?: ArmMapping(null, null, null, null, 1)
+        }
+
+        // Fetch base AniList media details
+        val cached = AnilistApi.getCachedMedia(anilistId)
+        val media: AnilistMedia = if (cached != null && cached.characters.isNotEmpty() && cached.recommendations.isNotEmpty() && cached.studios.isNotEmpty()) {
+            cached
+        } else {
+            AnilistApi.fetchMediaById(anilistId, token = token) ?: cached
+        } ?: return@coroutineScope null
+
+        val armMapping = armDeferred.await()
 
         val effectiveImdbId = armMapping.imdbId
             ?: media.relations.firstOrNull { it.relationType in listOf("PARENT", "PREQUEL", "SOURCE", "MAIN", "ALTERNATIVE") }?.let {
                 armMappingCache[it.id]?.imdbId ?: runCatching {
-                    kotlinx.coroutines.withTimeoutOrNull(1500L) { resolveArmMapping(it.id) }
+                    kotlinx.coroutines.withTimeoutOrNull(1200L) { resolveArmMapping(it.id) }
                 }.getOrNull()?.imdbId
             }
 
@@ -83,11 +88,27 @@ object AnilistMetaDetailsResolver {
         val kitsuId = armMapping.kitsuId?.removePrefix("kitsu:")?.takeIf { it.isNotBlank() }
             ?: resolveKitsuId(anilistId, media.title?.displayTitle.orEmpty())
 
-        val kitsuEpisodes = if (!kitsuId.isNullOrBlank()) {
-            runCatching {
-                kotlinx.coroutines.withTimeoutOrNull(2500L) { fetchKitsuEpisodes(kitsuId) }
-            }.getOrNull() ?: emptyMap()
-        } else emptyMap()
+        // Fetch Kitsu episodes and MAL score concurrently!
+        val kitsuDeferred = async {
+            if (!kitsuId.isNullOrBlank()) {
+                runCatching {
+                    kotlinx.coroutines.withTimeoutOrNull(2000L) { fetchKitsuEpisodes(kitsuId) }
+                }.getOrNull() ?: emptyMap()
+            } else emptyMap()
+        }
+
+        val malDeferred = async {
+            val idMal = media.idMal
+            if (idMal != null) {
+                runCatching {
+                    kotlinx.coroutines.withTimeoutOrNull(1500L) {
+                        com.nuvio.app.features.anilist.AnilistApi.fetchMalMetadata(idMal)
+                    }
+                }.getOrNull()
+            } else null
+        }
+
+        val kitsuEpisodes = kitsuDeferred.await()
 
         val poster = media.coverImage?.extraLarge
             ?: media.coverImage?.large
@@ -261,11 +282,7 @@ object AnilistMetaDetailsResolver {
             )
         }
 
-        val malMeta = media.idMal?.let {
-            runCatching {
-                com.nuvio.app.features.anilist.AnilistApi.fetchMalMetadata(it)
-            }.getOrNull()
-        }
+        val malMeta = malDeferred.await()
 
         val malScore = malMeta?.score ?: if (media.averageScore != null && media.averageScore > 0) {
             val approx = (media.averageScore / 10.0)
