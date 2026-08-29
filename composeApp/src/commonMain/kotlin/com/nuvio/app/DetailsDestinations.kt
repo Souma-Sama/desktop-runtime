@@ -44,21 +44,10 @@ internal typealias ContentPlayAction = (
 @Composable
 private fun rememberOpenMeta(navController: NuvioNavigator): (MetaPreview) -> Unit {
     return { preview ->
-        val resolvedId = if (preview.id.startsWith("tmdb:")) {
-            val tmdbId = preview.id.removePrefix("tmdb:").toIntOrNull()
-            tmdbId?.let {
-                TmdbService.tmdbToImdb(
-                    tmdbId = it,
-                    mediaType = preview.type,
-                )
-            } ?: preview.id
-        } else {
-            preview.id
-        }
         navController.navigate(
             DetailRoute(
                 type = preview.type,
-                id = resolvedId,
+                id = preview.id,
                 title = preview.name,
                 poster = preview.poster,
                 banner = preview.banner,

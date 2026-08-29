@@ -1330,7 +1330,7 @@ internal fun MainAppContent(
                                             id = item.id,
                                             title = item.name,
                                             poster = item.poster,
-                                            banner = item.background,
+                                            banner = item.banner,
                                             logo = item.logo,
                                         ),
                                     )
@@ -1395,8 +1395,7 @@ internal fun MainAppContent(
                                                             type = mediaType,
                                                             id = result.id,
                                                             title = item.title,
-                                                            poster = item.posterImage,
-                                                            banner = item.bannerImage,
+                                                            poster = item.posterUrl,
                                                         ),
                                                     )
                                                 }
@@ -1406,8 +1405,7 @@ internal fun MainAppContent(
                                                             type = mediaType,
                                                             id = "anilist:${item.id}",
                                                             title = result.title,
-                                                            poster = item.posterImage,
-                                                            banner = item.bannerImage,
+                                                            poster = item.posterUrl,
                                                         ),
                                                     )
                                                 }
@@ -1417,8 +1415,7 @@ internal fun MainAppContent(
                                                             type = mediaType,
                                                             id = "anilist:${item.id}",
                                                             title = item.title,
-                                                            poster = item.posterImage,
-                                                            banner = item.bannerImage,
+                                                            poster = item.posterUrl,
                                                         ),
                                                     )
                                                 }
@@ -1429,8 +1426,7 @@ internal fun MainAppContent(
                                                     type = mediaType,
                                                     id = "anilist:${item.id}",
                                                     title = item.title,
-                                                    poster = item.posterImage,
-                                                    banner = item.bannerImage,
+                                                    poster = item.posterUrl,
                                                 ),
                                             )
                                         }
