@@ -230,21 +230,7 @@ private fun HeroBackgroundLayers(
 
     layerPages.forEach { page ->
         val item = items[page]
-        val metahubBackdrop = MetaHubArtwork.getBackdropUrl(item.id)
-        var heroBackdrop by remember(item.type, item.id, item.banner) {
-            mutableStateOf(
-                metahubBackdrop
-                    ?: item.banner
-                    ?: item.poster
-            )
-        }
-        LaunchedEffect(item.type, item.id) {
-            val resolved = MetaHubArtwork.resolveBackdropUrl(item.id)
-            if (resolved != null && resolved != heroBackdrop) {
-                heroBackdrop = resolved
-            }
-        }
-        val backgroundModel = heroBackdrop ?: item.banner ?: item.poster
+        val backgroundModel = MetaHubArtwork.getBackdropUrl(item.id) ?: item.banner
         AsyncImage(
             model = backgroundModel,
             contentDescription = item.name,

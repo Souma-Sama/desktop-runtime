@@ -262,7 +262,7 @@ object AnilistCatalogRepository {
                 poster = media.coverImage?.extraLarge
                     ?: media.coverImage?.large
                     ?: media.coverImage?.medium,
-                banner = MetaHubArtwork.getBackdropUrl(itemId) ?: media.bannerImage,
+                banner = MetaHubArtwork.getBackdropUrl(itemId),
                 logo = MetaHubArtwork.getLogoUrl(itemId),
                 posterShape = PosterShape.Poster,
                 description = media.description,
