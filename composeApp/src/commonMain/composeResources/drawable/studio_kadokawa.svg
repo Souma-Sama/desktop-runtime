@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 60" width="200" height="60">
+  <path d="M15 12 L38 30 L15 48 Z" fill="#D9232E"/>
+  <path d="M42 12 L65 30 L42 48 Z" fill="#1B365D"/>
+  <text x="75" y="38" font-family="Arial, Helvetica, sans-serif" font-weight="900" font-size="24" fill="#1B365D" letter-spacing="2">KADOKAWA</text>
+</svg>

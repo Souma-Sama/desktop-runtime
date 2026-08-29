@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 60" width="180" height="60">
+  <polygon points="12,45 28,15 44,45" fill="#FFDE00"/>
+  <polygon points="20,40 28,24 36,40" fill="#111111"/>
+  <text x="50" y="38" font-family="Arial, Helvetica, sans-serif" font-weight="900" font-size="22" fill="#D9232E" letter-spacing="2">TRIGGER</text>
+</svg>

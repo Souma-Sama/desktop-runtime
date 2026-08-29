@@ -127,18 +127,12 @@ object MetaDetailsRepository {
 
             val anilistId = if (isAnilistItem) {
                 com.nuvio.app.features.anilist.AnilistTrackerCoordinator.extractAnilistId(id)
-            } else {
-                // Check if this IMDb / TMDb ID is an anime so it opens as an isolated standalone AniList season!
-                when {
-                    id.startsWith("tt", ignoreCase = true) -> com.nuvio.app.features.anilist.AnilistApi.resolveArmAnilistId("imdb", id)
-                    id.startsWith("tmdb:", ignoreCase = true) -> com.nuvio.app.features.anilist.AnilistApi.resolveArmAnilistId("themoviedb", id.removePrefix("tmdb:"))
-                    id.all(Char::isDigit) -> com.nuvio.app.features.anilist.AnilistApi.resolveArmAnilistId("themoviedb", id)
-                    else -> null
-                }
-            }
+            } else null
 
             if (anilistId != null) {
-                val anilistMeta = com.nuvio.app.features.anilist.catalog.AnilistMetaDetailsResolver.resolveMetaDetails("ani_$anilistId")
+                val anilistMeta = runCatching {
+                    com.nuvio.app.features.anilist.catalog.AnilistMetaDetailsResolver.resolveMetaDetails("ani_$anilistId")
+                }.getOrNull()
                 if (anilistMeta != null) {
                     val metaLookupId = resolveMetaLookupId(itemId = "ani_$anilistId", itemType = type)
                     publishLoadedMeta(
@@ -396,6 +390,17 @@ object MetaDetailsRepository {
     private suspend fun resolveMetaLookupId(itemId: String, itemType: String): String {
         val cached = FanartService.extractLookupId(itemId)
         if (cached != null) return cached
+
+        if (itemId.startsWith("ani_", ignoreCase = true) || itemId.startsWith("anilist:", ignoreCase = true)) {
+            val anilistId = com.nuvio.app.features.anilist.AnilistTrackerCoordinator.extractAnilistId(itemId)
+            if (anilistId != null) {
+                val arm = com.nuvio.app.features.anilist.catalog.AnilistMetaDetailsResolver.resolveArmMapping(anilistId)
+                val resolved = arm.imdbId ?: arm.tmdbId?.let { "tmdb:$it" } ?: arm.kitsuId
+                if (!resolved.isNullOrBlank()) {
+                    return resolved
+                }
+            }
+        }
 
         return FanartService.resolveLookupId(itemId, itemType) ?: itemId
     }

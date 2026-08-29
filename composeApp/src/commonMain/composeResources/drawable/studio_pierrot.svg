@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 60" width="180" height="60">
+  <circle cx="26" cy="30" r="16" fill="#F39200"/>
+  <circle cx="22" cy="26" r="2.5" fill="#FFFFFF"/>
+  <circle cx="30" cy="26" r="2.5" fill="#FFFFFF"/>
+  <circle cx="26" cy="33" r="3.5" fill="#D9232E"/>
+  <text x="50" y="38" font-family="Arial, Helvetica, sans-serif" font-weight="800" font-size="22" fill="#111111" letter-spacing="1">Pierrot</text>
+</svg>

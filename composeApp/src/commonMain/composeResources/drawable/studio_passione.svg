@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 60" width="180" height="60">
+  <circle cx="24" cy="30" r="14" fill="#E5004F"/>
+  <path d="M18 30 Q24 20 30 30 T24 40 Z" fill="#FFFFFF"/>
+  <text x="46" y="38" font-family="Arial, Helvetica, sans-serif" font-weight="800" font-size="20" fill="#111111" letter-spacing="1">Passione</text>
+</svg>

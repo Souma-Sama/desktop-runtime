@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 170 60" width="170" height="60">
+  <circle cx="24" cy="30" r="14" fill="#F39200"/>
+  <path d="M24 16 Q30 22 24 28" stroke="#FFFFFF" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+  <text x="46" y="38" font-family="Arial, Helvetica, sans-serif" font-weight="900" font-size="22" fill="#F39200" letter-spacing="1.5">Orange</text>
+</svg>

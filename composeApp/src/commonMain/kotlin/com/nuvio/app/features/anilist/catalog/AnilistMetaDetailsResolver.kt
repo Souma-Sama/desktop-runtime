@@ -42,7 +42,11 @@ object AnilistMetaDetailsResolver {
         val media: AnilistMedia = if (cached != null && cached.characters.isNotEmpty() && cached.recommendations.isNotEmpty()) {
             cached
         } else {
-            AnilistApi.fetchMediaById(anilistId, token = token)
+            runCatching {
+                kotlinx.coroutines.withTimeoutOrNull(4000L) {
+                    AnilistApi.fetchMediaById(anilistId, token = token)
+                }
+            }.getOrNull() ?: cached
         } ?: return@withContext null
 
         // 2. Fast cache check for ARM mapping (0ms)
@@ -62,25 +66,31 @@ object AnilistMetaDetailsResolver {
             } else null
         }.getOrNull()
 
-        val effectiveImdbId = cachedArm?.imdbId
-            ?: resolveArmMapping(anilistId).imdbId
+        val armMapping = cachedArm ?: runCatching {
+            kotlinx.coroutines.withTimeoutOrNull(2500L) { resolveArmMapping(anilistId) }
+        }.getOrNull() ?: ArmMapping(null, null, null, null, 1)
+
+        val effectiveImdbId = armMapping.imdbId
             ?: media.relations.firstOrNull { it.relationType in listOf("PARENT", "PREQUEL", "SOURCE", "MAIN", "ALTERNATIVE") }?.let {
-                resolveArmMapping(it.id).imdbId
+                armMappingCache[it.id]?.imdbId ?: runCatching {
+                    kotlinx.coroutines.withTimeoutOrNull(1500L) { resolveArmMapping(it.id) }
+                }.getOrNull()?.imdbId
             }
 
         val isSpecial = isSpecialAnime(media)
         val targetSeason = when {
-            cachedArm?.season == 0 -> 0
+            armMapping.season == 0 -> 0
             isSpecial -> 0
-            cachedArm?.season != null -> cachedArm.season
-            else -> 1
+            else -> armMapping.season
         }
 
-        val kitsuId = cachedArm?.kitsuId?.removePrefix("kitsu:")?.takeIf { it.isNotBlank() }
-            ?: resolveArmMapping(anilistId).kitsuId?.removePrefix("kitsu:")?.takeIf { it.isNotBlank() }
+        val kitsuId = armMapping.kitsuId?.removePrefix("kitsu:")?.takeIf { it.isNotBlank() }
+            ?: resolveKitsuId(anilistId, media.title?.displayTitle.orEmpty())
 
         val kitsuEpisodes = if (!kitsuId.isNullOrBlank()) {
-            fetchKitsuEpisodes(kitsuId)
+            runCatching {
+                kotlinx.coroutines.withTimeoutOrNull(2500L) { fetchKitsuEpisodes(kitsuId) }
+            }.getOrNull() ?: emptyMap()
         } else emptyMap()
 
         val poster = media.coverImage?.extraLarge

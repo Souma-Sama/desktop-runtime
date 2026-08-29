@@ -45,22 +45,18 @@ fun DetailProductionSection(
     onCompanyClick: ((MetaCompany, String) -> Unit)? = null,
 ) {
     val isSeriesLike = meta.type == "series" || meta.videos.any { it.season != null || it.episode != null }
-    val isNetworkSource = isSeriesLike && meta.networks.isNotEmpty()
-    val sourceItems = if (isSeriesLike) {
+    val isAnilist = meta.id.startsWith("ani_", ignoreCase = true) || meta.id.startsWith("anilist:", ignoreCase = true)
+
+    val sourceItems = if (isAnilist) {
+        (meta.productionCompanies + meta.networks).distinctBy { it.name.trim().lowercase() }
+    } else if (isSeriesLike) {
         meta.networks.ifEmpty { meta.productionCompanies }
     } else {
         meta.productionCompanies.ifEmpty { meta.networks }
     }
     if (sourceItems.isEmpty()) return
 
-    val entityKind = if (isNetworkSource) "network" else "company"
-
-    val displayItems = if (isSeriesLike) {
-        sourceItems.take(6)
-    } else {
-        val logosOnly = sourceItems.filter { !it.logo.isNullOrBlank() }
-        (if (logosOnly.isNotEmpty()) logosOnly else sourceItems).take(6)
-    }
+    val displayItems = sourceItems.take(8)
     if (displayItems.isEmpty()) return
 
     DetailSection(
@@ -94,6 +90,7 @@ fun DetailProductionSection(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 displayItems.forEach { item ->
+                    val entityKind = if (meta.networks.contains(item)) "network" else "company"
                     ProductionChip(
                         item = item,
                         chipHeight = chipHeight,

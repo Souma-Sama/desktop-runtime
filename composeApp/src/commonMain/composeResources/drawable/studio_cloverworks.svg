@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 60" width="220" height="60">
+  <circle cx="24" cy="24" r="8" fill="#33A652"/>
+  <circle cx="38" cy="24" r="8" fill="#33A652"/>
+  <circle cx="31" cy="36" r="8" fill="#33A652"/>
+  <path d="M31 34 Q31 46 22 48" stroke="#33A652" stroke-width="3" fill="none" stroke-linecap="round"/>
+  <text x="56" y="38" font-family="Arial, Helvetica, sans-serif" font-weight="800" font-size="22" fill="#111111" letter-spacing="0.5">CloverWorks</text>
+</svg>
