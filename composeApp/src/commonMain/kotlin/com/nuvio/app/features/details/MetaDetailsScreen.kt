@@ -179,22 +179,9 @@ fun MetaDetailsScreen(
     animatedVisibilityScope: AnimatedVisibilityScope? = null,
     modifier: Modifier = Modifier,
 ) {
-    val previewMeta = remember(type, id, initialTitle, initialPoster, initialBanner, initialLogo) {
-        if (!initialTitle.isNullOrBlank() || !initialPoster.isNullOrBlank() || !initialBanner.isNullOrBlank()) {
-            MetaDetails(
-                id = id,
-                type = type,
-                name = initialTitle.orEmpty(),
-                poster = initialPoster,
-                background = initialBanner ?: initialPoster,
-                logo = initialLogo,
-            )
-        } else null
-    }
     val uiState by MetaDetailsRepository.uiState.collectAsStateWithLifecycle()
     val displayedMeta = uiState.meta?.takeIf { it.type == type && it.id == id }
         ?: MetaDetailsRepository.peek(type, id)
-        ?: previewMeta
     val metaScreenSettingsUiState by remember {
         MetaScreenSettingsRepository.ensureLoaded()
         MetaScreenSettingsRepository.uiState
