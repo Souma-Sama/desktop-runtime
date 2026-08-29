@@ -478,10 +478,8 @@ object FanartService {
                     val fanartSeasonPoster = seasonPosterCache["$cleanId:$s"] ?: seasonPosterCache["$targetId:$s"]
                     if (fanartSeasonPoster != null) {
                         vid.copy(seasonPoster = fanartSeasonPoster)
-                    } else if (s <= 1 && betterPosterFallback != null) {
+                    } else if (s == 1 && betterPosterFallback != null) {
                         vid.copy(seasonPoster = betterPosterFallback)
-                    } else if (vid.seasonPoster.isNullOrBlank() && !updated.poster.isNullOrBlank()) {
-                        vid.copy(seasonPoster = updated.poster)
                     } else {
                         vid
                     }

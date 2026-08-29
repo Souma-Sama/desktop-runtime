@@ -497,15 +497,10 @@ object TmdbMetadataService {
                 val studioLogo = com.nuvio.app.features.anilist.catalog.AnimeStudioLogos.findLogo(studioName)
 
                 val wikiSummary = runCatching {
-                    kotlinx.coroutines.withTimeoutOrNull(2000L) {
+                    kotlinx.coroutines.withTimeoutOrNull(2500L) {
                         fetchWikipediaSummary(studioName)
                     }
                 }.getOrNull()
-
-                val studioDescription = wikiSummary ?: when (entityKind) {
-                    TmdbEntityKind.NETWORK -> "Japanese broadcast and television network delivering popular anime broadcasts and seasonal programming."
-                    else -> "Japanese animation studio and production company."
-                }
 
                 val browseData = TmdbEntityBrowseData(
                     header = TmdbEntityHeader(
@@ -515,7 +510,7 @@ object TmdbMetadataService {
                         logo = studioLogo,
                         originCountry = "Japan",
                         secondaryLabel = if (entityKind == TmdbEntityKind.NETWORK) "Broadcaster / Network" else "Animation Studio",
-                        description = studioDescription,
+                        description = wikiSummary,
                     ),
                     rails = rails.ifEmpty {
                         listOf(
@@ -617,9 +612,6 @@ object TmdbMetadataService {
     private suspend fun fetchWikipediaSummary(name: String): String? {
         val cleanName = name.trim()
         if (cleanName.isBlank()) return null
-
-        val localDesc = com.nuvio.app.features.anilist.catalog.AnimeStudioDescriptions.findDescription(cleanName)
-        if (!localDesc.isNullOrBlank()) return localDesc
 
         val candidates = listOf(
             cleanName,
