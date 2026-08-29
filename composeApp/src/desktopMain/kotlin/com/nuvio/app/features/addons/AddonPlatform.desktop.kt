@@ -45,9 +45,9 @@ internal actual object AddonStorage {
 
 private val desktopHttpClient = OkHttpClient.Builder()
     .dns(DesktopIPv4FirstDns())
-    .connectTimeout(60, TimeUnit.SECONDS)
-    .readTimeout(60, TimeUnit.SECONDS)
-    .writeTimeout(60, TimeUnit.SECONDS)
+    .connectTimeout(12, TimeUnit.SECONDS)
+    .readTimeout(12, TimeUnit.SECONDS)
+    .writeTimeout(12, TimeUnit.SECONDS)
     .followRedirects(true)
     .followSslRedirects(true)
     .build()
