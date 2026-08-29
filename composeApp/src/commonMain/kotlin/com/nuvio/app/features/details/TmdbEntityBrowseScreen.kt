@@ -363,7 +363,25 @@ private fun EntityIdentitySidebar(
                 overflow = TextOverflow.Ellipsis,
             )
 
-            if (!header.logo.isNullOrBlank()) {
+            val localLogo = com.nuvio.app.features.anilist.catalog.AnimeStudioLogos.findLogoResource(header.name)
+            if (localLogo != null) {
+                Box(
+                    modifier = Modifier
+                        .width(184.dp)
+                        .height(104.dp)
+                        .clip(RoundedCornerShape(18.dp))
+                        .background(Color.White)
+                        .padding(18.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    androidx.compose.foundation.Image(
+                        painter = org.jetbrains.compose.resources.painterResource(localLogo),
+                        contentDescription = header.name,
+                        modifier = Modifier.matchParentSize(),
+                        contentScale = ContentScale.Fit,
+                    )
+                }
+            } else if (!header.logo.isNullOrBlank()) {
                 Box(
                     modifier = Modifier
                         .width(184.dp)

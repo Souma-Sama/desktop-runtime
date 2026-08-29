@@ -35,4 +35,6 @@ object AnimeStudioLogos {
             else -> null
         }
     }
+
+    fun findLogo(rawName: String?): String? = null
 }
