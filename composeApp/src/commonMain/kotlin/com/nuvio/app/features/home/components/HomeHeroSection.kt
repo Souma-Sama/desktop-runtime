@@ -116,6 +116,14 @@ fun HomeHeroSection(
     var pagerDragActive by remember { mutableStateOf(false) }
     val autoScrollPage = pagerState.currentPage
 
+    LaunchedEffect(items) {
+        items.take(6).forEach { item ->
+            launch {
+                MetaHubArtwork.resolveImdbId(item.id)
+            }
+        }
+    }
+
     LaunchedEffect(autoScrollPage, items.size) {
         if (items.size <= 1) return@LaunchedEffect
         delay(HERO_AUTO_SCROLL_INTERVAL_MS)
@@ -222,8 +230,22 @@ private fun HeroBackgroundLayers(
 
     layerPages.forEach { page ->
         val item = items[page]
-        val heroBackdrop = item.banner ?: MetaHubArtwork.getBackdropUrl(item.id) ?: item.poster
-        val backgroundModel = heroBackdrop
+        var heroBackdrop by remember(item.type, item.id, item.banner) {
+            mutableStateOf(
+                item.banner
+                    ?: MetaHubArtwork.getBackdropUrl(item.id)
+                    ?: item.poster
+            )
+        }
+        LaunchedEffect(item.type, item.id) {
+            if (heroBackdrop == null || heroBackdrop == item.poster) {
+                val resolved = MetaHubArtwork.resolveBackdropUrl(item.id)
+                if (resolved != null) {
+                    heroBackdrop = resolved
+                }
+            }
+        }
+        val backgroundModel = heroBackdrop ?: item.banner ?: item.poster
         AsyncImage(
             model = backgroundModel,
             contentDescription = item.name,
@@ -749,7 +771,18 @@ private fun HeroContentBlock(
     var logoLoadError by remember(item.type, item.id) {
         mutableStateOf(false)
     }
-    val logoUrl = item.logo?.takeIf { it.isNotBlank() } ?: MetaHubArtwork.getLogoUrl(item.id)
+    var resolvedLogo by remember(item.type, item.id, item.logo) {
+        mutableStateOf(item.logo?.takeIf { it.isNotBlank() } ?: MetaHubArtwork.getLogoUrl(item.id))
+    }
+    LaunchedEffect(item.type, item.id) {
+        if (resolvedLogo == null) {
+            val logo = MetaHubArtwork.resolveLogoUrl(item.id)
+            if (logo != null) {
+                resolvedLogo = logo
+            }
+        }
+    }
+    val logoUrl = resolvedLogo
 
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -823,7 +856,18 @@ private fun DesktopHeroContentBlock(
     var logoLoadError by remember(item.type, item.id) {
         mutableStateOf(false)
     }
-    val logoUrl = item.logo?.takeIf { it.isNotBlank() } ?: MetaHubArtwork.getLogoUrl(item.id)
+    var resolvedLogo by remember(item.type, item.id, item.logo) {
+        mutableStateOf(item.logo?.takeIf { it.isNotBlank() } ?: MetaHubArtwork.getLogoUrl(item.id))
+    }
+    LaunchedEffect(item.type, item.id) {
+        if (resolvedLogo == null) {
+            val logo = MetaHubArtwork.resolveLogoUrl(item.id)
+            if (logo != null) {
+                resolvedLogo = logo
+            }
+        }
+    }
+    val logoUrl = resolvedLogo
 
     Column(
         modifier = Modifier
