@@ -505,8 +505,11 @@ private fun SeasonPosterScrollRow(
                 }
             }
 
+            val epThumbnailFallback = groupedEpisodes[season]
+                ?.firstNotNullOfOrNull { episode -> episode.thumbnail?.takeIf(String::isNotBlank) }
+
             val posterUrl = resolvedSeasonPoster
-                ?: meta.poster
+                ?: (if (season == 1) meta.poster else (epThumbnailFallback ?: meta.poster))
                 ?: meta.background
 
             SeasonPosterButton(

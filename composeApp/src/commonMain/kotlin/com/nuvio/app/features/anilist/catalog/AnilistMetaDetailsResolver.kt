@@ -1,7 +1,8 @@
 package com.nuvio.app.features.anilist.catalog
 
-import co.touchlab.kermit.Logger
+import com.nuvio.app.features.addons.encodeUnsafeHttpUrlCharacters
 import com.nuvio.app.features.addons.httpGetText
+import com.nuvio.app.features.addons.httpGetTextWithHeaders
 import com.nuvio.app.features.anilist.AnilistApi
 import com.nuvio.app.features.anilist.AnilistAuthRepository
 import com.nuvio.app.features.anilist.AnilistMedia
@@ -181,18 +182,30 @@ object AnilistMetaDetailsResolver {
             )
         }
 
-        val trailers = if (media.trailer != null && media.trailer.id != null) {
-            listOf(
-                com.nuvio.app.features.details.MetaTrailer(
-                    id = media.trailer.id,
-                    key = media.trailer.id,
-                    name = "Official Trailer",
-                    site = media.trailer.site ?: "YouTube",
-                    type = "Trailer",
-                    official = true,
-                )
+        val primaryTrailer = if (media.trailer != null && media.trailer.id != null) {
+            com.nuvio.app.features.details.MetaTrailer(
+                id = media.trailer.id,
+                key = media.trailer.id,
+                name = "Official Trailer",
+                site = media.trailer.site ?: "YouTube",
+                type = "Trailer",
+                official = true,
             )
-        } else emptyList()
+        } else null
+
+        val ytTrailers = fetchYoutubeAnimeTrailers(media.title?.displayTitle.orEmpty())
+
+        val seenTrailerKeys = mutableSetOf<String>()
+        val trailers = mutableListOf<com.nuvio.app.features.details.MetaTrailer>()
+
+        if (primaryTrailer != null && seenTrailerKeys.add(primaryTrailer.key)) {
+            trailers.add(primaryTrailer)
+        }
+        for (t in ytTrailers) {
+            if (seenTrailerKeys.add(t.key)) {
+                trailers.add(t)
+            }
+        }
 
         val directors = media.staff.filter { it.role?.contains("Director", ignoreCase = true) == true }.mapNotNull { it.name }
         val writers = media.staff.filter { it.role?.contains("Original Creator", ignoreCase = true) == true || it.role?.contains("Series Composition", ignoreCase = true) == true }.mapNotNull { it.name }
@@ -832,5 +845,71 @@ object AnilistMetaDetailsResolver {
             fullText.contains("bonus") ||
             fullText.contains("includes episode 0") ||
             (format == "ONA" && (fullText.contains("short") || fullText.contains("sp") || (media.episodes != null && media.episodes <= 13 && media.duration != null && media.duration <= 10)))
+    }
+
+    private suspend fun fetchYoutubeAnimeTrailers(animeTitle: String): List<com.nuvio.app.features.details.MetaTrailer> {
+        val cleanTitle = animeTitle.trim()
+        if (cleanTitle.isBlank()) return emptyList()
+
+        return runCatching {
+            withTimeoutOrNull(2500L) {
+                val encodedQuery = cleanTitle.encodeUnsafeHttpUrlCharacters()
+                val url = "https://www.youtube.com/results?search_query=$encodedQuery+anime+official+trailer"
+                val html = httpGetTextWithHeaders(
+                    url = url,
+                    headers = mapOf(
+                        "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                        "Accept-Language" to "en-US,en;q=0.9",
+                    ),
+                )
+
+                val regex = Regex(""""videoId":"([a-zA-Z0-9_-]{11})".*?"title":\{"runs":\[\{"text":"(.*?)"\}""")
+                val matches = regex.findAll(html)
+
+                val seen = mutableSetOf<String>()
+                val trailers = mutableListOf<com.nuvio.app.features.details.MetaTrailer>()
+                val keywords = listOf("trailer", "pv", "teaser", "preview", "official", "promo", "sub", "dub")
+
+                for (match in matches) {
+                    val vid = match.groupValues.getOrNull(1) ?: continue
+                    val rawName = match.groupValues.getOrNull(2) ?: continue
+                    if (!seen.add(vid)) continue
+
+                    val lower = rawName.lowercase()
+                    if (keywords.any { lower.contains(it) }) {
+                        val trailerType = when {
+                            lower.contains("teaser") -> "Teaser"
+                            lower.contains("pv") || lower.contains("preview") || lower.contains("promo") -> "Promo Video"
+                            lower.contains("clip") -> "Clip"
+                            else -> "Trailer"
+                        }
+
+                        val cleanName = rawName
+                            .replace("&quot;", "\"")
+                            .replace("&amp;", "&")
+                            .replace("&#39;", "'")
+                            .replace(Regex("""\s*\|\s*Crunchyroll""", RegexOption.IGNORE_CASE), "")
+                            .replace(Regex("""\s*\|\s*Netflix""", RegexOption.IGNORE_CASE), "")
+                            .replace(Regex("""\s*\|\s*TOHO animation""", RegexOption.IGNORE_CASE), "")
+                            .replace(Regex("""\s*\|\s*Aniplex""", RegexOption.IGNORE_CASE), "")
+                            .trim()
+
+                        trailers.add(
+                            com.nuvio.app.features.details.MetaTrailer(
+                                id = vid,
+                                key = vid,
+                                name = cleanName.ifBlank { "Official Trailer" },
+                                site = "YouTube",
+                                type = trailerType,
+                                official = true,
+                            ),
+                        )
+
+                        if (trailers.size >= 8) break
+                    }
+                }
+                trailers
+            }
+        }.getOrNull().orEmpty()
     }
 }

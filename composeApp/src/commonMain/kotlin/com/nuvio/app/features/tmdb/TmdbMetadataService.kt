@@ -459,76 +459,87 @@ object TmdbMetadataService {
 
         val studioName = fallbackName.orEmpty()
         if (isAnilist || !settings.enabled || !settings.hasApiKey || entityId <= 0) {
-            val anilistStudioMedia = if (studioName.isNotBlank()) {
+            val cleanName = studioName.replace(" (TV)", "").replace(" Corporation", "").replace(" Co., Ltd.", "").trim()
+            var anilistStudioMedia = if (cleanName.isNotBlank()) {
                 runCatching {
-                    com.nuvio.app.features.anilist.AnilistApi.fetchStudioMedia(studioName)
+                    com.nuvio.app.features.anilist.AnilistApi.fetchStudioMedia(cleanName)
                 }.getOrNull().orEmpty()
             } else emptyList()
 
-            if (anilistStudioMedia.isNotEmpty()) {
-                val seriesList = anilistStudioMedia.filter { it.type == "series" }
-                val moviesList = anilistStudioMedia.filter { it.type == "movie" }
-
-                val rails = buildList {
-                    if (seriesList.isNotEmpty()) {
-                        add(
-                            TmdbEntityRail(
-                                mediaType = TmdbEntityMediaType.TV,
-                                railType = TmdbEntityRailType.POPULAR,
-                                items = seriesList,
-                                currentPage = 1,
-                                hasMore = false,
-                            )
-                        )
-                    }
-                    if (moviesList.isNotEmpty()) {
-                        add(
-                            TmdbEntityRail(
-                                mediaType = TmdbEntityMediaType.MOVIE,
-                                railType = TmdbEntityRailType.POPULAR,
-                                items = moviesList,
-                                currentPage = 1,
-                                hasMore = false,
-                            )
-                        )
-                    }
-                }
-
-                val studioLogo = com.nuvio.app.features.anilist.catalog.AnimeStudioLogos.findLogo(studioName)
-
-                val wikiSummary = runCatching {
-                    kotlinx.coroutines.withTimeoutOrNull(2500L) {
-                        fetchWikipediaSummary(studioName)
-                    }
-                }.getOrNull()
-
-                val browseData = TmdbEntityBrowseData(
-                    header = TmdbEntityHeader(
-                        id = entityId,
-                        kind = entityKind,
-                        name = studioName,
-                        logo = studioLogo,
-                        originCountry = "Japan",
-                        secondaryLabel = if (entityKind == TmdbEntityKind.NETWORK) "Broadcaster / Network" else "Animation Studio",
-                        description = wikiSummary,
-                    ),
-                    rails = rails.ifEmpty {
-                        listOf(
-                            TmdbEntityRail(
-                                mediaType = TmdbEntityMediaType.TV,
-                                railType = TmdbEntityRailType.POPULAR,
-                                items = anilistStudioMedia,
-                                currentPage = 1,
-                                hasMore = false,
-                            )
-                        )
-                    },
-                )
-                entityBrowseCache[cacheKey] = browseData
-                return@withContext browseData
-            } else if (isAnilist || entityId <= 0) {
-                return@withContext null
+            if (anilistStudioMedia.isEmpty() && cleanName.isNotBlank()) {
+                // Secondary fallback: search AniList by keyword
+                anilistStudioMedia = runCatching {
+                    com.nuvio.app.features.anilist.AnilistApi.fetchCatalogPage(
+                        catalogId = "search",
+                        page = 1,
+                        perPage = 30,
+                        search = cleanName,
+                    ).items
+                }.getOrNull().orEmpty()
             }
+
+            val seriesList = anilistStudioMedia.filter { it.type == "series" }
+            val moviesList = anilistStudioMedia.filter { it.type == "movie" }
+
+            val rails = buildList {
+                if (seriesList.isNotEmpty()) {
+                    add(
+                        TmdbEntityRail(
+                            mediaType = TmdbEntityMediaType.TV,
+                            railType = TmdbEntityRailType.POPULAR,
+                            items = seriesList,
+                            currentPage = 1,
+                            hasMore = false,
+                        )
+                    )
+                }
+                if (moviesList.isNotEmpty()) {
+                    add(
+                        TmdbEntityRail(
+                            mediaType = TmdbEntityMediaType.MOVIE,
+                            railType = TmdbEntityRailType.POPULAR,
+                            items = moviesList,
+                            currentPage = 1,
+                            hasMore = false,
+                        )
+                    )
+                }
+                if (isEmpty() && anilistStudioMedia.isNotEmpty()) {
+                    add(
+                        TmdbEntityRail(
+                            mediaType = TmdbEntityMediaType.TV,
+                            railType = TmdbEntityRailType.POPULAR,
+                            items = anilistStudioMedia,
+                            currentPage = 1,
+                            hasMore = false,
+                        )
+                    )
+                }
+            }
+
+            val studioLogo = com.nuvio.app.features.anilist.catalog.AnimeStudioLogos.findLogo(studioName)
+                ?: com.nuvio.app.features.anilist.catalog.AnimeStudioLogos.findLogo(cleanName)
+
+            val wikiSummary = runCatching {
+                kotlinx.coroutines.withTimeoutOrNull(2500L) {
+                    fetchWikipediaSummary(cleanName.ifBlank { studioName })
+                }
+            }.getOrNull()
+
+            val browseData = TmdbEntityBrowseData(
+                header = TmdbEntityHeader(
+                    id = entityId,
+                    kind = entityKind,
+                    name = studioName.ifBlank { cleanName },
+                    logo = studioLogo,
+                    originCountry = "Japan",
+                    secondaryLabel = if (entityKind == TmdbEntityKind.NETWORK) "Broadcaster / Network" else "Animation Studio",
+                    description = wikiSummary,
+                ),
+                rails = rails,
+            )
+            entityBrowseCache[cacheKey] = browseData
+            return@withContext browseData
         }
 
         val (header, rails) = coroutineScope {
