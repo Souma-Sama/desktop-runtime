@@ -582,6 +582,28 @@ object MetaDetailsRepository {
                             }
                         } else (if (isAnilist && tmdbEnriched.networks.isNotEmpty()) tmdbEnriched.networks else tmdbEnriched.networks)
 
+                        val mergedTrailers = if (tmdbEnriched.trailers.isNotEmpty()) {
+                            val seen = mutableSetOf<String>()
+                            val combined = mutableListOf<MetaTrailer>()
+                            for (t in tmdbEnriched.trailers) {
+                                val key = t.source.ifBlank { t.id }
+                                if (key.isNotBlank() && seen.add(key)) {
+                                    combined.add(t)
+                                }
+                            }
+                            for (t in anilistTrailers) {
+                                val key = t.source.ifBlank { t.id }
+                                if (key.isNotBlank() && seen.add(key)) {
+                                    combined.add(t)
+                                }
+                            }
+                            combined
+                        } else if (isAnilist && anilistTrailers.isNotEmpty()) {
+                            anilistTrailers
+                        } else {
+                            if (tmdbEnriched.trailers.isNotEmpty()) tmdbEnriched.trailers else current.trailers
+                        }
+
                         tmdbEnriched.copy(
                             id = current.id,
                             type = current.type,
@@ -594,7 +616,7 @@ object MetaDetailsRepository {
                             cast = if (isAnilist && anilistCast.isNotEmpty()) anilistCast else tmdbEnriched.cast,
                             productionCompanies = mergedCompanies,
                             networks = mergedNetworks,
-                            trailers = if (isAnilist && anilistTrailers.isNotEmpty()) anilistTrailers else (if (tmdbEnriched.trailers.isNotEmpty()) tmdbEnriched.trailers else current.trailers),
+                            trailers = mergedTrailers,
                             moreLikeThis = if (isAnilist && anilistRecommendations.isNotEmpty()) anilistRecommendations else tmdbEnriched.moreLikeThis,
                             moreLikeThisSource = if (isAnilist && anilistRecommendations.isNotEmpty()) null else tmdbEnriched.moreLikeThisSource,
                             description = if (isAnilist && !meta.description.isNullOrBlank()) meta.description else tmdbEnriched.description,
