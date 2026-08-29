@@ -511,11 +511,9 @@ object MetaDetailsRepository {
             }
         }
 
-        // 2. TMDB job: Full credits, cast portraits, episodes, synopses (~1-2s) - Streams in independently!
-        // Pull the plug on TMDb for AniList / anime addon. TMDb enrichment only runs for non-AniList addons.
+        // 2. TMDB job: Full credits, cast portraits, episodes, synopses, and trailers (~1-2s) - Streams in independently!
         val tmdbJob = launch {
-            val isAnilistItem = itemId.startsWith("ani_", ignoreCase = true) || itemId.startsWith("anilist:", ignoreCase = true)
-            if (!isAnilistItem && tmdbSettings.enabled && tmdbSettings.hasApiKey) {
+            if (tmdbSettings.enabled && tmdbSettings.hasApiKey) {
                 val tmdbEnriched = runCatching {
                     withTimeoutOrNull(TMDB_ENRICH_TIMEOUT_MS) {
                         TmdbMetadataService.enrichMeta(
@@ -528,32 +526,63 @@ object MetaDetailsRepository {
 
                 if (tmdbEnriched != null) {
                     emitUpdate { current ->
-                        tmdbEnriched.copy(
-                            id = current.id,
-                            type = current.type,
-                            name = tmdbEnriched.name,
-                            genres = if (current.genres.isNotEmpty()) current.genres else tmdbEnriched.genres,
-                            logo = current.logo ?: tmdbEnriched.logo ?: meta.logo,
-                            background = tmdbEnriched.background ?: current.background ?: meta.background,
-                            poster = current.poster ?: tmdbEnriched.poster ?: meta.poster,
-                            videos = tmdbEnriched.videos.mapIndexed { idx, enrichedVid ->
-                                val currentVid = current.videos.getOrNull(idx)
-                                if (!currentVid?.seasonPoster.isNullOrBlank()) {
-                                    enrichedVid.copy(seasonPoster = currentVid.seasonPoster)
-                                } else enrichedVid
-                            },
-                            cast = tmdbEnriched.cast,
-                            productionCompanies = tmdbEnriched.productionCompanies,
-                            networks = tmdbEnriched.networks,
-                            trailers = if (tmdbEnriched.trailers.isNotEmpty()) tmdbEnriched.trailers else current.trailers,
-                            moreLikeThis = tmdbEnriched.moreLikeThis,
-                            moreLikeThisSource = tmdbEnriched.moreLikeThisSource,
-                            description = tmdbEnriched.description,
-                            releaseInfo = meta.releaseInfo ?: tmdbEnriched.releaseInfo,
-                            status = tmdbEnriched.status,
-                            lastAirDate = tmdbEnriched.lastAirDate,
-                            externalRatings = current.externalRatings.ifEmpty { tmdbEnriched.externalRatings },
-                        )
+                        val isAnilist = current.id.startsWith("ani_", ignoreCase = true) || current.id.startsWith("anilist:", ignoreCase = true)
+
+                        val mergedTrailers = if (tmdbEnriched.trailers.isNotEmpty()) {
+                            val seen = mutableSetOf<String>()
+                            val combined = mutableListOf<MetaTrailer>()
+                            for (t in tmdbEnriched.trailers) {
+                                val key = t.key.ifBlank { t.id }
+                                if (key.isNotBlank() && seen.add(key)) {
+                                    combined.add(t)
+                                }
+                            }
+                            for (t in current.trailers) {
+                                val key = t.key.ifBlank { t.id }
+                                if (key.isNotBlank() && seen.add(key)) {
+                                    combined.add(t)
+                                }
+                            }
+                            combined
+                        } else {
+                            current.trailers
+                        }
+
+                        if (isAnilist) {
+                            current.copy(
+                                logo = current.logo ?: tmdbEnriched.logo,
+                                background = current.background ?: tmdbEnriched.background,
+                                trailers = mergedTrailers,
+                                externalRatings = current.externalRatings.ifEmpty { tmdbEnriched.externalRatings },
+                            )
+                        } else {
+                            tmdbEnriched.copy(
+                                id = current.id,
+                                type = current.type,
+                                name = tmdbEnriched.name,
+                                genres = if (current.genres.isNotEmpty()) current.genres else tmdbEnriched.genres,
+                                logo = current.logo ?: tmdbEnriched.logo ?: meta.logo,
+                                background = tmdbEnriched.background ?: current.background ?: meta.background,
+                                poster = current.poster ?: tmdbEnriched.poster ?: meta.poster,
+                                videos = tmdbEnriched.videos.mapIndexed { idx, enrichedVid ->
+                                    val currentVid = current.videos.getOrNull(idx)
+                                    if (!currentVid?.seasonPoster.isNullOrBlank()) {
+                                        enrichedVid.copy(seasonPoster = currentVid.seasonPoster)
+                                    } else enrichedVid
+                                },
+                                cast = tmdbEnriched.cast,
+                                productionCompanies = tmdbEnriched.productionCompanies,
+                                networks = tmdbEnriched.networks,
+                                trailers = mergedTrailers,
+                                moreLikeThis = tmdbEnriched.moreLikeThis,
+                                moreLikeThisSource = tmdbEnriched.moreLikeThisSource,
+                                description = tmdbEnriched.description,
+                                releaseInfo = meta.releaseInfo ?: tmdbEnriched.releaseInfo,
+                                status = tmdbEnriched.status,
+                                lastAirDate = tmdbEnriched.lastAirDate,
+                                externalRatings = current.externalRatings.ifEmpty { tmdbEnriched.externalRatings },
+                            )
+                        }
                     }
                 }
             }
