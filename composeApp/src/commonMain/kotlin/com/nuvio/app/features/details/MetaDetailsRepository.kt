@@ -514,8 +514,7 @@ object MetaDetailsRepository {
         // 2. TMDB job: Full credits, cast portraits, episodes, synopses (~1-2s) - Streams in independently!
         // TMDb enrichment is completely shut down for the native AniList addon. It only runs for non-AniList addons (Cinemeta, Stremio, etc.).
         val tmdbJob = launch {
-            val isAnilistItem = itemId.startsWith("ani_", ignoreCase = true) || itemId.startsWith("anilist:", ignoreCase = true)
-            if (!isAnilistItem && tmdbSettings.enabled && tmdbSettings.hasApiKey) {
+            if (!isAnilist && tmdbSettings.enabled && tmdbSettings.hasApiKey) {
                 val tmdbEnriched = runCatching {
                     withTimeoutOrNull(TMDB_ENRICH_TIMEOUT_MS) {
                         TmdbMetadataService.enrichMeta(
