@@ -10,8 +10,6 @@ import com.nuvio.app.features.catalog.CatalogPage
 import com.nuvio.app.features.home.HomeCatalogDefinition
 import com.nuvio.app.features.home.MetaPreview
 import com.nuvio.app.features.home.PosterShape
-import com.nuvio.app.features.fanart.FanartService
-import com.nuvio.app.features.fanart.FanartSettingsRepository
 import com.nuvio.app.features.library.LibraryClock
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -250,12 +248,11 @@ object AnilistCatalogRepository {
                 id = itemId,
                 type = itemType,
                 name = media.title?.getDisplayTitle(prefs.preferredTitleLanguage).orEmpty(),
-                poster = FanartService.getCachedPoster(itemId, itemType)
-                    ?: media.coverImage?.extraLarge
+                poster = media.coverImage?.extraLarge
                     ?: media.coverImage?.large
                     ?: media.coverImage?.medium,
-                banner = FanartService.getCachedBackdrop(itemId, itemType) ?: media.bannerImage,
-                logo = FanartService.getCachedLogo(itemId, itemType),
+                banner = media.bannerImage,
+                logo = null,
                 posterShape = PosterShape.Poster,
                 description = media.description,
                 releaseInfo = listOfNotNull(

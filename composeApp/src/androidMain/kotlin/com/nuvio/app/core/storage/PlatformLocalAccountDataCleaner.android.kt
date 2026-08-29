@@ -17,7 +17,6 @@ internal actual object PlatformLocalAccountDataCleaner {
         "nuvio_poster_card_style",
         "nuvio_debrid_settings",
         "nuvio_mdblist_settings",
-        "nuvio_fanart_settings",
         "nuvio_auth",
         "nuvio_trakt_auth",
         "nuvio_simkl_auth",

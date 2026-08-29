@@ -77,7 +77,6 @@ import com.nuvio.app.features.details.MetaEpisodeCardStyle
 import com.nuvio.app.features.details.MetaVideo
 import com.nuvio.app.features.details.SeasonViewMode
 import com.nuvio.app.features.details.SeasonViewModeStorage
-import com.nuvio.app.features.fanart.FanartService
 import com.nuvio.app.features.details.formatRuntimeFromMinutes
 import com.nuvio.app.features.details.metaVideoSeasonEpisodeComparator
 import com.nuvio.app.features.details.normalizeSeasonNumber
@@ -490,25 +489,11 @@ private fun SeasonPosterScrollRow(
         items(seasons, key = { season -> season }) { season ->
             val staticSeasonPoster = groupedEpisodes[season]
                 ?.firstNotNullOfOrNull { episode -> episode.seasonPoster?.takeIf(String::isNotBlank) }
-                ?: FanartService.getCachedSeasonPoster(meta.id, season)
-
-            var resolvedSeasonPoster by remember(meta.id, season, staticSeasonPoster) {
-                mutableStateOf(staticSeasonPoster)
-            }
-
-            LaunchedEffect(meta.id, season, staticSeasonPoster) {
-                if (resolvedSeasonPoster == null) {
-                    val fanartPoster = FanartService.resolveSeasonPoster(meta.id, meta.type, season)
-                    if (!fanartPoster.isNullOrBlank()) {
-                        resolvedSeasonPoster = fanartPoster
-                    }
-                }
-            }
 
             val epThumbnailFallback = groupedEpisodes[season]
                 ?.firstNotNullOfOrNull { episode -> episode.thumbnail?.takeIf(String::isNotBlank) }
 
-            val posterUrl = resolvedSeasonPoster
+            val posterUrl = staticSeasonPoster
                 ?: (if (season == 1) meta.poster else (epThumbnailFallback ?: meta.poster))
                 ?: meta.background
 

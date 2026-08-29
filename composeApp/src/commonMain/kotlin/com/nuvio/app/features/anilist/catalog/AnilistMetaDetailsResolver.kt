@@ -40,21 +40,7 @@ object AnilistMetaDetailsResolver {
         val token = AnilistAuthRepository.token.value
 
         // 1. Fast cache check for ARM mapping (0ms)
-        val cachedArm = armMappingCache[anilistId] ?: runCatching {
-            val diskCached = com.nuvio.app.features.fanart.FanartCacheStorage.get("arm:$anilistId")
-            if (!diskCached.isNullOrBlank()) {
-                val parts = diskCached.split("|")
-                if (parts.size >= 5) {
-                    ArmMapping(
-                        imdbId = parts[0].takeIf(String::isNotBlank),
-                        kitsuId = parts[1].takeIf(String::isNotBlank),
-                        tmdbId = parts[2].toIntOrNull(),
-                        tvdbId = parts[3].takeIf(String::isNotBlank),
-                        season = parts[4].toIntOrNull() ?: 1,
-                    ).also { armMappingCache[anilistId] = it }
-                } else null
-            } else null
-        }.getOrNull()
+        val cachedArm = armMappingCache[anilistId]
 
         // Fetch ARM mapping concurrently with AniList media fetch!
         val armDeferred = async {
@@ -368,21 +354,6 @@ object AnilistMetaDetailsResolver {
 
     suspend fun resolveArmMapping(anilistId: Int): ArmMapping {
         armMappingCache[anilistId]?.let { return it }
-        val diskCached = com.nuvio.app.features.fanart.FanartCacheStorage.get("arm:$anilistId")
-        if (!diskCached.isNullOrBlank()) {
-            val parts = diskCached.split("|")
-            if (parts.size >= 5) {
-                val mapping = ArmMapping(
-                    imdbId = parts[0].takeIf(String::isNotBlank),
-                    kitsuId = parts[1].takeIf(String::isNotBlank),
-                    tmdbId = parts[2].toIntOrNull(),
-                    tvdbId = parts[3].takeIf(String::isNotBlank),
-                    season = parts[4].toIntOrNull() ?: 1,
-                )
-                armMappingCache[anilistId] = mapping
-                return mapping
-            }
-        }
 
         return kotlinx.coroutines.withTimeoutOrNull(2500L) {
             runCatching {
@@ -405,10 +376,6 @@ object AnilistMetaDetailsResolver {
                     season = if (season >= 0) season else 1,
                 )
                 armMappingCache[anilistId] = mapping
-                com.nuvio.app.features.fanart.FanartCacheStorage.put(
-                    "arm:$anilistId",
-                    "${mapping.imdbId.orEmpty()}|${mapping.kitsuId.orEmpty()}|${mapping.tmdbId ?: ""}|${mapping.tvdbId.orEmpty()}|${mapping.season}"
-                )
                 mapping
             }.getOrDefault(ArmMapping(null, null, null, null, 1))
         } ?: ArmMapping(null, null, null, null, 1)

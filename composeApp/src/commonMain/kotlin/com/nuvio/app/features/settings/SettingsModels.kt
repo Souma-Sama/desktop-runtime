@@ -22,7 +22,6 @@ import nuvio.composeapp.generated.resources.compose_settings_page_hover_preview
 import nuvio.composeapp.generated.resources.compose_settings_page_integrations
 import nuvio.composeapp.generated.resources.compose_settings_page_licenses_attributions
 import nuvio.composeapp.generated.resources.compose_settings_page_mdblist_ratings
-import nuvio.composeapp.generated.resources.compose_settings_page_fanart
 import nuvio.composeapp.generated.resources.compose_settings_page_meta_screen
 import nuvio.composeapp.generated.resources.compose_settings_page_notifications
 import nuvio.composeapp.generated.resources.compose_settings_page_playback
@@ -150,11 +149,6 @@ internal enum class SettingsPage(
     ),
     MdbListRatings(
         titleRes = Res.string.compose_settings_page_mdblist_ratings,
-        category = SettingsCategory.General,
-        parentPage = Integrations,
-    ),
-    FanartArtwork(
-        titleRes = Res.string.compose_settings_page_fanart,
         category = SettingsCategory.General,
         parentPage = Integrations,
     ),

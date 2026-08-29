@@ -7,8 +7,6 @@ import com.nuvio.app.features.addons.AddonResource
 import com.nuvio.app.features.addons.buildAddonResourceUrl
 import com.nuvio.app.features.addons.enabledAddons
 import com.nuvio.app.features.addons.fetchAddonResponseText
-import com.nuvio.app.features.fanart.FanartService
-import com.nuvio.app.features.fanart.FanartSettingsRepository
 import com.nuvio.app.features.home.HomeCatalogSettingsRepository
 import com.nuvio.app.features.home.filterReleasedItems
 import com.nuvio.app.features.mdblist.MdbListMetadataService
@@ -388,8 +386,8 @@ object MetaDetailsRepository {
         addons.enabledAddons().any { addon -> addon.manifest == null && addon.isRefreshing }
 
     private suspend fun resolveMetaLookupId(itemId: String, itemType: String): String {
-        val cached = FanartService.extractLookupId(itemId)
-        if (cached != null) return cached
+        val match = Regex("tt\\d+").find(itemId)?.value
+        if (match != null) return match
 
         if (itemId.startsWith("ani_", ignoreCase = true) || itemId.startsWith("anilist:", ignoreCase = true)) {
             val anilistId = com.nuvio.app.features.anilist.AnilistTrackerCoordinator.extractAnilistId(itemId)
@@ -402,7 +400,7 @@ object MetaDetailsRepository {
             }
         }
 
-        return FanartService.resolveLookupId(itemId, itemType) ?: itemId
+        return itemId
     }
 
     private suspend fun tryFetchTmdbFallbackMeta(type: String, id: String): MetaDetails? =
@@ -464,7 +462,6 @@ object MetaDetailsRepository {
         settingsFingerprint: String,
     ): MetaDetails = coroutineScope {
         val tmdbSettings = TmdbSettingsRepository.snapshot()
-        val fanartSettings = FanartSettingsRepository.snapshot()
         val isAnilist = meta.id.startsWith("ani_", ignoreCase = true) || meta.id.startsWith("anilist:", ignoreCase = true)
 
         var currentMeta = meta
@@ -480,38 +477,7 @@ object MetaDetailsRepository {
             }
         }
 
-        // 1. Fanart job: Fast artwork resolution (~100-300ms) - Emits IMMEDIATELY without waiting for TMDB!
-        val fanartJob = launch {
-            if ((fanartSettings.enabled && fanartSettings.hasApiKey) || fanartSettings.useBetterPosters) {
-                val fanartEnriched = runCatching {
-                    withTimeoutOrNull(TMDB_ENRICH_TIMEOUT_MS) {
-                        FanartService.enrichMetaDetails(
-                            meta = meta,
-                            fallbackItemId = fallbackItemId,
-                            settings = fanartSettings,
-                        )
-                    }
-                }.getOrNull()
-
-                if (fanartEnriched != null) {
-                    emitUpdate { current ->
-                        current.copy(
-                            logo = fanartEnriched.logo ?: current.logo,
-                            background = fanartEnriched.background ?: current.background,
-                            poster = fanartEnriched.poster ?: current.poster,
-                            videos = current.videos.mapIndexed { idx, vid ->
-                                val fanartVid = fanartEnriched.videos.getOrNull(idx)
-                                if (!fanartVid?.seasonPoster.isNullOrBlank()) {
-                                    vid.copy(seasonPoster = fanartVid.seasonPoster)
-                                } else vid
-                            }
-                        )
-                    }
-                }
-            }
-        }
-
-        // 2. TMDB job: Full credits, cast portraits, episodes, synopses (~1-2s) - Streams in independently!
+        // 1. TMDB job: Full credits, cast portraits, episodes, synopses (~1-2s) - Streams in independently!
         // TMDb enrichment is completely shut down for the native AniList addon. It only runs for non-AniList addons (Cinemeta, Stremio, etc.).
         val tmdbJob = launch {
             if (!isAnilist && tmdbSettings.enabled && tmdbSettings.hasApiKey) {
@@ -619,7 +585,6 @@ object MetaDetailsRepository {
             }
         }
 
-        fanartJob.join()
         tmdbJob.join()
         mdbListJob.join()
         traktJob.join()
@@ -690,8 +655,6 @@ object MetaDetailsRepository {
         fallbackItemId: String,
         settings: com.nuvio.app.features.mdblist.MdbListSettings,
     ): Boolean {
-        val fanartSettings = FanartSettingsRepository.snapshot()
-        if ((fanartSettings.enabled && fanartSettings.hasApiKey) || fanartSettings.useBetterPosters) return true
         val tmdbSettings = TmdbSettingsRepository.snapshot()
         if (tmdbSettings.enabled && tmdbSettings.hasApiKey) return true
         if (shouldFetchMdbListOnMetaScreen(meta, fallbackItemId, settings)) return true
@@ -718,7 +681,6 @@ object MetaDetailsRepository {
         TrackingSettingsRepository.ensureLoaded()
         TraktAuthRepository.ensureLoaded()
         TmdbSettingsRepository.ensureLoaded()
-        val fanartSettings = FanartSettingsRepository.snapshot()
         val providers = settings.enabledProvidersInPriorityOrder().joinToString(",")
         val trackingSettings = TrackingSettingsRepository.uiState.value
         val traktAuthMode = TraktAuthRepository.uiState.value.mode
@@ -727,7 +689,6 @@ object MetaDetailsRepository {
             append("${settings.enabled}:${settings.apiKey.trim()}:$providers")
             append("|more_like=${trackingSettings.moreLikeThisSource}:$traktAuthMode")
             append("|tmdb=${tmdbSettings.enabled}:${tmdbSettings.useMoreLikeThis}:${tmdbSettings.hasApiKey}:${tmdbSettings.language}")
-            append("|fanart=${fanartSettings.enabled}:${fanartSettings.hasApiKey}:${fanartSettings.quality}")
         }
     }
 

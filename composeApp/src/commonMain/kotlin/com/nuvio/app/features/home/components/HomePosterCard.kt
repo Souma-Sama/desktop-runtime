@@ -7,7 +7,7 @@ import com.nuvio.app.core.ui.NuvioPosterCard
 import com.nuvio.app.core.ui.NuvioPosterShape
 import com.nuvio.app.core.ui.desktopCatalogShelfPosterBaseWidthDp
 import com.nuvio.app.core.ui.rememberPosterCardStyleUiState
-import com.nuvio.app.features.fanart.FanartService
+import com.nuvio.app.features.artwork.MetaHubArtwork
 import com.nuvio.app.features.home.MetaPreview
 import com.nuvio.app.features.home.PosterShape
 
@@ -22,7 +22,7 @@ fun HomePosterCard(
 ) {
     val posterCardStyle = rememberPosterCardStyleUiState()
     val isLandscapeMode = useLandscapeBackdropMode || posterCardStyle.catalogLandscapeModeEnabled
-    val fanartLogo = FanartService.getCachedLogo(item.id, item.type)
+    val logoUrl = item.logo ?: MetaHubArtwork.getLogoUrl(item.id)
 
     HomePosterHoverPreview(
         item = item,
@@ -33,17 +33,17 @@ fun HomePosterCard(
         NuvioPosterCard(
             title = item.name,
             imageUrl = if (isLandscapeMode) {
-                (FanartService.getCachedBackdrop(item.id, item.type) ?: FanartService.getCachedBanner(item.id, item.type) ?: item.banner ?: item.poster)
+                (item.banner ?: MetaHubArtwork.getBackdropUrl(item.id) ?: item.poster)
             } else {
-                (FanartService.getCachedPoster(item.id, item.type) ?: item.poster)
+                (item.poster ?: MetaHubArtwork.getPosterUrl(item.id))
             },
             modifier = modifier.then(hoverModifier),
             basePosterWidthDp = desktopCatalogShelfPosterBaseWidthDp(posterCardStyle.widthDp),
             shape = if (isLandscapeMode) NuvioPosterShape.Landscape else item.posterShape.toNuvioPosterShape(),
             detailLine = if (isLandscapeMode || posterCardStyle.hideLabelsEnabled) null else item.releaseInfo?.let { formatReleaseDateForDisplay(it) },
             showTitleBelow = !posterCardStyle.hideLabelsEnabled,
-            bottomLeftLogoUrl = if (isLandscapeMode) (fanartLogo ?: item.logo) else null,
-            bottomLeftText = if (isLandscapeMode && (fanartLogo ?: item.logo).isNullOrBlank() && !posterCardStyle.hideLabelsEnabled) item.name else null,
+            bottomLeftLogoUrl = if (isLandscapeMode) logoUrl else null,
+            bottomLeftText = if (isLandscapeMode && logoUrl.isNullOrBlank() && !posterCardStyle.hideLabelsEnabled) item.name else null,
             isWatched = isWatched,
             onClick = onClick,
             onLongClick = onLongClick,

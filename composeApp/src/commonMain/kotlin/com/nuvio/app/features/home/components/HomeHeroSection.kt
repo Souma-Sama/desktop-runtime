@@ -62,7 +62,7 @@ import com.nuvio.app.core.ui.isFullscreenActionSupported
 import com.nuvio.app.core.format.formatReleaseDateForDisplay
 import com.nuvio.app.core.ui.heroStretchHeight
 import com.nuvio.app.core.ui.heroStretchZoom
-import com.nuvio.app.features.fanart.FanartService
+import com.nuvio.app.features.artwork.MetaHubArtwork
 import com.nuvio.app.features.home.MetaPreview
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
@@ -115,14 +115,6 @@ fun HomeHeroSection(
     val coroutineScope = rememberCoroutineScope()
     var pagerDragActive by remember { mutableStateOf(false) }
     val autoScrollPage = pagerState.currentPage
-
-    LaunchedEffect(items) {
-        items.take(6).forEach { item ->
-            launch {
-                FanartService.resolveLogo(item.id, item.type)
-            }
-        }
-    }
 
     LaunchedEffect(autoScrollPage, items.size) {
         if (items.size <= 1) return@LaunchedEffect
@@ -230,22 +222,8 @@ private fun HeroBackgroundLayers(
 
     layerPages.forEach { page ->
         val item = items[page]
-        var heroBackdrop by remember(item.type, item.id) {
-            mutableStateOf(
-                FanartService.getCachedBackdrop(item.id, item.type)
-                    ?: if (item.id.startsWith("tt")) "https://images.metahub.space/background/medium/${item.id}/img" else null
-            )
-        }
-        LaunchedEffect(item.type, item.id) {
-            if (heroBackdrop == null) {
-                FanartService.resolveLogo(item.id, item.type)
-                val resolved = FanartService.getCachedBackdrop(item.id, item.type)
-                if (resolved != null) {
-                    heroBackdrop = resolved
-                }
-            }
-        }
-        val backgroundModel = heroBackdrop ?: item.banner ?: item.poster
+        val heroBackdrop = item.banner ?: MetaHubArtwork.getBackdropUrl(item.id) ?: item.poster
+        val backgroundModel = heroBackdrop
         AsyncImage(
             model = backgroundModel,
             contentDescription = item.name,
@@ -771,18 +749,7 @@ private fun HeroContentBlock(
     var logoLoadError by remember(item.type, item.id) {
         mutableStateOf(false)
     }
-    var fanartLogo by remember(item.type, item.id) {
-        mutableStateOf(FanartService.getCachedLogo(item.id, item.type))
-    }
-    LaunchedEffect(item.type, item.id) {
-        if (fanartLogo == null) {
-            val resolved = FanartService.resolveLogo(item.id, item.type)
-            if (!resolved.isNullOrBlank()) {
-                fanartLogo = resolved
-            }
-        }
-    }
-    val logoUrl = fanartLogo ?: item.logo?.takeIf { it.isNotBlank() }
+    val logoUrl = item.logo?.takeIf { it.isNotBlank() } ?: MetaHubArtwork.getLogoUrl(item.id)
 
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -856,18 +823,7 @@ private fun DesktopHeroContentBlock(
     var logoLoadError by remember(item.type, item.id) {
         mutableStateOf(false)
     }
-    var fanartLogo by remember(item.type, item.id) {
-        mutableStateOf(FanartService.getCachedLogo(item.id, item.type))
-    }
-    LaunchedEffect(item.type, item.id) {
-        if (fanartLogo == null) {
-            val resolved = FanartService.resolveLogo(item.id, item.type)
-            if (!resolved.isNullOrBlank()) {
-                fanartLogo = resolved
-            }
-        }
-    }
-    val logoUrl = fanartLogo ?: item.logo?.takeIf { it.isNotBlank() }
+    val logoUrl = item.logo?.takeIf { it.isNotBlank() } ?: MetaHubArtwork.getLogoUrl(item.id)
 
     Column(
         modifier = Modifier

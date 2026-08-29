@@ -18,6 +18,5 @@ internal actual fun integrationLogoPainter(logo: IntegrationLogo): Painter =
         IntegrationLogo.Trakt -> painterResource(id = R.drawable.trakt_tv_favicon)
         IntegrationLogo.Simkl -> simklBrandPainter(SimklBrandAsset.Glyph)
         IntegrationLogo.MdbList -> painterResource(id = R.drawable.mdblist_logo)
-        IntegrationLogo.Fanart -> com.nuvio.app.features.fanart.rememberFanartBrandPainter()
         IntegrationLogo.IntroDb -> composePainterResource(Res.drawable.introdb_favicon)
     }

@@ -9,15 +9,12 @@ import nuvio.composeapp.generated.resources.settings_integrations_mdblist_descri
 import nuvio.composeapp.generated.resources.settings_integrations_debrid_description
 import nuvio.composeapp.generated.resources.settings_integrations_section_title
 import nuvio.composeapp.generated.resources.settings_integrations_tmdb_description
-import nuvio.composeapp.generated.resources.compose_settings_page_fanart
-import nuvio.composeapp.generated.resources.settings_integrations_fanart_description
 import org.jetbrains.compose.resources.stringResource
 
 internal fun LazyListScope.integrationsContent(
     isTablet: Boolean,
     onTmdbClick: () -> Unit,
     onMdbListClick: () -> Unit,
-    onFanartClick: () -> Unit,
     onDebridClick: () -> Unit,
 ) {
     item {
@@ -40,14 +37,6 @@ internal fun LazyListScope.integrationsContent(
                     iconPainter = integrationLogoPainter(IntegrationLogo.MdbList),
                     isTablet = isTablet,
                     onClick = onMdbListClick,
-                )
-                SettingsGroupDivider(isTablet = isTablet)
-                SettingsNavigationRow(
-                    title = stringResource(Res.string.compose_settings_page_fanart),
-                    description = stringResource(Res.string.settings_integrations_fanart_description),
-                    iconPainter = integrationLogoPainter(IntegrationLogo.Fanart),
-                    isTablet = isTablet,
-                    onClick = onFanartClick,
                 )
                 SettingsGroupDivider(isTablet = isTablet)
                 SettingsNavigationRow(
