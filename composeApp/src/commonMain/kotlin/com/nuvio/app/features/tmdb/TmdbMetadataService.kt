@@ -1062,6 +1062,8 @@ object TmdbMetadataService {
                         video.episode?.let { episode -> season to episode }
                     }
                     val enrichmentForEpisode = key?.let(episodeMap::get)
+                        ?: (video.episode?.let { ep -> 1 to ep }?.let(episodeMap::get))
+                        ?: (video.episode?.let { ep -> 0 to ep }?.let(episodeMap::get))
                     if (enrichmentForEpisode == null) {
                         video
                     } else {
@@ -1352,7 +1354,7 @@ object TmdbMetadataService {
         }
     }
 
-    private suspend fun fetchEpisodeEnrichment(
+    internal suspend fun fetchEpisodeEnrichment(
         tmdbId: String,
         seasonNumbers: List<Int>,
         language: String,
