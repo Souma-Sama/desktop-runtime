@@ -103,6 +103,17 @@ object AnilistMetaDetailsResolver {
             } else emptyList()
         }
 
+        val malDeferred = async {
+            val idMal = media.idMal
+            if (idMal != null) {
+                runCatching {
+                    kotlinx.coroutines.withTimeoutOrNull(600L) {
+                        com.nuvio.app.features.anilist.AnilistApi.fetchMalMetadata(idMal)
+                    }
+                }.getOrNull()
+            } else null
+        }
+
         val kitsuEpisodes = kitsuDeferred.await()
 
         val poster = media.coverImage?.extraLarge
@@ -211,17 +222,6 @@ object AnilistMetaDetailsResolver {
                 "Ep $epNum Airing Soon"
             }
         }
-
-        val primaryTrailer = if (media.trailer != null && media.trailer.id != null) {
-            com.nuvio.app.features.details.MetaTrailer(
-                id = media.trailer.id,
-                key = media.trailer.id,
-                name = "Official Trailer",
-                site = media.trailer.site ?: "YouTube",
-                type = "Trailer",
-                official = true,
-            )
-        } else null
 
         val ytTrailers = ytTrailersDeferred.await()
 
