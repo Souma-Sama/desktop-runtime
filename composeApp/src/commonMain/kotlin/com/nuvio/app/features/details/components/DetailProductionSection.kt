@@ -1,5 +1,6 @@
 package com.nuvio.app.features.details.components
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -23,6 +24,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -31,6 +33,7 @@ import com.nuvio.app.core.ui.NuvioAsyncImage as AsyncImage
 import com.nuvio.app.features.details.MetaCompany
 import com.nuvio.app.features.details.MetaDetails
 import nuvio.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -114,25 +117,42 @@ private fun ProductionChip(
     logoHeight: androidx.compose.ui.unit.Dp,
     onClick: (() -> Unit)? = null,
 ) {
+    val localLogo = com.nuvio.app.features.anilist.catalog.AnimeStudioLogos.findLogoResource(item.name)
     var hasLogoError by remember(item.logo) { mutableStateOf(false) }
+    val hasLogo = localLogo != null || (!item.logo.isNullOrBlank() && !hasLogoError)
+
+    val chipBackground = if (hasLogo) {
+        Color(0xFFF5F5F5)
+    } else {
+        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.70f)
+    }
 
     Box(
         modifier = Modifier
             .clip(RoundedCornerShape(12.dp))
-            .background(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.70f))
+            .background(color = chipBackground)
             .border(
                 width = 1.dp,
-                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.20f),
+                color = if (hasLogo) Color(0x33000000) else MaterialTheme.colorScheme.outline.copy(alpha = 0.20f),
                 shape = RoundedCornerShape(12.dp),
             )
             .then(
                 if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier
             )
-            .padding(horizontal = 12.dp, vertical = 6.dp)
+            .padding(horizontal = 14.dp, vertical = 6.dp)
             .height(chipHeight),
         contentAlignment = Alignment.Center,
     ) {
-        if (!item.logo.isNullOrBlank() && !hasLogoError) {
+        if (localLogo != null) {
+            Image(
+                painter = painterResource(localLogo),
+                contentDescription = item.name,
+                modifier = Modifier
+                    .width(logoWidth)
+                    .height(logoHeight),
+                contentScale = ContentScale.Fit,
+            )
+        } else if (!item.logo.isNullOrBlank() && !hasLogoError) {
             AsyncImage(
                 model = item.logo,
                 contentDescription = item.name,
