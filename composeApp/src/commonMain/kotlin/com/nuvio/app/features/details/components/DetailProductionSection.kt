@@ -6,9 +6,11 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -27,6 +29,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.nuvio.app.core.ui.NuvioAsyncImage as AsyncImage
@@ -44,50 +48,56 @@ fun DetailProductionSection(
     showHeader: Boolean = true,
     onCompanyClick: ((MetaCompany, String) -> Unit)? = null,
 ) {
-    val isSeriesLike = meta.type == "series" || meta.videos.any { it.season != null || it.episode != null }
     val isAnilist = meta.id.startsWith("ani_", ignoreCase = true) || meta.id.startsWith("anilist:", ignoreCase = true)
 
-    val sourceItems = if (isAnilist) {
-        (meta.productionCompanies + meta.networks).distinctBy { it.name.trim().lowercase() }
-    } else if (meta.productionCompanies.isNotEmpty() && meta.networks.isNotEmpty()) {
-        (meta.productionCompanies + meta.networks).distinctBy { it.name.trim().lowercase() }
-    } else if (isSeriesLike) {
-        meta.networks.ifEmpty { meta.productionCompanies }
-    } else {
-        meta.productionCompanies.ifEmpty { meta.networks }
-    }
-    if (sourceItems.isEmpty()) return
+    val companies = meta.productionCompanies.take(10)
+    val networks = meta.networks.take(10)
 
-    val displayItems = sourceItems.take(10)
-    if (displayItems.isEmpty()) return
+    if (companies.isEmpty() && networks.isEmpty()) return
 
-    val sectionTitle = if (isAnilist) {
-        "Studios & Networks"
-    } else if (meta.productionCompanies.isNotEmpty() && meta.networks.isNotEmpty()) {
-        "Production & Networks"
-    } else if (isSeriesLike) {
-        stringResource(Res.string.details_networks)
-    } else {
-        stringResource(Res.string.meta_section_production_title)
-    }
-
-    DetailSection(
-        title = sectionTitle,
+    Column(
         modifier = modifier,
-        showHeader = showHeader,
+        verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            displayItems.forEach { item ->
-                val entityKind = if (meta.networks.contains(item)) "network" else "company"
-                ProductionChip(
-                    item = item,
-                    onClick = if (onCompanyClick != null && item.name.isNotBlank()) {
-                        { onCompanyClick(item, entityKind) }
-                    } else null,
-                )
+        if (companies.isNotEmpty()) {
+            DetailSection(
+                title = if (isAnilist) "Animation Studios" else stringResource(Res.string.meta_section_production_title),
+                showHeader = showHeader,
+            ) {
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    companies.forEach { item ->
+                        ProductionChip(
+                            item = item,
+                            onClick = if (onCompanyClick != null && item.name.isNotBlank()) {
+                                { onCompanyClick(item, "company") }
+                            } else null,
+                        )
+                    }
+                }
+            }
+        }
+
+        if (networks.isNotEmpty()) {
+            DetailSection(
+                title = stringResource(Res.string.details_networks),
+                showHeader = showHeader,
+            ) {
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    networks.forEach { item ->
+                        ProductionChip(
+                            item = item,
+                            onClick = if (onCompanyClick != null && item.name.isNotBlank()) {
+                                { onCompanyClick(item, "network") }
+                            } else null,
+                        )
+                    }
+                }
             }
         }
     }
@@ -100,44 +110,36 @@ private fun ProductionChip(
 ) {
     val localLogo = com.nuvio.app.features.anilist.catalog.AnimeStudioLogos.findLogoResource(item.name)
     var hasLogoError by remember(item.logo) { mutableStateOf(false) }
-    val hasLogo = localLogo != null || (!item.logo.isNullOrBlank() && !hasLogoError)
 
-    val chipBackground = if (hasLogo) {
-        Color(0xFFF5F5F5)
-    } else {
-        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.70f)
-    }
-
-    androidx.compose.foundation.layout.Column(
+    Column(
         modifier = Modifier
-            .width(132.dp)
-            .clip(RoundedCornerShape(14.dp))
-            .background(color = chipBackground)
-            .border(
-                width = 1.dp,
-                color = if (hasLogo) Color(0x33000000) else MaterialTheme.colorScheme.outline.copy(alpha = 0.20f),
-                shape = RoundedCornerShape(14.dp),
-            )
+            .width(136.dp)
+            .clip(RoundedCornerShape(12.dp))
             .then(
                 if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier
-            )
-            .padding(horizontal = 10.dp, vertical = 8.dp),
+            ),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
     ) {
+        // Logo image badge
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(38.dp),
+                .height(60.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(Color(0xFFF5F5F5))
+                .border(
+                    width = 1.dp,
+                    color = Color(0x26000000),
+                    shape = RoundedCornerShape(12.dp),
+                )
+                .padding(horizontal = 10.dp, vertical = 8.dp),
             contentAlignment = Alignment.Center,
         ) {
             if (localLogo != null) {
                 Image(
                     painter = painterResource(localLogo),
                     contentDescription = item.name,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(36.dp),
+                    modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Fit,
                 )
             } else if (!item.logo.isNullOrBlank() && !hasLogoError) {
@@ -145,9 +147,7 @@ private fun ProductionChip(
                     model = item.logo,
                     contentDescription = item.name,
                     onError = { hasLogoError = true },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(36.dp),
+                    modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Fit,
                 )
             } else {
@@ -157,27 +157,27 @@ private fun ProductionChip(
                         fontSize = 12.sp,
                         fontWeight = FontWeight.SemiBold,
                     ),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                    color = Color(0xFF222222),
+                    textAlign = TextAlign.Center,
                     maxLines = 2,
-                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
         }
 
-        if (hasLogo) {
-            androidx.compose.foundation.layout.Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = item.name,
-                style = MaterialTheme.typography.labelSmall.copy(
-                    fontSize = 10.5.sp,
-                    fontWeight = FontWeight.Medium,
-                ),
-                color = Color(0xFF333333),
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                maxLines = 1,
-                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-            )
-        }
+        // Caption UNDER the image
+        Spacer(modifier = Modifier.height(6.dp))
+        Text(
+            text = item.name,
+            style = MaterialTheme.typography.labelSmall.copy(
+                fontSize = 11.5.sp,
+                fontWeight = FontWeight.Medium,
+            ),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 2.dp),
+        )
     }
 }
