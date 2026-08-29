@@ -236,7 +236,7 @@ object AnilistMetaDetailsResolver {
                     overview = kitsuEp?.overview,
                     thumbnail = epThumbnail,
                     runtime = media.duration,
-                    released = null,
+                    released = kitsuEp?.airdate,
                     streams = emptyList(),
                 )
             }
@@ -264,7 +264,7 @@ object AnilistMetaDetailsResolver {
                     overview = kitsuEp?.overview,
                     thumbnail = epThumbnail,
                     runtime = media.duration,
-                    released = null,
+                    released = kitsuEp?.airdate,
                     streams = emptyList(),
                 )
             }
@@ -467,12 +467,14 @@ object AnilistMetaDetailsResolver {
                         title = matchedSpecial.title?.takeIf { it.isNotBlank() } ?: media?.title?.displayTitle ?: "Special",
                         thumbnail = matchedSpecial.thumbnail?.takeIf { it.isNotBlank() }
                             ?: "https://episodes.metahub.space/$effectiveImdbId/0/$epNum/w780.jpg",
+                        released = kitsuEp?.airdate ?: matchedSpecial.released,
                     )
                 )
             } else {
                 specialVideos.mapIndexed { idx, v ->
                     val epNum = v.episode ?: (idx + 1)
                     val videoId = if (!kitsuId.isNullOrBlank()) "kitsu:$kitsuId:$epNum" else "anilist:$anilistId:$epNum"
+                    val kitsuEp = kitsuEpisodes[epNum] ?: (if (epNum == 0) kitsuEpisodes[0] else null)
                     v.copy(
                         id = videoId,
                         season = 0,
@@ -480,6 +482,7 @@ object AnilistMetaDetailsResolver {
                         title = v.title?.takeIf { it.isNotBlank() } ?: "Special $epNum",
                         thumbnail = v.thumbnail?.takeIf { it.isNotBlank() }
                             ?: "https://episodes.metahub.space/$effectiveImdbId/0/$epNum/w780.jpg",
+                        released = kitsuEp?.airdate ?: v.released,
                     )
                 }
             }
@@ -508,6 +511,7 @@ object AnilistMetaDetailsResolver {
                     thumbnail = epThumbnail,
                     overview = kitsuEp?.overview,
                     runtime = media?.duration,
+                    released = kitsuEp?.airdate,
                 )
             }
         } else if (targetSeason > 1 && cinemetaMeta.videos.any { it.season == targetSeason }) {
@@ -535,7 +539,7 @@ object AnilistMetaDetailsResolver {
                     title = epTitle,
                     thumbnail = epThumbnail,
                     overview = kitsuEp?.overview ?: cinemetaEp?.overview,
-                    released = cinemetaEp?.released,
+                    released = kitsuEp?.airdate ?: cinemetaEp?.released,
                     streams = cinemetaEp?.streams.orEmpty(),
                     runtime = media?.duration,
                 )
@@ -560,6 +564,7 @@ object AnilistMetaDetailsResolver {
                     thumbnail = epThumbnail,
                     overview = kitsuEp?.overview,
                     runtime = media.duration,
+                    released = kitsuEp?.airdate,
                 )
             }
         } else {
@@ -587,7 +592,7 @@ object AnilistMetaDetailsResolver {
                     title = epTitle,
                     thumbnail = epThumbnail,
                     overview = kitsuEp?.overview ?: cinemetaEp?.overview,
-                    released = cinemetaEp?.released,
+                    released = kitsuEp?.airdate ?: cinemetaEp?.released,
                     streams = cinemetaEp?.streams.orEmpty(),
                     runtime = media?.duration,
                 )
@@ -669,6 +674,7 @@ object AnilistMetaDetailsResolver {
         val title: String?,
         val overview: String?,
         val thumbnail: String?,
+        val airdate: String? = null,
     )
 
     private suspend fun fetchKitsuEpisodes(kitsuId: String): Map<Int, KitsuEpisodeData> = runCatching {
@@ -695,11 +701,13 @@ object AnilistMetaDetailsResolver {
             val thumbnail = thumbnailObj?.get("original").asStringOrNull()
                 ?: thumbnailObj?.get("medium").asStringOrNull()
                 ?: thumbnailObj?.get("large").asStringOrNull()
+            val airdate = attrs["airdate"].asStringOrNull() ?: attrs["released"].asStringOrNull()
 
             result[epNum] = KitsuEpisodeData(
                 title = epTitle,
                 overview = overview,
                 thumbnail = thumbnail,
+                airdate = airdate,
             )
         }
         result

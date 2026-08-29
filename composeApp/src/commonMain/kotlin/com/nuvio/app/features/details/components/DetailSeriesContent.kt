@@ -1161,9 +1161,19 @@ private fun EpisodeListCard(
 
                 if (formattedDate != null || ratingLabel != null) {
                     Row(
+                        modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
+                        ratingLabel?.let { rating ->
+                            ImdbEpisodeRatingBadge(
+                                rating = rating,
+                                logoWidth = 24.dp,
+                                logoHeight = 12.dp,
+                                textSize = sizing.metaTextSize,
+                            )
+                        }
+                        Spacer(modifier = Modifier.weight(1f))
                         formattedDate?.let { date ->
                             Text(
                                 text = date,
@@ -1174,14 +1184,7 @@ private fun EpisodeListCard(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
-                            )
-                        }
-                        ratingLabel?.let { rating ->
-                            ImdbEpisodeRatingBadge(
-                                rating = rating,
-                                logoWidth = 24.dp,
-                                logoHeight = 12.dp,
-                                textSize = sizing.metaTextSize,
+                                textAlign = TextAlign.End,
                             )
                         }
                     }

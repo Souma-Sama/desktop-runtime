@@ -7,6 +7,7 @@ import com.nuvio.app.features.anilist.AnilistApi
 import com.nuvio.app.features.anilist.AnilistMedia
 import com.nuvio.app.features.anilist.AnilistMediaListStatus
 import com.nuvio.app.features.catalog.CatalogPage
+import com.nuvio.app.features.artwork.MetaHubArtwork
 import com.nuvio.app.features.home.HomeCatalogDefinition
 import com.nuvio.app.features.home.MetaPreview
 import com.nuvio.app.features.home.PosterShape
@@ -251,8 +252,8 @@ object AnilistCatalogRepository {
                 poster = media.coverImage?.extraLarge
                     ?: media.coverImage?.large
                     ?: media.coverImage?.medium,
-                banner = media.bannerImage,
-                logo = null,
+                banner = MetaHubArtwork.getBackdropUrl(itemId) ?: media.bannerImage,
+                logo = MetaHubArtwork.getLogoUrl(itemId),
                 posterShape = PosterShape.Poster,
                 description = media.description,
                 releaseInfo = listOfNotNull(
@@ -269,6 +270,12 @@ object AnilistCatalogRepository {
                 } else null,
                 genres = media.genres,
             )
+        }
+
+        CoroutineScope(Dispatchers.Default).launch {
+            previews.take(12).forEach { preview ->
+                MetaHubArtwork.resolveImdbId(preview.id)
+            }
         }
 
         val result = CatalogPage(
