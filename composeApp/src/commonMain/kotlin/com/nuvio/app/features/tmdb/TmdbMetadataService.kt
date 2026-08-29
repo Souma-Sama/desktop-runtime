@@ -493,6 +493,8 @@ object TmdbMetadataService {
                     }
                 }
 
+                val studioLogo = com.nuvio.app.features.anilist.catalog.AnimeStudioLogos.findLogo(studioName)
+
                 val wikiSummary = runCatching {
                     kotlinx.coroutines.withTimeoutOrNull(2000L) {
                         fetchWikipediaSummary(studioName)

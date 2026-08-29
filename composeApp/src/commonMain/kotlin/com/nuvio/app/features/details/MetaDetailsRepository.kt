@@ -586,13 +586,13 @@ object MetaDetailsRepository {
                             val seen = mutableSetOf<String>()
                             val combined = mutableListOf<MetaTrailer>()
                             for (t in tmdbEnriched.trailers) {
-                                val key = t.source.ifBlank { t.id }
+                                val key = t.key.ifBlank { t.id }
                                 if (key.isNotBlank() && seen.add(key)) {
                                     combined.add(t)
                                 }
                             }
                             for (t in anilistTrailers) {
-                                val key = t.source.ifBlank { t.id }
+                                val key = t.key.ifBlank { t.id }
                                 if (key.isNotBlank() && seen.add(key)) {
                                     combined.add(t)
                                 }
