@@ -426,11 +426,8 @@ private fun EntityIdentitySidebar(
                     maxLines = 3,
                     overflow = TextOverflow.Ellipsis,
                 )
-                val metaLine = listOfNotNull(
-                    header.secondaryLabel?.takeIf { it.isNotBlank() },
-                    header.originCountry?.takeIf { it.isNotBlank() },
-                ).joinToString(" · ")
-                if (metaLine.isNotBlank()) {
+                val metaLine = header.secondaryLabel?.takeIf { it.isNotBlank() }
+                if (!metaLine.isNullOrBlank()) {
                     Text(
                         text = metaLine,
                         style = MaterialTheme.typography.bodyMedium,
@@ -451,11 +448,7 @@ private fun EntityIdentitySidebar(
                 if (catalogueCount > 0) {
                     EntitySidebarFact(
                         label = stringResource(Res.string.entity_browse_catalogue),
-                        value = if (catalogueCount == 1) {
-                            stringResource(Res.string.entity_browse_title_count_one, catalogueCount)
-                        } else {
-                            stringResource(Res.string.entity_browse_title_count_other, catalogueCount)
-                        },
+                        value = "$catalogueCount ${if (catalogueCount == 1) "title" else "titles"}",
                     )
                 }
             }

@@ -65,19 +65,29 @@ object AnilistMetaDetailsResolver {
         val armImdbId = cachedArm?.imdbId
         val targetSeason = cachedArm?.season ?: 1
 
+        val kitsuId = cachedArm?.kitsuId?.removePrefix("kitsu:")?.takeIf { it.isNotBlank() }
+            ?: resolveArmMapping(anilistId).kitsuId?.removePrefix("kitsu:")?.takeIf { it.isNotBlank() }
+
+        val kitsuEpisodes = if (!kitsuId.isNullOrBlank()) {
+            fetchKitsuEpisodes(kitsuId)
+        } else emptyMap()
+
+        val poster = media.coverImage?.extraLarge
+            ?: media.coverImage?.large
+            ?: media.coverImage?.medium
+
+        val episode1Thumb = kitsuEpisodes[1]?.thumbnail?.takeIf { it.isNotBlank() }
+            ?: media.streamingEpisodes.firstOrNull()?.thumbnail?.takeIf { it.isNotBlank() }
+
         val backdrop = if (!armImdbId.isNullOrBlank()) {
             "https://images.metahub.space/background/medium/$armImdbId/img"
         } else {
-            media.bannerImage
+            media.bannerImage ?: episode1Thumb ?: poster
         }
 
         val logo = if (!armImdbId.isNullOrBlank()) {
             "https://images.metahub.space/logo/medium/$armImdbId/img"
         } else null
-
-        val poster = media.coverImage?.extraLarge
-            ?: media.coverImage?.large
-            ?: media.coverImage?.medium
 
         val isMovie = media.format == "MOVIE"
         val contentType = if (isMovie) "movie" else "series"
@@ -102,6 +112,7 @@ object AnilistMetaDetailsResolver {
             studio.name?.takeIf { it.isNotBlank() }?.let { name ->
                 com.nuvio.app.features.details.MetaCompany(
                     name = name,
+                    logo = AnimeStudioLogos.findLogo(name),
                 )
             }
         }
@@ -110,6 +121,7 @@ object AnilistMetaDetailsResolver {
             studio.name?.takeIf { it.isNotBlank() }?.let { name ->
                 com.nuvio.app.features.details.MetaCompany(
                     name = name,
+                    logo = AnimeStudioLogos.findLogo(name),
                 )
             }
         }
@@ -146,13 +158,6 @@ object AnilistMetaDetailsResolver {
 
         val directors = media.staff.filter { it.role?.contains("Director", ignoreCase = true) == true }.mapNotNull { it.name }
         val writers = media.staff.filter { it.role?.contains("Original Creator", ignoreCase = true) == true || it.role?.contains("Series Composition", ignoreCase = true) == true }.mapNotNull { it.name }
-
-        val kitsuId = cachedArm?.kitsuId?.removePrefix("kitsu:")?.takeIf { it.isNotBlank() }
-            ?: resolveArmMapping(anilistId).kitsuId?.removePrefix("kitsu:")?.takeIf { it.isNotBlank() }
-
-        val kitsuEpisodes = if (!kitsuId.isNullOrBlank()) {
-            fetchKitsuEpisodes(kitsuId)
-        } else emptyMap()
 
         val episodeOffset = resolveEpisodeOffset(
             media = media,

@@ -230,11 +230,18 @@ private fun PersonDetailContent(
     }
 
     val isAnimePerson = person.knownFor == "Voice Acting" || allCredits.any { it.id.startsWith("ani_") }
+    val displayPopularCredits = remember(popularCredits, isAnimePerson) {
+        if (isAnimePerson) popularCredits.take(10) else popularCredits
+    }
     val animeTvCredits = remember(person.tvCredits) {
-        person.tvCredits.filter { it.id.startsWith("ani_") || it.id.startsWith("anilist:") }
+        person.tvCredits
+            .filter { it.id.startsWith("ani_") || it.id.startsWith("anilist:") }
+            .sortedByDescending { it.rawReleaseDate ?: "" }
     }
     val animeMovieCredits = remember(person.movieCredits) {
-        person.movieCredits.filter { it.id.startsWith("ani_") || it.id.startsWith("anilist:") }
+        person.movieCredits
+            .filter { it.id.startsWith("ani_") || it.id.startsWith("anilist:") }
+            .sortedByDescending { it.rawReleaseDate ?: "" }
     }
 
     val scrollState = rememberScrollState()
@@ -284,7 +291,7 @@ private fun PersonDetailContent(
                 if (useWideLayout) {
                     WidePersonDetailContent(
                         person = person,
-                        popularCredits = popularCredits,
+                        popularCredits = displayPopularCredits,
                         animeTvCredits = animeTvCredits,
                         animeMovieCredits = animeMovieCredits,
                         latestCredits = latestCredits,
@@ -315,11 +322,11 @@ private fun PersonDetailContent(
                                 animatedVisibilityScope = animatedVisibilityScope,
                             )
 
-                            if (popularCredits.isNotEmpty()) {
+                            if (displayPopularCredits.isNotEmpty()) {
                                 Spacer(modifier = Modifier.height(24.dp))
                                 DetailPosterRailSection(
-                                    title = if (isAnimePerson) "Popular Anime" else stringResource(Res.string.person_popular),
-                                    items = popularCredits,
+                                    title = if (isAnimePerson) "Popular Works" else stringResource(Res.string.person_popular),
+                                    items = displayPopularCredits,
                                     watchedKeys = watchedKeys,
                                     headerHorizontalPadding = 20.dp,
                                     onPosterClick = onOpenMeta,
@@ -348,7 +355,7 @@ private fun PersonDetailContent(
                                 )
                             }
 
-                            if (latestCredits.isNotEmpty()) {
+                            if (latestCredits.isNotEmpty() && !isAnimePerson) {
                                 Spacer(modifier = Modifier.height(24.dp))
                                 DetailPosterRailSection(
                                     title = stringResource(Res.string.person_latest),
@@ -447,7 +454,7 @@ private fun WidePersonDetailContent(
             ) {
                 if (popularCredits.isNotEmpty()) {
                     DetailPosterRailSection(
-                        title = if (isAnimePerson) "Popular Anime" else stringResource(Res.string.person_popular),
+                        title = if (isAnimePerson) "Popular Works" else stringResource(Res.string.person_popular),
                         items = popularCredits,
                         watchedKeys = watchedKeys,
                         headerHorizontalPadding = 0.dp,
@@ -475,7 +482,7 @@ private fun WidePersonDetailContent(
                     )
                 }
 
-                if (latestCredits.isNotEmpty()) {
+                if (latestCredits.isNotEmpty() && !isAnimePerson) {
                     DetailPosterRailSection(
                         title = stringResource(Res.string.person_latest),
                         items = latestCredits,

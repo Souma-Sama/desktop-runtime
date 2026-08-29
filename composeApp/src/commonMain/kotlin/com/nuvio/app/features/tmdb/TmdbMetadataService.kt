@@ -455,67 +455,71 @@ object TmdbMetadataService {
         entityBrowseCache[cacheKey]?.let { return@withContext it }
 
         val studioName = fallbackName.orEmpty()
-        if (isAnilist) {
+        if (isAnilist || !settings.enabled || !settings.hasApiKey || entityId <= 0) {
             val anilistStudioMedia = if (studioName.isNotBlank()) {
                 runCatching {
                     com.nuvio.app.features.anilist.AnilistApi.fetchStudioMedia(studioName)
                 }.getOrNull().orEmpty()
             } else emptyList()
 
-            val anilistRail = TmdbEntityRail(
-                mediaType = TmdbEntityMediaType.TV,
-                railType = TmdbEntityRailType.POPULAR,
-                items = anilistStudioMedia,
-                currentPage = 1,
-                hasMore = false,
-            )
-            val browseData = TmdbEntityBrowseData(
-                header = TmdbEntityHeader(
-                    id = entityId,
-                    kind = entityKind,
-                    name = studioName,
-                    logo = null,
-                    originCountry = "JP",
-                    secondaryLabel = null,
-                    description = null,
-                ),
-                rails = listOf(anilistRail),
-            )
-            entityBrowseCache[cacheKey] = browseData
-            return@withContext browseData
-        }
-
-        val anilistStudioMedia = if (studioName.isNotBlank()) {
-            runCatching {
-                com.nuvio.app.features.anilist.AnilistApi.fetchStudioMedia(studioName)
-            }.getOrNull().orEmpty()
-        } else emptyList()
-
-        if (!settings.enabled || !settings.hasApiKey || entityId <= 0) {
             if (anilistStudioMedia.isNotEmpty()) {
-                val anilistRail = TmdbEntityRail(
-                    mediaType = TmdbEntityMediaType.TV,
-                    railType = TmdbEntityRailType.POPULAR,
-                    items = anilistStudioMedia,
-                    currentPage = 1,
-                    hasMore = false,
-                )
+                val seriesList = anilistStudioMedia.filter { it.type == "series" }
+                val moviesList = anilistStudioMedia.filter { it.type == "movie" }
+
+                val rails = buildList {
+                    if (seriesList.isNotEmpty()) {
+                        add(
+                            TmdbEntityRail(
+                                mediaType = TmdbEntityMediaType.TV,
+                                railType = TmdbEntityRailType.POPULAR,
+                                items = seriesList,
+                                currentPage = 1,
+                                hasMore = false,
+                            )
+                        )
+                    }
+                    if (moviesList.isNotEmpty()) {
+                        add(
+                            TmdbEntityRail(
+                                mediaType = TmdbEntityMediaType.MOVIE,
+                                railType = TmdbEntityRailType.POPULAR,
+                                items = moviesList,
+                                currentPage = 1,
+                                hasMore = false,
+                            )
+                        )
+                    }
+                }
+
+                val studioLogo = com.nuvio.app.features.anilist.catalog.AnimeStudioLogos.findLogo(studioName)
+
                 val browseData = TmdbEntityBrowseData(
                     header = TmdbEntityHeader(
                         id = entityId,
                         kind = entityKind,
                         name = studioName,
-                        logo = null,
+                        logo = studioLogo,
                         originCountry = "JP",
-                        secondaryLabel = null,
+                        secondaryLabel = if (entityKind == TmdbEntityKind.NETWORK) "Broadcaster / Network" else "Animation Studio",
                         description = null,
                     ),
-                    rails = listOf(anilistRail),
+                    rails = rails.ifEmpty {
+                        listOf(
+                            TmdbEntityRail(
+                                mediaType = TmdbEntityMediaType.TV,
+                                railType = TmdbEntityRailType.POPULAR,
+                                items = anilistStudioMedia,
+                                currentPage = 1,
+                                hasMore = false,
+                            )
+                        )
+                    },
                 )
                 entityBrowseCache[cacheKey] = browseData
                 return@withContext browseData
+            } else if (isAnilist || entityId <= 0) {
+                return@withContext null
             }
-            return@withContext null
         }
 
         val (header, rails) = coroutineScope {
