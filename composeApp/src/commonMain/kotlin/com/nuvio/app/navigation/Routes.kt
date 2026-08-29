@@ -38,6 +38,9 @@ data class DetailRoute(
     val type: String,
     val id: String,
     override val title: String? = null,
+    val poster: String? = null,
+    val banner: String? = null,
+    val logo: String? = null,
 ) : AppRoute
 
 @Serializable

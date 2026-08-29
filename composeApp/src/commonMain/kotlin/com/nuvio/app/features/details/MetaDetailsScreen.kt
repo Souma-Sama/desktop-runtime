@@ -166,6 +166,9 @@ fun MetaDetailsScreen(
     type: String,
     id: String,
     initialTitle: String? = null,
+    initialPoster: String? = null,
+    initialBanner: String? = null,
+    initialLogo: String? = null,
     onBack: () -> Unit,
     onPlay: ((type: String, videoId: String, parentMetaId: String, parentMetaType: String, title: String, logo: String?, poster: String?, background: String?, seasonNumber: Int?, episodeNumber: Int?, episodeTitle: String?, episodeThumbnail: String?, pauseDescription: String?, resumePositionMs: Long?) -> Unit)? = null,
     onPlayManually: ((type: String, videoId: String, parentMetaId: String, parentMetaType: String, title: String, logo: String?, poster: String?, background: String?, seasonNumber: Int?, episodeNumber: Int?, episodeTitle: String?, episodeThumbnail: String?, pauseDescription: String?, resumePositionMs: Long?) -> Unit)? = null,
@@ -176,9 +179,22 @@ fun MetaDetailsScreen(
     animatedVisibilityScope: AnimatedVisibilityScope? = null,
     modifier: Modifier = Modifier,
 ) {
+    val previewMeta = remember(type, id, initialTitle, initialPoster, initialBanner, initialLogo) {
+        if (!initialTitle.isNullOrBlank() || !initialPoster.isNullOrBlank() || !initialBanner.isNullOrBlank()) {
+            MetaDetails(
+                id = id,
+                type = type,
+                name = initialTitle.orEmpty(),
+                poster = initialPoster,
+                background = initialBanner ?: initialPoster,
+                logo = initialLogo,
+            )
+        } else null
+    }
     val uiState by MetaDetailsRepository.uiState.collectAsStateWithLifecycle()
     val displayedMeta = uiState.meta?.takeIf { it.type == type && it.id == id }
         ?: MetaDetailsRepository.peek(type, id)
+        ?: previewMeta
     val metaScreenSettingsUiState by remember {
         MetaScreenSettingsRepository.ensureLoaded()
         MetaScreenSettingsRepository.uiState

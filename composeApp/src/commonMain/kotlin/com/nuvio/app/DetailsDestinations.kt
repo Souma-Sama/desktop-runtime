@@ -43,72 +43,28 @@ internal typealias ContentPlayAction = (
 
 @Composable
 private fun rememberOpenMeta(navController: NuvioNavigator): (MetaPreview) -> Unit {
-    val scope = rememberCoroutineScope()
     return { preview ->
-        scope.launch {
-            // 1. Direct AniList ID
-            if (preview.id.startsWith("ani_", ignoreCase = true) || preview.id.startsWith("anilist:", ignoreCase = true)) {
-                navController.navigate(
-                    DetailRoute(
-                        type = preview.type,
-                        id = preview.id,
-                        title = preview.name,
-                    ),
+        val resolvedId = if (preview.id.startsWith("tmdb:")) {
+            val tmdbId = preview.id.removePrefix("tmdb:").toIntOrNull()
+            tmdbId?.let {
+                TmdbService.tmdbToImdb(
+                    tmdbId = it,
+                    mediaType = preview.type,
                 )
-                return@launch
-            }
-
-            // 2. If it's an anime, resolve to standalone AniList season by searching title on AniList GraphQL
-            val searchTitle = preview.name.trim()
-            if (searchTitle.isNotBlank()) {
-                val anilistMatches = runCatching {
-                    com.nuvio.app.features.anilist.AnilistApi.searchAnime(query = searchTitle)
-                }.getOrNull().orEmpty()
-
-                if (anilistMatches.isNotEmpty()) {
-                    val cleanQuery = searchTitle.lowercase().replace(Regex("[^a-z0-9 ]"), " ").replace(Regex("\\s+"), " ").trim()
-                    val matched = anilistMatches.firstOrNull { m ->
-                        val mEng = m.title?.english?.lowercase()?.replace(Regex("[^a-z0-9 ]"), " ")?.replace(Regex("\\s+"), " ")?.trim().orEmpty()
-                        val mRom = m.title?.romaji?.lowercase()?.replace(Regex("[^a-z0-9 ]"), " ")?.replace(Regex("\\s+"), " ")?.trim().orEmpty()
-                        val mDisp = m.title?.displayTitle?.lowercase()?.replace(Regex("[^a-z0-9 ]"), " ")?.replace(Regex("\\s+"), " ")?.trim().orEmpty()
-                        cleanQuery == mEng || cleanQuery == mRom || cleanQuery == mDisp ||
-                            (cleanQuery.length >= 4 && (mEng.contains(cleanQuery) || cleanQuery.contains(mEng) || mRom.contains(cleanQuery) || cleanQuery.contains(mRom)))
-                    } ?: (if (anilistMatches.size == 1) anilistMatches.first() else null)
-
-                    if (matched != null) {
-                        val mediaType = if (matched.format?.equals("MOVIE", ignoreCase = true) == true || matched.episodes == 1) "movie" else "series"
-                        navController.navigate(
-                            DetailRoute(
-                                type = mediaType,
-                                id = "ani_${matched.id}",
-                                title = matched.title?.displayTitle ?: preview.name,
-                            ),
-                        )
-                        return@launch
-                    }
-                }
-            }
-
-            // 3. Fallback for Western movies / series
-            val resolvedId = if (preview.id.startsWith("tmdb:")) {
-                val tmdbId = preview.id.removePrefix("tmdb:").toIntOrNull()
-                tmdbId?.let {
-                    TmdbService.tmdbToImdb(
-                        tmdbId = it,
-                        mediaType = preview.type,
-                    )
-                } ?: preview.id
-            } else {
-                preview.id
-            }
-            navController.navigate(
-                DetailRoute(
-                    type = preview.type,
-                    id = resolvedId,
-                    title = preview.name,
-                ),
-            )
+            } ?: preview.id
+        } else {
+            preview.id
         }
+        navController.navigate(
+            DetailRoute(
+                type = preview.type,
+                id = resolvedId,
+                title = preview.name,
+                poster = preview.poster,
+                banner = preview.banner,
+                logo = preview.logo,
+            ),
+        )
     }
 }
 
@@ -131,6 +87,9 @@ internal fun DetailsDestination(
         type = route.type,
         id = route.id,
         initialTitle = route.title,
+        initialPoster = route.poster,
+        initialBanner = route.banner,
+        initialLogo = route.logo,
         onBack = onBack,
         onPlay = onPlay,
         onPlayManually = onPlayManually,

@@ -1310,7 +1310,14 @@ internal fun MainAppContent(
                                 onCatalogClick = onCatalogClick,
                                 onPosterClick = { meta ->
                                     navController.navigate(
-                                        DetailRoute(type = meta.type, id = meta.id, title = meta.name),
+                                        DetailRoute(
+                                            type = meta.type,
+                                            id = meta.id,
+                                            title = meta.name,
+                                            poster = meta.poster,
+                                            banner = meta.banner,
+                                            logo = meta.logo,
+                                        ),
                                     )
                                 },
                                 onPosterLongClick = { meta ->
@@ -1318,7 +1325,14 @@ internal fun MainAppContent(
                                 },
                                 onLibraryPosterClick = { item ->
                                     navController.navigate(
-                                        DetailRoute(type = item.type, id = item.id, title = item.name),
+                                        DetailRoute(
+                                            type = item.type,
+                                            id = item.id,
+                                            title = item.name,
+                                            poster = item.poster,
+                                            banner = item.background,
+                                            logo = item.logo,
+                                        ),
                                     )
                                 },
                                 onLibraryPosterLongClick = { item, section ->
@@ -1381,6 +1395,8 @@ internal fun MainAppContent(
                                                             type = mediaType,
                                                             id = result.id,
                                                             title = item.title,
+                                                            poster = item.posterImage,
+                                                            banner = item.bannerImage,
                                                         ),
                                                     )
                                                 }
@@ -1390,6 +1406,8 @@ internal fun MainAppContent(
                                                             type = mediaType,
                                                             id = "anilist:${item.id}",
                                                             title = result.title,
+                                                            poster = item.posterImage,
+                                                            banner = item.bannerImage,
                                                         ),
                                                     )
                                                 }
@@ -1399,6 +1417,8 @@ internal fun MainAppContent(
                                                             type = mediaType,
                                                             id = "anilist:${item.id}",
                                                             title = item.title,
+                                                            poster = item.posterImage,
+                                                            banner = item.bannerImage,
                                                         ),
                                                     )
                                                 }
@@ -1409,6 +1429,8 @@ internal fun MainAppContent(
                                                     type = mediaType,
                                                     id = "anilist:${item.id}",
                                                     title = item.title,
+                                                    poster = item.posterImage,
+                                                    banner = item.bannerImage,
                                                 ),
                                             )
                                         }
@@ -1899,6 +1921,8 @@ internal fun MainAppContent(
                                                         type = item.parentMetaType,
                                                         id = item.parentMetaId,
                                                         title = item.title,
+                                                        poster = item.poster,
+                                                        banner = item.background,
                                                     ),
                                                 )
                                             },
@@ -1954,6 +1978,8 @@ internal fun MainAppContent(
                                 type = item.parentMetaType,
                                 id = item.parentMetaId,
                                 title = item.title,
+                                poster = item.poster,
+                                banner = item.background,
                             ),
                         )
                     }
