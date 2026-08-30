@@ -274,6 +274,7 @@ fun DetailSeriesContent(
                         title = sectionTitle,
                     )
                     val seasonEpisodes = groupedEpisodes[seasonForContent] ?: emptyList()
+                    val episodeFallbackImage = if (meta.id.startsWith("ani_") || meta.id.startsWith("anilist:")) null else (meta.background ?: meta.poster)
                     if (episodeCardStyle == MetaEpisodeCardStyle.Horizontal) {
                         EpisodeHorizontalRow(
                             episodes = seasonEpisodes,
@@ -282,7 +283,7 @@ fun DetailSeriesContent(
                             parentMetaId = meta.id,
                             metaType = meta.type,
                             watchedKeys = watchedKeys,
-                            fallbackImage = meta.background ?: meta.poster,
+                            fallbackImage = episodeFallbackImage,
                             progressByVideoId = progressByVideoId,
                             episodeRatings = episodeRatings,
                             blurUnwatchedEpisodes = blurUnwatchedEpisodes,
@@ -307,7 +308,7 @@ fun DetailSeriesContent(
                                 )
                                 EpisodeListCard(
                                     video = episode,
-                                    fallbackImage = meta.background ?: meta.poster,
+                                    fallbackImage = episodeFallbackImage,
                                     progressEntry = progressByVideoId[episodeVideoId],
                                     imdbRating = episode.seasonEpisodeKey()?.let { episodeRatings[it] } ?: episode.rating,
                                     isWatched = progressByVideoId[episodeVideoId]?.isEffectivelyCompleted == true ||

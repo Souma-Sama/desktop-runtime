@@ -43,6 +43,8 @@ object AnilistMetaDetailsResolver {
         media: AnilistMedia,
         backdrop: String? = null,
         logo: String? = null,
+        season: Int = 1,
+        imdbId: String? = null,
     ): MetaDetails {
         val anilistId = media.id
         val isMovie = media.format == "MOVIE"
@@ -61,7 +63,7 @@ object AnilistMetaDetailsResolver {
             studio.name?.takeIf { it.isNotBlank() }?.let { name ->
                 com.nuvio.app.features.details.MetaCompany(
                     name = name,
-                    logo = AnimeStudioLogos.findLogo(name),
+                    role = "Animation Studio",
                 )
             }
         }
@@ -70,7 +72,7 @@ object AnilistMetaDetailsResolver {
             studio.name?.takeIf { it.isNotBlank() }?.let { name ->
                 com.nuvio.app.features.details.MetaCompany(
                     name = name,
-                    logo = AnimeStudioLogos.findLogo(name),
+                    role = "Network / Producer",
                 )
             }
         }
@@ -178,15 +180,19 @@ object AnilistMetaDetailsResolver {
                 val streamingEp = if (startsAtZero) media.streamingEpisodes.getOrNull(idx) else media.streamingEpisodes.getOrNull(idx - 1)
                 val rawTitle = streamingEp?.title?.takeIf { it.isNotBlank() } ?: "Episode $epNum"
                 val epTitle = cleanEpisodeTitle(rawTitle, epNum)
-                val thumb = streamingEp?.thumbnail?.takeIf { it.isNotBlank() }
+                val streamingThumb = streamingEp?.thumbnail?.takeIf { it.isNotBlank() }
+                val metahubThumb = if (!imdbId.isNullOrBlank()) {
+                    "https://episodes.metahub.space/$imdbId/$season/$epNum/w780.jpg"
+                } else null
+                val thumb = metahubThumb ?: streamingThumb
                 MetaVideo(
                     id = "anilist:$anilistId:$epNum",
                     title = epTitle,
-                    season = 1,
+                    season = season,
                     episode = epNum,
                     overview = null,
                     thumbnail = thumb,
-                    fallbackThumbnail = thumb,
+                    fallbackThumbnail = streamingThumb,
                     runtime = media.duration,
                     released = resolveEpisodeAirDate(epNum, null, null, media),
                     streams = emptyList(),
@@ -293,7 +299,13 @@ object AnilistMetaDetailsResolver {
             "https://images.metahub.space/logo/medium/$effectiveImdbId/img"
         } else null
 
-        buildBaseMetaFromAnilistMedia(media, backdrop = backdrop, logo = logo)
+        buildBaseMetaFromAnilistMedia(
+            media = media,
+            backdrop = backdrop,
+            logo = logo,
+            season = targetSeason,
+            imdbId = effectiveImdbId,
+        )
     }
 
     suspend fun enrichAnimeForMetaScreen(
