@@ -416,8 +416,8 @@ object AnilistMetaDetailsResolver {
                         "https://episodes.metahub.space/$effectiveImdbId/${v.season ?: 1}/$epNum/w780.jpg"
                     } else null
                     val currentThumb = v.thumbnail?.takeIf { it.isNotBlank() && it != current.poster && it != current.background }
-                    val epThumbnail = kitsuThumb
-                        ?: currentThumb
+                    val epThumbnail = currentThumb
+                        ?: kitsuThumb
                         ?: metahubEpThumb
                         ?: v.thumbnail
                     val videoId = if (!kitsuId.isNullOrBlank()) "kitsu:$kitsuId:$epNum" else v.id
