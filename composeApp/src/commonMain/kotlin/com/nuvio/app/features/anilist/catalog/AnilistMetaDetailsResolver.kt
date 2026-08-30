@@ -63,7 +63,7 @@ object AnilistMetaDetailsResolver {
             studio.name?.takeIf { it.isNotBlank() }?.let { name ->
                 com.nuvio.app.features.details.MetaCompany(
                     name = name,
-                    role = "Animation Studio",
+                    logo = AnimeStudioLogos.findLogo(name),
                 )
             }
         }
@@ -72,7 +72,7 @@ object AnilistMetaDetailsResolver {
             studio.name?.takeIf { it.isNotBlank() }?.let { name ->
                 com.nuvio.app.features.details.MetaCompany(
                     name = name,
-                    role = "Network / Producer",
+                    logo = AnimeStudioLogos.findLogo(name),
                 )
             }
         }
