@@ -128,20 +128,6 @@ object MetaDetailsRepository {
             } else null
 
             if (anilistId != null) {
-                val cachedMedia = com.nuvio.app.features.anilist.AnilistApi.getCachedMedia(anilistId)
-                if (cachedMedia != null) {
-                    val instantBaseMeta = com.nuvio.app.features.anilist.catalog.AnilistMetaDetailsResolver.buildBaseMetaFromAnilistMedia(cachedMedia)
-                    publishLoadedMeta(
-                        requestKey = requestKey,
-                        meta = instantBaseMeta,
-                        fallbackItemId = "ani_$anilistId",
-                        fallbackItemType = effectiveType,
-                        mdbListSettings = mdbListSettings,
-                        metaScreenSettingsFingerprint = metaScreenSettingsFingerprint,
-                    )
-                    return@launch
-                }
-
                 val anilistMeta = runCatching {
                     com.nuvio.app.features.anilist.catalog.AnilistMetaDetailsResolver.resolveMetaDetails("ani_$anilistId")
                 }.getOrNull()

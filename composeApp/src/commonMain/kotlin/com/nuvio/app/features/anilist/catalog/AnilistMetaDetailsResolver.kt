@@ -39,16 +39,21 @@ object AnilistMetaDetailsResolver {
 
     private val resolvedMetaDetailsCache = mutableMapOf<String, MetaDetails>()
 
-    fun buildBaseMetaFromAnilistMedia(media: AnilistMedia): MetaDetails {
+    fun buildBaseMetaFromAnilistMedia(
+        media: AnilistMedia,
+        backdrop: String? = null,
+        logo: String? = null,
+    ): MetaDetails {
         val anilistId = media.id
         val isMovie = media.format == "MOVIE"
         val totalEpisodes = media.episodes ?: media.streamingEpisodes.size.takeIf { it > 0 } ?: 12
 
-        val poster = media.coverImage?.extraLarge
+        val poster = media.coverImage?.bestUrl
+            ?: media.coverImage?.extraLarge
             ?: media.coverImage?.large
             ?: media.coverImage?.medium
 
-        val logo = MetaHubArtwork.getLogoUrl("ani_$anilistId")
+        val effectiveLogo = logo ?: MetaHubArtwork.getLogoUrl("ani_$anilistId")
         val cleanDescription = com.nuvio.app.core.format.cleanHtmlDescription(media.description)
         val castPersons = buildCategorizedCast(media)
 
@@ -74,7 +79,11 @@ object AnilistMetaDetailsResolver {
             val recId = rec.id
             val isRecMovie = rec.format == "MOVIE" || rec.episodes == 1
             val recType = if (isRecMovie) "movie" else "series"
-            val recPoster = rec.coverImage?.extraLarge ?: rec.coverImage?.large ?: return@mapNotNull null
+            val recPoster = rec.coverImage?.bestUrl
+                ?: rec.coverImage?.extraLarge
+                ?: rec.coverImage?.large
+                ?: rec.coverImage?.medium
+                ?: return@mapNotNull null
             val recScore = if (rec.averageScore != null && rec.averageScore > 0) rec.averageScore / 10.0 else null
             com.nuvio.app.features.home.MetaPreview(
                 id = "ani_$recId",
@@ -214,8 +223,8 @@ object AnilistMetaDetailsResolver {
             type = if (isMovie) "movie" else "series",
             name = media.title?.displayTitle.orEmpty(),
             poster = poster,
-            background = null,
-            logo = logo,
+            background = backdrop,
+            logo = effectiveLogo,
             description = cleanDescription,
             releaseInfo = releaseYear,
             status = media.status,
@@ -242,19 +251,49 @@ object AnilistMetaDetailsResolver {
         )
     }
 
-    suspend fun resolveMetaDetails(rawId: String): MetaDetails? {
-        val anilistId = AnilistTrackerCoordinator.extractAnilistId(rawId) ?: return null
+    suspend fun resolveMetaDetails(rawId: String): MetaDetails? = coroutineScope {
+        val anilistId = AnilistTrackerCoordinator.extractAnilistId(rawId) ?: return@coroutineScope null
         val token = AnilistAuthRepository.token.value
 
-        val media = AnilistApi.getCachedMedia(anilistId)
-            ?: runCatching {
-                withTimeoutOrNull(2500L) {
-                    AnilistApi.fetchMediaById(anilistId, token = token)
-                }
-            }.getOrNull()
-            ?: return null
+        val mediaDeferred = async {
+            val cached = AnilistApi.getCachedMedia(anilistId)
+            if (cached != null && cached.isFullDetails) {
+                cached
+            } else {
+                runCatching {
+                    withTimeoutOrNull(2500L) {
+                        AnilistApi.fetchMediaById(anilistId, token = token)
+                    }
+                }.getOrNull() ?: cached
+            }
+        }
 
-        return buildBaseMetaFromAnilistMedia(media)
+        val armDeferred = async {
+            val cachedArm = armMappingCache[anilistId]
+            cachedArm ?: runCatching {
+                withTimeoutOrNull(2000L) { resolveArmMapping(anilistId) }
+            }.getOrNull() ?: ArmMapping(null, null, null, null, 1)
+        }
+
+        val media = mediaDeferred.await() ?: return@coroutineScope null
+        val arm = armDeferred.await()
+        val effectiveImdbId = resolveEffectiveImdbId(media, arm.imdbId)
+        val isSpecial = isSpecialAnime(media)
+        val targetSeason = when {
+            arm.season == 0 -> 0
+            isSpecial -> 0
+            else -> arm.season
+        }
+
+        val backdrop = if (!effectiveImdbId.isNullOrBlank()) {
+            "https://images.metahub.space/background/medium/$effectiveImdbId/img"
+        } else null
+
+        val logo = if (!isSpecial && targetSeason != 0 && !effectiveImdbId.isNullOrBlank()) {
+            "https://images.metahub.space/logo/medium/$effectiveImdbId/img"
+        } else null
+
+        buildBaseMetaFromAnilistMedia(media, backdrop = backdrop, logo = logo)
     }
 
     suspend fun enrichAnimeForMetaScreen(
@@ -305,7 +344,11 @@ object AnilistMetaDetailsResolver {
                     val recId = rec.id
                     val isRecMovie = rec.format == "MOVIE" || rec.episodes == 1
                     val recType = if (isRecMovie) "movie" else "series"
-                    val recPoster = rec.coverImage?.extraLarge ?: rec.coverImage?.large ?: return@mapNotNull null
+                    val recPoster = rec.coverImage?.bestUrl
+                        ?: rec.coverImage?.extraLarge
+                        ?: rec.coverImage?.large
+                        ?: rec.coverImage?.medium
+                        ?: return@mapNotNull null
                     val recScore = if (rec.averageScore != null && rec.averageScore > 0) rec.averageScore / 10.0 else null
                     com.nuvio.app.features.home.MetaPreview(
                         id = "ani_$recId",

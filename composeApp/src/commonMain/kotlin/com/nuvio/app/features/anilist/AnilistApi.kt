@@ -1343,7 +1343,7 @@ object AnilistApi {
 
         val query = """
             query FetchMediaById(${'$'}id: Int) {
-              Media(id: ${'$'}id, type: ANIME) {
+              Media(id: ${'$'}id) {
                 id
                 idMal
                 title {
@@ -1419,6 +1419,7 @@ object AnilistApi {
                       coverImage {
                         extraLarge
                         large
+                        medium
                       }
                       bannerImage
                       averageScore
@@ -1676,6 +1677,7 @@ object AnilistApi {
                     AnilistCoverImage(
                         extraLarge = it["extraLarge"].asStringOrNull(),
                         large = it["large"].asStringOrNull(),
+                        medium = it["medium"].asStringOrNull(),
                     )
                 }
                 AnilistRecommendation(
