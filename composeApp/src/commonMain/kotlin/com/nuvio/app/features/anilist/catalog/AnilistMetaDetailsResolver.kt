@@ -751,10 +751,11 @@ object AnilistMetaDetailsResolver {
                     runtime = media?.duration ?: cinemetaEp?.runtime,
                 )
             }
-        } else if (targetSeason > 1 && media?.episodes != null && media.episodes > 0) {
-            (1..media.episodes).map { idx ->
+        } else if (targetSeason > 1) {
+            val epCount = media?.episodes ?: kitsuEpisodes.size.takeIf { it > 0 } ?: 12
+            (1..epCount).map { idx ->
                 val actualEpNumber = idx + episodeOffset
-                val streamingEp = media.streamingEpisodes.getOrNull(idx - 1)
+                val streamingEp = media?.streamingEpisodes?.getOrNull(idx - 1)
                 val kitsuEp = kitsuEpisodes[actualEpNumber] ?: kitsuEpisodes[idx]
                 val rawTitle = kitsuEp?.title?.takeIf { it.isNotBlank() }
                     ?: streamingEp?.title?.takeIf { it.isNotBlank() }
@@ -770,7 +771,7 @@ object AnilistMetaDetailsResolver {
                     thumbnail = metahubThumb ?: kitsuFallback ?: fallbackThumb,
                     fallbackThumbnail = kitsuFallback,
                     overview = kitsuEp?.overview,
-                    runtime = media.duration,
+                    runtime = media?.duration,
                     released = resolveEpisodeAirDate(actualEpNumber, kitsuEp?.airdate, null, media),
                 )
             }

@@ -158,7 +158,7 @@ object MetaDetailsRepository {
                     publishLoadedMeta(
                         requestKey = requestKey,
                         meta = finalMeta,
-                        fallbackItemId = metaLookupId,
+                        fallbackItemId = if (isAnilistItem) id else metaLookupId,
                         fallbackItemType = effectiveType,
                         mdbListSettings = mdbListSettings,
                         metaScreenSettingsFingerprint = metaScreenSettingsFingerprint,
@@ -175,7 +175,7 @@ object MetaDetailsRepository {
                 publishLoadedMeta(
                     requestKey = requestKey,
                     meta = finalMeta,
-                    fallbackItemId = metaLookupId,
+                    fallbackItemId = if (isAnilistItem) id else metaLookupId,
                     fallbackItemType = effectiveType,
                     mdbListSettings = mdbListSettings,
                     metaScreenSettingsFingerprint = metaScreenSettingsFingerprint,
