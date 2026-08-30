@@ -70,6 +70,9 @@ object AnilistMetaDetailsResolver {
             val armMapping = armDeferred.await()
 
             val effectiveImdbId = armMapping.imdbId
+                ?: media.relations.firstOrNull { it.relationType in listOf("PARENT", "PREQUEL", "SOURCE", "MAIN", "ALTERNATIVE", "SIDE_STORY", "SPIN_OFF", "OTHER") }?.let {
+                    resolveArmMapping(it.id).imdbId
+                }
             val isSpecial = isSpecialAnime(media)
             val targetSeason = when {
                 armMapping.season == 0 -> 0
@@ -96,11 +99,10 @@ object AnilistMetaDetailsResolver {
             val episode1Thumb = kitsuEpisodes[1]?.thumbnail?.takeIf { it.isNotBlank() }
                 ?: media.streamingEpisodes.firstOrNull()?.thumbnail?.takeIf { it.isNotBlank() }
 
-            val backdrop = if (!effectiveImdbId.isNullOrBlank()) {
-                "https://images.metahub.space/background/medium/$effectiveImdbId/img"
-            } else {
-                media.bannerImage ?: episode1Thumb ?: poster
-            }
+            val backdrop = media.bannerImage
+                ?: (if (!effectiveImdbId.isNullOrBlank()) "https://images.metahub.space/background/medium/$effectiveImdbId/img" else null)
+                ?: episode1Thumb
+                ?: poster
 
             val logo = if (!effectiveImdbId.isNullOrBlank()) {
                 "https://images.metahub.space/logo/medium/$effectiveImdbId/img"
@@ -397,6 +399,9 @@ object AnilistMetaDetailsResolver {
         val kitsuId = arm.kitsuId?.removePrefix("kitsu:")?.takeIf { it.isNotBlank() }
             ?: resolveKitsuId(anilistId, media)
         val effectiveImdbId = arm.imdbId
+            ?: media?.relations?.firstOrNull { it.relationType in listOf("PARENT", "PREQUEL", "SOURCE", "MAIN", "ALTERNATIVE", "SIDE_STORY", "SPIN_OFF", "OTHER") }?.let {
+                resolveArmMapping(it.id).imdbId
+            }
 
         if (!kitsuId.isNullOrBlank() || !effectiveImdbId.isNullOrBlank()) {
             val kitsuEpisodes = if (!kitsuId.isNullOrBlank()) {
@@ -411,8 +416,9 @@ object AnilistMetaDetailsResolver {
                     val kitsuEp = kitsuEpisodes[epNum]
                     val epTitle = kitsuEp?.title?.takeIf { it.isNotBlank() } ?: v.title
                     val kitsuThumb = kitsuEp?.thumbnail?.takeIf { it.isNotBlank() }
+                    val targetSeasonForEp = v.season ?: (if (isSpecial) 0 else 1)
                     val metahubEpThumb = if (!effectiveImdbId.isNullOrBlank()) {
-                        "https://episodes.metahub.space/$effectiveImdbId/${v.season ?: 1}/$epNum/w780.jpg"
+                        "https://episodes.metahub.space/$effectiveImdbId/$targetSeasonForEp/$epNum/w780.jpg"
                     } else null
                     val videoId = if (!kitsuId.isNullOrBlank()) "kitsu:$kitsuId:$epNum" else v.id
                     v.copy(
