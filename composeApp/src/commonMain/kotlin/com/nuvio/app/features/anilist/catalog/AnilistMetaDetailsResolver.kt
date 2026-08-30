@@ -399,8 +399,12 @@ object AnilistMetaDetailsResolver {
         val kitsuId = arm.kitsuId?.removePrefix("kitsu:")?.takeIf { it.isNotBlank() }
         val effectiveImdbId = arm.imdbId
 
+        val hasMissingThumbnails = meta.videos.isEmpty() || meta.videos.any { 
+            it.thumbnail.isNullOrBlank() || it.thumbnail == meta.poster || it.thumbnail == meta.background 
+        }
+
         if (!kitsuId.isNullOrBlank() || !effectiveImdbId.isNullOrBlank()) {
-            val kitsuEpisodes = if (!kitsuId.isNullOrBlank()) {
+            val kitsuEpisodes = if (hasMissingThumbnails && !kitsuId.isNullOrBlank()) {
                 runCatching {
                     withTimeoutOrNull(3000L) { fetchKitsuEpisodes(kitsuId) }
                 }.getOrNull() ?: emptyMap()
@@ -535,8 +539,13 @@ object AnilistMetaDetailsResolver {
             )
         }.orEmpty()
 
-        val kitsuId = mapping.kitsuId?.removePrefix("kitsu:")?.takeIf { it.isNotBlank() }
-            ?: resolveKitsuId(anilistId, media)
+        val hasCinemetaThumbnails = cinemetaMeta.videos.any {
+            (it.season == targetSeason || (targetSeason == 1 && it.season == null)) && !it.thumbnail.isNullOrBlank()
+        }
+
+        val kitsuId = if (!hasCinemetaThumbnails) {
+            mapping.kitsuId?.removePrefix("kitsu:")?.takeIf { it.isNotBlank() } ?: resolveKitsuId(anilistId, media)
+        } else null
 
         val kitsuEpisodes = if (!kitsuId.isNullOrBlank()) {
             fetchKitsuEpisodes(kitsuId)
