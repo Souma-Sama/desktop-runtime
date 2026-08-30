@@ -85,6 +85,25 @@ private fun RelationPosterCard(
     val baseWidth = desktopCatalogShelfPosterBaseWidthDp(posterCardStyle.widthDp)
     var lazyLogoUrl by remember(relation.id) { mutableStateOf<String?>(null) }
     var lazyMalScore by remember(relation.id) { mutableStateOf<Double?>(null) }
+    var lazyPosterUrl by remember(relation.id, relation.poster) {
+        val initial = relation.poster?.takeIf { it.isNotBlank() }
+            ?: relation.id.removePrefix("ani_").toIntOrNull()?.let { "https://img.anili.st/media/$it" }
+        mutableStateOf(initial)
+    }
+
+    LaunchedEffect(relation.id, relation.poster) {
+        if (relation.poster.isNullOrBlank()) {
+            val anilistId = com.nuvio.app.features.anilist.AnilistTrackerCoordinator.extractAnilistId(relation.id)
+            if (anilistId != null) {
+                val media = com.nuvio.app.features.anilist.AnilistApi.getCachedMedia(anilistId)
+                    ?: runCatching { com.nuvio.app.features.anilist.AnilistApi.fetchMediaById(anilistId) }.getOrNull()
+                val fetchedPoster = media?.coverImage?.bestUrl
+                if (!fetchedPoster.isNullOrBlank()) {
+                    lazyPosterUrl = fetchedPoster
+                }
+            }
+        }
+    }
 
     LaunchedEffect(relation.id, anilistPrefs.showPosterTitleLogos) {
         if (anilistPrefs.showPosterTitleLogos && lazyLogoUrl == null) {
@@ -106,7 +125,7 @@ private fun RelationPosterCard(
     Box(modifier = modifier) {
         NuvioPosterCard(
             title = relation.title,
-            imageUrl = relation.poster,
+            imageUrl = lazyPosterUrl ?: relation.poster,
             basePosterWidthDp = baseWidth,
             shape = NuvioPosterShape.Poster,
             detailLine = detailSubtitle,

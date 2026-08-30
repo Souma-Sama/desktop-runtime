@@ -143,7 +143,11 @@ object AnilistMetaDetailsResolver {
 
             val relations = media.relations.mapNotNull { rel ->
                 val relTitle = rel.title?.displayTitle?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
-                val relPoster = rel.coverImage?.extraLarge ?: rel.coverImage?.large
+                val relPoster = rel.coverImage?.bestUrl
+                    ?: rel.coverImage?.extraLarge
+                    ?: rel.coverImage?.large
+                    ?: rel.coverImage?.medium
+                    ?: "https://img.anili.st/media/${rel.id}"
                 val isRelMovie = rel.format == "MOVIE" || rel.episodes == 1
                 val relType = if (isRelMovie) "movie" else "series"
                 val relationLabel = when (rel.relationType?.uppercase()) {
@@ -377,7 +381,11 @@ object AnilistMetaDetailsResolver {
 
             val rels = media.relations.mapNotNull { rel ->
                 val relTitle = rel.title?.displayTitle?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
-                val relPoster = rel.coverImage?.extraLarge ?: rel.coverImage?.large
+                val relPoster = rel.coverImage?.bestUrl
+                    ?: rel.coverImage?.extraLarge
+                    ?: rel.coverImage?.large
+                    ?: rel.coverImage?.medium
+                    ?: "https://img.anili.st/media/${rel.id}"
                 val isRelMovie = rel.format == "MOVIE" || rel.episodes == 1
                 val relType = if (isRelMovie) "movie" else "series"
                 val relationLabel = when (rel.relationType?.uppercase()) {

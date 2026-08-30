@@ -1473,6 +1473,7 @@ object AnilistApi {
                       coverImage {
                         extraLarge
                         large
+                        medium
                       }
                       bannerImage
                       averageScore
@@ -1811,6 +1812,7 @@ object AnilistApi {
                 AnilistCoverImage(
                     extraLarge = it["extraLarge"].asStringOrNull(),
                     large = it["large"].asStringOrNull(),
+                    medium = it["medium"].asStringOrNull(),
                 )
             }
             val banner = node["bannerImage"].asStringOrNull()
