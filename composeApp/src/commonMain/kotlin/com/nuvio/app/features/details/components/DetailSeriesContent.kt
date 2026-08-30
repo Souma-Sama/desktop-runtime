@@ -273,7 +273,7 @@ fun DetailSeriesContent(
                     DetailSectionTitle(
                         title = sectionTitle,
                     )
-                    val seasonEpisodes = groupedEpisodes.getValue(seasonForContent)
+                    val seasonEpisodes = groupedEpisodes[seasonForContent] ?: emptyList()
                     if (episodeCardStyle == MetaEpisodeCardStyle.Horizontal) {
                         EpisodeHorizontalRow(
                             episodes = seasonEpisodes,
