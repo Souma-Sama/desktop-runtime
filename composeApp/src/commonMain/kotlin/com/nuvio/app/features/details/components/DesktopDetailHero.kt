@@ -118,7 +118,12 @@ fun DesktopDetailHero(
             .graphicsLayer { clip = true }
             .onSizeChanged { onHeightChanged(it.height) },
     ) {
-        val heroMinHeight = (maxWidth * (9f / 16f)).coerceIn(360.dp, 760.dp)
+        val isAnilistItem = meta.id.startsWith("ani_") || meta.id.startsWith("anilist:")
+        val heroMinHeight = if (isAnilistItem) {
+            (maxWidth * (9f / 16f)).coerceIn(360.dp, 760.dp)
+        } else {
+            (maxWidth * 0.45f).coerceIn(660.dp, 800.dp)
+        }
         val actionHorizontalInset = fullscreenActionHorizontalInsetForWidth(maxWidth.value)
 
         Spacer(

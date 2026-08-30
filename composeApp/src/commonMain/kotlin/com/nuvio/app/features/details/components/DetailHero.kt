@@ -82,7 +82,8 @@ fun DetailHero(
     BoxWithConstraints(
         modifier = modifier.fillMaxWidth(),
     ) {
-        val heroHeight = detailHeroHeight(maxWidth, viewportHeight, isTablet)
+        val isAnilistItem = meta.id.startsWith("ani_") || meta.id.startsWith("anilist:")
+        val heroHeight = detailHeroHeight(maxWidth, viewportHeight, isTablet, isAnilistItem)
         val trailerAlpha by animateFloatAsState(
             targetValue = if (heroTrailerReady) 1f else 0f,
             animationSpec = tween(durationMillis = 300),
@@ -299,14 +300,18 @@ fun DetailHero(
     }
 }
 
-private fun detailHeroHeight(maxWidth: Dp, viewportHeight: Dp, isTablet: Boolean): Dp =
+private fun detailHeroHeight(maxWidth: Dp, viewportHeight: Dp, isTablet: Boolean, isAnilistItem: Boolean): Dp =
     if (!isTablet) {
-        val landscapeHeight = maxWidth * (9f / 16f)
-        val viewportLimit = viewportHeight
-            .takeIf { it > 0.dp }
-            ?.let { it * 0.65f }
-            ?: 600.dp
-        minOf(landscapeHeight, viewportLimit).coerceIn(220.dp, 600.dp)
+        if (isAnilistItem) {
+            val landscapeHeight = maxWidth * (9f / 16f)
+            val viewportLimit = viewportHeight
+                .takeIf { it > 0.dp }
+                ?.let { it * 0.65f }
+                ?: 600.dp
+            minOf(landscapeHeight, viewportLimit).coerceIn(220.dp, 600.dp)
+        } else {
+            (maxWidth * 1.33f).coerceIn(420.dp, 760.dp)
+        }
     } else {
         val viewportLimit = viewportHeight
             .takeIf { it > 0.dp }
