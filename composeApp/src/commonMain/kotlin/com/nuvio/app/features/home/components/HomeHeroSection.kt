@@ -886,6 +886,7 @@ private fun DesktopHeroContentBlock(
     onItemClick: ((MetaPreview) -> Unit)?,
 ) {
     val colorScheme = MaterialTheme.colorScheme
+    val isCompact = layout.heroHeight <= 340.dp
     var logoLoadError by remember(item.type, item.id) {
         mutableStateOf(false)
     }
@@ -937,26 +938,32 @@ private fun DesktopHeroContentBlock(
             Text(
                 text = item.name,
                 modifier = Modifier.fillMaxWidth(),
-                style = MaterialTheme.typography.displayLarge.copy(
-                    fontSize = NuvioTokens.Type.displayMd,
-                    lineHeight = NuvioTokens.LineHeight.displayMd,
-                    fontWeight = FontWeight.ExtraBold,
-                    letterSpacing = NuvioTokens.LetterSpacing.none,
-                ),
+                style = if (isCompact) {
+                    MaterialTheme.typography.titleLarge.copy(
+                        fontWeight = FontWeight.ExtraBold,
+                    )
+                } else {
+                    MaterialTheme.typography.displayLarge.copy(
+                        fontSize = NuvioTokens.Type.displayMd,
+                        lineHeight = NuvioTokens.LineHeight.displayMd,
+                        fontWeight = FontWeight.ExtraBold,
+                        letterSpacing = NuvioTokens.LetterSpacing.none,
+                    )
+                },
                 color = colorScheme.onBackground,
                 textAlign = TextAlign.Start,
-                maxLines = 3,
+                maxLines = if (isCompact) 2 else 3,
                 overflow = TextOverflow.Ellipsis,
             )
         }
 
         val genreText = desktopHeroGenreText(item)
         if (genreText.isNotBlank()) {
-            Spacer(modifier = Modifier.height(NuvioTokens.Space.s12))
+            Spacer(modifier = Modifier.height(if (isCompact) NuvioTokens.Space.s6 else NuvioTokens.Space.s12))
             Text(
                 text = genreText,
                 style = MaterialTheme.typography.bodyMedium.copy(
-                    fontSize = NuvioTokens.Type.bodyMd,
+                    fontSize = if (isCompact) NuvioTokens.Type.bodySm else NuvioTokens.Type.bodyMd,
                     fontWeight = FontWeight.SemiBold,
                     letterSpacing = NuvioTokens.LetterSpacing.none,
                 ),
@@ -977,41 +984,41 @@ private fun DesktopHeroContentBlock(
                     trimmed
                 }
             }
-            Spacer(modifier = Modifier.height(NuvioTokens.Space.s16))
+            Spacer(modifier = Modifier.height(if (isCompact) NuvioTokens.Space.s8 else NuvioTokens.Space.s16))
             Text(
                 text = description,
                 style = MaterialTheme.typography.bodyLarge.copy(
-                    fontSize = NuvioTokens.Type.bodyLg,
-                    lineHeight = NuvioTokens.LineHeight.bodyLg,
+                    fontSize = if (isCompact) NuvioTokens.Type.bodySm else NuvioTokens.Type.bodyLg,
+                    lineHeight = if (isCompact) NuvioTokens.LineHeight.bodySm else NuvioTokens.LineHeight.bodyLg,
                     letterSpacing = NuvioTokens.LetterSpacing.none,
                 ),
                 color = colorScheme.onSurface,
-                maxLines = 3,
+                maxLines = if (isCompact) 2 else 3,
                 overflow = TextOverflow.Ellipsis,
             )
         }
 
         if (onItemClick != null) {
-            Spacer(modifier = Modifier.height(NuvioTokens.Space.s24))
+            Spacer(modifier = Modifier.height(if (isCompact) NuvioTokens.Space.s12 else NuvioTokens.Space.s24))
             Row(
                 horizontalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s12),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Surface(
                     modifier = Modifier
-                        .height(48.dp)
+                        .height(if (isCompact) 38.dp else 48.dp)
                         .clickable { onItemClick(item) },
                     color = colorScheme.onBackground,
                     contentColor = colorScheme.background,
                     shape = RoundedCornerShape(40.dp),
                 ) {
                     Box(
-                        modifier = Modifier.padding(horizontal = 24.dp),
+                        modifier = Modifier.padding(horizontal = if (isCompact) 18.dp else 24.dp),
                         contentAlignment = Alignment.Center,
                     ) {
                         Text(
                             text = stringResource(Res.string.home_view_details),
-                            style = MaterialTheme.typography.titleSmall,
+                            style = if (isCompact) MaterialTheme.typography.labelLarge else MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.Bold,
                             maxLines = 1,
                         )
@@ -1024,13 +1031,17 @@ private fun DesktopHeroContentBlock(
 
 private fun desktopHeroLogoWidthFraction(layout: HomeHeroLayout): Float =
     when {
+        layout.heroHeight <= 300.dp -> 0.48f
+        layout.heroHeight <= 420.dp -> 0.60f
         layout.contentMaxWidth >= 640.dp -> 0.74f
         layout.contentMaxWidth >= 520.dp -> 0.74f
-        else -> 0.8f
+        else -> 0.76f
     }
 
 private fun desktopHeroLogoSlotHeight(layout: HomeHeroLayout): Dp =
     when {
+        layout.heroHeight <= 300.dp -> (layout.heroHeight * 0.24f).coerceIn(46.dp, 60.dp)
+        layout.heroHeight <= 420.dp -> (layout.heroHeight * 0.22f).coerceIn(60.dp, 84.dp)
         layout.contentMaxWidth >= 640.dp -> 120.dp
         layout.contentMaxWidth >= 520.dp -> 112.dp
         else -> 104.dp

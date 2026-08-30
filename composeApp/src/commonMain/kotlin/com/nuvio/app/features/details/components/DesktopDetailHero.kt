@@ -222,19 +222,32 @@ fun DesktopDetailHero(
                 ),
         )
 
+        val isNarrow = maxWidth < 600.dp
+        val logoMaxHeight = if (isNarrow && isAnilistItem) (heroMinHeight * 0.22f).coerceIn(48.dp, 64.dp)
+                            else if (isNarrow) 80.dp
+                            else 120.dp
+        val logoMaxWidth = if (isNarrow && isAnilistItem) (maxWidth * 0.55f).coerceIn(160.dp, 280.dp)
+                           else if (isNarrow) 360.dp
+                           else 560.dp
+
         Column(
             modifier = Modifier
                 .align(Alignment.BottomStart)
                 .widthIn(max = 760.dp)
-                .padding(start = space.s56, end = space.s32, top = space.s56, bottom = space.s40),
+                .padding(
+                    start = if (isNarrow) space.s24 else space.s56,
+                    end = if (isNarrow) space.s20 else space.s32,
+                    top = if (isNarrow) space.s24 else space.s56,
+                    bottom = if (isNarrow) space.s20 else space.s40,
+                ),
         ) {
             if (logoUrl != null && !logoLoadError) {
                 AsyncImage(
                     model = logoUrl,
                     contentDescription = stringResource(Res.string.detail_logo_content_description, meta.name),
                     modifier = Modifier
-                        .widthIn(max = 560.dp)
-                        .height(120.dp),
+                        .widthIn(max = logoMaxWidth)
+                        .height(logoMaxHeight),
                     alignment = Alignment.CenterStart,
                     contentScale = ContentScale.Fit,
                     onError = { logoLoadError = true },
