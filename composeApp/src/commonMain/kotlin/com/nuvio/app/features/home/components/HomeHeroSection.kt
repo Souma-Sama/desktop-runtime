@@ -155,11 +155,13 @@ fun HomeHeroSection(
                 },
             ),
     ) {
+        val isAnilistCatalog = items.any { it.id.startsWith("ani_") || it.id.startsWith("anilist:") }
         val layout = homeHeroLayout(
             maxWidthDp = maxWidth.value,
             viewportHeightDp = viewportHeight?.value,
             mobileBelowSectionHeightHintDp = mobileBelowSectionHeightHint?.value,
             preferDesktopLayout = isDesktop,
+            isAnilistCatalog = isAnilistCatalog,
         )
         val heroWidthPx = with(LocalDensity.current) { maxWidth.toPx() }
         val heroHeightPx = with(LocalDensity.current) { layout.heroHeight.toPx() }
@@ -1057,18 +1059,26 @@ internal fun homeHeroLayout(
     viewportHeightDp: Float? = null,
     mobileBelowSectionHeightHintDp: Float? = null,
     preferDesktopLayout: Boolean = false,
+    isAnilistCatalog: Boolean = false,
 ): HomeHeroLayout =
     when {
-        preferDesktopLayout -> HomeHeroLayout(
-            isTablet = true,
-            heroHeight = (maxWidthDp * 0.56f).dp.coerceIn(460.dp, 660.dp),
-            contentMaxWidth = 760.dp,
-            contentWidthFraction = 0.58f,
-            contentHorizontalPadding = if (maxWidthDp >= 840f) 56.dp else 32.dp,
-            contentVerticalPadding = 40.dp,
-            bottomFadeHeight = 260.dp,
-            logoWidthFraction = 0.74f,
-        )
+        preferDesktopLayout -> {
+            val heroHeight = if (isAnilistCatalog) {
+                (maxWidthDp * (9f / 16f)).dp.coerceIn(240.dp, 660.dp)
+            } else {
+                (maxWidthDp * 0.56f).dp.coerceIn(460.dp, 660.dp)
+            }
+            HomeHeroLayout(
+                isTablet = true,
+                heroHeight = heroHeight,
+                contentMaxWidth = 760.dp,
+                contentWidthFraction = if (maxWidthDp < 600f) 1f else 0.58f,
+                contentHorizontalPadding = if (maxWidthDp >= 840f) 56.dp else if (maxWidthDp >= 600f) 32.dp else 20.dp,
+                contentVerticalPadding = if (maxWidthDp < 600f) 16.dp else 40.dp,
+                bottomFadeHeight = if (maxWidthDp < 600f && isAnilistCatalog) 120.dp else 260.dp,
+                logoWidthFraction = 0.74f,
+            )
+        }
         maxWidthDp >= 1200f -> HomeHeroLayout(
             isTablet = true,
             heroHeight = (maxWidthDp * 0.42f).dp.coerceIn(360.dp, 440.dp),
@@ -1099,20 +1109,27 @@ internal fun homeHeroLayout(
             bottomFadeHeight = 170.dp,
             logoWidthFraction = 0.54f,
         )
-        else -> HomeHeroLayout(
-            isTablet = false,
-            heroHeight = mobileHeroHeight(
-                maxWidthDp = maxWidthDp,
-                viewportHeightDp = viewportHeightDp,
-                mobileBelowSectionHeightHintDp = mobileBelowSectionHeightHintDp,
-            ),
-            contentMaxWidth = 480.dp,
-            contentWidthFraction = 1f,
-            contentHorizontalPadding = 24.dp,
-            contentVerticalPadding = 16.dp,
-            bottomFadeHeight = 220.dp,
-            logoWidthFraction = 0.62f,
-        )
+        else -> {
+            val heroHeight = if (isAnilistCatalog) {
+                (maxWidthDp * (9f / 16f)).dp.coerceIn(220.dp, 500.dp)
+            } else {
+                mobileHeroHeight(
+                    maxWidthDp = maxWidthDp,
+                    viewportHeightDp = viewportHeightDp,
+                    mobileBelowSectionHeightHintDp = mobileBelowSectionHeightHintDp,
+                )
+            }
+            HomeHeroLayout(
+                isTablet = false,
+                heroHeight = heroHeight,
+                contentMaxWidth = 480.dp,
+                contentWidthFraction = 1f,
+                contentHorizontalPadding = 24.dp,
+                contentVerticalPadding = 16.dp,
+                bottomFadeHeight = if (isAnilistCatalog) 120.dp else 220.dp,
+                logoWidthFraction = 0.62f,
+            )
+        }
     }
 
 private fun mobileHeroHeight(
