@@ -103,6 +103,7 @@ data class MetaVideo(
     val released: String? = null,
     val available: Boolean = true,
     val thumbnail: String? = null,
+    val fallbackThumbnail: String? = null,
     val seasonPoster: String? = null,
     val season: Int? = null,
     val episode: Int? = null,

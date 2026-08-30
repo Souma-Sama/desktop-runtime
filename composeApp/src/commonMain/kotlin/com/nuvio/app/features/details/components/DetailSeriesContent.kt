@@ -684,8 +684,15 @@ private fun EpisodeHorizontalCard(
     val ratingLabel = remember(imdbRating) { imdbRating?.takeIf { it > 0.0 }?.let(::formatEpisodeRating) }
     val formattedDate = remember(video.released) { video.released?.let { formatReleaseDateForDisplay(it) } }
     val runtimeLabel = remember(video.runtime) { video.runtime?.takeIf { it > 0 }?.let(::formatEpisodeRuntime) }
-    var imageLoadFailed by remember(video.id, video.thumbnail) { mutableStateOf(false) }
-    val imageUrl = if (imageLoadFailed) fallbackImage else (video.thumbnail ?: fallbackImage)
+    var candidateIndex by remember(video.id, video.thumbnail, video.fallbackThumbnail) { mutableStateOf(0) }
+    val candidateUrls = remember(video.thumbnail, video.fallbackThumbnail, fallbackImage) {
+        listOfNotNull(
+            video.thumbnail?.takeIf { it.isNotBlank() },
+            video.fallbackThumbnail?.takeIf { it.isNotBlank() },
+            fallbackImage?.takeIf { it.isNotBlank() },
+        ).distinct()
+    }
+    val imageUrl = candidateUrls.getOrNull(candidateIndex)
     val visibleProgressEntry = progressEntry?.takeIf { it.durationMs > 0L && !it.isCompleted }
     val progressBarHeight = 4.dp
     val progressBarContentSpacing = 6.dp
@@ -722,7 +729,11 @@ private fun EpisodeHorizontalCard(
                     .fillMaxSize()
                     .then(if (shouldBlurArtwork) Modifier.blur(18.dp) else Modifier),
                 contentScale = ContentScale.Crop,
-                onError = { imageLoadFailed = true },
+                onError = {
+                    if (candidateIndex < candidateUrls.size - 1) {
+                        candidateIndex++
+                    }
+                },
             )
         }
 
@@ -1097,8 +1108,15 @@ private fun EpisodeListCard(
                     .fillMaxHeight()
                     .clip(RoundedCornerShape(topStart = sizing.cardRadius, bottomStart = sizing.cardRadius)),
             ) {
-                var imageLoadFailed by remember(video.id, video.thumbnail) { mutableStateOf(false) }
-                val imageUrl = if (imageLoadFailed) fallbackImage else (video.thumbnail ?: fallbackImage)
+                var candidateIndex by remember(video.id, video.thumbnail, video.fallbackThumbnail) { mutableStateOf(0) }
+                val candidateUrls = remember(video.thumbnail, video.fallbackThumbnail, fallbackImage) {
+                    listOfNotNull(
+                        video.thumbnail?.takeIf { it.isNotBlank() },
+                        video.fallbackThumbnail?.takeIf { it.isNotBlank() },
+                        fallbackImage?.takeIf { it.isNotBlank() },
+                    ).distinct()
+                }
+                val imageUrl = candidateUrls.getOrNull(candidateIndex)
                 val shouldBlurArtwork = blurUnwatchedEpisodes && !isWatched
                 if (imageUrl != null) {
                     AsyncImage(
@@ -1108,7 +1126,11 @@ private fun EpisodeListCard(
                             .fillMaxSize()
                             .then(if (shouldBlurArtwork) Modifier.blur(18.dp) else Modifier),
                         contentScale = ContentScale.Crop,
-                        onError = { imageLoadFailed = true },
+                        onError = {
+                            if (candidateIndex < candidateUrls.size - 1) {
+                                candidateIndex++
+                            }
+                        },
                     )
                 } else {
                     Box(
