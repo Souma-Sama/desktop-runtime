@@ -24,8 +24,9 @@ object MetaHubArtwork {
         if (rawId.startsWith("ani_", ignoreCase = true) || rawId.startsWith("anilist:", ignoreCase = true)) {
             val anilistId = AnilistTrackerCoordinator.extractAnilistId(rawId)
             if (anilistId != null) {
+                val media = AnilistApi.getCachedMedia(anilistId)
                 val arm = AnilistMetaDetailsResolver.resolveArmMapping(anilistId)
-                val imdb = arm.imdbId
+                val imdb = AnilistMetaDetailsResolver.resolveEffectiveImdbId(media, arm.imdbId)
                 if (!imdb.isNullOrBlank()) {
                     resolvedImdbCache[rawId] = imdb
                     return@withContext imdb

@@ -231,7 +231,18 @@ private fun HeroBackgroundLayers(
 
     layerPages.forEach { page ->
         val item = items[page]
-        val backgroundModel = MetaHubArtwork.getBackdropUrl(item.id) ?: item.banner
+        var backdropUrl by remember(item.id, item.banner) {
+            mutableStateOf(MetaHubArtwork.getBackdropUrl(item.id) ?: item.banner)
+        }
+
+        LaunchedEffect(item.id) {
+            val resolved = MetaHubArtwork.resolveBackdropUrl(item.id)
+            if (!resolved.isNullOrBlank()) {
+                backdropUrl = resolved
+            }
+        }
+
+        val backgroundModel = backdropUrl ?: item.banner
         val isAnilistItem = item.id.startsWith("ani_") || item.id.startsWith("anilist:")
         val isAnilistBanner = isAnilistItem && (backgroundModel?.contains("anilistcdn/media/anime/banner", ignoreCase = true) == true)
 
