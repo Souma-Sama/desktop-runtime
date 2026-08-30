@@ -309,16 +309,26 @@ fun NuvioPosterCard(
             }
 
             if (!bottomLeftLogoUrl.isNullOrBlank() || !bottomLeftText.isNullOrBlank()) {
+                val maxLogoHeight = when (shape) {
+                    NuvioPosterShape.Landscape -> 44.dp
+                    NuvioPosterShape.Square -> 56.dp
+                    NuvioPosterShape.Poster -> (cardWidth * 0.48f).coerceIn(48.dp, 68.dp)
+                }
                 Box(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .fillMaxWidth()
                         .background(
                             Brush.verticalGradient(
-                                colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.72f)),
+                                colorStops = arrayOf(
+                                    0.00f to Color.Transparent,
+                                    0.25f to Color.Black.copy(alpha = 0.25f),
+                                    0.65f to Color.Black.copy(alpha = 0.65f),
+                                    1.00f to Color.Black.copy(alpha = 0.85f),
+                                ),
                             )
                         )
-                        .padding(horizontal = 8.dp, vertical = 6.dp),
+                        .padding(horizontal = 6.dp, vertical = 6.dp),
                     contentAlignment = Alignment.BottomCenter,
                 ) {
                     if (!bottomLeftLogoUrl.isNullOrBlank()) {
@@ -326,8 +336,8 @@ fun NuvioPosterCard(
                             model = bottomLeftLogoUrl,
                             contentDescription = stringResource(Res.string.poster_logo_content_description, title),
                             modifier = Modifier
-                                .fillMaxWidth(0.85f)
-                                .heightIn(min = 24.dp, max = if (shape == NuvioPosterShape.Landscape) 40.dp else 46.dp),
+                                .fillMaxWidth(0.90f)
+                                .heightIn(min = 20.dp, max = maxLogoHeight),
                             contentScale = ContentScale.Fit,
                             alignment = Alignment.BottomCenter,
                         )
