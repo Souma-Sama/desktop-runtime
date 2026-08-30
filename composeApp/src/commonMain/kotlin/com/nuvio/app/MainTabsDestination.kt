@@ -91,6 +91,8 @@ internal fun MainTabsDestination(
         val navBarHazeState = rememberHazeState()
         val navBarStyleSetting by remember { ThemeSettingsRepository.navBarStyle }.collectAsStateWithLifecycle()
 
+        val anilistPrefs by com.nuvio.app.features.anilist.AnilistPreferencesRepository.preferences.collectAsStateWithLifecycle()
+
         Scaffold(
             modifier = Modifier
                 .fillMaxSize()
@@ -112,12 +114,14 @@ internal fun MainTabsDestination(
                             icon = Res.drawable.sidebar_search,
                             contentDescription = stringResource(Res.string.compose_nav_search),
                         )
-                        NavItem(
-                            selected = selectedTab == AppScreenTab.AniChart,
-                            onClick = { onTabSelected(AppScreenTab.AniChart) },
-                            icon = Icons.Rounded.CalendarMonth,
-                            contentDescription = "AniChart",
-                        )
+                        if (anilistPrefs.enabled) {
+                            NavItem(
+                                selected = selectedTab == AppScreenTab.AniChart,
+                                onClick = { onTabSelected(AppScreenTab.AniChart) },
+                                icon = Icons.Rounded.CalendarMonth,
+                                contentDescription = "AniChart",
+                            )
+                        }
                         NavItem(
                             selected = selectedTab == AppScreenTab.Library,
                             onClick = { onTabSelected(AppScreenTab.Library) },
@@ -205,13 +209,15 @@ internal fun MainTabsDestination(
                             contentDescription = stringResource(Res.string.compose_nav_search),
                             label = stringResource(Res.string.compose_nav_search),
                         )
-                        NavItem(
-                            selected = selectedTab == AppScreenTab.AniChart,
-                            onClick = { onTabSelected(AppScreenTab.AniChart) },
-                            icon = Icons.Rounded.CalendarMonth,
-                            contentDescription = "AniChart",
-                            label = "AniChart",
-                        )
+                        if (anilistPrefs.enabled) {
+                            NavItem(
+                                selected = selectedTab == AppScreenTab.AniChart,
+                                onClick = { onTabSelected(AppScreenTab.AniChart) },
+                                icon = Icons.Rounded.CalendarMonth,
+                                contentDescription = "AniChart",
+                                label = "AniChart",
+                            )
+                        }
                         NavItem(
                             selected = selectedTab == AppScreenTab.Library,
                             onClick = { onTabSelected(AppScreenTab.Library) },

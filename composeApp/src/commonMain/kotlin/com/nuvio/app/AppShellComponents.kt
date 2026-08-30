@@ -258,10 +258,13 @@ internal fun AppTabHost(
                         }
 
                         AppScreenTab.AniChart -> {
-                            com.nuvio.app.features.anilist.anichart.AniChartScreen(
-                                onAnimeClick = { preview -> actions.onPosterClick?.invoke(preview) },
-                                topChromePadding = state.topChromePadding ?: 0.dp,
-                            )
+                            val anilistPrefs by com.nuvio.app.features.anilist.AnilistPreferencesRepository.preferences.collectAsStateWithLifecycle()
+                            if (anilistPrefs.enabled) {
+                                com.nuvio.app.features.anilist.anichart.AniChartScreen(
+                                    onAnimeClick = { preview -> actions.onPosterClick?.invoke(preview) },
+                                    topChromePadding = state.topChromePadding ?: 0.dp,
+                                )
+                            }
                         }
 
                         AppScreenTab.Library -> {
@@ -320,6 +323,8 @@ internal fun TabletFloatingTopBar(
     val tokens = MaterialTheme.nuvio
     val statusBarPadding = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
 
+    val anilistPrefs by com.nuvio.app.features.anilist.AnilistPreferencesRepository.preferences.collectAsStateWithLifecycle()
+
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -371,23 +376,25 @@ internal fun TabletFloatingTopBar(
                         )
                     },
                 )
-                TabletTopPillItem(
-                    label = "AniChart",
-                    selected = selectedTab == AppScreenTab.AniChart,
-                    onClick = { onTabSelected(AppScreenTab.AniChart) },
-                    icon = {
-                        Icon(
-                            imageVector = Icons.Rounded.CalendarMonth,
-                            contentDescription = "AniChart",
-                            modifier = Modifier.size(NuvioTokens.Space.s18),
-                            tint = if (selectedTab == AppScreenTab.AniChart) {
-                                tokens.colors.textPrimary
-                            } else {
-                                tokens.colors.textMuted
-                            },
-                        )
-                    },
-                )
+                if (anilistPrefs.enabled) {
+                    TabletTopPillItem(
+                        label = "AniChart",
+                        selected = selectedTab == AppScreenTab.AniChart,
+                        onClick = { onTabSelected(AppScreenTab.AniChart) },
+                        icon = {
+                            Icon(
+                                imageVector = Icons.Rounded.CalendarMonth,
+                                contentDescription = "AniChart",
+                                modifier = Modifier.size(NuvioTokens.Space.s18),
+                                tint = if (selectedTab == AppScreenTab.AniChart) {
+                                    tokens.colors.textPrimary
+                                } else {
+                                    tokens.colors.textMuted
+                                },
+                            )
+                        },
+                    )
+                }
                 TabletTopPillItem(
                     label = stringResource(Res.string.compose_nav_library),
                     selected = selectedTab == AppScreenTab.Library,
@@ -651,18 +658,21 @@ internal fun DesktopHoverSidebar(
                         tint = color,
                     )
                 }
-                DesktopSidebarItem(
-                    label = "AniChart",
-                    selected = selectedTab == AppScreenTab.AniChart,
-                    expanded = sidebarExpanded,
-                    onClick = { selectTab(AppScreenTab.AniChart) },
-                ) { color ->
-                    Icon(
-                        imageVector = Icons.Rounded.CalendarMonth,
-                        contentDescription = "AniChart",
-                        modifier = Modifier.size(DesktopSidebarIconSize),
-                        tint = color,
-                    )
+                val anilistPrefs by com.nuvio.app.features.anilist.AnilistPreferencesRepository.preferences.collectAsStateWithLifecycle()
+                if (anilistPrefs.enabled) {
+                    DesktopSidebarItem(
+                        label = "AniChart",
+                        selected = selectedTab == AppScreenTab.AniChart,
+                        expanded = sidebarExpanded,
+                        onClick = { selectTab(AppScreenTab.AniChart) },
+                    ) { color ->
+                        Icon(
+                            imageVector = Icons.Rounded.CalendarMonth,
+                            contentDescription = "AniChart",
+                            modifier = Modifier.size(DesktopSidebarIconSize),
+                            tint = color,
+                        )
+                    }
                 }
                 DesktopSidebarItem(
                     label = stringResource(Res.string.compose_nav_library),

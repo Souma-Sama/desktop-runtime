@@ -752,11 +752,14 @@ private fun LibrarySourceSwitch(
             selected = selectedMode == LibraryViewMode.Cloud,
             onClick = { onModeSelected(LibraryViewMode.Cloud) },
         )
-        LibraryChip(
-            label = "AniList",
-            selected = selectedMode == LibraryViewMode.AniList,
-            onClick = { onModeSelected(LibraryViewMode.AniList) },
-        )
+        val anilistPrefs by com.nuvio.app.features.anilist.AnilistPreferencesRepository.preferences.collectAsStateWithLifecycle()
+        if (anilistPrefs.enabled) {
+            LibraryChip(
+                label = "AniList",
+                selected = selectedMode == LibraryViewMode.AniList,
+                onClick = { onModeSelected(LibraryViewMode.AniList) },
+            )
+        }
     }
 }
 
