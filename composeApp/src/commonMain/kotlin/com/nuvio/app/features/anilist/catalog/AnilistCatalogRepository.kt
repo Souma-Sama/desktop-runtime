@@ -305,7 +305,7 @@ object AnilistCatalogRepository {
                 poster = media.coverImage?.extraLarge
                     ?: media.coverImage?.large
                     ?: media.coverImage?.medium,
-                banner = media.bannerImage ?: MetaHubArtwork.getBackdropUrl(itemId),
+                banner = MetaHubArtwork.getBackdropUrl(itemId) ?: media.bannerImage,
                 logo = MetaHubArtwork.getLogoUrl(itemId),
                 posterShape = PosterShape.Poster,
                 description = media.description,
@@ -332,22 +332,6 @@ object AnilistCatalogRepository {
             nextSkip = if (mediaList.size >= perPage) (page * perPage) else null,
         )
         pageCache[cacheKey] = CachedCatalogPage(timestamp = now, page = result)
-
-        // Prefetch buffer: Warm up logo and MAL score cache for visible + next buffer items in background
-        if (prefs.showPosterTitleLogos || prefs.showPosterMalScore) {
-            CoroutineScope(Dispatchers.Default).launch {
-                mediaList.take(12).forEach { media ->
-                    val rawId = "ani_${media.id}"
-                    if (prefs.showPosterTitleLogos) {
-                        MetaHubArtwork.resolveLogoUrl(rawId)
-                    }
-                    if (prefs.showPosterMalScore) {
-                        MetaHubArtwork.resolveMalScore(rawId)
-                    }
-                }
-            }
-        }
-
         return result
     }
 }
