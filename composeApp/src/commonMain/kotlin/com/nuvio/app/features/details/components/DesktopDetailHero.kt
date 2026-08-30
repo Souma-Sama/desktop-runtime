@@ -114,7 +114,7 @@ fun DesktopDetailHero(
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxWidth()
-            .heightIn(min = 660.dp)
+            .heightIn(min = (maxWidth * 0.45f).coerceIn(660.dp, 800.dp))
             .wrapContentHeight()
             .graphicsLayer { clip = true }
             .onSizeChanged { onHeightChanged(it.height) },
