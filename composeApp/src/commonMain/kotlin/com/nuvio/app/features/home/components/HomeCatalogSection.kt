@@ -5,10 +5,10 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.nuvio.app.core.ui.NuvioShelfSection
 import com.nuvio.app.core.ui.NuvioViewAllPillSize
 import com.nuvio.app.core.ui.rememberPosterCardStyleUiState
@@ -18,7 +18,6 @@ import com.nuvio.app.features.home.HomeCatalogSection
 import com.nuvio.app.features.home.MetaPreview
 import com.nuvio.app.features.home.stableKey
 import com.nuvio.app.features.watching.application.WatchingState
-import org.koin.compose.koinInject
 
 @Composable
 fun HomeCatalogRowSection(
@@ -74,7 +73,7 @@ private fun HomeCatalogRowSectionContent(
     onPosterLongClick: ((MetaPreview) -> Unit)?,
 ) {
     val posterCardStyle = rememberPosterCardStyleUiState()
-    val anilistPrefs by koinInject<AnilistPreferencesRepository>().preferences.collectAsState()
+    val anilistPrefs by AnilistPreferencesRepository.preferences.collectAsStateWithLifecycle()
 
     // Prefetch/buffer the first 10 items (visible items + 3-4 buffer items sideways) in background
     LaunchedEffect(entries, anilistPrefs.showPosterTitleLogos, anilistPrefs.showPosterMalScore) {
