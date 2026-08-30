@@ -51,6 +51,7 @@ data class MetaRelation(
     val format: String? = null,
     val episodes: Int? = null,
     val status: String? = null,
+    val averageScore: Int? = null,
 )
 
 enum class MoreLikeThisSource {

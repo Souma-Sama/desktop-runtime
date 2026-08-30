@@ -169,6 +169,7 @@ data class AnilistRelation(
     val status: String? = null,
     val coverImage: AnilistCoverImage? = null,
     val bannerImage: String? = null,
+    val averageScore: Int? = null,
     val relations: List<AnilistRelation> = emptyList(),
 )
 

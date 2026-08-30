@@ -1475,6 +1475,7 @@ object AnilistApi {
                         large
                       }
                       bannerImage
+                      averageScore
                       relations {
                         edges {
                           relationType
@@ -1489,6 +1490,7 @@ object AnilistApi {
                             episodes
                             status
                             bannerImage
+                            averageScore
                           }
                         }
                       }
@@ -1813,6 +1815,7 @@ object AnilistApi {
             }
             val banner = node["bannerImage"].asStringOrNull()
             val status = node["status"].asStringOrNull()
+            val avgScore = node["averageScore"].asIntOrNull()
             val nestedRelations = parseRelations(node)
             AnilistRelation(
                 relationType = relType,
@@ -1823,6 +1826,7 @@ object AnilistApi {
                 status = status,
                 coverImage = cov,
                 bannerImage = banner,
+                averageScore = avgScore,
                 relations = nestedRelations,
             )
         }

@@ -10,6 +10,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -25,6 +31,8 @@ import com.nuvio.app.core.ui.desktopCatalogShelfPosterBaseWidthDp
 import com.nuvio.app.core.ui.nuvioHorizontalScrollBleed
 import com.nuvio.app.core.ui.nuvioShelfHoverOverdraw
 import com.nuvio.app.core.ui.rememberPosterCardStyleUiState
+import com.nuvio.app.features.anilist.AnilistPreferencesRepository
+import com.nuvio.app.features.artwork.MetaHubArtwork
 import com.nuvio.app.features.details.MetaRelation
 import com.nuvio.app.isDesktop
 
@@ -73,7 +81,22 @@ private fun RelationPosterCard(
     onClick: (() -> Unit)? = null,
 ) {
     val posterCardStyle = rememberPosterCardStyleUiState()
+    val anilistPrefs by AnilistPreferencesRepository.preferences.collectAsState()
     val baseWidth = desktopCatalogShelfPosterBaseWidthDp(posterCardStyle.widthDp)
+    var lazyLogoUrl by remember(relation.id) { mutableStateOf<String?>(null) }
+    var lazyMalScore by remember(relation.id) { mutableStateOf<Double?>(null) }
+
+    LaunchedEffect(relation.id, anilistPrefs.showPosterTitleLogos) {
+        if (anilistPrefs.showPosterTitleLogos && lazyLogoUrl == null) {
+            lazyLogoUrl = MetaHubArtwork.resolveLogoUrl(relation.id)
+        }
+    }
+
+    LaunchedEffect(relation.id, anilistPrefs.showPosterMalScore) {
+        if (anilistPrefs.showPosterMalScore && lazyMalScore == null) {
+            lazyMalScore = MetaHubArtwork.resolveMalScore(relation.id)
+        }
+    }
 
     val detailSubtitle = listOfNotNull(
         relation.format?.takeIf { it.isNotBlank() },
@@ -88,6 +111,10 @@ private fun RelationPosterCard(
             shape = NuvioPosterShape.Poster,
             detailLine = detailSubtitle,
             showTitleBelow = !posterCardStyle.hideLabelsEnabled,
+            bottomLeftLogoUrl = if (anilistPrefs.showPosterTitleLogos) lazyLogoUrl else null,
+            anilistScore = if (anilistPrefs.showPosterAnilistScore) relation.averageScore?.toDouble() else null,
+            malScore = if (anilistPrefs.showPosterMalScore) lazyMalScore else null,
+            scoreFormat = anilistPrefs.posterScoreFormat,
             onClick = onClick,
         )
 

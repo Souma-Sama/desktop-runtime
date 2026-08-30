@@ -133,6 +133,7 @@ object AnilistMetaDetailsResolver {
                 val isRecMovie = rec.format == "MOVIE" || rec.episodes == 1
                 val recType = if (isRecMovie) "movie" else "series"
                 val recPoster = rec.coverImage?.extraLarge ?: rec.coverImage?.large ?: return@mapNotNull null
+                val recScore = if (rec.averageScore != null && rec.averageScore > 0) rec.averageScore / 10.0 else null
                 com.nuvio.app.features.home.MetaPreview(
                     id = "ani_$recId",
                     type = recType,
@@ -142,6 +143,8 @@ object AnilistMetaDetailsResolver {
                     logo = MetaHubArtwork.getLogoUrl("ani_$recId"),
                     description = null,
                     releaseInfo = if (rec.episodes != null) "${rec.episodes} Ep" else null,
+                    imdbRating = recScore?.let { "${((it * 10).toInt()) / 10.0}" },
+                    anilistScore = if (rec.averageScore != null && rec.averageScore > 0) rec.averageScore.toDouble() else null,
                 )
             }
 
@@ -171,6 +174,7 @@ object AnilistMetaDetailsResolver {
                     format = rel.format,
                     episodes = rel.episodes,
                     status = rel.status,
+                    averageScore = rel.averageScore,
                 )
             }
 
@@ -544,6 +548,7 @@ object AnilistMetaDetailsResolver {
             val isRecMovie = rec.format == "MOVIE" || rec.episodes == 1
             val recType = if (isRecMovie) "movie" else "series"
             val recPoster = rec.coverImage?.extraLarge ?: rec.coverImage?.large ?: return@mapNotNull null
+            val recScore = if (rec.averageScore != null && rec.averageScore > 0) rec.averageScore / 10.0 else null
             com.nuvio.app.features.home.MetaPreview(
                 id = "ani_$recId",
                 type = recType,
@@ -553,6 +558,8 @@ object AnilistMetaDetailsResolver {
                 logo = MetaHubArtwork.getLogoUrl("ani_$recId"),
                 description = null,
                 releaseInfo = if (rec.episodes != null) "${rec.episodes} Ep" else null,
+                imdbRating = recScore?.let { "${((it * 10).toInt()) / 10.0}" },
+                anilistScore = if (rec.averageScore != null && rec.averageScore > 0) rec.averageScore.toDouble() else null,
             )
         }.orEmpty()
 
@@ -617,6 +624,7 @@ object AnilistMetaDetailsResolver {
                 format = rel.format,
                 episodes = rel.episodes,
                 status = rel.status,
+                averageScore = rel.averageScore,
             )
         }.orEmpty()
 

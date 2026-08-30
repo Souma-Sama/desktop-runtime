@@ -86,6 +86,23 @@ object MetaHubArtwork {
                     return@withContext score
                 }
             }
+
+            // Franchise fallback for specials/OVAs/previews without independent MAL score
+            if (cachedMedia != null) {
+                val priorityTypes = listOf("PARENT", "MAIN", "SOURCE", "PREQUEL")
+                val parentRel = cachedMedia.relations.firstOrNull { it.relationType in priorityTypes }
+                if (parentRel != null) {
+                    val parentMalId = AnilistApi.getCachedMedia(parentRel.id)?.idMal
+                        ?: AnilistMetaDetailsResolver.resolveArmMapping(parentRel.id).malId
+                    if (parentMalId != null && parentMalId > 0) {
+                        val score = AnilistApi.fetchMalScore(parentMalId)
+                        if (score != null && score > 0) {
+                            malScoreCache[rawId] = score
+                            return@withContext score
+                        }
+                    }
+                }
+            }
         }
         null
     }

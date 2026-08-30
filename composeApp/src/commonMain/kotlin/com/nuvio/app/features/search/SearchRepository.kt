@@ -430,12 +430,16 @@ object SearchRepository {
         if (isNativeAnilist) {
             val mediaList = com.nuvio.app.features.anilist.AnilistApi.searchAnime(query)
             val previews = mediaList.map { media ->
+                val score = if (media.averageScore != null && media.averageScore > 0) {
+                    media.averageScore / 10.0
+                } else null
                 MetaPreview(
                     id = "ani_${media.id}",
                     type = if (media.format == "MOVIE") "movie" else "series",
                     name = media.title?.displayTitle.orEmpty(),
                     poster = media.coverImage?.extraLarge ?: media.coverImage?.large ?: media.coverImage?.medium,
                     banner = media.bannerImage,
+                    logo = com.nuvio.app.features.artwork.MetaHubArtwork.getLogoUrl("ani_${media.id}"),
                     posterShape = com.nuvio.app.features.home.PosterShape.Poster,
                     description = media.description,
                     releaseInfo = listOfNotNull(
@@ -446,9 +450,8 @@ object SearchRepository {
                             media.duration?.let { "$it min" }
                         },
                     ).joinToString(" • ").takeIf { it.isNotBlank() },
-                    imdbRating = if (media.averageScore != null && media.averageScore > 0) {
-                        "${((media.averageScore / 10.0) * 10).toInt() / 10.0}"
-                    } else null,
+                    imdbRating = score?.let { "${((it * 10).toInt()) / 10.0}" },
+                    anilistScore = if (media.averageScore != null && media.averageScore > 0) media.averageScore.toDouble() else null,
                     genres = media.genres,
                 )
             }
