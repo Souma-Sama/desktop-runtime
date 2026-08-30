@@ -38,6 +38,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -231,6 +232,40 @@ private fun HeroBackgroundLayers(
     layerPages.forEach { page ->
         val item = items[page]
         val backgroundModel = MetaHubArtwork.getBackdropUrl(item.id) ?: item.banner
+        val isAnilistItem = item.id.startsWith("ani_") || item.id.startsWith("anilist:")
+        val isAnilistBanner = isAnilistItem && (backgroundModel?.contains("anilistcdn/media/anime/banner", ignoreCase = true) == true)
+
+        if (isAnilistBanner) {
+            AsyncImage(
+                model = backgroundModel,
+                contentDescription = null,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(layout.heroHeight)
+                    .heroStretchZoom(stretchPx)
+                    .blur(36.dp)
+                    .graphicsLayer {
+                        val pageOffset = heroPageOffset(pagerState, page)
+                        val scrollOffsetPx = heroScrollOffsetPx(listState, heroHeightPx)
+                        val scrollScale = heroBackgroundScrollScale(scrollOffsetPx)
+
+                        alpha = heroPageVisibility(pageOffset) * 0.55f
+                        translationX = -pageOffset * heroWidthPx * HERO_BACKGROUND_PARALLAX
+                        translationY = if (desktopFrame) {
+                            heroDesktopBackgroundScrollTranslationY(scrollOffsetPx)
+                        } else {
+                            heroBackgroundScrollTranslationY(scrollOffsetPx)
+                        }
+                        val baseScale = if (desktopFrame) 1.04f else HERO_BACKGROUND_SCALE
+                        scaleX = baseScale * scrollScale
+                        scaleY = baseScale * scrollScale
+                    },
+                alignment = Alignment.Center,
+                contentScale = ContentScale.Crop,
+                desktopImageScaling = NuvioDesktopImageScaling.Disabled,
+            )
+        }
+
         AsyncImage(
             model = backgroundModel,
             contentDescription = item.name,
@@ -254,8 +289,8 @@ private fun HeroBackgroundLayers(
                     scaleX = baseScale * scrollScale
                     scaleY = baseScale * scrollScale
                 },
-            alignment = if (desktopFrame || !layout.isTablet) Alignment.Center else Alignment.TopCenter,
-            contentScale = ContentScale.Crop,
+            alignment = if (isAnilistBanner) Alignment.Center else if (desktopFrame || !layout.isTablet) Alignment.Center else Alignment.TopCenter,
+            contentScale = if (isAnilistBanner) ContentScale.FillWidth else ContentScale.Crop,
             desktopImageScaling = NuvioDesktopImageScaling.Disabled,
         )
     }
