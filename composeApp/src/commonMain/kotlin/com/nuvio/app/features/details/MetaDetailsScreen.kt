@@ -2257,7 +2257,6 @@ private fun ConfiguredMetaSections(
                         mediaId = anilistMediaId,
                         animeTitle = meta.name,
                         showHeader = showHeader,
-                        headerHorizontalPadding = headerHorizontalPadding,
                         horizontalScrollPadding = horizontalScrollPadding,
                     )
                 } else if (shouldShowComments && (isCommentsLoading || comments.isNotEmpty() || !commentsError.isNullOrBlank())) {

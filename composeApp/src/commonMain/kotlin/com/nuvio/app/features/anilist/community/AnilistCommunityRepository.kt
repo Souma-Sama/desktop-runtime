@@ -19,7 +19,7 @@ object AnilistCommunityRepository {
             reviewsCache[mediaId]?.let { return@withContext it }
         }
 
-        val token = AnilistAuthRepository.accessToken
+        val token = AnilistAuthRepository.token.value
         val pageResult = AnilistApi.fetchMediaReviews(
             mediaId = mediaId,
             page = page,
@@ -45,7 +45,7 @@ object AnilistCommunityRepository {
         rating: AnilistReviewVote,
         mediaId: Int,
     ): Result<AnilistReview> = withContext(Dispatchers.Default) {
-        val token = AnilistAuthRepository.accessToken
+        val token = AnilistAuthRepository.token.value
             ?: return@withContext Result.failure(IllegalStateException("Must be logged in to rate reviews"))
 
         val ratingString = when (rating) {
@@ -85,7 +85,7 @@ object AnilistCommunityRepository {
         score: Int,
         reviewId: Int? = null,
     ): Result<AnilistReview> = withContext(Dispatchers.Default) {
-        val token = AnilistAuthRepository.accessToken
+        val token = AnilistAuthRepository.token.value
             ?: return@withContext Result.failure(IllegalStateException("Must be logged in to post a review"))
 
         val cleanSummary = summary.trim()
@@ -125,7 +125,7 @@ object AnilistCommunityRepository {
         reviewId: Int,
         mediaId: Int,
     ): Result<Boolean> = withContext(Dispatchers.Default) {
-        val token = AnilistAuthRepository.accessToken
+        val token = AnilistAuthRepository.token.value
             ?: return@withContext Result.failure(IllegalStateException("Must be logged in to delete a review"))
 
         val deleted = AnilistApi.deleteReview(reviewId = reviewId, token = token)

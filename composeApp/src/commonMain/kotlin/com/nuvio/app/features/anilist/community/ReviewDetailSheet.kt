@@ -55,7 +55,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
-import com.nuvio.app.core.ui.theme.NuvioTokens
 import com.nuvio.app.features.anilist.AnilistAuthRepository
 import kotlinx.coroutines.launch
 
@@ -70,7 +69,7 @@ fun ReviewDetailSheet(
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val uriHandler = LocalUriHandler.current
-    val currentUserId = AnilistAuthRepository.currentUser?.id
+    val currentUserId = AnilistAuthRepository.currentUser.value?.id
     val isAuthor = currentUserId != null && currentUserId == review.userId
     var userVoted by remember(review.id, review.userRating) {
         mutableStateOf(review.userRating == "UP_VOTE")
@@ -107,7 +106,7 @@ fun ReviewDetailSheet(
                     if (avatarUrl != null) {
                         AsyncImage(
                             model = avatarUrl,
-                            contentDescription = review.user.name,
+                            contentDescription = review.user?.name,
                             modifier = Modifier
                                 .size(48.dp)
                                 .clip(CircleShape)

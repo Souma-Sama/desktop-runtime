@@ -60,11 +60,11 @@ import com.nuvio.app.core.ui.nuvioDesktopDragScroll
 import com.nuvio.app.core.ui.nuvioHorizontalScrollBleed
 import com.nuvio.app.core.ui.nuvioShelfHoverOverdraw
 import com.nuvio.app.features.anilist.AnilistAuthRepository
-import com.nuvio.app.features.details.components.DetailRailHoverInset
-import com.nuvio.app.features.details.components.DetailSectionHeader
 import com.nuvio.app.isDesktop
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
+
+private val DetailRailHoverInset = 20.dp
 
 @Composable
 fun DetailAnilistReviewsSection(
@@ -72,7 +72,6 @@ fun DetailAnilistReviewsSection(
     animeTitle: String,
     modifier: Modifier = Modifier,
     showHeader: Boolean = true,
-    headerHorizontalPadding: Dp = 0.dp,
     horizontalScrollPadding: Dp = 0.dp,
     onLoginClick: (() -> Unit)? = null,
 ) {
@@ -87,8 +86,8 @@ fun DetailAnilistReviewsSection(
     var reviewToEdit by remember { mutableStateOf<AnilistReview?>(null) }
 
     val scope = rememberCoroutineScope()
-    val isLoggedIn = AnilistAuthRepository.isLoggedIn
-    val currentUserId = AnilistAuthRepository.currentUser?.id
+    val isLoggedIn = AnilistAuthRepository.isAuthenticated.value
+    val currentUserId = AnilistAuthRepository.currentUser.value?.id
     val userReview = reviews.firstOrNull { it.userId == currentUserId }
 
     // Lazy load reviews on first mount
@@ -135,7 +134,7 @@ fun DetailAnilistReviewsSection(
     }
 
     val rowHoverInset = if (isDesktop) DetailRailHoverInset else 0.dp
-    val rowEdgePadding = headerHorizontalPadding + horizontalScrollPadding + rowHoverInset
+    val rowEdgePadding = horizontalScrollPadding + rowHoverInset
 
     Column(
         modifier = modifier
@@ -148,7 +147,7 @@ fun DetailAnilistReviewsSection(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = headerHorizontalPadding),
+                    .padding(horizontal = horizontalScrollPadding),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -156,9 +155,13 @@ fun DetailAnilistReviewsSection(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    DetailSectionHeader(
-                        title = "Community Reviews",
-                        modifier = Modifier,
+                    Text(
+                        text = "Community Reviews",
+                        style = MaterialTheme.typography.titleLarge.copy(
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.SemiBold,
+                        ),
+                        color = MaterialTheme.colorScheme.onBackground,
                     )
                     if (totalReviews > 0) {
                         Surface(
@@ -238,7 +241,7 @@ fun DetailAnilistReviewsSection(
                         showWriteDialog = true
                     },
                     onLoginClick = onLoginClick,
-                    modifier = Modifier.padding(horizontal = headerHorizontalPadding),
+                    modifier = Modifier.padding(horizontal = horizontalScrollPadding),
                 )
             }
 
@@ -380,7 +383,7 @@ private fun ReviewCard(
                     if (avatarUrl != null) {
                         AsyncImage(
                             model = avatarUrl,
-                            contentDescription = review.user.name,
+                            contentDescription = review.user?.name,
                             modifier = Modifier
                                 .size(36.dp)
                                 .clip(CircleShape)
