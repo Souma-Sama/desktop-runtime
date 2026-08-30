@@ -333,6 +333,21 @@ object AnilistCatalogRepository {
         )
         pageCache[cacheKey] = CachedCatalogPage(timestamp = now, page = result)
 
+        // Prefetch buffer: Warm up logo and MAL score cache for visible + next buffer items in background
+        if (prefs.showPosterTitleLogos || prefs.showPosterMalScore) {
+            CoroutineScope(Dispatchers.Default).launch {
+                mediaList.take(12).forEach { media ->
+                    val rawId = "ani_${media.id}"
+                    if (prefs.showPosterTitleLogos) {
+                        MetaHubArtwork.resolveLogoUrl(rawId)
+                    }
+                    if (prefs.showPosterMalScore) {
+                        MetaHubArtwork.resolveMalScore(rawId)
+                    }
+                }
+            }
+        }
+
         return result
     }
 }
