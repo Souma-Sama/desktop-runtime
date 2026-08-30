@@ -21,6 +21,7 @@ data class AnilistPreferences(
     val showPosterTitleLogos: Boolean = true,
     val showPosterAnilistScore: Boolean = true,
     val showPosterMalScore: Boolean = true,
+    val posterScoreFormat: AnilistPosterScoreFormat = AnilistPosterScoreFormat.PERCENTAGE,
     val librarySections: List<AnilistSectionSettings> = defaultAuthenticatedSections,
 ) {
     companion object {
@@ -61,4 +62,10 @@ enum class AnilistScoreFormat(val label: String) {
     POINT_100("100-Point (0 - 100)"),
     POINT_5("5-Star (1 - 5)"),
     POINT_3("3-Point (Smileys)"),
+}
+
+@Serializable
+enum class AnilistPosterScoreFormat(val label: String) {
+    PERCENTAGE("Percentage (e.g. 84%)"),
+    POINT_10("10-Point Score (e.g. 8.4)"),
 }

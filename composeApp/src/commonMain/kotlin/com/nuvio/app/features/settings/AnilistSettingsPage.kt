@@ -71,6 +71,7 @@ import com.nuvio.app.core.ui.nuvio
 import com.nuvio.app.features.anilist.AnilistAuthRepository
 import com.nuvio.app.features.anilist.AnilistBrandBlue
 import com.nuvio.app.features.anilist.AnilistLogoVector
+import com.nuvio.app.features.anilist.AnilistPosterScoreFormat
 import com.nuvio.app.features.anilist.AnilistPreferences
 import com.nuvio.app.features.anilist.AnilistPreferencesRepository
 import com.nuvio.app.features.anilist.AnilistScoreFormat
@@ -101,6 +102,7 @@ import org.jetbrains.compose.resources.stringResource
 private enum class AnilistPickerType {
     TITLE_LANGUAGE,
     SCORE_FORMAT,
+    POSTER_SCORE_FORMAT,
 }
 
 internal fun LazyListScope.anilistSettingsContent(
@@ -130,6 +132,7 @@ internal fun LazyListScope.anilistSettingsContent(
 @Composable
 private fun AnilistPosterDisplaySection(isTablet: Boolean) {
     val prefs by AnilistPreferencesRepository.preferences.collectAsStateWithLifecycle()
+    var activePicker by rememberSaveable { mutableStateOf<String?>(null) }
 
     SettingsSection(
         title = "Poster Display Options",
@@ -138,7 +141,7 @@ private fun AnilistPosterDisplaySection(isTablet: Boolean) {
         SettingsGroup(isTablet = isTablet) {
             SettingsSwitchRow(
                 title = "Show Title Logos on Posters",
-                description = "Display transparent anime title logos over poster cards across shelves and catalogs.",
+                description = "Display transparent anime title logos centered over poster cards across shelves and catalogs.",
                 checked = prefs.showPosterTitleLogos,
                 isTablet = isTablet,
                 onCheckedChange = AnilistPreferencesRepository::setShowPosterTitleLogos,
@@ -154,6 +157,18 @@ private fun AnilistPosterDisplaySection(isTablet: Boolean) {
                 onCheckedChange = AnilistPreferencesRepository::setShowPosterAnilistScore,
             )
 
+            if (prefs.showPosterAnilistScore) {
+                SettingsGroupDivider(isTablet = isTablet)
+
+                TrackingPreferenceActionRow(
+                    title = "AniList Score Format",
+                    description = "Choose how AniList ratings are formatted on poster cards (Percentage or 10-Point Score).",
+                    value = prefs.posterScoreFormat.label,
+                    isTablet = isTablet,
+                    onClick = { activePicker = AnilistPickerType.POSTER_SCORE_FORMAT.name },
+                )
+            }
+
             SettingsGroupDivider(isTablet = isTablet)
 
             SettingsSwitchRow(
@@ -162,6 +177,34 @@ private fun AnilistPosterDisplaySection(isTablet: Boolean) {
                 checked = prefs.showPosterMalScore,
                 isTablet = isTablet,
                 onCheckedChange = AnilistPreferencesRepository::setShowPosterMalScore,
+            )
+        }
+    }
+
+    when (activePicker) {
+        AnilistPickerType.POSTER_SCORE_FORMAT.name -> {
+            val scoreOptions = AnilistPosterScoreFormat.entries.map { fmt ->
+                TrackingPickerOption(
+                    value = fmt,
+                    title = fmt.label,
+                    description = when (fmt) {
+                        AnilistPosterScoreFormat.PERCENTAGE -> "Display scores as percentage out of 100% (e.g., 84%)"
+                        AnilistPosterScoreFormat.POINT_10 -> "Display scores on a 10-point scale (e.g., 8.4)"
+                    },
+                )
+            }
+
+            TrackingAdaptivePicker(
+                isTablet = isTablet,
+                title = "AniList Score Format",
+                subtitle = "Select how you would like AniList ratings displayed on poster cards",
+                selectedValue = prefs.posterScoreFormat,
+                options = scoreOptions,
+                onSelected = {
+                    AnilistPreferencesRepository.setPosterScoreFormat(it)
+                    activePicker = null
+                },
+                onDismiss = { activePicker = null },
             )
         }
     }

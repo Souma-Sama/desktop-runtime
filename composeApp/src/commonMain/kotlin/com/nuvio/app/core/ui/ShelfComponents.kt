@@ -20,10 +20,12 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import com.nuvio.app.features.anilist.AnilistPosterScoreFormat
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.lazy.LazyRow
@@ -249,6 +251,7 @@ fun NuvioPosterCard(
     bottomLeftText: String? = null,
     anilistScore: Double? = null,
     malScore: Double? = null,
+    scoreFormat: AnilistPosterScoreFormat = AnilistPosterScoreFormat.PERCENTAGE,
     isWatched: Boolean = false,
     onClick: (() -> Unit)? = null,
     onLongClick: (() -> Unit)? = null,
@@ -258,10 +261,6 @@ fun NuvioPosterCard(
     val effectiveBasePosterWidthDp = basePosterWidthDp ?: posterCardStyle.widthDp
     val cardWidth = shape.cardWidth(basePosterWidthDp = effectiveBasePosterWidthDp)
     val cardShape = RoundedCornerShape(posterCardStyle.cornerRadiusDp.dp)
-    val catalogLogoOverlaySize = catalogLogoOverlaySize(
-        basePosterWidthDp = effectiveBasePosterWidthDp,
-        shape = shape,
-    )
     val shouldShowTitleBelow = showTitleBelow && !posterCardStyle.hideLabelsEnabled
 
     Column(
@@ -312,24 +311,25 @@ fun NuvioPosterCard(
             if (!bottomLeftLogoUrl.isNullOrBlank() || !bottomLeftText.isNullOrBlank()) {
                 Box(
                     modifier = Modifier
-                        .align(Alignment.BottomStart)
+                        .align(Alignment.BottomCenter)
                         .fillMaxWidth()
                         .background(
                             Brush.verticalGradient(
-                                colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.65f)),
+                                colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.72f)),
                             )
                         )
-                        .padding(horizontal = NuvioTokens.Space.s8, vertical = NuvioTokens.Space.s8),
+                        .padding(horizontal = 8.dp, vertical = 6.dp),
+                    contentAlignment = Alignment.BottomCenter,
                 ) {
                     if (!bottomLeftLogoUrl.isNullOrBlank()) {
                         NuvioAsyncImage(
                             model = bottomLeftLogoUrl,
                             contentDescription = stringResource(Res.string.poster_logo_content_description, title),
                             modifier = Modifier
-                                .width(catalogLogoOverlaySize.width)
-                                .height(catalogLogoOverlaySize.height),
+                                .fillMaxWidth(0.85f)
+                                .heightIn(min = 24.dp, max = if (shape == NuvioPosterShape.Landscape) 40.dp else 46.dp),
                             contentScale = ContentScale.Fit,
-                            alignment = Alignment.BottomStart,
+                            alignment = Alignment.BottomCenter,
                         )
                     } else {
                         Text(
@@ -338,7 +338,8 @@ fun NuvioPosterCard(
                             color = tokens.colors.textPrimary,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.widthIn(max = catalogLogoOverlaySize.textMaxWidth),
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth(0.90f),
                         )
                     }
                 }
@@ -347,6 +348,7 @@ fun NuvioPosterCard(
             PosterRatingBadgesOverlay(
                 anilistScore = anilistScore,
                 malScore = malScore,
+                scoreFormat = scoreFormat,
                 modifier = Modifier.align(Alignment.TopEnd),
             )
 
@@ -651,10 +653,31 @@ private fun androidx.compose.ui.layout.LayoutCoordinates.unclippedBoundsInRoot()
     )
 }
 
+fun formatAnilistScore(
+    score: Double?,
+    format: AnilistPosterScoreFormat = AnilistPosterScoreFormat.PERCENTAGE,
+): String? {
+    if (score == null || score <= 0.0) return null
+    return when (format) {
+        AnilistPosterScoreFormat.PERCENTAGE -> {
+            val pct = if (score <= 10.0) (score * 10.0).roundToInt() else score.roundToInt()
+            "$pct%"
+        }
+        AnilistPosterScoreFormat.POINT_10 -> {
+            val score10 = if (score > 10.0) (score / 10.0) else score
+            val rounded = (score10 * 10.0).roundToInt()
+            val whole = rounded / 10
+            val decimal = (rounded % 10).absoluteValue
+            "$whole.$decimal"
+        }
+    }
+}
+
 @Composable
 private fun PosterRatingBadgesOverlay(
     anilistScore: Double?,
     malScore: Double?,
+    scoreFormat: AnilistPosterScoreFormat = AnilistPosterScoreFormat.PERCENTAGE,
     modifier: Modifier = Modifier,
 ) {
     val hasAnilist = anilistScore != null && anilistScore > 0
@@ -668,11 +691,14 @@ private fun PosterRatingBadgesOverlay(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (hasAnilist) {
-            PosterScoreBadge(
-                logo = Res.drawable.rating_anilist,
-                contentDescription = "AniList",
-                text = "${anilistScore!!.roundToInt()}%",
-            )
+            val formatted = formatAnilistScore(anilistScore, scoreFormat)
+            if (formatted != null) {
+                PosterScoreBadge(
+                    logo = Res.drawable.rating_anilist,
+                    contentDescription = "AniList",
+                    text = formatted,
+                )
+            }
         }
         if (hasMal) {
             val roundedMal = (malScore!! * 100.0).roundToInt()

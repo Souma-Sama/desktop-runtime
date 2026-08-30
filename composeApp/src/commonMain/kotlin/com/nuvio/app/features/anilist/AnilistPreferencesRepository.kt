@@ -137,6 +137,10 @@ object AnilistPreferencesRepository {
         updateAndPersist { it.copy(showPosterMalScore = enabled) }
     }
 
+    fun setPosterScoreFormat(format: AnilistPosterScoreFormat) {
+        updateAndPersist { it.copy(posterScoreFormat = format) }
+    }
+
     private fun updateAndPersist(transform: (AnilistPreferences) -> AnilistPreferences) {
         ensureLoaded()
         _preferences.update { current ->

@@ -74,6 +74,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.nuvio.app.core.ui.NuvioAsyncImage as AsyncImage
 import com.nuvio.app.core.ui.NuvioCardDepthSurface
+import com.nuvio.app.core.ui.formatAnilistScore
 import com.nuvio.app.core.ui.nuvioCardDepth
 import com.nuvio.app.core.ui.nuvioDesktopDragScroll
 import com.nuvio.app.core.ui.rememberPosterCardStyleUiState
@@ -736,34 +737,37 @@ private fun AniChartCard(
 
             // Top Right: Score badge (AniList)
             if (media.score != null && media.score > 0.0 && anilistPrefs.showPosterAnilistScore) {
-                Surface(
-                    shape = RoundedCornerShape(4.dp),
-                    color = Color.Black.copy(alpha = 0.72f),
-                    border = BorderStroke(0.5.dp, Color.White.copy(alpha = 0.18f)),
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(6.dp),
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(3.dp),
+                val formattedScore = formatAnilistScore(media.score, anilistPrefs.posterScoreFormat)
+                if (formattedScore != null) {
+                    Surface(
+                        shape = RoundedCornerShape(4.dp),
+                        color = Color.Black.copy(alpha = 0.72f),
+                        border = BorderStroke(0.5.dp, Color.White.copy(alpha = 0.18f)),
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(6.dp),
                     ) {
-                        Image(
-                            painter = painterResource(Res.drawable.rating_anilist),
-                            contentDescription = "AniList",
-                            modifier = Modifier.size(12.dp),
-                        )
-                        Text(
-                            text = "${media.score.roundToInt()}%",
-                            style = MaterialTheme.typography.labelSmall.copy(
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 10.sp,
-                                letterSpacing = (-0.2).sp,
-                            ),
-                            color = Color.White,
-                            maxLines = 1,
-                        )
+                        Row(
+                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(3.dp),
+                        ) {
+                            Image(
+                                painter = painterResource(Res.drawable.rating_anilist),
+                                contentDescription = "AniList",
+                                modifier = Modifier.size(12.dp),
+                            )
+                            Text(
+                                text = formattedScore,
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 10.sp,
+                                    letterSpacing = (-0.2).sp,
+                                ),
+                                color = Color.White,
+                                maxLines = 1,
+                            )
+                        }
                     }
                 }
             }
