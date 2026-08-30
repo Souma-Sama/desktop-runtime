@@ -24,8 +24,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlin.math.absoluteValue
-import kotlin.random.Random
+import kotlinx.coroutines.joinAll
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 object HomeRepository {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -85,40 +86,30 @@ object HomeRepository {
                 putAll(cachedSections)
             }
             var firstErrorMessage: String? = null
-            var batchIndex = 0
+            val mutex = Mutex()
 
-            prioritizedRequests.chunked(HOME_CATALOG_FETCH_BATCH_SIZE).forEach { batch ->
-                if (activeRequestKey != requestKey) return@launch
-                val results = batch.map { request ->
-                    async {
-                        request to runCatching {
-                            request.toSection(forceRefresh = force)
+            val jobs = prioritizedRequests.map { request ->
+                launch {
+                    val result = runCatching {
+                        request.toSection(forceRefresh = force)
+                    }
+                    if (activeRequestKey != requestKey) return@launch
+                    val section = result.getOrNull()
+                    if (section != null) {
+                        mutex.withLock {
+                            loadedSections[request.cacheKey] = section
+                            cachedSections = loadedSections.toMap()
+                            publishCurrentState(
+                                isLoading = true,
+                                requestKey = requestKey,
+                            )
                         }
-                    }
-                }.awaitAll()
-
-                if (activeRequestKey != requestKey) return@launch
-
-                results.mapNotNull { (request, result) ->
-                    result.getOrNull()?.let { section -> request.cacheKey to section }
-                }.forEach { (cacheKey, section) ->
-                    loadedSections[cacheKey] = section
-                }
-                if (firstErrorMessage == null) {
-                    firstErrorMessage = results.firstNotNullOfOrNull { (_, result) ->
-                        result.exceptionOrNull()?.message
+                    } else if (firstErrorMessage == null) {
+                        firstErrorMessage = result.exceptionOrNull()?.message
                     }
                 }
-                cachedSections = loadedSections.toMap()
-                lastErrorMessage = firstErrorMessage
-                if (batchIndex == 0 || (batchIndex + 1) % HOME_CATALOG_PUBLISH_INTERVAL == 0) {
-                    publishCurrentState(
-                        isLoading = true,
-                        requestKey = requestKey,
-                    )
-                }
-                batchIndex++
             }
+            jobs.joinAll()
 
             if (activeRequestKey != requestKey) return@launch
 

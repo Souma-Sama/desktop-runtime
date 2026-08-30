@@ -75,20 +75,6 @@ private fun HomeCatalogRowSectionContent(
     val posterCardStyle = rememberPosterCardStyleUiState()
     val anilistPrefs by AnilistPreferencesRepository.preferences.collectAsStateWithLifecycle()
 
-    // Prefetch/buffer the first 10 items (visible items + 3-4 buffer items sideways) in background
-    LaunchedEffect(entries, anilistPrefs.showPosterTitleLogos, anilistPrefs.showPosterMalScore) {
-        if (entries.isNotEmpty() && (anilistPrefs.showPosterTitleLogos || anilistPrefs.showPosterMalScore)) {
-            entries.take(10).forEach { item ->
-                if (anilistPrefs.showPosterTitleLogos) {
-                    MetaHubArtwork.resolveLogoUrl(item.id)
-                }
-                if (anilistPrefs.showPosterMalScore) {
-                    MetaHubArtwork.resolveMalScore(item.id)
-                }
-            }
-        }
-    }
-
     NuvioShelfSection(
         title = section.title,
         entries = entries,
