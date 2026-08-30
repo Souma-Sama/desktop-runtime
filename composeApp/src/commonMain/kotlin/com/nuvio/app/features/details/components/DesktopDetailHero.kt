@@ -112,8 +112,8 @@ fun DesktopDetailHero(
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxWidth()
-            .height(660.dp)
-            .graphicsLayer { clip = true }
+            .heightIn(min = 660.dp)
+            .wrapContentHeight()
             .onSizeChanged { onHeightChanged(it.height) },
     ) {
         val actionHorizontalInset = fullscreenActionHorizontalInsetForWidth(maxWidth.value)
@@ -123,7 +123,7 @@ fun DesktopDetailHero(
                 model = imageUrl,
                 contentDescription = meta.name,
                 modifier = Modifier
-                    .fillMaxSize()
+                    .matchParentSize()
                     .graphicsLayer {
                         translationY = scrollOffset() * 0.38f
                         scaleX = 1f
@@ -135,7 +135,7 @@ fun DesktopDetailHero(
                 onSuccess = { state -> onBackdropLoaded(state.painter) },
             )
         } else {
-            DesktopStripePlaceholder(modifier = Modifier.fillMaxSize())
+            DesktopStripePlaceholder(modifier = Modifier.matchParentSize())
         }
 
         if (heroTrailerSourceUrl != null) {
@@ -146,7 +146,7 @@ fun DesktopDetailHero(
                 muted = heroTrailerMuted,
                 fillFrame = true,
                 modifier = Modifier
-                    .fillMaxSize()
+                    .matchParentSize()
                     .graphicsLayer {
                         alpha = trailerAlpha
                         translationY = scrollOffset() * 0.38f
@@ -161,7 +161,7 @@ fun DesktopDetailHero(
 
         Box(
             modifier = Modifier
-                .fillMaxSize()
+                .matchParentSize()
                 .background(
                     Brush.verticalGradient(
                         colorStops = arrayOf(
@@ -177,7 +177,7 @@ fun DesktopDetailHero(
         )
         Box(
             modifier = Modifier
-                .fillMaxSize()
+                .matchParentSize()
                 .background(
                     Brush.horizontalGradient(
                         colorStops = arrayOf(
@@ -194,7 +194,7 @@ fun DesktopDetailHero(
             modifier = Modifier
                 .align(Alignment.BottomStart)
                 .widthIn(max = 760.dp)
-                .padding(start = space.s56, end = space.s32, bottom = space.s40),
+                .padding(start = space.s56, end = space.s32, top = space.s56, bottom = space.s40),
         ) {
             if (logoUrl != null && !logoLoadError) {
                 AsyncImage(

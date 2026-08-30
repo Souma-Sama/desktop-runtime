@@ -634,6 +634,9 @@ object AnilistMetaDetailsResolver {
             cinemetaVideos = cinemetaMeta.videos,
         )
 
+        val hasValidImdbId = effectiveImdbId?.startsWith("tt", ignoreCase = true) == true
+        val fallbackThumb = media?.bannerImage ?: media?.coverImage?.bestUrl
+
         // For seasons, isolate and map that season's episodes cleanly using Kitsu IDs
         val seasonVideos = if (targetSeason == 0 && cinemetaMeta.videos.any { it.season == 0 }) {
             val specialVideos = cinemetaMeta.videos.filter { it.season == 0 }
@@ -649,7 +652,7 @@ object AnilistMetaDetailsResolver {
                         episode = epNum,
                         title = matchedSpecial.title?.takeIf { it.isNotBlank() } ?: media?.title?.displayTitle ?: "Special",
                         thumbnail = matchedSpecial.thumbnail?.takeIf { it.isNotBlank() }
-                            ?: "https://episodes.metahub.space/$effectiveImdbId/0/$epNum/w780.jpg",
+                            ?: (if (hasValidImdbId) "https://episodes.metahub.space/$effectiveImdbId/0/$epNum/w780.jpg" else fallbackThumb),
                         released = resolveEpisodeAirDate(epNum, kitsuEp?.airdate, matchedSpecial.released, media),
                     )
                 )
@@ -664,7 +667,7 @@ object AnilistMetaDetailsResolver {
                         episode = epNum,
                         title = v.title?.takeIf { it.isNotBlank() } ?: "Special $epNum",
                         thumbnail = v.thumbnail?.takeIf { it.isNotBlank() }
-                            ?: "https://episodes.metahub.space/$effectiveImdbId/0/$epNum/w780.jpg",
+                            ?: (if (hasValidImdbId) "https://episodes.metahub.space/$effectiveImdbId/0/$epNum/w780.jpg" else fallbackThumb),
                         released = resolveEpisodeAirDate(epNum, kitsuEp?.airdate, v.released, media),
                     )
                 }
@@ -684,7 +687,7 @@ object AnilistMetaDetailsResolver {
                 val epTitle = cleanEpisodeTitle(rawTitle, epNum)
                 val epThumbnail = kitsuEp?.thumbnail?.takeIf { it.isNotBlank() }
                     ?: streamingEp?.thumbnail
-                    ?: "https://episodes.metahub.space/$effectiveImdbId/0/$epNum/w780.jpg"
+                    ?: (if (hasValidImdbId) "https://episodes.metahub.space/$effectiveImdbId/0/$epNum/w780.jpg" else fallbackThumb)
                 val videoId = if (!kitsuId.isNullOrBlank()) "kitsu:$kitsuId:$epNum" else "anilist:$anilistId:$epNum"
                 MetaVideo(
                     id = videoId,
@@ -713,7 +716,7 @@ object AnilistMetaDetailsResolver {
                 val epThumbnail = kitsuEp?.thumbnail?.takeIf { it.isNotBlank() }
                     ?: cinemetaEp?.thumbnail?.takeIf { it.isNotBlank() }
                     ?: streamingEp?.thumbnail
-                    ?: "https://episodes.metahub.space/$effectiveImdbId/$targetSeason/$actualEpNumber/w780.jpg"
+                    ?: (if (hasValidImdbId) "https://episodes.metahub.space/$effectiveImdbId/$targetSeason/$actualEpNumber/w780.jpg" else fallbackThumb)
                 val videoId = if (!kitsuId.isNullOrBlank()) "kitsu:$kitsuId:$actualEpNumber" else "anilist:$anilistId:$actualEpNumber"
                 MetaVideo(
                     id = videoId,
@@ -737,7 +740,7 @@ object AnilistMetaDetailsResolver {
                 val epTitle = cleanEpisodeTitle(rawTitle, actualEpNumber)
                 val epThumbnail = kitsuEp?.thumbnail?.takeIf { it.isNotBlank() }
                     ?: streamingEp?.thumbnail
-                    ?: "https://episodes.metahub.space/$effectiveImdbId/$targetSeason/$actualEpNumber/w780.jpg"
+                    ?: (if (hasValidImdbId) "https://episodes.metahub.space/$effectiveImdbId/$targetSeason/$actualEpNumber/w780.jpg" else fallbackThumb)
                 val videoId = if (!kitsuId.isNullOrBlank()) "kitsu:$kitsuId:$actualEpNumber" else "anilist:$anilistId:$actualEpNumber"
                 MetaVideo(
                     id = videoId,
@@ -766,7 +769,7 @@ object AnilistMetaDetailsResolver {
                 val epThumbnail = kitsuEp?.thumbnail?.takeIf { it.isNotBlank() }
                     ?: cinemetaEp?.thumbnail?.takeIf { it.isNotBlank() }
                     ?: streamingEp?.thumbnail
-                    ?: "https://episodes.metahub.space/$effectiveImdbId/1/$actualEpNumber/w780.jpg"
+                    ?: (if (hasValidImdbId) "https://episodes.metahub.space/$effectiveImdbId/1/$actualEpNumber/w780.jpg" else fallbackThumb)
                 val videoId = if (!kitsuId.isNullOrBlank()) "kitsu:$kitsuId:$actualEpNumber" else "anilist:$anilistId:$actualEpNumber"
                 MetaVideo(
                     id = videoId,
