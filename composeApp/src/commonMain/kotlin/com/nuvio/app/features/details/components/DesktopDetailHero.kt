@@ -114,12 +114,18 @@ fun DesktopDetailHero(
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxWidth()
-            .heightIn(min = (maxWidth * 0.45f).coerceIn(660.dp, 800.dp))
-            .wrapContentHeight()
             .graphicsLayer { clip = true }
             .onSizeChanged { onHeightChanged(it.height) },
     ) {
+        val heroMinHeight = (maxWidth * 0.45f).coerceIn(660.dp, 800.dp)
         val actionHorizontalInset = fullscreenActionHorizontalInsetForWidth(maxWidth.value)
+
+        Spacer(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(heroMinHeight),
+        )
+
         val imageUrl = meta.background
         if (imageUrl != null) {
             AsyncImage(
