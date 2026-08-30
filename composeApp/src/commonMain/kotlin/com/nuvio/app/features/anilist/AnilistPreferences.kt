@@ -18,6 +18,9 @@ data class AnilistPreferences(
     val showSyncNotification: Boolean = true,
     val preferredTitleLanguage: AnilistTitleLanguage = AnilistTitleLanguage.ROMAJI,
     val preferredScoreFormat: AnilistScoreFormat = AnilistScoreFormat.POINT_10_DECIMAL,
+    val showPosterTitleLogos: Boolean = true,
+    val showPosterAnilistScore: Boolean = true,
+    val showPosterMalScore: Boolean = true,
     val librarySections: List<AnilistSectionSettings> = defaultAuthenticatedSections,
 ) {
     companion object {

@@ -62,6 +62,7 @@ import com.nuvio.app.features.home.HomeCatalogSection
 import com.nuvio.app.features.home.MetaPreview
 import com.nuvio.app.features.home.PosterShape
 import com.nuvio.app.features.home.canOpenCatalog
+import com.nuvio.app.features.home.components.HomePosterCard
 import com.nuvio.app.features.home.stableKey
 import com.nuvio.app.features.home.components.HomeCatalogRowSection
 import com.nuvio.app.features.home.components.HomePosterHoverPreview
@@ -303,22 +304,11 @@ private fun TabbedGridContent(
                                     watchedKeys = watchedKeys,
                                     item = item,
                                 )
-                                HomePosterHoverPreview(
+                                HomePosterCard(
                                     item = item,
                                     isWatched = isWatched,
                                     onClick = { onPosterClick(item) },
-                                    onLongClick = null,
-                                ) {
-                                    NuvioPosterCard(
-                                        title = item.name,
-                                        imageUrl = item.poster,
-                                        modifier = it,
-                                        shape = NuvioPosterShape.Poster,
-                                        detailLine = item.releaseInfo,
-                                        isWatched = isWatched,
-                                        onClick = { onPosterClick(item) },
-                                    )
-                                }
+                                )
                             }
 
                             if (uiState.selectedTabIsLoadingMore) {

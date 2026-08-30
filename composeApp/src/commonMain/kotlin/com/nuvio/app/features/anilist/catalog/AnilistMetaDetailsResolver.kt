@@ -137,7 +137,7 @@ object AnilistMetaDetailsResolver {
                     name = rec.title?.displayTitle.orEmpty(),
                     poster = recPoster,
                     banner = rec.bannerImage,
-                    logo = null,
+                    logo = MetaHubArtwork.getLogoUrl("ani_$recId"),
                     description = null,
                     releaseInfo = if (rec.episodes != null) "${rec.episodes} Ep" else null,
                 )
@@ -526,7 +526,7 @@ object AnilistMetaDetailsResolver {
                 name = rec.title?.displayTitle.orEmpty(),
                 poster = recPoster,
                 banner = rec.bannerImage,
-                logo = null,
+                logo = MetaHubArtwork.getLogoUrl("ani_$recId"),
                 description = null,
                 releaseInfo = if (rec.episodes != null) "${rec.episodes} Ep" else null,
             )

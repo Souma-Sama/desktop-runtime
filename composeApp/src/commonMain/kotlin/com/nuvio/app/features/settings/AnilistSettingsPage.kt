@@ -115,11 +115,55 @@ internal fun LazyListScope.anilistSettingsContent(
     }
 
     item {
+        AnilistPosterDisplaySection(isTablet = isTablet)
+    }
+
+    item {
         AnilistLibrarySectionsSection(isTablet = isTablet)
     }
 
     item {
         AnilistDisplayPreferencesSection(isTablet = isTablet)
+    }
+}
+
+@Composable
+private fun AnilistPosterDisplaySection(isTablet: Boolean) {
+    val prefs by AnilistPreferencesRepository.preferences.collectAsStateWithLifecycle()
+
+    SettingsSection(
+        title = "Poster Display Options",
+        isTablet = isTablet,
+    ) {
+        SettingsGroup(isTablet = isTablet) {
+            SettingsSwitchRow(
+                title = "Show Title Logos on Posters",
+                description = "Display transparent anime title logos over poster cards across shelves and catalogs.",
+                checked = prefs.showPosterTitleLogos,
+                isTablet = isTablet,
+                onCheckedChange = AnilistPreferencesRepository::setShowPosterTitleLogos,
+            )
+
+            SettingsGroupDivider(isTablet = isTablet)
+
+            SettingsSwitchRow(
+                title = "Show AniList Scores",
+                description = "Display native AniList rating badges in the top right corner of anime poster cards.",
+                checked = prefs.showPosterAnilistScore,
+                isTablet = isTablet,
+                onCheckedChange = AnilistPreferencesRepository::setShowPosterAnilistScore,
+            )
+
+            SettingsGroupDivider(isTablet = isTablet)
+
+            SettingsSwitchRow(
+                title = "Show MyAnimeList (MAL) Scores",
+                description = "Display native MyAnimeList (MAL) rating badges in the top right corner of anime poster cards.",
+                checked = prefs.showPosterMalScore,
+                isTablet = isTablet,
+                onCheckedChange = AnilistPreferencesRepository::setShowPosterMalScore,
+            )
+        }
     }
 }
 

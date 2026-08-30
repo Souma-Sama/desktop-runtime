@@ -47,6 +47,7 @@ import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.foundation.Image
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -54,8 +55,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -73,7 +77,12 @@ import com.nuvio.app.core.ui.NuvioCardDepthSurface
 import com.nuvio.app.core.ui.nuvioCardDepth
 import com.nuvio.app.core.ui.nuvioDesktopDragScroll
 import com.nuvio.app.core.ui.rememberPosterCardStyleUiState
+import com.nuvio.app.features.anilist.AnilistPreferencesRepository
 import com.nuvio.app.features.home.MetaPreview
+import nuvio.composeapp.generated.resources.Res
+import nuvio.composeapp.generated.resources.rating_anilist
+import org.jetbrains.compose.resources.painterResource
+import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
 
 private fun aniChartColumnCountForWidth(screenWidth: Dp): Int =
@@ -522,6 +531,7 @@ private fun AniChartSeasonalGrid(
                             name = anime.title,
                             poster = anime.poster,
                             banner = anime.banner,
+                            anilistScore = anime.score?.toDouble(),
                         )
                     )
                 },
@@ -577,6 +587,7 @@ private fun AniChartScheduleGrid(
                             name = anime.title,
                             poster = anime.poster,
                             banner = anime.banner,
+                            anilistScore = anime.score?.toDouble(),
                         )
                     )
                 },
@@ -593,6 +604,7 @@ private fun AniChartCard(
     showAiringTime: Boolean = false,
     onClick: () -> Unit,
 ) {
+    val anilistPrefs by AnilistPreferencesRepository.preferences.collectAsStateWithLifecycle()
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
     val scale by animateFloatAsState(
@@ -722,33 +734,35 @@ private fun AniChartCard(
                 }
             }
 
-            // Top Right: Score badge
-            if (media.score != null && media.score > 0.0) {
-                Box(
+            // Top Right: Score badge (AniList)
+            if (media.score != null && media.score > 0.0 && anilistPrefs.showPosterAnilistScore) {
+                Surface(
+                    shape = RoundedCornerShape(4.dp),
+                    color = Color.Black.copy(alpha = 0.72f),
+                    border = BorderStroke(0.5.dp, Color.White.copy(alpha = 0.18f)),
                     modifier = Modifier
                         .align(Alignment.TopEnd)
-                        .padding(6.dp)
-                        .clip(RoundedCornerShape(6.dp))
-                        .background(Color.Black.copy(alpha = 0.70f))
-                        .padding(horizontal = 5.dp, vertical = 2.dp),
+                        .padding(6.dp),
                 ) {
                     Row(
+                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(3.dp),
                     ) {
-                        Icon(
-                            imageVector = Icons.Rounded.Star,
-                            contentDescription = "Score",
-                            tint = Color(0xFFFFC107),
-                            modifier = Modifier.size(11.dp),
+                        Image(
+                            painter = painterResource(Res.drawable.rating_anilist),
+                            contentDescription = "AniList",
+                            modifier = Modifier.size(12.dp),
                         )
                         Text(
-                            text = media.score.toString(),
+                            text = "${media.score.roundToInt()}%",
                             style = MaterialTheme.typography.labelSmall.copy(
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 10.sp,
+                                letterSpacing = (-0.2).sp,
                             ),
                             color = Color.White,
+                            maxLines = 1,
                         )
                     }
                 }

@@ -123,13 +123,14 @@ fun LazyListScope.anilistLibraryContent(
 
 private fun AnilistLibraryItem.toMetaPreview(): MetaPreview =
     MetaPreview(
-        id = "anilist:$id",
+        id = "ani_$id",
         type = if (format?.equals("MOVIE", ignoreCase = true) == true) "movie" else "series",
         name = title,
         poster = posterUrl,
         banner = posterUrl,
-        logo = null,
+        logo = MetaHubArtwork.getLogoUrl("ani_$id"),
         description = null,
         releaseInfo = if (progress > 0 && totalEpisodes != null) "Ep $progress / $totalEpisodes" else if (progress > 0) "Ep $progress" else null,
+        anilistScore = if (score != null && score > 0) score else null,
         posterShape = PosterShape.Poster,
     )

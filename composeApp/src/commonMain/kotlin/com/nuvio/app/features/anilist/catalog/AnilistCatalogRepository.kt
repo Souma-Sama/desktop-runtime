@@ -331,6 +331,7 @@ object AnilistCatalogRepository {
                     val score = (media.averageScore / 10.0)
                     "${(score * 10).toInt() / 10.0}"
                 } else null,
+                anilistScore = if (media.averageScore != null && media.averageScore > 0) media.averageScore.toDouble() else null,
                 genres = media.genres,
             )
         }

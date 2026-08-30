@@ -125,6 +125,18 @@ object AnilistPreferencesRepository {
         updateAndPersist { it.copy(preferredScoreFormat = format) }
     }
 
+    fun setShowPosterTitleLogos(enabled: Boolean) {
+        updateAndPersist { it.copy(showPosterTitleLogos = enabled) }
+    }
+
+    fun setShowPosterAnilistScore(enabled: Boolean) {
+        updateAndPersist { it.copy(showPosterAnilistScore = enabled) }
+    }
+
+    fun setShowPosterMalScore(enabled: Boolean) {
+        updateAndPersist { it.copy(showPosterMalScore = enabled) }
+    }
+
     private fun updateAndPersist(transform: (AnilistPreferences) -> AnilistPreferences) {
         ensureLoaded()
         _preferences.update { current ->

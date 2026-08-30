@@ -3,7 +3,9 @@ package com.nuvio.app.core.ui
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
@@ -34,6 +36,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -44,6 +47,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
@@ -52,12 +57,20 @@ import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import com.nuvio.app.isDesktop
+import nuvio.composeapp.generated.resources.Res
+import nuvio.composeapp.generated.resources.rating_anilist
+import nuvio.composeapp.generated.resources.rating_mal
+import org.jetbrains.compose.resources.painterResource
+import kotlin.math.absoluteValue
+import kotlin.math.roundToInt
 import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.home_view_all
 import nuvio.composeapp.generated.resources.poster_logo_content_description
@@ -236,6 +249,8 @@ fun NuvioPosterCard(
     showTitleBelow: Boolean = true,
     bottomLeftLogoUrl: String? = null,
     bottomLeftText: String? = null,
+    anilistScore: Double? = null,
+    malScore: Double? = null,
     isWatched: Boolean = false,
     onClick: (() -> Unit)? = null,
     onLongClick: (() -> Unit)? = null,
@@ -300,7 +315,13 @@ fun NuvioPosterCard(
                 Box(
                     modifier = Modifier
                         .align(Alignment.BottomStart)
-                        .padding(horizontal = NuvioTokens.Space.s10, vertical = NuvioTokens.Space.s10),
+                        .fillMaxWidth()
+                        .background(
+                            Brush.verticalGradient(
+                                colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.65f)),
+                            )
+                        )
+                        .padding(horizontal = NuvioTokens.Space.s8, vertical = NuvioTokens.Space.s8),
                 ) {
                     if (!bottomLeftLogoUrl.isNullOrBlank()) {
                         NuvioAsyncImage(
@@ -310,6 +331,7 @@ fun NuvioPosterCard(
                                 .width(catalogLogoOverlaySize.width)
                                 .height(catalogLogoOverlaySize.height),
                             contentScale = ContentScale.Fit,
+                            alignment = Alignment.BottomStart,
                         )
                     } else {
                         Text(
@@ -323,6 +345,12 @@ fun NuvioPosterCard(
                     }
                 }
             }
+
+            PosterRatingBadgesOverlay(
+                anilistScore = anilistScore,
+                malScore = malScore,
+                modifier = Modifier.align(Alignment.TopEnd),
+            )
 
             NuvioPosterWatchedOverlay(isWatched = isWatched)
         }
@@ -623,4 +651,76 @@ private fun androidx.compose.ui.layout.LayoutCoordinates.unclippedBoundsInRoot()
         right = position.x + size.width,
         bottom = position.y + size.height,
     )
+}
+
+@Composable
+private fun PosterRatingBadgesOverlay(
+    anilistScore: Double?,
+    malScore: Double?,
+    modifier: Modifier = Modifier,
+) {
+    val hasAnilist = anilistScore != null && anilistScore > 0
+    val hasMal = malScore != null && malScore > 0
+    if (!hasAnilist && !hasMal) return
+
+    Row(
+        modifier = modifier
+            .padding(top = 6.dp, end = 6.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (hasAnilist) {
+            PosterScoreBadge(
+                logo = Res.drawable.rating_anilist,
+                contentDescription = "AniList",
+                text = "${anilistScore!!.roundToInt()}%",
+            )
+        }
+        if (hasMal) {
+            val roundedMal = (malScore!! * 100.0).roundToInt()
+            val whole = roundedMal / 100
+            val decimal = (roundedMal % 100).absoluteValue
+            val malFormatted = "$whole.${decimal.toString().padStart(2, '0')}"
+            PosterScoreBadge(
+                logo = Res.drawable.rating_mal,
+                contentDescription = "MyAnimeList",
+                text = malFormatted,
+            )
+        }
+    }
+}
+
+@Composable
+private fun PosterScoreBadge(
+    logo: org.jetbrains.compose.resources.DrawableResource,
+    contentDescription: String,
+    text: String,
+) {
+    Surface(
+        shape = RoundedCornerShape(4.dp),
+        color = Color.Black.copy(alpha = 0.72f),
+        border = BorderStroke(0.5.dp, Color.White.copy(alpha = 0.18f)),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(3.dp),
+        ) {
+            Image(
+                painter = painterResource(logo),
+                contentDescription = contentDescription,
+                modifier = Modifier.size(12.dp),
+            )
+            Text(
+                text = text,
+                style = MaterialTheme.typography.labelSmall.copy(
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = (-0.2).sp,
+                ),
+                color = Color.White,
+                maxLines = 1,
+            )
+        }
+    }
 }
