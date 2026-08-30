@@ -347,7 +347,77 @@ object AnilistMetaDetailsResolver {
         onUpdate: suspend ((MetaDetails) -> MetaDetails) -> Unit,
     ): MetaDetails = coroutineScope {
         val anilistId = AnilistTrackerCoordinator.extractAnilistId(meta.id) ?: return@coroutineScope meta
-        val media = AnilistApi.getCachedMedia(anilistId)
+        val token = AnilistAuthRepository.token.value
+        val cachedMedia = AnilistApi.getCachedMedia(anilistId)
+        val media = if (cachedMedia != null && cachedMedia.isFullDetails) {
+            cachedMedia
+        } else {
+            runCatching {
+                withTimeoutOrNull(4000L) {
+                    AnilistApi.fetchMediaById(anilistId, token = token)
+                }
+            }.getOrNull() ?: cachedMedia
+        }
+
+        // If recommendations or relations are missing from current meta, apply them immediately
+        if (media != null && (meta.moreLikeThis.isEmpty() || meta.relations.isEmpty())) {
+            val recs = media.recommendations.mapNotNull { rec ->
+                val recId = rec.id
+                val isRecMovie = rec.format == "MOVIE" || rec.episodes == 1
+                val recType = if (isRecMovie) "movie" else "series"
+                val recPoster = rec.coverImage?.extraLarge ?: rec.coverImage?.large ?: return@mapNotNull null
+                val recScore = if (rec.averageScore != null && rec.averageScore > 0) rec.averageScore / 10.0 else null
+                com.nuvio.app.features.home.MetaPreview(
+                    id = "ani_$recId",
+                    type = recType,
+                    name = rec.title?.displayTitle.orEmpty(),
+                    poster = recPoster,
+                    banner = rec.bannerImage,
+                    logo = MetaHubArtwork.getLogoUrl("ani_$recId"),
+                    description = null,
+                    releaseInfo = if (rec.episodes != null) "${rec.episodes} Ep" else null,
+                    imdbRating = recScore?.let { "${((it * 10).toInt()) / 10.0}" },
+                    anilistScore = if (rec.averageScore != null && rec.averageScore > 0) rec.averageScore.toDouble() else null,
+                )
+            }
+
+            val rels = media.relations.mapNotNull { rel ->
+                val relTitle = rel.title?.displayTitle?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
+                val relPoster = rel.coverImage?.extraLarge ?: rel.coverImage?.large
+                val isRelMovie = rel.format == "MOVIE" || rel.episodes == 1
+                val relType = if (isRelMovie) "movie" else "series"
+                val relationLabel = when (rel.relationType?.uppercase()) {
+                    "PREQUEL" -> "Prequel"
+                    "SEQUEL" -> "Sequel"
+                    "PARENT" -> "Parent Story"
+                    "SIDE_STORY" -> "Side Story"
+                    "SPIN_OFF" -> "Spin-Off"
+                    "ALTERNATIVE" -> "Alternative"
+                    "SUMMARY" -> "Summary"
+                    "CHARACTER" -> "Character"
+                    "OTHER" -> "Other"
+                    else -> rel.relationType?.replace('_', ' ')?.lowercase()?.replaceFirstChar { it.uppercase() } ?: "Related"
+                }
+                com.nuvio.app.features.details.MetaRelation(
+                    id = "ani_${rel.id}",
+                    type = relType,
+                    relationType = relationLabel,
+                    title = relTitle,
+                    poster = relPoster,
+                    format = rel.format,
+                    episodes = rel.episodes,
+                    status = rel.status,
+                    averageScore = rel.averageScore,
+                )
+            }
+
+            onUpdate { current ->
+                current.copy(
+                    moreLikeThis = if (current.moreLikeThis.isEmpty()) recs else current.moreLikeThis,
+                    relations = if (current.relations.isEmpty()) rels else current.relations,
+                )
+            }
+        }
 
         // 1. ARM mapping in background
         val armDeferred = async {
@@ -366,15 +436,6 @@ object AnilistMetaDetailsResolver {
             } else null
         }
 
-        // 3. YouTube trailer in background (if AniList had no official trailer)
-        val ytDeferred = async {
-            if (meta.trailers.isEmpty() && meta.name.isNotBlank()) {
-                runCatching {
-                    withTimeoutOrNull(3000L) { fetchYoutubeAnimeTrailers(meta.name) }
-                }.getOrNull() ?: emptyList()
-            } else emptyList()
-        }
-
         // Apply MAL score when ready
         val malMeta = malDeferred.await()
         if (malMeta?.score != null && malMeta.score > 0) {
@@ -385,16 +446,6 @@ object AnilistMetaDetailsResolver {
                     externalRatings = updated,
                     ageRating = malMeta.ageRating ?: current.ageRating,
                 )
-            }
-        }
-
-        // Apply YouTube trailers when ready
-        val ytTrailers = ytDeferred.await()
-        if (ytTrailers.isNotEmpty()) {
-            onUpdate { current ->
-                if (current.trailers.isEmpty()) {
-                    current.copy(trailers = ytTrailers)
-                } else current
             }
         }
 
@@ -1239,76 +1290,5 @@ object AnilistMetaDetailsResolver {
             fullText.contains("bonus") ||
             fullText.contains("includes episode 0") ||
             (format == "ONA" && (fullText.contains("short") || fullText.contains("sp") || (media.episodes != null && media.episodes <= 13 && media.duration != null && media.duration <= 10)))
-    }
-
-    private val trailerCache = mutableMapOf<String, List<com.nuvio.app.features.details.MetaTrailer>>()
-
-    private suspend fun fetchYoutubeAnimeTrailers(animeTitle: String): List<com.nuvio.app.features.details.MetaTrailer> {
-        val cleanTitle = animeTitle.trim()
-        if (cleanTitle.isBlank()) return emptyList()
-
-        trailerCache[cleanTitle]?.let { return it }
-
-        return runCatching {
-            withTimeoutOrNull(2000L) {
-                val encodedQuery = cleanTitle.encodeUnsafeHttpUrlCharacters()
-                val url = "https://www.youtube.com/results?search_query=$encodedQuery+anime+official+trailer"
-                val html = httpGetTextWithHeaders(
-                    url = url,
-                    headers = mapOf(
-                        "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-                        "Accept-Language" to "en-US,en;q=0.9",
-                    ),
-                )
-
-                val regex = Regex(""""videoId":"([a-zA-Z0-9_-]{11})".*?"title":\{"runs":\[\{"text":"(.*?)"\}""")
-                val matches = regex.findAll(html)
-
-                val seen = mutableSetOf<String>()
-                val trailers = mutableListOf<com.nuvio.app.features.details.MetaTrailer>()
-                val keywords = listOf("trailer", "pv", "teaser", "preview", "official", "promo", "sub", "dub")
-
-                for (match in matches) {
-                    val vid = match.groupValues.getOrNull(1) ?: continue
-                    val rawName = match.groupValues.getOrNull(2) ?: continue
-                    if (!seen.add(vid)) continue
-
-                    val lower = rawName.lowercase()
-                    if (keywords.any { lower.contains(it) }) {
-                        val trailerType = when {
-                            lower.contains("teaser") -> "Teaser"
-                            lower.contains("pv") || lower.contains("preview") || lower.contains("promo") -> "Promo Video"
-                            lower.contains("clip") -> "Clip"
-                            else -> "Trailer"
-                        }
-
-                        val cleanName = rawName
-                            .replace("&quot;", "\"")
-                            .replace("&amp;", "&")
-                            .replace("&#39;", "'")
-                            .replace(Regex("""\s*\|\s*Crunchyroll""", RegexOption.IGNORE_CASE), "")
-                            .replace(Regex("""\s*\|\s*Netflix""", RegexOption.IGNORE_CASE), "")
-                            .replace(Regex("""\s*\|\s*TOHO animation""", RegexOption.IGNORE_CASE), "")
-                            .replace(Regex("""\s*\|\s*Aniplex""", RegexOption.IGNORE_CASE), "")
-                            .trim()
-
-                        trailers.add(
-                            com.nuvio.app.features.details.MetaTrailer(
-                                id = vid,
-                                key = vid,
-                                name = cleanName.ifBlank { "Official Trailer" },
-                                site = "YouTube",
-                                type = trailerType,
-                                official = true,
-                            ),
-                        )
-
-                        if (trailers.size >= 8) break
-                    }
-                }
-                trailerCache[cleanTitle] = trailers
-                trailers
-            }
-        }.getOrNull().orEmpty()
     }
 }

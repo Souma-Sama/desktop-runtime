@@ -585,7 +585,7 @@ object MetaDetailsRepository {
         fallbackItemType: String,
     ): MetaDetails {
         val isAnilist = meta.id.startsWith("ani_", ignoreCase = true) || meta.id.startsWith("anilist:", ignoreCase = true)
-        if (isAnilist && meta.moreLikeThis.isNotEmpty()) {
+        if (isAnilist) {
             return meta
         }
 
