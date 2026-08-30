@@ -397,10 +397,50 @@ object AnilistMetaDetailsResolver {
                     )
                 }
 
+                val castPersons = buildCategorizedCast(media)
+                val animationStudios = media.studios.filter { it.isAnimationStudio }.mapNotNull { studio ->
+                    studio.name?.takeIf { it.isNotBlank() }?.let { name ->
+                        com.nuvio.app.features.details.MetaCompany(
+                            name = name,
+                            logo = AnimeStudioLogos.findLogo(name),
+                        )
+                    }
+                }
+                val networks = media.studios.filter { !it.isAnimationStudio }.mapNotNull { studio ->
+                    studio.name?.takeIf { it.isNotBlank() }?.let { name ->
+                        com.nuvio.app.features.details.MetaCompany(
+                            name = name,
+                            logo = AnimeStudioLogos.findLogo(name),
+                        )
+                    }
+                }
+                val primaryTrailer = if (media.trailer != null && media.trailer.id != null) {
+                    listOf(
+                        MetaTrailer(
+                            id = media.trailer.id,
+                            key = media.trailer.id,
+                            name = "Official Trailer",
+                            site = media.trailer.site ?: "YouTube",
+                            type = "Trailer",
+                            official = true,
+                        )
+                    )
+                } else emptyList()
+                val directors = media.staff.filter { it.role?.contains("Director", ignoreCase = true) == true }.mapNotNull { it.name }
+                val writers = media.staff.filter { it.role?.contains("Original Creator", ignoreCase = true) == true || it.role?.contains("Series Composition", ignoreCase = true) == true }.mapNotNull { it.name }
+                val cleanDescription = com.nuvio.app.core.format.cleanHtmlDescription(media.description)
+
                 onUpdate { current ->
                     current.copy(
                         moreLikeThis = if (recs.isNotEmpty()) recs else current.moreLikeThis,
                         relations = if (rels.isNotEmpty()) rels else current.relations,
+                        cast = if (castPersons.isNotEmpty()) castPersons else current.cast,
+                        productionCompanies = if (animationStudios.isNotEmpty()) animationStudios else current.productionCompanies,
+                        networks = if (networks.isNotEmpty()) networks else current.networks,
+                        trailers = if (primaryTrailer.isNotEmpty()) primaryTrailer else current.trailers,
+                        director = if (directors.isNotEmpty()) directors else current.director,
+                        writer = if (writers.isNotEmpty()) writers else current.writer,
+                        description = cleanDescription.ifBlank { current.description },
                         status = media.status ?: current.status,
                     )
                 }
