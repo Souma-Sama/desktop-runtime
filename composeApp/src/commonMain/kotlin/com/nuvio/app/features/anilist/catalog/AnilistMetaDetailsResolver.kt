@@ -38,306 +38,222 @@ object AnilistMetaDetailsResolver {
 
     private val resolvedMetaDetailsCache = mutableMapOf<String, MetaDetails>()
 
+    fun buildBaseMetaFromAnilistMedia(media: AnilistMedia): MetaDetails {
+        val anilistId = media.id
+        val isMovie = media.format == "MOVIE"
+        val totalEpisodes = media.episodes ?: media.streamingEpisodes.size.takeIf { it > 0 } ?: 12
+
+        val poster = media.coverImage?.extraLarge
+            ?: media.coverImage?.large
+            ?: media.coverImage?.medium
+
+        val logo = MetaHubArtwork.getLogoUrl("ani_$anilistId")
+        val cleanDescription = com.nuvio.app.core.format.cleanHtmlDescription(media.description)
+        val castPersons = buildCategorizedCast(media)
+
+        val animationStudios = media.studios.filter { it.isAnimationStudio }.mapNotNull { studio ->
+            studio.name?.takeIf { it.isNotBlank() }?.let { name ->
+                com.nuvio.app.features.details.MetaCompany(
+                    name = name,
+                    logo = AnimeStudioLogos.findLogo(name),
+                )
+            }
+        }
+
+        val networks = media.studios.filter { !it.isAnimationStudio }.mapNotNull { studio ->
+            studio.name?.takeIf { it.isNotBlank() }?.let { name ->
+                com.nuvio.app.features.details.MetaCompany(
+                    name = name,
+                    logo = AnimeStudioLogos.findLogo(name),
+                )
+            }
+        }
+
+        val recommendations = media.recommendations.mapNotNull { rec ->
+            val recId = rec.id
+            val isRecMovie = rec.format == "MOVIE" || rec.episodes == 1
+            val recType = if (isRecMovie) "movie" else "series"
+            val recPoster = rec.coverImage?.extraLarge ?: rec.coverImage?.large ?: return@mapNotNull null
+            val recScore = if (rec.averageScore != null && rec.averageScore > 0) rec.averageScore / 10.0 else null
+            com.nuvio.app.features.home.MetaPreview(
+                id = "ani_$recId",
+                type = recType,
+                name = rec.title?.displayTitle.orEmpty(),
+                poster = recPoster,
+                banner = rec.bannerImage,
+                logo = MetaHubArtwork.getLogoUrl("ani_$recId"),
+                description = null,
+                releaseInfo = if (rec.episodes != null) "${rec.episodes} Ep" else null,
+                imdbRating = recScore?.let { "${((it * 10).toInt()) / 10.0}" },
+                anilistScore = if (rec.averageScore != null && rec.averageScore > 0) rec.averageScore.toDouble() else null,
+            )
+        }
+
+        val relations = media.relations.mapNotNull { rel ->
+            val relTitle = rel.title?.displayTitle?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
+            val relPoster = rel.coverImage?.bestUrl
+                ?: rel.coverImage?.extraLarge
+                ?: rel.coverImage?.large
+                ?: rel.coverImage?.medium
+            val isRelMovie = rel.format == "MOVIE" || rel.episodes == 1
+            val relType = if (isRelMovie) "movie" else "series"
+            val relationLabel = when (rel.relationType?.uppercase()) {
+                "PREQUEL" -> "Prequel"
+                "SEQUEL" -> "Sequel"
+                "PARENT" -> "Parent Story"
+                "SIDE_STORY" -> "Side Story"
+                "SPIN_OFF" -> "Spin-Off"
+                "ALTERNATIVE" -> "Alternative"
+                "SUMMARY" -> "Summary"
+                "CHARACTER" -> "Character"
+                "OTHER" -> "Other"
+                else -> rel.relationType?.replace('_', ' ')?.lowercase()?.replaceFirstChar { it.uppercase() } ?: "Related"
+            }
+            com.nuvio.app.features.details.MetaRelation(
+                id = "ani_${rel.id}",
+                type = relType,
+                relationType = relationLabel,
+                title = relTitle,
+                poster = relPoster,
+                format = rel.format,
+                episodes = rel.episodes,
+                status = rel.status,
+                averageScore = rel.averageScore,
+            )
+        }
+
+        val nextAiringCountdown = media.nextAiringEpisode?.let { nextEp ->
+            val epNum = nextEp.episode ?: return@let null
+            val timeUntil = nextEp.timeUntilAiring
+            if (timeUntil != null && timeUntil > 0) {
+                val days = timeUntil / 86400
+                val hours = (timeUntil % 86400) / 3600
+                val mins = (timeUntil % 3600) / 60
+                val timeFormatted = when {
+                    days > 0 -> "${days}d ${hours}h"
+                    hours > 0 -> "${hours}h ${mins}m"
+                    else -> "${mins}m"
+                }
+                "Ep $epNum in $timeFormatted"
+            } else {
+                "Ep $epNum Airing Soon"
+            }
+        }
+
+        val primaryTrailer = if (media.trailer != null && media.trailer.id != null) {
+            listOf(
+                MetaTrailer(
+                    id = media.trailer.id,
+                    key = media.trailer.id,
+                    name = "Official Trailer",
+                    site = media.trailer.site ?: "YouTube",
+                    type = "Trailer",
+                    official = true,
+                )
+            )
+        } else emptyList()
+
+        val directors = media.staff.filter { it.role?.contains("Director", ignoreCase = true) == true }.mapNotNull { it.name }
+        val writers = media.staff.filter { it.role?.contains("Original Creator", ignoreCase = true) == true || it.role?.contains("Series Composition", ignoreCase = true) == true }.mapNotNull { it.name }
+
+        val mappedVideos = if (isMovie) {
+            emptyList()
+        } else {
+            val startsAtZero = media.description?.contains("Includes Episode 0", ignoreCase = true) == true ||
+                (media.description?.contains("Episode 0", ignoreCase = true) == true && media.streamingEpisodes.any { it.title?.contains("Episode 0", ignoreCase = true) == true })
+            val epRange = if (startsAtZero) (0 until totalEpisodes) else (1..totalEpisodes)
+
+            epRange.map { idx ->
+                val epNum = idx
+                val streamingEp = if (startsAtZero) media.streamingEpisodes.getOrNull(idx) else media.streamingEpisodes.getOrNull(idx - 1)
+                val rawTitle = streamingEp?.title?.takeIf { it.isNotBlank() } ?: "Episode $epNum"
+                val epTitle = cleanEpisodeTitle(rawTitle, epNum)
+                val thumb = streamingEp?.thumbnail?.takeIf { it.isNotBlank() }
+                MetaVideo(
+                    id = "anilist:$anilistId:$epNum",
+                    title = epTitle,
+                    season = 1,
+                    episode = epNum,
+                    overview = null,
+                    thumbnail = thumb,
+                    fallbackThumbnail = thumb,
+                    runtime = media.duration,
+                    released = resolveEpisodeAirDate(epNum, null, null, media),
+                    streams = emptyList(),
+                )
+            }
+        }
+
+        val formattedScore = if (media.averageScore != null && media.averageScore > 0) {
+            val score = media.averageScore / 10.0
+            "${(score * 10).toInt() / 10.0}"
+        } else null
+
+        val ratings = mutableListOf<com.nuvio.app.features.details.MetaExternalRating>()
+        if (media.averageScore != null && media.averageScore > 0) {
+            ratings.add(
+                com.nuvio.app.features.details.MetaExternalRating(
+                    source = "anilist",
+                    value = media.averageScore.toDouble(),
+                )
+            )
+        }
+
+        val releaseYear = when {
+            media.startDateYear != null -> "${media.startDateYear}"
+            media.episodes != null -> "${media.episodes} Episodes"
+            else -> null
+        }
+
+        val ageRating = if (media.genres.contains("Hentai")) "18+" else "TV-14"
+        val runtime = if (media.duration != null && media.duration > 0) "${media.duration} min" else null
+
+        return MetaDetails(
+            id = "ani_$anilistId",
+            type = if (isMovie) "movie" else "series",
+            name = media.title?.displayTitle.orEmpty(),
+            poster = poster,
+            background = null,
+            logo = logo,
+            description = cleanDescription,
+            releaseInfo = releaseYear,
+            status = media.status,
+            lastAirDate = media.endDateYear?.toString() ?: releaseYear,
+            imdbRating = formattedScore,
+            ageRating = ageRating,
+            runtime = runtime,
+            externalRatings = ratings,
+            genres = media.genres,
+            country = "JP",
+            language = "ja",
+            hasScheduledVideos = media.status == "RELEASING",
+            cast = castPersons,
+            productionCompanies = animationStudios,
+            networks = networks,
+            moreLikeThis = recommendations,
+            relations = relations,
+            nextAiringEpisode = nextAiringCountdown,
+            trailers = primaryTrailer,
+            director = directors,
+            writer = writers,
+            videos = mappedVideos,
+            defaultVideoId = if (isMovie) "anilist:$anilistId" else mappedVideos.firstOrNull()?.id,
+        )
+    }
+
     suspend fun resolveMetaDetails(rawId: String): MetaDetails? {
         val anilistId = AnilistTrackerCoordinator.extractAnilistId(rawId) ?: return null
         val token = AnilistAuthRepository.token.value
 
-        return coroutineScope {
-            // Fetch AniList full media & ARM mapping concurrently (~200ms)
-            val mediaDeferred = async {
-                val cached = AnilistApi.getCachedMedia(anilistId)
-                if (cached != null && cached.isFullDetails) {
-                    cached
-                } else {
-                    runCatching {
-                        withTimeoutOrNull(4000L) {
-                            AnilistApi.fetchMediaById(anilistId, token = token)
-                        }
-                    }.getOrNull() ?: cached
+        val media = AnilistApi.getCachedMedia(anilistId)
+            ?: runCatching {
+                withTimeoutOrNull(2500L) {
+                    AnilistApi.fetchMediaById(anilistId, token = token)
                 }
-            }
+            }.getOrNull()
+            ?: return null
 
-            val armDeferred = async {
-                val cachedArm = armMappingCache[anilistId]
-                cachedArm ?: runCatching {
-                    withTimeoutOrNull(2000L) { resolveArmMapping(anilistId) }
-                }.getOrNull() ?: ArmMapping(null, null, null, null, 1)
-            }
-
-            val media = mediaDeferred.await() ?: return@coroutineScope null
-            val armMapping = armDeferred.await()
-
-            val effectiveImdbId = resolveEffectiveImdbId(media, armMapping.imdbId)
-            val isSpecial = isSpecialAnime(media)
-            val targetSeason = when {
-                armMapping.season == 0 -> 0
-                isSpecial -> 0
-                else -> armMapping.season
-            }
-
-            val kitsuId = armMapping.kitsuId?.removePrefix("kitsu:")?.takeIf { it.isNotBlank() }
-                ?: resolveKitsuId(anilistId, media)
-
-            val kitsuEpisodes = if (!kitsuId.isNullOrBlank()) {
-                runCatching {
-                    withTimeoutOrNull(2000L) { fetchKitsuEpisodes(kitsuId) }
-                }.getOrNull() ?: emptyMap()
-            } else emptyMap()
-
-            val isMovie = media.format == "MOVIE"
-            val totalEpisodes = media.episodes ?: media.streamingEpisodes.size.takeIf { it > 0 } ?: kitsuEpisodes.size.takeIf { it > 0 } ?: 12
-
-            val poster = media.coverImage?.extraLarge
-                ?: media.coverImage?.large
-                ?: media.coverImage?.medium
-
-            // Exclusively use Metahub backdrop — NO AniList banner image!
-            val backdrop = if (!effectiveImdbId.isNullOrBlank()) {
-                "https://images.metahub.space/background/medium/$effectiveImdbId/img"
-            } else null
-
-            val logo = if (!isSpecial && targetSeason != 0 && !effectiveImdbId.isNullOrBlank()) {
-                "https://images.metahub.space/logo/medium/$effectiveImdbId/img"
-            } else null
-
-            val cleanDescription = com.nuvio.app.core.format.cleanHtmlDescription(media.description)
-            val castPersons = buildCategorizedCast(media)
-
-            val animationStudios = media.studios.filter { it.isAnimationStudio }.mapNotNull { studio ->
-                studio.name?.takeIf { it.isNotBlank() }?.let { name ->
-                    com.nuvio.app.features.details.MetaCompany(
-                        name = name,
-                        logo = AnimeStudioLogos.findLogo(name),
-                    )
-                }
-            }
-
-            val networks = media.studios.filter { !it.isAnimationStudio }.mapNotNull { studio ->
-                studio.name?.takeIf { it.isNotBlank() }?.let { name ->
-                    com.nuvio.app.features.details.MetaCompany(
-                        name = name,
-                        logo = AnimeStudioLogos.findLogo(name),
-                    )
-                }
-            }
-
-            val recommendations = media.recommendations.mapNotNull { rec ->
-                val recId = rec.id
-                val isRecMovie = rec.format == "MOVIE" || rec.episodes == 1
-                val recType = if (isRecMovie) "movie" else "series"
-                val recPoster = rec.coverImage?.extraLarge ?: rec.coverImage?.large ?: return@mapNotNull null
-                val recScore = if (rec.averageScore != null && rec.averageScore > 0) rec.averageScore / 10.0 else null
-                com.nuvio.app.features.home.MetaPreview(
-                    id = "ani_$recId",
-                    type = recType,
-                    name = rec.title?.displayTitle.orEmpty(),
-                    poster = recPoster,
-                    banner = rec.bannerImage,
-                    logo = MetaHubArtwork.getLogoUrl("ani_$recId"),
-                    description = null,
-                    releaseInfo = if (rec.episodes != null) "${rec.episodes} Ep" else null,
-                    imdbRating = recScore?.let { "${((it * 10).toInt()) / 10.0}" },
-                    anilistScore = if (rec.averageScore != null && rec.averageScore > 0) rec.averageScore.toDouble() else null,
-                )
-            }
-
-            val relations = media.relations.mapNotNull { rel ->
-                val relTitle = rel.title?.displayTitle?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
-                val relPoster = rel.coverImage?.bestUrl
-                    ?: rel.coverImage?.extraLarge
-                    ?: rel.coverImage?.large
-                    ?: rel.coverImage?.medium
-                    ?: "https://img.anili.st/media/${rel.id}"
-                val isRelMovie = rel.format == "MOVIE" || rel.episodes == 1
-                val relType = if (isRelMovie) "movie" else "series"
-                val relationLabel = when (rel.relationType?.uppercase()) {
-                    "PREQUEL" -> "Prequel"
-                    "SEQUEL" -> "Sequel"
-                    "PARENT" -> "Parent Story"
-                    "SIDE_STORY" -> "Side Story"
-                    "SPIN_OFF" -> "Spin-Off"
-                    "ALTERNATIVE" -> "Alternative"
-                    "SUMMARY" -> "Summary"
-                    "CHARACTER" -> "Character"
-                    "OTHER" -> "Other"
-                    else -> rel.relationType?.replace('_', ' ')?.lowercase()?.replaceFirstChar { it.uppercase() } ?: "Related"
-                }
-                com.nuvio.app.features.details.MetaRelation(
-                    id = "ani_${rel.id}",
-                    type = relType,
-                    relationType = relationLabel,
-                    title = relTitle,
-                    poster = relPoster,
-                    format = rel.format,
-                    episodes = rel.episodes,
-                    status = rel.status,
-                    averageScore = rel.averageScore,
-                )
-            }
-
-            val nextAiringCountdown = media.nextAiringEpisode?.let { nextEp ->
-                val epNum = nextEp.episode ?: return@let null
-                val timeUntil = nextEp.timeUntilAiring
-                if (timeUntil != null && timeUntil > 0) {
-                    val days = timeUntil / 86400
-                    val hours = (timeUntil % 86400) / 3600
-                    val mins = (timeUntil % 3600) / 60
-                    val timeFormatted = when {
-                        days > 0 -> "${days}d ${hours}h"
-                        hours > 0 -> "${hours}h ${mins}m"
-                        else -> "${mins}m"
-                    }
-                    "Ep $epNum in $timeFormatted"
-                } else {
-                    "Ep $epNum Airing Soon"
-                }
-            }
-
-            val primaryTrailer = if (media.trailer != null && media.trailer.id != null) {
-                listOf(
-                    MetaTrailer(
-                        id = media.trailer.id,
-                        key = media.trailer.id,
-                        name = "Official Trailer",
-                        site = media.trailer.site ?: "YouTube",
-                        type = "Trailer",
-                        official = true,
-                    )
-                )
-            } else emptyList()
-
-            val directors = media.staff.filter { it.role?.contains("Director", ignoreCase = true) == true }.mapNotNull { it.name }
-            val writers = media.staff.filter { it.role?.contains("Original Creator", ignoreCase = true) == true || it.role?.contains("Series Composition", ignoreCase = true) == true }.mapNotNull { it.name }
-
-            val episodeOffset = resolveEpisodeOffset(
-                media = media,
-                targetSeason = targetSeason,
-                cinemetaVideos = emptyList(),
-            )
-
-            val hasValidImdbId = effectiveImdbId?.startsWith("tt", ignoreCase = true) == true
-
-            val mappedVideos = if (isMovie) {
-                emptyList()
-            } else if (targetSeason == 0) {
-                val totalEps = media.episodes ?: media.streamingEpisodes.size.takeIf { it > 0 } ?: kitsuEpisodes.size.takeIf { it > 0 } ?: 1
-                val startsAtZero = media.description?.contains("Includes Episode 0", ignoreCase = true) == true ||
-                    (media.description?.contains("Episode 0", ignoreCase = true) == true && media.streamingEpisodes.any { it.title?.contains("Episode 0", ignoreCase = true) == true })
-                val epRange = if (startsAtZero) (0 until totalEps) else (1..totalEps)
-
-                epRange.map { idx ->
-                    val actualEpNumber = idx + episodeOffset
-                    val streamingEp = if (startsAtZero) media.streamingEpisodes.getOrNull(idx) else media.streamingEpisodes.getOrNull(idx - 1)
-                    val kitsuEp = kitsuEpisodes[actualEpNumber] ?: kitsuEpisodes[idx] ?: (if (startsAtZero && idx == 0) kitsuEpisodes[0] else null)
-                    val rawTitle = kitsuEp?.title?.takeIf { it.isNotBlank() }
-                        ?: streamingEp?.title?.takeIf { it.isNotBlank() }
-                        ?: if (actualEpNumber == 0) "Episode 0" else "Episode $actualEpNumber"
-                    val epTitle = cleanEpisodeTitle(rawTitle, actualEpNumber)
-                    val metahubThumb = if (hasValidImdbId) "https://episodes.metahub.space/$effectiveImdbId/0/$actualEpNumber/w780.jpg" else null
-                    val kitsuFallback = kitsuEp?.thumbnail?.takeIf { it.isNotBlank() } ?: streamingEp?.thumbnail?.takeIf { it.isNotBlank() }
-                    val videoId = if (!kitsuId.isNullOrBlank()) "kitsu:$kitsuId:$actualEpNumber" else if (!effectiveImdbId.isNullOrBlank()) "$effectiveImdbId:0:$actualEpNumber" else "anilist:$anilistId:$actualEpNumber"
-                    MetaVideo(
-                        id = videoId,
-                        title = epTitle,
-                        season = 0,
-                        episode = actualEpNumber,
-                        overview = kitsuEp?.overview,
-                        thumbnail = metahubThumb ?: kitsuFallback,
-                        fallbackThumbnail = kitsuFallback,
-                        runtime = media.duration,
-                        released = resolveEpisodeAirDate(actualEpNumber, kitsuEp?.airdate, null, media),
-                        streams = emptyList(),
-                    )
-                }
-            } else {
-                (1..totalEpisodes).map { epIdx ->
-                    val actualEpNumber = epIdx + episodeOffset
-                    val streamingEp = media.streamingEpisodes.getOrNull(epIdx - 1)
-                    val kitsuEp = kitsuEpisodes[actualEpNumber] ?: kitsuEpisodes[epIdx]
-                    val rawTitle = kitsuEp?.title?.takeIf { it.isNotBlank() }
-                        ?: streamingEp?.title?.takeIf { it.isNotBlank() }
-                    val epTitle = cleanEpisodeTitle(rawTitle, actualEpNumber)
-                    val metahubThumb = if (hasValidImdbId) "https://episodes.metahub.space/$effectiveImdbId/$targetSeason/$actualEpNumber/w780.jpg" else null
-                    val kitsuFallback = kitsuEp?.thumbnail?.takeIf { it.isNotBlank() } ?: streamingEp?.thumbnail?.takeIf { it.isNotBlank() }
-                    val videoId = if (!kitsuId.isNullOrBlank()) "kitsu:$kitsuId:$actualEpNumber" else if (!effectiveImdbId.isNullOrBlank()) "$effectiveImdbId:$targetSeason:$actualEpNumber" else "anilist:$anilistId:$epIdx"
-
-                    MetaVideo(
-                        id = videoId,
-                        title = epTitle,
-                        season = targetSeason,
-                        episode = actualEpNumber,
-                        overview = kitsuEp?.overview,
-                        thumbnail = metahubThumb ?: kitsuFallback,
-                        fallbackThumbnail = kitsuFallback,
-                        runtime = media.duration,
-                        released = resolveEpisodeAirDate(actualEpNumber, kitsuEp?.airdate, null, media),
-                        streams = emptyList(),
-                    )
-                }
-            }
-
-            val formattedScore = if (media.averageScore != null && media.averageScore > 0) {
-                val score = media.averageScore / 10.0
-                "${(score * 10).toInt() / 10.0}"
-            } else null
-
-            val ratings = mutableListOf<com.nuvio.app.features.details.MetaExternalRating>()
-            if (media.averageScore != null && media.averageScore > 0) {
-                ratings.add(
-                    com.nuvio.app.features.details.MetaExternalRating(
-                        source = "anilist",
-                        value = media.averageScore.toDouble(),
-                    )
-                )
-            }
-
-            val releaseYear = when {
-                media.startDateYear != null -> "${media.startDateYear}"
-                media.episodes != null -> "${media.episodes} Episodes"
-                else -> null
-            }
-
-            val ageRating = if (media.genres.contains("Hentai")) "18+" else "TV-14"
-            val runtime = if (media.duration != null && media.duration > 0) "${media.duration} min" else null
-
-            val defaultVidId = if (isMovie) {
-                if (!kitsuId.isNullOrBlank()) "kitsu:$kitsuId"
-                else if (!effectiveImdbId.isNullOrBlank()) effectiveImdbId
-                else "anilist:$anilistId"
-            } else mappedVideos.firstOrNull()?.id
-
-            MetaDetails(
-                id = "ani_$anilistId",
-                type = if (isMovie) "movie" else "series",
-                name = media.title?.displayTitle.orEmpty(),
-                poster = poster,
-                background = backdrop,
-                logo = logo,
-                description = cleanDescription,
-                releaseInfo = releaseYear,
-                status = media.status,
-                lastAirDate = media.endDateYear?.toString() ?: releaseYear,
-                imdbRating = formattedScore,
-                ageRating = ageRating,
-                runtime = runtime,
-                externalRatings = ratings,
-                genres = media.genres,
-                country = "JP",
-                language = "ja",
-                hasScheduledVideos = media.status == "RELEASING",
-                cast = castPersons,
-                productionCompanies = animationStudios,
-                networks = networks,
-                moreLikeThis = recommendations,
-                relations = relations,
-                nextAiringEpisode = nextAiringCountdown,
-                trailers = primaryTrailer,
-                director = directors,
-                writer = writers,
-                videos = mappedVideos,
-                defaultVideoId = defaultVidId,
-            )
-        }
+        return buildBaseMetaFromAnilistMedia(media)
     }
 
     suspend fun enrichAnimeForMetaScreen(
@@ -347,89 +263,31 @@ object AnilistMetaDetailsResolver {
         val anilistId = AnilistTrackerCoordinator.extractAnilistId(meta.id) ?: return@coroutineScope meta
         val token = AnilistAuthRepository.token.value
         val cachedMedia = AnilistApi.getCachedMedia(anilistId)
-        val media = if (cachedMedia != null && cachedMedia.isFullDetails) {
-            cachedMedia
-        } else {
-            runCatching {
-                withTimeoutOrNull(4000L) {
-                    AnilistApi.fetchMediaById(anilistId, token = token)
-                }
-            }.getOrNull() ?: cachedMedia
-        }
 
-        // If recommendations or relations are missing from current meta, apply them immediately
-        if (media != null && (meta.moreLikeThis.isEmpty() || meta.relations.isEmpty())) {
-            val recs = media.recommendations.mapNotNull { rec ->
-                val recId = rec.id
-                val isRecMovie = rec.format == "MOVIE" || rec.episodes == 1
-                val recType = if (isRecMovie) "movie" else "series"
-                val recPoster = rec.coverImage?.extraLarge ?: rec.coverImage?.large ?: return@mapNotNull null
-                val recScore = if (rec.averageScore != null && rec.averageScore > 0) rec.averageScore / 10.0 else null
-                com.nuvio.app.features.home.MetaPreview(
-                    id = "ani_$recId",
-                    type = recType,
-                    name = rec.title?.displayTitle.orEmpty(),
-                    poster = recPoster,
-                    banner = rec.bannerImage,
-                    logo = MetaHubArtwork.getLogoUrl("ani_$recId"),
-                    description = null,
-                    releaseInfo = if (rec.episodes != null) "${rec.episodes} Ep" else null,
-                    imdbRating = recScore?.let { "${((it * 10).toInt()) / 10.0}" },
-                    anilistScore = if (rec.averageScore != null && rec.averageScore > 0) rec.averageScore.toDouble() else null,
-                )
-            }
-
-            val rels = media.relations.mapNotNull { rel ->
-                val relTitle = rel.title?.displayTitle?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
-                val relPoster = rel.coverImage?.bestUrl
-                    ?: rel.coverImage?.extraLarge
-                    ?: rel.coverImage?.large
-                    ?: rel.coverImage?.medium
-                    ?: "https://img.anili.st/media/${rel.id}"
-                val isRelMovie = rel.format == "MOVIE" || rel.episodes == 1
-                val relType = if (isRelMovie) "movie" else "series"
-                val relationLabel = when (rel.relationType?.uppercase()) {
-                    "PREQUEL" -> "Prequel"
-                    "SEQUEL" -> "Sequel"
-                    "PARENT" -> "Parent Story"
-                    "SIDE_STORY" -> "Side Story"
-                    "SPIN_OFF" -> "Spin-Off"
-                    "ALTERNATIVE" -> "Alternative"
-                    "SUMMARY" -> "Summary"
-                    "CHARACTER" -> "Character"
-                    "OTHER" -> "Other"
-                    else -> rel.relationType?.replace('_', ' ')?.lowercase()?.replaceFirstChar { it.uppercase() } ?: "Related"
-                }
-                com.nuvio.app.features.details.MetaRelation(
-                    id = "ani_${rel.id}",
-                    type = relType,
-                    relationType = relationLabel,
-                    title = relTitle,
-                    poster = relPoster,
-                    format = rel.format,
-                    episodes = rel.episodes,
-                    status = rel.status,
-                    averageScore = rel.averageScore,
-                )
-            }
-
-            onUpdate { current ->
-                current.copy(
-                    moreLikeThis = if (current.moreLikeThis.isEmpty()) recs else current.moreLikeThis,
-                    relations = if (current.relations.isEmpty()) rels else current.relations,
-                )
+        // 1. Live full media in background
+        val mediaDeferred = async {
+            if (cachedMedia != null && cachedMedia.isFullDetails) {
+                cachedMedia
+            } else {
+                runCatching {
+                    withTimeoutOrNull(3000L) {
+                        AnilistApi.fetchMediaById(anilistId, token = token)
+                    }
+                }.getOrNull() ?: cachedMedia
             }
         }
 
-        // 1. ARM mapping in background
+        // 2. ARM mapping in background
         val armDeferred = async {
-            runCatching {
+            val cachedArm = armMappingCache[anilistId]
+            cachedArm ?: runCatching {
                 withTimeoutOrNull(2000L) { resolveArmMapping(anilistId) }
             }.getOrNull() ?: ArmMapping(null, null, null, null, 1)
         }
 
-        // 2. MAL score in background
+        // 3. MAL score in background
         val malDeferred = async {
+            val media = cachedMedia ?: mediaDeferred.await()
             val idMal = media?.idMal
             if (idMal != null) {
                 runCatching {
@@ -438,64 +296,202 @@ object AnilistMetaDetailsResolver {
             } else null
         }
 
-        // Apply MAL score when ready
-        val malMeta = malDeferred.await()
-        if (malMeta?.score != null && malMeta.score > 0) {
-            onUpdate { current ->
-                val existing = current.externalRatings.filterNot { it.source == "mal" }
-                val updated = existing + com.nuvio.app.features.details.MetaExternalRating("mal", malMeta.score)
-                current.copy(
-                    externalRatings = updated,
-                    ageRating = malMeta.ageRating ?: current.ageRating,
-                )
+        // Stream media relations & recommendations as soon as media arrives
+        launch {
+            val media = mediaDeferred.await()
+            if (media != null) {
+                val recs = media.recommendations.mapNotNull { rec ->
+                    val recId = rec.id
+                    val isRecMovie = rec.format == "MOVIE" || rec.episodes == 1
+                    val recType = if (isRecMovie) "movie" else "series"
+                    val recPoster = rec.coverImage?.extraLarge ?: rec.coverImage?.large ?: return@mapNotNull null
+                    val recScore = if (rec.averageScore != null && rec.averageScore > 0) rec.averageScore / 10.0 else null
+                    com.nuvio.app.features.home.MetaPreview(
+                        id = "ani_$recId",
+                        type = recType,
+                        name = rec.title?.displayTitle.orEmpty(),
+                        poster = recPoster,
+                        banner = rec.bannerImage,
+                        logo = MetaHubArtwork.getLogoUrl("ani_$recId"),
+                        description = null,
+                        releaseInfo = if (rec.episodes != null) "${rec.episodes} Ep" else null,
+                        imdbRating = recScore?.let { "${((it * 10).toInt()) / 10.0}" },
+                        anilistScore = if (rec.averageScore != null && rec.averageScore > 0) rec.averageScore.toDouble() else null,
+                    )
+                }
+
+                val rels = media.relations.mapNotNull { rel ->
+                    val relTitle = rel.title?.displayTitle?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
+                    val relPoster = rel.coverImage?.bestUrl
+                        ?: rel.coverImage?.extraLarge
+                        ?: rel.coverImage?.large
+                        ?: rel.coverImage?.medium
+                    val isRelMovie = rel.format == "MOVIE" || rel.episodes == 1
+                    val relType = if (isRelMovie) "movie" else "series"
+                    val relationLabel = when (rel.relationType?.uppercase()) {
+                        "PREQUEL" -> "Prequel"
+                        "SEQUEL" -> "Sequel"
+                        "PARENT" -> "Parent Story"
+                        "SIDE_STORY" -> "Side Story"
+                        "SPIN_OFF" -> "Spin-Off"
+                        "ALTERNATIVE" -> "Alternative"
+                        "SUMMARY" -> "Summary"
+                        "CHARACTER" -> "Character"
+                        "OTHER" -> "Other"
+                        else -> rel.relationType?.replace('_', ' ')?.lowercase()?.replaceFirstChar { it.uppercase() } ?: "Related"
+                    }
+                    com.nuvio.app.features.details.MetaRelation(
+                        id = "ani_${rel.id}",
+                        type = relType,
+                        relationType = relationLabel,
+                        title = relTitle,
+                        poster = relPoster,
+                        format = rel.format,
+                        episodes = rel.episodes,
+                        status = rel.status,
+                        averageScore = rel.averageScore,
+                    )
+                }
+
+                onUpdate { current ->
+                    current.copy(
+                        moreLikeThis = if (recs.isNotEmpty()) recs else current.moreLikeThis,
+                        relations = if (rels.isNotEmpty()) rels else current.relations,
+                        status = media.status ?: current.status,
+                    )
+                }
             }
         }
 
-        val arm = armDeferred.await()
-        val kitsuId = arm.kitsuId?.removePrefix("kitsu:")?.takeIf { it.isNotBlank() }
-            ?: resolveKitsuId(anilistId, media)
-        val effectiveImdbId = resolveEffectiveImdbId(media, arm.imdbId)
-
-        if (!kitsuId.isNullOrBlank() || !effectiveImdbId.isNullOrBlank()) {
-            val isSpecial = isSpecialAnime(media)
-            val kitsuEpisodes = if (!kitsuId.isNullOrBlank()) {
-                runCatching {
-                    withTimeoutOrNull(3000L) { fetchKitsuEpisodes(kitsuId) }
-                }.getOrNull() ?: emptyMap()
-            } else emptyMap()
-
-            onUpdate { current ->
-                val updatedVideos = current.videos.map { v ->
-                    val epNum = v.episode ?: 1
-                    val kitsuEp = kitsuEpisodes[epNum]
-                    val epTitle = kitsuEp?.title?.takeIf { it.isNotBlank() } ?: v.title
-                    val kitsuThumb = kitsuEp?.thumbnail?.takeIf { it.isNotBlank() }
-                    val targetSeasonForEp = v.season ?: (if (isSpecial) 0 else 1)
-                    val metahubEpThumb = if (!effectiveImdbId.isNullOrBlank()) {
-                        "https://episodes.metahub.space/$effectiveImdbId/$targetSeasonForEp/$epNum/w780.jpg"
-                    } else null
-                    val videoId = if (!kitsuId.isNullOrBlank()) "kitsu:$kitsuId:$epNum" else v.id
-                    v.copy(
-                        id = videoId,
-                        title = epTitle,
-                        thumbnail = metahubEpThumb ?: v.thumbnail,
-                        fallbackThumbnail = kitsuThumb ?: v.fallbackThumbnail,
-                        overview = kitsuEp?.overview ?: v.overview,
+        // Stream MAL score as soon as MAL API responds
+        launch {
+            val malMeta = malDeferred.await()
+            if (malMeta?.score != null && malMeta.score > 0) {
+                onUpdate { current ->
+                    val existing = current.externalRatings.filterNot { it.source == "mal" }
+                    val updated = existing + com.nuvio.app.features.details.MetaExternalRating("mal", malMeta.score)
+                    current.copy(
+                        externalRatings = updated,
+                        ageRating = malMeta.ageRating ?: current.ageRating,
                     )
                 }
-                val updatedBackdrop = if (!effectiveImdbId.isNullOrBlank()) {
-                    "https://images.metahub.space/background/medium/$effectiveImdbId/img"
-                } else {
-                    media?.bannerImage ?: current.background
+            }
+        }
+
+        // Stream ARM mapping & Metahub backdrop & Kitsu episodes concurrently
+        launch {
+            val media = mediaDeferred.await()
+            val arm = armDeferred.await()
+            val effectiveImdbId = resolveEffectiveImdbId(media, arm.imdbId)
+            val isSpecial = isSpecialAnime(media)
+            val targetSeason = when {
+                arm.season == 0 -> 0
+                isSpecial -> 0
+                else -> arm.season
+            }
+
+            val kitsuId = arm.kitsuId?.removePrefix("kitsu:")?.takeIf { it.isNotBlank() }
+                ?: resolveKitsuId(anilistId, media)
+
+            // Update Metahub backdrop immediately as soon as IMDb ID resolves
+            if (!effectiveImdbId.isNullOrBlank()) {
+                val metahubBackdrop = "https://images.metahub.space/background/medium/$effectiveImdbId/img"
+                val metahubLogo = if (!isSpecial && targetSeason != 0) "https://images.metahub.space/logo/medium/$effectiveImdbId/img" else null
+                onUpdate { current ->
+                    current.copy(
+                        background = metahubBackdrop,
+                        logo = metahubLogo ?: current.logo,
+                    )
                 }
-                val updatedLogo = if (!isSpecial && !effectiveImdbId.isNullOrBlank()) {
-                    "https://images.metahub.space/logo/medium/$effectiveImdbId/img"
-                } else if (isSpecial) null else current.logo
-                current.copy(
-                    videos = updatedVideos,
-                    background = updatedBackdrop,
-                    logo = updatedLogo,
+            }
+
+            // Fetch Kitsu episodes and update episode list with Metahub/Kitsu thumbnails
+            if (!kitsuId.isNullOrBlank() || !effectiveImdbId.isNullOrBlank()) {
+                val kitsuEpisodes = if (!kitsuId.isNullOrBlank()) {
+                    runCatching {
+                        withTimeoutOrNull(2500L) { fetchKitsuEpisodes(kitsuId) }
+                    }.getOrNull() ?: emptyMap()
+                } else emptyMap()
+
+                val hasValidImdbId = effectiveImdbId?.startsWith("tt", ignoreCase = true) == true
+                val isMovie = media?.format == "MOVIE"
+                val totalEpisodes = media?.episodes ?: media?.streamingEpisodes?.size?.takeIf { it > 0 } ?: kitsuEpisodes.size.takeIf { it > 0 } ?: 12
+                val episodeOffset = resolveEpisodeOffset(
+                    media = media,
+                    targetSeason = targetSeason,
+                    cinemetaVideos = emptyList(),
                 )
+
+                val updatedVideos = if (isMovie) {
+                    emptyList()
+                } else if (targetSeason == 0) {
+                    val startsAtZero = media?.description?.contains("Includes Episode 0", ignoreCase = true) == true ||
+                        (media?.description?.contains("Episode 0", ignoreCase = true) == true && media.streamingEpisodes.any { it.title?.contains("Episode 0", ignoreCase = true) == true })
+                    val epRange = if (startsAtZero) (0 until totalEpisodes) else (1..totalEpisodes)
+
+                    epRange.map { idx ->
+                        val actualEpNumber = idx + episodeOffset
+                        val streamingEp = if (startsAtZero) media?.streamingEpisodes?.getOrNull(idx) else media?.streamingEpisodes?.getOrNull(idx - 1)
+                        val kitsuEp = kitsuEpisodes[actualEpNumber] ?: kitsuEpisodes[idx] ?: (if (startsAtZero && idx == 0) kitsuEpisodes[0] else null)
+                        val rawTitle = kitsuEp?.title?.takeIf { it.isNotBlank() }
+                            ?: streamingEp?.title?.takeIf { it.isNotBlank() }
+                            ?: if (actualEpNumber == 0) "Episode 0" else "Episode $actualEpNumber"
+                        val epTitle = cleanEpisodeTitle(rawTitle, actualEpNumber)
+                        val metahubThumb = if (hasValidImdbId) "https://episodes.metahub.space/$effectiveImdbId/0/$actualEpNumber/w780.jpg" else null
+                        val kitsuFallback = kitsuEp?.thumbnail?.takeIf { it.isNotBlank() } ?: streamingEp?.thumbnail?.takeIf { it.isNotBlank() }
+                        val videoId = if (!kitsuId.isNullOrBlank()) "kitsu:$kitsuId:$actualEpNumber" else if (!effectiveImdbId.isNullOrBlank()) "$effectiveImdbId:0:$actualEpNumber" else "anilist:$anilistId:$actualEpNumber"
+                        MetaVideo(
+                            id = videoId,
+                            title = epTitle,
+                            season = 0,
+                            episode = actualEpNumber,
+                            overview = kitsuEp?.overview,
+                            thumbnail = metahubThumb ?: kitsuFallback,
+                            fallbackThumbnail = kitsuFallback,
+                            runtime = media?.duration,
+                            released = resolveEpisodeAirDate(actualEpNumber, kitsuEp?.airdate, null, media),
+                            streams = emptyList(),
+                        )
+                    }
+                } else {
+                    (1..totalEpisodes).map { epIdx ->
+                        val actualEpNumber = epIdx + episodeOffset
+                        val streamingEp = media?.streamingEpisodes?.getOrNull(epIdx - 1)
+                        val kitsuEp = kitsuEpisodes[actualEpNumber] ?: kitsuEpisodes[epIdx]
+                        val rawTitle = kitsuEp?.title?.takeIf { it.isNotBlank() }
+                            ?: streamingEp?.title?.takeIf { it.isNotBlank() }
+                        val epTitle = cleanEpisodeTitle(rawTitle, actualEpNumber)
+                        val metahubThumb = if (hasValidImdbId) "https://episodes.metahub.space/$effectiveImdbId/$targetSeason/$actualEpNumber/w780.jpg" else null
+                        val kitsuFallback = kitsuEp?.thumbnail?.takeIf { it.isNotBlank() } ?: streamingEp?.thumbnail?.takeIf { it.isNotBlank() }
+                        val videoId = if (!kitsuId.isNullOrBlank()) "kitsu:$kitsuId:$actualEpNumber" else if (!effectiveImdbId.isNullOrBlank()) "$effectiveImdbId:$targetSeason:$actualEpNumber" else "anilist:$anilistId:$epIdx"
+
+                        MetaVideo(
+                            id = videoId,
+                            title = epTitle,
+                            season = targetSeason,
+                            episode = actualEpNumber,
+                            overview = kitsuEp?.overview,
+                            thumbnail = metahubThumb ?: kitsuFallback,
+                            fallbackThumbnail = kitsuFallback,
+                            runtime = media?.duration,
+                            released = resolveEpisodeAirDate(actualEpNumber, kitsuEp?.airdate, null, media),
+                            streams = emptyList(),
+                        )
+                    }
+                }
+
+                val defaultVidId = if (isMovie) {
+                    if (!kitsuId.isNullOrBlank()) "kitsu:$kitsuId"
+                    else if (!effectiveImdbId.isNullOrBlank()) effectiveImdbId
+                    else "anilist:$anilistId"
+                } else updatedVideos.firstOrNull()?.id
+
+                onUpdate { current ->
+                    current.copy(
+                        videos = updatedVideos,
+                        defaultVideoId = defaultVidId ?: current.defaultVideoId,
+                    )
+                }
             }
         }
 

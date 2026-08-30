@@ -86,13 +86,11 @@ private fun RelationPosterCard(
     var lazyLogoUrl by remember(relation.id) { mutableStateOf<String?>(null) }
     var lazyMalScore by remember(relation.id) { mutableStateOf<Double?>(null) }
     var lazyPosterUrl by remember(relation.id, relation.poster) {
-        val initial = relation.poster?.takeIf { it.isNotBlank() }
-            ?: relation.id.removePrefix("ani_").toIntOrNull()?.let { "https://img.anili.st/media/$it" }
-        mutableStateOf(initial)
+        mutableStateOf(relation.poster?.takeIf { it.isNotBlank() })
     }
 
     LaunchedEffect(relation.id, relation.poster) {
-        if (relation.poster.isNullOrBlank()) {
+        if (lazyPosterUrl.isNullOrBlank()) {
             val anilistId = com.nuvio.app.features.anilist.AnilistTrackerCoordinator.extractAnilistId(relation.id)
             if (anilistId != null) {
                 val media = com.nuvio.app.features.anilist.AnilistApi.getCachedMedia(anilistId)
