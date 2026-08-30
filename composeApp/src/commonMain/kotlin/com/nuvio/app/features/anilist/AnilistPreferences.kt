@@ -18,17 +18,30 @@ data class AnilistPreferences(
     val showSyncNotification: Boolean = true,
     val preferredTitleLanguage: AnilistTitleLanguage = AnilistTitleLanguage.ROMAJI,
     val preferredScoreFormat: AnilistScoreFormat = AnilistScoreFormat.POINT_10_DECIMAL,
-    val librarySections: List<AnilistSectionSettings> = defaultLibrarySections,
+    val librarySections: List<AnilistSectionSettings> = defaultAuthenticatedSections,
 ) {
     companion object {
-        val defaultLibrarySections = listOf(
-            AnilistSectionSettings("Watching", enabled = true),
-            AnilistSectionSettings("Planning", enabled = true),
+        val defaultUnauthenticatedSections = listOf(
+            AnilistSectionSettings("Trending Anime", enabled = true),
+            AnilistSectionSettings("Currently Airing", enabled = true),
+            AnilistSectionSettings("Popular This Season", enabled = true),
+            AnilistSectionSettings("Top Rated Anime", enabled = true),
+        )
+
+        val defaultAuthenticatedSections = listOf(
+            AnilistSectionSettings("Currently Watching", enabled = true),
+            AnilistSectionSettings("Plan to Watch", enabled = true),
+            AnilistSectionSettings("Trending Anime", enabled = true),
+            AnilistSectionSettings("Currently Airing", enabled = true),
+            AnilistSectionSettings("Popular This Season", enabled = true),
+            AnilistSectionSettings("Top Rated Anime", enabled = true),
             AnilistSectionSettings("Completed", enabled = true),
             AnilistSectionSettings("Rewatching", enabled = true),
             AnilistSectionSettings("Paused", enabled = true),
             AnilistSectionSettings("Dropped", enabled = false),
         )
+
+        val defaultLibrarySections = defaultAuthenticatedSections
     }
 }
 

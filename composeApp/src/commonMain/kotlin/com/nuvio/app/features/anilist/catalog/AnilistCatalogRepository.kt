@@ -49,146 +49,160 @@ object AnilistCatalogRepository {
         AnilistAuthRepository.ensureInitialized()
         val token = AnilistAuthRepository.token.value
         val isAuthenticated = !token.isNullOrBlank() || AnilistAuthRepository.isAuthenticated.value
-        val list = mutableListOf<HomeCatalogDefinition>()
+
+        val availableDefinitions = mutableMapOf<String, HomeCatalogDefinition>()
 
         if (isAuthenticated) {
-            list.add(
-                HomeCatalogDefinition(
-                    key = "anilist:anime:watching",
-                    defaultTitle = "Currently Watching",
-                    catalogName = "Currently Watching",
-                    addonName = "AniList",
-                    manifestUrl = "native://anilist",
-                    type = "anime",
-                    catalogId = CATALOG_WATCHING,
-                    supportsPagination = true,
-                    descriptorSignature = "anilist:watching",
-                )
+            availableDefinitions["Currently Watching"] = HomeCatalogDefinition(
+                key = "anilist:anime:watching",
+                defaultTitle = "Currently Watching",
+                catalogName = "Currently Watching",
+                addonName = "AniList",
+                manifestUrl = "native://anilist",
+                type = "anime",
+                catalogId = CATALOG_WATCHING,
+                supportsPagination = true,
+                descriptorSignature = "anilist:watching",
             )
-            list.add(
-                HomeCatalogDefinition(
-                    key = "anilist:anime:planning",
-                    defaultTitle = "Plan to Watch",
-                    catalogName = "Plan to Watch",
-                    addonName = "AniList",
-                    manifestUrl = "native://anilist",
-                    type = "anime",
-                    catalogId = CATALOG_PLANNING,
-                    supportsPagination = true,
-                    descriptorSignature = "anilist:planning",
-                )
+            availableDefinitions["Plan to Watch"] = HomeCatalogDefinition(
+                key = "anilist:anime:planning",
+                defaultTitle = "Plan to Watch",
+                catalogName = "Plan to Watch",
+                addonName = "AniList",
+                manifestUrl = "native://anilist",
+                type = "anime",
+                catalogId = CATALOG_PLANNING,
+                supportsPagination = true,
+                descriptorSignature = "anilist:planning",
+            )
+            availableDefinitions["Completed"] = HomeCatalogDefinition(
+                key = "anilist:anime:completed",
+                defaultTitle = "Completed",
+                catalogName = "Completed",
+                addonName = "AniList",
+                manifestUrl = "native://anilist",
+                type = "anime",
+                catalogId = CATALOG_COMPLETED,
+                supportsPagination = true,
+                descriptorSignature = "anilist:completed",
+            )
+            availableDefinitions["Rewatching"] = HomeCatalogDefinition(
+                key = "anilist:anime:rewatching",
+                defaultTitle = "Rewatching",
+                catalogName = "Rewatching",
+                addonName = "AniList",
+                manifestUrl = "native://anilist",
+                type = "anime",
+                catalogId = CATALOG_REWATCHING,
+                supportsPagination = true,
+                descriptorSignature = "anilist:rewatching",
+            )
+            availableDefinitions["Paused"] = HomeCatalogDefinition(
+                key = "anilist:anime:paused",
+                defaultTitle = "Paused",
+                catalogName = "Paused",
+                addonName = "AniList",
+                manifestUrl = "native://anilist",
+                type = "anime",
+                catalogId = CATALOG_PAUSED,
+                supportsPagination = true,
+                descriptorSignature = "anilist:paused",
+            )
+            availableDefinitions["Dropped"] = HomeCatalogDefinition(
+                key = "anilist:anime:dropped",
+                defaultTitle = "Dropped",
+                catalogName = "Dropped",
+                addonName = "AniList",
+                manifestUrl = "native://anilist",
+                type = "anime",
+                catalogId = CATALOG_DROPPED,
+                supportsPagination = true,
+                descriptorSignature = "anilist:dropped",
             )
         }
 
-        list.add(
-            HomeCatalogDefinition(
-                key = "anilist:anime:trending",
-                defaultTitle = "Trending Anime",
-                catalogName = "Trending Anime",
-                addonName = "AniList",
-                manifestUrl = "native://anilist",
-                type = "anime",
-                catalogId = CATALOG_TRENDING,
-                supportsPagination = true,
-                descriptorSignature = "anilist:trending",
-            )
+        availableDefinitions["Trending Anime"] = HomeCatalogDefinition(
+            key = "anilist:anime:trending",
+            defaultTitle = "Trending Anime",
+            catalogName = "Trending Anime",
+            addonName = "AniList",
+            manifestUrl = "native://anilist",
+            type = "anime",
+            catalogId = CATALOG_TRENDING,
+            supportsPagination = true,
+            descriptorSignature = "anilist:trending",
         )
-        list.add(
-            HomeCatalogDefinition(
-                key = "anilist:anime:airing",
-                defaultTitle = "Currently Airing",
-                catalogName = "Currently Airing",
-                addonName = "AniList",
-                manifestUrl = "native://anilist",
-                type = "anime",
-                catalogId = CATALOG_AIRING,
-                supportsPagination = true,
-                descriptorSignature = "anilist:airing",
-            )
+        availableDefinitions["Currently Airing"] = HomeCatalogDefinition(
+            key = "anilist:anime:airing",
+            defaultTitle = "Currently Airing",
+            catalogName = "Currently Airing",
+            addonName = "AniList",
+            manifestUrl = "native://anilist",
+            type = "anime",
+            catalogId = CATALOG_AIRING,
+            supportsPagination = true,
+            descriptorSignature = "anilist:airing",
         )
-        list.add(
-            HomeCatalogDefinition(
-                key = "anilist:anime:popular",
-                defaultTitle = "Popular This Season",
-                catalogName = "Popular This Season",
-                addonName = "AniList",
-                manifestUrl = "native://anilist",
-                type = "anime",
-                catalogId = CATALOG_POPULAR,
-                supportsPagination = true,
-                descriptorSignature = "anilist:popular",
-            )
+        availableDefinitions["Popular This Season"] = HomeCatalogDefinition(
+            key = "anilist:anime:popular",
+            defaultTitle = "Popular This Season",
+            catalogName = "Popular This Season",
+            addonName = "AniList",
+            manifestUrl = "native://anilist",
+            type = "anime",
+            catalogId = CATALOG_POPULAR,
+            supportsPagination = true,
+            descriptorSignature = "anilist:popular",
         )
-        list.add(
-            HomeCatalogDefinition(
-                key = "anilist:anime:top-rated",
-                defaultTitle = "Top Rated Anime",
-                catalogName = "Top Rated Anime",
-                addonName = "AniList",
-                manifestUrl = "native://anilist",
-                type = "anime",
-                catalogId = CATALOG_TOP_RATED,
-                supportsPagination = true,
-                descriptorSignature = "anilist:top-rated",
-            )
+        availableDefinitions["Top Rated Anime"] = HomeCatalogDefinition(
+            key = "anilist:anime:top-rated",
+            defaultTitle = "Top Rated Anime",
+            catalogName = "Top Rated Anime",
+            addonName = "AniList",
+            manifestUrl = "native://anilist",
+            type = "anime",
+            catalogId = CATALOG_TOP_RATED,
+            supportsPagination = true,
+            descriptorSignature = "anilist:top-rated",
         )
 
-        if (isAuthenticated) {
-            list.add(
-                HomeCatalogDefinition(
-                    key = "anilist:anime:completed",
-                    defaultTitle = "Completed",
-                    catalogName = "Completed",
-                    addonName = "AniList",
-                    manifestUrl = "native://anilist",
-                    type = "anime",
-                    catalogId = CATALOG_COMPLETED,
-                    supportsPagination = true,
-                    descriptorSignature = "anilist:completed",
-                )
-            )
-            list.add(
-                HomeCatalogDefinition(
-                    key = "anilist:anime:rewatching",
-                    defaultTitle = "Rewatching",
-                    catalogName = "Rewatching",
-                    addonName = "AniList",
-                    manifestUrl = "native://anilist",
-                    type = "anime",
-                    catalogId = CATALOG_REWATCHING,
-                    supportsPagination = true,
-                    descriptorSignature = "anilist:rewatching",
-                )
-            )
-            list.add(
-                HomeCatalogDefinition(
-                    key = "anilist:anime:paused",
-                    defaultTitle = "Paused",
-                    catalogName = "Paused",
-                    addonName = "AniList",
-                    manifestUrl = "native://anilist",
-                    type = "anime",
-                    catalogId = CATALOG_PAUSED,
-                    supportsPagination = true,
-                    descriptorSignature = "anilist:paused",
-                )
-            )
-            list.add(
-                HomeCatalogDefinition(
-                    key = "anilist:anime:dropped",
-                    defaultTitle = "Dropped",
-                    catalogName = "Dropped",
-                    addonName = "AniList",
-                    manifestUrl = "native://anilist",
-                    type = "anime",
-                    catalogId = CATALOG_DROPPED,
-                    supportsPagination = true,
-                    descriptorSignature = "anilist:dropped",
-                )
-            )
+        val configuredSections = com.nuvio.app.features.anilist.AnilistPreferencesRepository.getEffectiveSections(isAuthenticated)
+        val orderedList = mutableListOf<HomeCatalogDefinition>()
+
+        for (section in configuredSections) {
+            if (!section.enabled) continue
+            val def = availableDefinitions[section.type]
+                ?: availableDefinitions.entries.firstOrNull {
+                    it.key.equals(section.type, ignoreCase = true) || isCatalogAlias(it.key, section.type)
+                }?.value
+            if (def != null && orderedList.none { it.key == def.key }) {
+                orderedList.add(def)
+            }
         }
 
-        return list
+        for ((_, def) in availableDefinitions) {
+            val isExplicitlyConfigured = configuredSections.any {
+                it.type.equals(def.catalogName, ignoreCase = true) || isCatalogAlias(it.type, def.catalogName)
+            }
+            if (!isExplicitlyConfigured && orderedList.none { it.key == def.key }) {
+                orderedList.add(def)
+            }
+        }
+
+        return orderedList
+    }
+
+    private fun isCatalogAlias(a: String, b: String): Boolean {
+        val cleanA = a.lowercase().trim()
+        val cleanB = b.lowercase().trim()
+        if (cleanA == cleanB) return true
+        if ((cleanA == "watching" || cleanA == "currently watching") && (cleanB == "watching" || cleanB == "currently watching")) return true
+        if ((cleanA == "planning" || cleanA == "plan to watch") && (cleanB == "planning" || cleanB == "plan to watch")) return true
+        if ((cleanA == "trending" || cleanA == "trending anime") && (cleanB == "trending" || cleanB == "trending anime")) return true
+        if ((cleanA == "airing" || cleanA == "currently airing") && (cleanB == "airing" || cleanB == "currently airing")) return true
+        if ((cleanA == "popular" || cleanA == "popular this season") && (cleanB == "popular" || cleanB == "popular this season")) return true
+        if ((cleanA == "top rated" || cleanA == "top rated anime") && (cleanB == "top rated" || cleanB == "top rated anime")) return true
+        return false
     }
 
     suspend fun fetchCatalogPage(catalogId: String, page: Int = 1, perPage: Int = 25, force: Boolean = false): CatalogPage {

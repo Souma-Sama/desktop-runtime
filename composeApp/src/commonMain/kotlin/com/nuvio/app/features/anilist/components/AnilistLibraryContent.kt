@@ -63,10 +63,10 @@ fun LazyListScope.anilistLibraryContent(
         else -> {
             val sections = sectionsConfig.mapNotNull { sectionConfig ->
                 if (!sectionConfig.enabled) return@mapNotNull null
-                val rawList = when (sectionConfig.type.lowercase()) {
-                    "watching", "current" -> uiState.watching
+                val rawList = when (sectionConfig.type.lowercase().trim()) {
+                    "watching", "currently watching", "current" -> uiState.watching
                     "completed" -> uiState.completed
-                    "planning" -> uiState.planning
+                    "planning", "plan to watch" -> uiState.planning
                     "paused", "on hold" -> uiState.paused
                     "dropped" -> uiState.dropped
                     "rewatching", "repeating" -> uiState.rewatching

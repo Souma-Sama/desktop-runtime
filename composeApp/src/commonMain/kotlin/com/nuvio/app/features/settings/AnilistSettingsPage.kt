@@ -315,23 +315,26 @@ private fun AnilistLibrarySectionsSection(isTablet: Boolean) {
     val prefs by AnilistPreferencesRepository.preferences.collectAsStateWithLifecycle()
     val isAuth by AnilistAuthRepository.isAuthenticated.collectAsStateWithLifecycle()
 
-    if (!isAuth) return
+    val sections = remember(prefs.librarySections, isAuth) {
+        AnilistPreferencesRepository.getEffectiveSections(isAuth)
+    }
 
     SettingsSection(
-        title = "Customize Library Sections",
+        title = "Customize Catalogs & Sections",
         isTablet = isTablet,
         actions = {
             NuvioActionLabel(
                 text = "Reset",
                 onClick = {
-                    AnilistPreferencesRepository.resetLibrarySections()
+                    AnilistPreferencesRepository.resetLibrarySections(isAuth)
                 },
             )
         },
     ) {
         AnilistSectionsList(
             isTablet = isTablet,
-            items = prefs.librarySections,
+            items = sections,
+            isAuth = isAuth,
         )
     }
 }
@@ -340,13 +343,14 @@ private fun AnilistLibrarySectionsSection(isTablet: Boolean) {
 private fun AnilistSectionsList(
     isTablet: Boolean,
     items: List<AnilistSectionSettings>,
+    isAuth: Boolean,
 ) {
     val hapticFeedback = LocalHapticFeedback.current
     val lazyListState = rememberLazyListState()
     val reorderableLazyListState = rememberReorderableLazyListState(
         lazyListState = lazyListState,
     ) { from, to ->
-        AnilistPreferencesRepository.moveSection(from.index, to.index)
+        AnilistPreferencesRepository.moveSection(from.index, to.index, isAuth)
         hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
     }
 
@@ -373,7 +377,7 @@ private fun AnilistSectionsList(
                                 item = item,
                                 isTablet = isTablet,
                                 onEnabledChange = { enabled ->
-                                    AnilistPreferencesRepository.setSectionEnabled(item.type, enabled)
+                                    AnilistPreferencesRepository.setSectionEnabled(item.type, enabled, isAuth)
                                 },
                                 dragHandleScope = this@ReorderableItem,
                             )

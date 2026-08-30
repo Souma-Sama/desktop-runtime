@@ -49,10 +49,47 @@ object AnilistPreferencesRepository {
         updateAndPersist { it.copy(autoAddNewAnime = enabled) }
     }
 
-    fun setSectionEnabled(type: String, enabled: Boolean) {
+    fun getEffectiveSections(isAuthenticated: Boolean): List<AnilistSectionSettings> {
+        ensureLoaded()
+        val savedSections = _preferences.value.librarySections
+        val baseSections = if (isAuthenticated) {
+            AnilistPreferences.defaultAuthenticatedSections
+        } else {
+            AnilistPreferences.defaultUnauthenticatedSections
+        }
+
+        val result = mutableListOf<AnilistSectionSettings>()
+        savedSections.forEach { saved ->
+            val match = baseSections.firstOrNull { it.type.equals(saved.type, ignoreCase = true) || isSectionAlias(it.type, saved.type) }
+            if (match != null && result.none { it.type.equals(match.type, ignoreCase = true) }) {
+                result.add(AnilistSectionSettings(type = match.type, enabled = saved.enabled))
+            }
+        }
+        baseSections.forEach { base ->
+            if (result.none { it.type.equals(base.type, ignoreCase = true) }) {
+                result.add(base)
+            }
+        }
+        return result
+    }
+
+    private fun isSectionAlias(a: String, b: String): Boolean {
+        val cleanA = a.lowercase().trim()
+        val cleanB = b.lowercase().trim()
+        if (cleanA == cleanB) return true
+        if ((cleanA == "watching" || cleanA == "currently watching") && (cleanB == "watching" || cleanB == "currently watching")) return true
+        if ((cleanA == "planning" || cleanA == "plan to watch") && (cleanB == "planning" || cleanB == "plan to watch")) return true
+        if ((cleanA == "trending" || cleanA == "trending anime") && (cleanB == "trending" || cleanB == "trending anime")) return true
+        if ((cleanA == "airing" || cleanA == "currently airing") && (cleanB == "airing" || cleanB == "currently airing")) return true
+        if ((cleanA == "popular" || cleanA == "popular this season") && (cleanB == "popular" || cleanB == "popular this season")) return true
+        if ((cleanA == "top rated" || cleanA == "top rated anime") && (cleanB == "top rated" || cleanB == "top rated anime")) return true
+        return false
+    }
+
+    fun setSectionEnabled(type: String, enabled: Boolean, isAuthenticated: Boolean = true) {
         updateAndPersist { current ->
-            val currentSections = current.librarySections.toMutableList()
-            val index = currentSections.indexOfFirst { it.type.equals(type, ignoreCase = true) }
+            val currentSections = getEffectiveSections(isAuthenticated).toMutableList()
+            val index = currentSections.indexOfFirst { it.type.equals(type, ignoreCase = true) || isSectionAlias(it.type, type) }
             if (index != -1) {
                 currentSections[index] = currentSections[index].copy(enabled = enabled)
                 current.copy(librarySections = currentSections)
@@ -62,9 +99,9 @@ object AnilistPreferencesRepository {
         }
     }
 
-    fun moveSection(fromIndex: Int, toIndex: Int) {
+    fun moveSection(fromIndex: Int, toIndex: Int, isAuthenticated: Boolean = true) {
         updateAndPersist { current ->
-            val currentSections = current.librarySections.toMutableList()
+            val currentSections = getEffectiveSections(isAuthenticated).toMutableList()
             if (fromIndex in currentSections.indices && toIndex in currentSections.indices) {
                 val item = currentSections.removeAt(fromIndex)
                 currentSections.add(toIndex, item)
@@ -75,8 +112,9 @@ object AnilistPreferencesRepository {
         }
     }
 
-    fun resetLibrarySections() {
-        updateAndPersist { it.copy(librarySections = AnilistPreferences.defaultLibrarySections) }
+    fun resetLibrarySections(isAuthenticated: Boolean = true) {
+        val defaults = if (isAuthenticated) AnilistPreferences.defaultAuthenticatedSections else AnilistPreferences.defaultUnauthenticatedSections
+        updateAndPersist { it.copy(librarySections = defaults) }
     }
 
     fun setPreferredTitleLanguage(language: AnilistTitleLanguage) {
