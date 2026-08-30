@@ -301,11 +301,16 @@ fun DetailHero(
 
 private fun detailHeroHeight(maxWidth: Dp, viewportHeight: Dp, isTablet: Boolean): Dp =
     if (!isTablet) {
-        (maxWidth * 1.33f).coerceIn(420.dp, 760.dp)
+        val landscapeHeight = maxWidth * (9f / 16f)
+        val viewportLimit = viewportHeight
+            .takeIf { it > 0.dp }
+            ?.let { it * 0.65f }
+            ?: 600.dp
+        minOf(landscapeHeight, viewportLimit).coerceIn(220.dp, 600.dp)
     } else {
         val viewportLimit = viewportHeight
             .takeIf { it > 0.dp }
             ?.let { it * 0.72f }
             ?: 1080.dp
-        minOf(maxWidth * 9f / 16f, viewportLimit).coerceIn(420.dp, 1080.dp)
+        minOf(maxWidth * 9f / 16f, viewportLimit).coerceIn(360.dp, 1080.dp)
     }

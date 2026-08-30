@@ -118,7 +118,7 @@ fun DesktopDetailHero(
             .graphicsLayer { clip = true }
             .onSizeChanged { onHeightChanged(it.height) },
     ) {
-        val heroMinHeight = (maxWidth * 0.45f).coerceIn(660.dp, 800.dp)
+        val heroMinHeight = (maxWidth * (9f / 16f)).coerceIn(360.dp, 760.dp)
         val actionHorizontalInset = fullscreenActionHorizontalInsetForWidth(maxWidth.value)
 
         Spacer(
