@@ -116,6 +116,7 @@ fun DesktopDetailHero(
             .fillMaxWidth()
             .heightIn(min = 660.dp)
             .wrapContentHeight()
+            .graphicsLayer { clip = true }
             .onSizeChanged { onHeightChanged(it.height) },
     ) {
         val actionHorizontalInset = fullscreenActionHorizontalInsetForWidth(maxWidth.value)
