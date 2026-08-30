@@ -66,16 +66,14 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import com.nuvio.app.isDesktop
 import nuvio.composeapp.generated.resources.Res
+import nuvio.composeapp.generated.resources.home_view_all
+import nuvio.composeapp.generated.resources.poster_logo_content_description
 import nuvio.composeapp.generated.resources.rating_anilist
 import nuvio.composeapp.generated.resources.rating_mal
 import org.jetbrains.compose.resources.painterResource
-import kotlin.math.absoluteValue
-import kotlin.math.roundToInt
-import nuvio.composeapp.generated.resources.Res
-import nuvio.composeapp.generated.resources.home_view_all
-import nuvio.composeapp.generated.resources.poster_logo_content_description
 import org.jetbrains.compose.resources.stringResource
 import kotlin.math.abs
+import kotlin.math.absoluteValue
 import kotlin.math.roundToInt
 
 enum class NuvioPosterShape {

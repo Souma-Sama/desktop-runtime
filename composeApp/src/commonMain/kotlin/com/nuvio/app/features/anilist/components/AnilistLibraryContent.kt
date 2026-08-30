@@ -11,6 +11,7 @@ import com.nuvio.app.features.anilist.AnilistLibraryItem
 import com.nuvio.app.features.anilist.AnilistLibraryUiState
 import com.nuvio.app.features.anilist.AnilistSectionSettings
 import com.nuvio.app.features.anilist.AnilistSortBy
+import com.nuvio.app.features.artwork.MetaHubArtwork
 import com.nuvio.app.features.home.MetaPreview
 import com.nuvio.app.features.home.PosterShape
 import com.nuvio.app.features.home.components.HomeEmptyStateCard

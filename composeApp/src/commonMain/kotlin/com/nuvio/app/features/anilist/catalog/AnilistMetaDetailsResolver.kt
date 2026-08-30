@@ -9,6 +9,7 @@ import com.nuvio.app.features.anilist.AnilistAuthRepository
 import com.nuvio.app.features.anilist.AnilistMedia
 import com.nuvio.app.features.anilist.AnilistRelation
 import com.nuvio.app.features.anilist.AnilistTrackerCoordinator
+import com.nuvio.app.features.artwork.MetaHubArtwork
 import com.nuvio.app.features.details.MetaDetails
 import com.nuvio.app.features.details.MetaTrailer
 import com.nuvio.app.features.details.MetaVideo
@@ -695,7 +696,7 @@ object AnilistMetaDetailsResolver {
                 }
             }
         } else if (targetSeason == 0) {
-            val totalEps = media?.episodes ?: media?.streamingEpisodes?.size.takeIf { it > 0 } ?: kitsuEpisodes.size.takeIf { it > 0 } ?: 1
+            val totalEps = media?.episodes ?: media?.streamingEpisodes?.size?.takeIf { it > 0 } ?: kitsuEpisodes.size.takeIf { it > 0 } ?: 1
             val startsAtZero = media?.description?.contains("Includes Episode 0", ignoreCase = true) == true ||
                 (media?.description?.contains("Episode 0", ignoreCase = true) == true && media?.streamingEpisodes?.any { it.title?.contains("Episode 0", ignoreCase = true) == true } == true)
             val epRange = if (startsAtZero) (0 until totalEps) else (1..totalEps)
