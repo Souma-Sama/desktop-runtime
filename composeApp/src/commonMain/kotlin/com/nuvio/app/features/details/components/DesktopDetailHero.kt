@@ -43,7 +43,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -128,6 +128,23 @@ fun DesktopDetailHero(
 
         val imageUrl = meta.background
         if (imageUrl != null) {
+            val isAnilistBanner = imageUrl.contains("anilistcdn/media/anime/banner", ignoreCase = true)
+            if (isAnilistBanner) {
+                AsyncImage(
+                    model = imageUrl,
+                    contentDescription = null,
+                    modifier = Modifier
+                        .matchParentSize()
+                        .blur(36.dp)
+                        .graphicsLayer {
+                            translationY = scrollOffset() * 0.38f
+                            alpha = 0.55f
+                        },
+                    alignment = Alignment.Center,
+                    contentScale = ContentScale.Crop,
+                    desktopImageScaling = NuvioDesktopImageScaling.Disabled,
+                )
+            }
             AsyncImage(
                 model = imageUrl,
                 contentDescription = meta.name,
@@ -138,8 +155,8 @@ fun DesktopDetailHero(
                         scaleX = 1f
                         scaleY = 1f
                     },
-                alignment = Alignment.TopCenter,
-                contentScale = ContentScale.Crop,
+                alignment = if (isAnilistBanner) Alignment.Center else Alignment.TopCenter,
+                contentScale = if (isAnilistBanner) ContentScale.FillWidth else ContentScale.Crop,
                 desktopImageScaling = NuvioDesktopImageScaling.Disabled,
                 onSuccess = { state -> onBackdropLoaded(state.painter) },
             )

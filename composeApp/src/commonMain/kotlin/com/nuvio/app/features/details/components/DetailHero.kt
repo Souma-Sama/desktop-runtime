@@ -46,8 +46,8 @@ import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.draw.blur
 import com.nuvio.app.core.ui.NuvioDesktopImageScaling
 import com.nuvio.app.core.ui.NuvioAsyncImage as AsyncImage
 import com.nuvio.app.core.ui.heroStretchHeight
@@ -116,6 +116,26 @@ fun DetailHero(
                 val imageUrl = meta.background
                 val backdropScale = 1f
                 if (imageUrl != null) {
+                    val isAnilistBanner = imageUrl.contains("anilistcdn/media/anime/banner", ignoreCase = true)
+                    if (isAnilistBanner) {
+                        AsyncImage(
+                            model = imageUrl,
+                            contentDescription = null,
+                            modifier = Modifier
+                                .align(Alignment.Center)
+                                .fillMaxWidth()
+                                .height(heroHeight)
+                                .heroStretchZoom(stretchPx)
+                                .blur(36.dp)
+                                .graphicsLayer {
+                                    translationY = scrollOffset() * 0.5f
+                                    alpha = 0.55f
+                                },
+                            alignment = Alignment.Center,
+                            contentScale = ContentScale.Crop,
+                            desktopImageScaling = NuvioDesktopImageScaling.Disabled,
+                        )
+                    }
                     AsyncImage(
                         model = imageUrl,
                         contentDescription = meta.name,
@@ -129,8 +149,8 @@ fun DetailHero(
                                 scaleX = backdropScale
                                 scaleY = backdropScale
                             },
-                        alignment = if (isTablet) Alignment.TopCenter else Alignment.Center,
-                        contentScale = ContentScale.Crop,
+                        alignment = if (isAnilistBanner) Alignment.Center else if (isTablet) Alignment.TopCenter else Alignment.Center,
+                        contentScale = if (isAnilistBanner) ContentScale.FillWidth else ContentScale.Crop,
                         desktopImageScaling = NuvioDesktopImageScaling.Disabled,
                         onSuccess = { state ->
                             onBackdropLoaded(
