@@ -1032,47 +1032,57 @@ object AnilistMetaDetailsResolver {
 
     private suspend fun fetchKitsuEpisodes(kitsuId: String): Map<Int, KitsuEpisodeData> = runCatching {
         val cleanKitsuId = kitsuId.removePrefix("kitsu:")
-        val url = "https://kitsu.io/api/edge/anime/$cleanKitsuId/episodes?page%5Blimit%5D=50"
-        val response = runCatching {
-            httpGetTextWithHeaders(
-                url = url,
-                headers = mapOf(
-                    "Accept" to "application/vnd.api+json, application/json",
-                    "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-                ),
-            )
-        }.getOrNull() ?: httpGetText(url)
-        val root = json.parseToJsonElement(response)
-        val dataArray = root.asJsonObjectOrNull()?.get("data").asJsonArrayOrNull() ?: return@runCatching emptyMap()
-
         val result = mutableMapOf<Int, KitsuEpisodeData>()
-        dataArray.forEach { item ->
-            val itemObj = item.asJsonObjectOrNull() ?: return@forEach
-            val attrs = itemObj["attributes"].asJsonObjectOrNull() ?: return@forEach
-            val epNum = attrs["number"].asIntOrNull() ?: attrs["relativeNumber"].asIntOrNull() ?: return@forEach
 
-            val titlesObj = attrs["titles"].asJsonObjectOrNull()
-            val epTitle = titlesObj?.get("en_us").asStringOrNull()
-                ?: titlesObj?.get("en_jp").asStringOrNull()
-                ?: titlesObj?.get("canonical").asStringOrNull()
-                ?: attrs["canonicalTitle"].asStringOrNull()
+        suspend fun fetchPage(offset: Int): Int {
+            val url = "https://kitsu.io/api/edge/anime/$cleanKitsuId/episodes?page%5Blimit%5D=20&page%5Boffset%5D=$offset"
+            val response = runCatching {
+                httpGetTextWithHeaders(
+                    url = url,
+                    headers = mapOf(
+                        "Accept" to "application/vnd.api+json, application/json",
+                        "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                    ),
+                )
+            }.getOrNull() ?: httpGetText(url)
+            val root = json.parseToJsonElement(response)
+            val dataArray = root.asJsonObjectOrNull()?.get("data").asJsonArrayOrNull() ?: return 0
 
-            val overview = attrs["synopsis"].asStringOrNull() ?: attrs["description"].asStringOrNull()
-            val thumbnailObj = attrs["thumbnail"].asJsonObjectOrNull()
-            val thumbnail = thumbnailObj?.get("original").asStringOrNull()
-                ?: thumbnailObj?.get("large").asStringOrNull()
-                ?: thumbnailObj?.get("medium").asStringOrNull()
-                ?: thumbnailObj?.get("small").asStringOrNull()
-                ?: thumbnailObj?.get("tiny").asStringOrNull()
-            val airdate = attrs["airdate"].asStringOrNull() ?: attrs["released"].asStringOrNull()
+            dataArray.forEach { item ->
+                val itemObj = item.asJsonObjectOrNull() ?: return@forEach
+                val attrs = itemObj["attributes"].asJsonObjectOrNull() ?: return@forEach
+                val epNum = attrs["number"].asIntOrNull() ?: attrs["relativeNumber"].asIntOrNull() ?: return@forEach
 
-            result[epNum] = KitsuEpisodeData(
-                title = epTitle,
-                overview = overview,
-                thumbnail = thumbnail,
-                airdate = airdate,
-            )
+                val titlesObj = attrs["titles"].asJsonObjectOrNull()
+                val epTitle = titlesObj?.get("en_us").asStringOrNull()
+                    ?: titlesObj?.get("en_jp").asStringOrNull()
+                    ?: titlesObj?.get("canonical").asStringOrNull()
+                    ?: attrs["canonicalTitle"].asStringOrNull()
+
+                val overview = attrs["synopsis"].asStringOrNull() ?: attrs["description"].asStringOrNull()
+                val thumbnailObj = attrs["thumbnail"].asJsonObjectOrNull()
+                val thumbnail = thumbnailObj?.get("original").asStringOrNull()
+                    ?: thumbnailObj?.get("large").asStringOrNull()
+                    ?: thumbnailObj?.get("medium").asStringOrNull()
+                    ?: thumbnailObj?.get("small").asStringOrNull()
+                    ?: thumbnailObj?.get("tiny").asStringOrNull()
+                val airdate = attrs["airdate"].asStringOrNull() ?: attrs["released"].asStringOrNull()
+
+                result[epNum] = KitsuEpisodeData(
+                    title = epTitle,
+                    overview = overview,
+                    thumbnail = thumbnail,
+                    airdate = airdate,
+                )
+            }
+            return dataArray.size
         }
+
+        val count = fetchPage(0)
+        if (count == 20) {
+            fetchPage(20)
+        }
+
         result
     }.getOrElse { emptyMap() }
 
