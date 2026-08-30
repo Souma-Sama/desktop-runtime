@@ -409,6 +409,7 @@ object AnilistMetaDetailsResolver {
             }
 
         if (!kitsuId.isNullOrBlank() || !effectiveImdbId.isNullOrBlank()) {
+            val isSpecial = isSpecialAnime(media)
             val kitsuEpisodes = if (!kitsuId.isNullOrBlank()) {
                 runCatching {
                     withTimeoutOrNull(3000L) { fetchKitsuEpisodes(kitsuId) }
