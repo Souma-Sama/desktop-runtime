@@ -115,15 +115,6 @@ fun AniChartScreen(
         AniChartHeader(
             mode = state.mode,
             onModeSelected = { AniChartRepository.setMode(it) },
-            onRefresh = {
-                scope.launch {
-                    if (state.mode == AniChartMode.SEASONAL) {
-                        AniChartRepository.loadSeasonal(state.selectedSeason, state.selectedYear, force = true)
-                    } else {
-                        AniChartRepository.loadWeeklySchedule(force = true)
-                    }
-                }
-            },
             topPadding = totalTopPadding,
         )
 
@@ -229,7 +220,6 @@ fun AniChartScreen(
 private fun AniChartHeader(
     mode: AniChartMode,
     onModeSelected: (AniChartMode) -> Unit,
-    onRefresh: () -> Unit,
     topPadding: Dp,
 ) {
     Row(
@@ -269,64 +259,44 @@ private fun AniChartHeader(
             )
         }
 
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        // Mode Switcher Glass Pill
+        Surface(
+            shape = RoundedCornerShape(22.dp),
+            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f)),
         ) {
-            // Mode Switcher Glass Pill
-            Surface(
-                shape = RoundedCornerShape(22.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f)),
+            Row(
+                modifier = Modifier.padding(4.dp),
+                horizontalArrangement = Arrangement.spacedBy(3.dp),
             ) {
-                Row(
-                    modifier = Modifier.padding(4.dp),
-                    horizontalArrangement = Arrangement.spacedBy(3.dp),
-                ) {
-                    AniChartMode.entries.forEach { entry ->
-                        val isSelected = entry == mode
-                        val bg by animateColorAsState(
-                            targetValue = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
-                            animationSpec = tween(180),
+                AniChartMode.entries.forEach { entry ->
+                    val isSelected = entry == mode
+                    val bg by animateColorAsState(
+                        targetValue = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
+                        animationSpec = tween(180),
+                    )
+                    val textColor by animateColorAsState(
+                        targetValue = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        animationSpec = tween(180),
+                    )
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(18.dp))
+                            .background(bg)
+                            .clickable { onModeSelected(entry) }
+                            .padding(horizontal = 14.dp, vertical = 7.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            text = entry.label,
+                            style = MaterialTheme.typography.labelMedium.copy(
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                fontSize = 12.sp,
+                            ),
+                            color = textColor,
                         )
-                        val textColor by animateColorAsState(
-                            targetValue = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
-                            animationSpec = tween(180),
-                        )
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(18.dp))
-                                .background(bg)
-                                .clickable { onModeSelected(entry) }
-                                .padding(horizontal = 14.dp, vertical = 7.dp),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Text(
-                                text = entry.label,
-                                style = MaterialTheme.typography.labelMedium.copy(
-                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                    fontSize = 12.sp,
-                                ),
-                                color = textColor,
-                            )
-                        }
                     }
                 }
-            }
-
-            IconButton(
-                onClick = onRefresh,
-                modifier = Modifier
-                    .size(36.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)),
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Refresh,
-                    contentDescription = "Refresh",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(18.dp),
-                )
             }
         }
     }
@@ -345,78 +315,48 @@ private fun SeasonalControlsBar(
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         // Season / Year Selector Row
-        Row(
+        val seasonRowState = rememberLazyListState()
+        val seasonList = AniChartSeason.entries
+        LazyRow(
+            state = seasonRowState,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 20.dp),
+                .nuvioDesktopDragScroll(seasonRowState),
+            contentPadding = PaddingValues(horizontal = 20.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
         ) {
-            IconButton(
-                onClick = {
-                    val prevSeasonIndex = selectedSeason.ordinal - 1
-                    if (prevSeasonIndex < 0) {
-                        onSeasonChange(AniChartSeason.FALL, selectedYear - 1)
-                    } else {
-                        onSeasonChange(AniChartSeason.entries[prevSeasonIndex], selectedYear)
-                    }
-                },
-                modifier = Modifier.size(32.dp),
-            ) {
-                Icon(Icons.Default.ChevronLeft, contentDescription = "Previous Season", tint = MaterialTheme.colorScheme.onSurface)
-            }
+            items(seasonList) { season ->
+                val isSelected = season == selectedSeason
+                val containerColor by animateColorAsState(
+                    if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
+                )
+                val contentColor by animateColorAsState(
+                    if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
+                )
 
-            val seasonList = AniChartSeason.entries
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                seasonList.forEach { season ->
-                    val isSelected = season == selectedSeason
-                    val containerColor by animateColorAsState(
-                        if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
-                    )
-                    val contentColor by animateColorAsState(
-                        if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(containerColor)
-                            .border(
-                                width = if (isSelected) 1.dp else 0.dp,
-                                color = if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.5f) else Color.Transparent,
-                                shape = RoundedCornerShape(10.dp),
-                            )
-                            .clickable { onSeasonChange(season, selectedYear) }
-                            .padding(horizontal = 11.dp, vertical = 6.dp),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Text(
-                            text = "${season.label} $selectedYear",
-                            style = MaterialTheme.typography.labelMedium.copy(
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                fontSize = 12.sp,
-                            ),
-                            color = contentColor,
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(containerColor)
+                        .border(
+                            width = if (isSelected) 1.dp else 0.dp,
+                            color = if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.5f) else Color.Transparent,
+                            shape = RoundedCornerShape(10.dp),
                         )
-                    }
+                        .clickable { onSeasonChange(season, selectedYear) }
+                        .padding(horizontal = 14.dp, vertical = 7.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = "${season.label} $selectedYear",
+                        style = MaterialTheme.typography.labelMedium.copy(
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                            fontSize = 12.sp,
+                        ),
+                        color = contentColor,
+                    )
                 }
-            }
-
-            IconButton(
-                onClick = {
-                    val nextSeasonIndex = selectedSeason.ordinal + 1
-                    if (nextSeasonIndex >= AniChartSeason.entries.size) {
-                        onSeasonChange(AniChartSeason.WINTER, selectedYear + 1)
-                    } else {
-                        onSeasonChange(AniChartSeason.entries[nextSeasonIndex], selectedYear)
-                    }
-                },
-                modifier = Modifier.size(32.dp),
-            ) {
-                Icon(Icons.Default.ChevronRight, contentDescription = "Next Season", tint = MaterialTheme.colorScheme.onSurface)
             }
         }
 
@@ -553,6 +493,11 @@ private fun AniChartSeasonalGrid(
     }
 
     val gridState = rememberLazyGridState()
+    LaunchedEffect(items.firstOrNull()?.id) {
+        if (items.isNotEmpty()) {
+            runCatching { gridState.scrollToItem(0) }
+        }
+    }
     LazyVerticalGrid(
         columns = GridCells.Fixed(columns),
         state = gridState,

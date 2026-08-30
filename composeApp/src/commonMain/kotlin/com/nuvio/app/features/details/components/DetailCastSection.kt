@@ -72,16 +72,16 @@ fun DetailCastSection(
     val categories = remember(cast) {
         val distinctCats = cast.mapNotNull { it.category?.takeIf { c -> c.isNotBlank() } }.distinct()
         if (distinctCats.size > 1) {
-            listOf("All") + distinctCats
+            distinctCats
         } else {
             emptyList()
         }
     }
 
-    var selectedCategory by remember(cast) { mutableStateOf("All") }
+    var selectedCategory by remember(cast) { mutableStateOf(categories.firstOrNull().orEmpty()) }
 
     val filteredCast = remember(cast, selectedCategory) {
-        if (selectedCategory == "All" || categories.isEmpty()) {
+        if (categories.isEmpty() || selectedCategory.isBlank()) {
             cast
         } else {
             cast.filter { it.category == selectedCategory }
@@ -124,6 +124,9 @@ fun DetailCastSection(
             BoxWithConstraints {
                 val sizing = castSectionSizing(maxWidth.value)
                 val rowState = rememberLazyListState()
+                LaunchedEffect(selectedCategory) {
+                    runCatching { rowState.scrollToItem(0) }
+                }
 
                 LazyRow(
                     state = rowState,

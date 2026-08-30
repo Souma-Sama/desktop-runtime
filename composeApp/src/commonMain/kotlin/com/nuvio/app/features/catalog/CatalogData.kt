@@ -77,6 +77,16 @@ suspend fun fetchCatalogPage(
     maxItems: Int? = null,
     forceRefresh: Boolean = false,
 ): CatalogPage {
+    if (manifestUrl.startsWith("native://anilist", ignoreCase = true) || manifestUrl.equals("native", ignoreCase = true) || manifestUrl.startsWith("anilist:", ignoreCase = true)) {
+        val pageNum = ((skip ?: 0) / 25) + 1
+        return com.nuvio.app.features.anilist.catalog.AnilistCatalogRepository.fetchCatalogPage(
+            catalogId = catalogId,
+            page = pageNum,
+            perPage = maxItems ?: 25,
+            force = forceRefresh,
+        )
+    }
+
     val url = buildCatalogUrl(
         manifestUrl = manifestUrl,
         type = type,

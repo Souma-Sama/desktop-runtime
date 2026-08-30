@@ -77,6 +77,7 @@ data class AnilistCharacterVoiceActor(
     val id: Int? = null,
     val name: String? = null,
     val image: String? = null,
+    val language: String? = null,
 )
 
 @Serializable
@@ -86,7 +87,14 @@ data class AnilistCharacter(
     val role: String? = null,
     val image: String? = null,
     val voiceActor: AnilistCharacterVoiceActor? = null,
-)
+    val voiceActors: List<AnilistCharacterVoiceActor> = emptyList(),
+) {
+    val japaneseVoiceActor: AnilistCharacterVoiceActor?
+        get() = voiceActors.firstOrNull { it.language.equals("Japanese", ignoreCase = true) } ?: voiceActor
+
+    val englishVoiceActor: AnilistCharacterVoiceActor?
+        get() = voiceActors.firstOrNull { it.language.equals("English", ignoreCase = true) }
+}
 
 @Serializable
 data class AnilistStudio(

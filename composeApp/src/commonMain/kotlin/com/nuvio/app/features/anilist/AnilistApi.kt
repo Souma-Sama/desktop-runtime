@@ -1387,7 +1387,7 @@ object AnilistApi {
                         large
                       }
                     }
-                    voiceActors(language: JAPANESE) {
+                    voiceActors(sort: [RELEVANCE, ID]) {
                       id
                       name {
                         full
@@ -1395,6 +1395,7 @@ object AnilistApi {
                       image {
                         large
                       }
+                      languageV2
                     }
                   }
                 }
@@ -1606,14 +1607,25 @@ object AnilistApi {
                 val charName = node?.get("name").asJsonObjectOrNull()?.get("full").asStringOrNull()
                 val charImg = node?.get("image").asJsonObjectOrNull()?.get("large").asStringOrNull()
 
-                val vaNode = edge["voiceActors"].asJsonArrayOrNull()?.firstOrNull().asJsonObjectOrNull()
-                val vaId = vaNode?.get("id").asIntOrNull()
-                val vaName = vaNode?.get("name").asJsonObjectOrNull()?.get("full").asStringOrNull()
-                val vaImg = vaNode?.get("image").asJsonObjectOrNull()?.get("large").asStringOrNull()
+                val vaList = edge["voiceActors"].asJsonArrayOrNull()?.mapNotNull { vaElem ->
+                    val vaObj = vaElem.asJsonObjectOrNull() ?: return@mapNotNull null
+                    val vId = vaObj["id"].asIntOrNull()
+                    val vName = vaObj["name"].asJsonObjectOrNull()?.get("full").asStringOrNull() ?: return@mapNotNull null
+                    val vImg = vaObj["image"].asJsonObjectOrNull()?.get("large").asStringOrNull()
+                    val vLang = vaObj["languageV2"].asStringOrNull()
+                    AnilistCharacterVoiceActor(id = vId, name = vName, image = vImg, language = vLang)
+                }.orEmpty()
 
-                val va = if (vaName != null) AnilistCharacterVoiceActor(id = vaId, name = vaName, image = vaImg) else null
-                if (charName != null || vaName != null) {
-                    AnilistCharacter(id = charId, name = charName, role = role, image = charImg, voiceActor = va)
+                val primaryVa = vaList.firstOrNull { it.language.equals("Japanese", ignoreCase = true) } ?: vaList.firstOrNull()
+                if (charName != null || vaList.isNotEmpty()) {
+                    AnilistCharacter(
+                        id = charId,
+                        name = charName,
+                        role = role,
+                        image = charImg,
+                        voiceActor = primaryVa,
+                        voiceActors = vaList,
+                    )
                 } else null
             }.orEmpty()
 

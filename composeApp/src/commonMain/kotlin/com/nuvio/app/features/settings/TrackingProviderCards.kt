@@ -239,10 +239,12 @@ private fun AnilistProviderCard(
         approvalDescription = "",
         connectLabel = "Connect AniList",
         openLoginLabel = "Connect AniList",
-        disconnectLabel = stringResource(Res.string.settings_simkl_disconnect),
+        disconnectLabel = "Sign Out",
         missingCredentialsMessage = "",
-        syncLabel = if (onConfigureClick != null) "Configure Preferences" else null,
-        onSyncRequested = onConfigureClick,
+        syncLabel = "Sign Out",
+        showSyncIcon = false,
+        onSyncRequested = null,
+        showFooterDisconnect = false,
         infoLabel = if (onConfigureClick != null) "Preferences & Options" else null,
         onInfoRequested = onConfigureClick,
         websiteLabel = "Visit AniList",
@@ -504,6 +506,8 @@ private fun TrackingProviderCard(
     syncLabel: String? = null,
     infoLabel: String? = null,
     isSyncing: Boolean = false,
+    showFooterDisconnect: Boolean = true,
+    showSyncIcon: Boolean = true,
     statusMessage: String? = null,
     errorMessage: String? = null,
     websiteLabel: String? = null,
@@ -567,13 +571,13 @@ private fun TrackingProviderCard(
                         label = connectedLabel,
                         description = connectedDescription,
                     )
-                    if (syncLabel != null && onSyncRequested != null) {
+                    if (syncLabel != null) {
                         TrackingBrandPrimaryButton(
                             label = syncLabel,
                             loading = isSyncing,
                             enabled = !isLoading && !isSyncing,
-                            onClick = onSyncRequested,
-                            showSyncIcon = true,
+                            onClick = onSyncRequested ?: { showDisconnectDialog = true },
+                            showSyncIcon = showSyncIcon && onSyncRequested != null,
                         )
                     }
                 }
@@ -654,7 +658,7 @@ private fun TrackingProviderCard(
             }
 
             val hasWebsiteAction = !websiteLabel.isNullOrBlank() && !websiteUrl.isNullOrBlank()
-            val hasDisconnectAction = mode == TrackingConnectionCardMode.CONNECTED
+            val hasDisconnectAction = mode == TrackingConnectionCardMode.CONNECTED && showFooterDisconnect
             val hasInfoAction = infoLabel != null && onInfoRequested != null
             val footerActionCount = listOf(
                 hasWebsiteAction,

@@ -147,6 +147,45 @@ object AnilistCatalogRepository {
                     descriptorSignature = "anilist:completed",
                 )
             )
+            list.add(
+                HomeCatalogDefinition(
+                    key = "anilist:anime:rewatching",
+                    defaultTitle = "Rewatching",
+                    catalogName = "Rewatching",
+                    addonName = "AniList",
+                    manifestUrl = "native://anilist",
+                    type = "anime",
+                    catalogId = CATALOG_REWATCHING,
+                    supportsPagination = true,
+                    descriptorSignature = "anilist:rewatching",
+                )
+            )
+            list.add(
+                HomeCatalogDefinition(
+                    key = "anilist:anime:paused",
+                    defaultTitle = "Paused",
+                    catalogName = "Paused",
+                    addonName = "AniList",
+                    manifestUrl = "native://anilist",
+                    type = "anime",
+                    catalogId = CATALOG_PAUSED,
+                    supportsPagination = true,
+                    descriptorSignature = "anilist:paused",
+                )
+            )
+            list.add(
+                HomeCatalogDefinition(
+                    key = "anilist:anime:dropped",
+                    defaultTitle = "Dropped",
+                    catalogName = "Dropped",
+                    addonName = "AniList",
+                    manifestUrl = "native://anilist",
+                    type = "anime",
+                    catalogId = CATALOG_DROPPED,
+                    supportsPagination = true,
+                    descriptorSignature = "anilist:dropped",
+                )
+            )
         }
 
         return list

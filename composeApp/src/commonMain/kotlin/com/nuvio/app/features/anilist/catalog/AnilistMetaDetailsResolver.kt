@@ -823,53 +823,82 @@ object AnilistMetaDetailsResolver {
 
     private fun buildCategorizedCast(media: AnilistMedia): List<com.nuvio.app.features.details.MetaPerson> =
         buildList {
-            // 1. Main Cast (Main Characters & Voice Actors)
-            media.characters.filter { it.role?.equals("MAIN", ignoreCase = true) == true }.forEach { char ->
-                val va = char.voiceActor
-                val name = va?.name ?: char.name ?: return@forEach
-                val characterRole = if (char.name != null && va?.name != null) "${char.name} (VA)" else char.name ?: "Main Cast"
-                val photo = va?.image ?: char.image
+            // 1. Characters in the show
+            media.characters.forEach { char ->
+                val charName = char.name ?: return@forEach
+                val charRole = if (char.role?.equals("MAIN", ignoreCase = true) == true) "Main Character" else "Supporting Character"
                 add(
                     com.nuvio.app.features.details.MetaPerson(
-                        name = name,
-                        role = characterRole,
-                        photo = photo,
-                        tmdbId = va?.id ?: char.id,
-                        category = "Main Cast",
+                        name = charName,
+                        role = charRole,
+                        photo = char.image,
+                        tmdbId = char.id,
+                        category = "Characters",
                     )
                 )
             }
 
-            // 2. Supporting Cast (Supporting Characters & Voice Actors)
-            media.characters.filter { it.role?.equals("MAIN", ignoreCase = true) != true }.forEach { char ->
-                val va = char.voiceActor
-                val name = va?.name ?: char.name ?: return@forEach
-                val characterRole = if (char.name != null && va?.name != null) "${char.name} (VA)" else char.name ?: "Supporting Cast"
-                val photo = va?.image ?: char.image
+            // 2. Japanese Voice Cast
+            media.characters.forEach { char ->
+                val va = char.japaneseVoiceActor ?: return@forEach
+                val vaName = va.name ?: return@forEach
+                val role = if (char.name != null) "${char.name} (VA)" else "Voice Actor"
                 add(
                     com.nuvio.app.features.details.MetaPerson(
-                        name = name,
-                        role = characterRole,
-                        photo = photo,
-                        tmdbId = va?.id ?: char.id,
-                        category = "Supporting Cast",
+                        name = vaName,
+                        role = role,
+                        photo = va.image,
+                        tmdbId = va.id,
+                        category = "Japanese Cast",
                     )
                 )
             }
 
-            // 3. Staff & Production Crew
+            // 3. English Dub Voice Cast (if available)
+            media.characters.forEach { char ->
+                val va = char.englishVoiceActor ?: return@forEach
+                val vaName = va.name ?: return@forEach
+                val role = if (char.name != null) "${char.name} (VA)" else "Voice Actor"
+                add(
+                    com.nuvio.app.features.details.MetaPerson(
+                        name = vaName,
+                        role = role,
+                        photo = va.image,
+                        tmdbId = va.id,
+                        category = "English Cast",
+                    )
+                )
+            }
+
+            // 4. Staff & Production Crew (Deduplicated with combined roles)
+            val staffMap = linkedMapOf<String, com.nuvio.app.features.details.MetaPerson>()
             media.staff.forEach { st ->
                 val name = st.name ?: return@forEach
-                add(
-                    com.nuvio.app.features.details.MetaPerson(
+                val key = st.id?.toString() ?: name
+                val rawRole = st.role?.trim()?.takeIf { it.isNotBlank() } ?: "Staff"
+                val existing = staffMap[key]
+                if (existing == null) {
+                    staffMap[key] = com.nuvio.app.features.details.MetaPerson(
                         name = name,
-                        role = st.role ?: "Staff",
+                        role = rawRole,
                         photo = st.image,
                         tmdbId = st.id,
                         category = "Staff & Crew",
                     )
-                )
+                } else {
+                    val currentRoles = existing.role.orEmpty().split(",").map { it.trim() }.filter { it.isNotBlank() }
+                    val mergedRoles = if (!currentRoles.contains(rawRole)) {
+                        (currentRoles + rawRole).joinToString(", ")
+                    } else {
+                        existing.role
+                    }
+                    staffMap[key] = existing.copy(
+                        role = mergedRoles,
+                        photo = existing.photo ?: st.image,
+                    )
+                }
             }
+            addAll(staffMap.values)
         }
 
     private fun resolveEpisodeAirDate(

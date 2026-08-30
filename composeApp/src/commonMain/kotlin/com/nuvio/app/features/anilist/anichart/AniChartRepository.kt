@@ -33,15 +33,26 @@ object AniChartRepository {
     private var weeklyScheduleCache: Map<AniChartDay, List<AniChartMedia>>? = null
     private var weeklyScheduleCachedAtMs: Long = 0L
 
+    private val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + Dispatchers.Default)
+
     private val _uiState = MutableStateFlow(AniChartUiState())
     val uiState: StateFlow<AniChartUiState> = _uiState.asStateFlow()
 
     fun setMode(mode: AniChartMode) {
         _uiState.value = _uiState.value.copy(mode = mode)
+        if (mode == AniChartMode.SEASONAL && _uiState.value.seasonalItems.isEmpty()) {
+            scope.launch { loadSeasonal(_uiState.value.selectedSeason, _uiState.value.selectedYear) }
+        } else if (mode == AniChartMode.WEEKLY && _uiState.value.scheduleItems.isEmpty()) {
+            scope.launch { loadWeeklySchedule() }
+        }
     }
 
     fun setSeason(season: AniChartSeason, year: Int) {
-        _uiState.value = _uiState.value.copy(selectedSeason = season, selectedYear = year)
+        val current = _uiState.value
+        if (current.selectedSeason == season && current.selectedYear == year && current.seasonalItems.isNotEmpty()) return
+        scope.launch {
+            loadSeasonal(season, year)
+        }
     }
 
     fun setDay(day: AniChartDay) {
@@ -69,6 +80,7 @@ object AniChartRepository {
         }
 
         _uiState.value = _uiState.value.copy(
+            seasonalItems = emptyList(),
             selectedSeason = season,
             selectedYear = year,
             isLoading = true,

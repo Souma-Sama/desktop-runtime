@@ -112,6 +112,12 @@ internal fun MainTabsDestination(
                             contentDescription = stringResource(Res.string.compose_nav_search),
                         )
                         NavItem(
+                            selected = selectedTab == AppScreenTab.AniChart,
+                            onClick = { onTabSelected(AppScreenTab.AniChart) },
+                            icon = androidx.compose.material.icons.Icons.Rounded.CalendarMonth,
+                            contentDescription = "AniChart",
+                        )
+                        NavItem(
                             selected = selectedTab == AppScreenTab.Library,
                             onClick = { onTabSelected(AppScreenTab.Library) },
                             icon = Res.drawable.sidebar_library,
@@ -197,6 +203,13 @@ internal fun MainTabsDestination(
                             icon = Res.drawable.sidebar_search,
                             contentDescription = stringResource(Res.string.compose_nav_search),
                             label = stringResource(Res.string.compose_nav_search),
+                        )
+                        NavItem(
+                            selected = selectedTab == AppScreenTab.AniChart,
+                            onClick = { onTabSelected(AppScreenTab.AniChart) },
+                            icon = androidx.compose.material.icons.Icons.Rounded.CalendarMonth,
+                            contentDescription = "AniChart",
+                            label = "AniChart",
                         )
                         NavItem(
                             selected = selectedTab == AppScreenTab.Library,
