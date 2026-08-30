@@ -99,8 +99,13 @@ object AnilistMetaDetailsResolver {
             val episode1Thumb = kitsuEpisodes[1]?.thumbnail?.takeIf { it.isNotBlank() }
                 ?: media.streamingEpisodes.firstOrNull()?.thumbnail?.takeIf { it.isNotBlank() }
 
+            val parentRelation = media.relations.firstOrNull { 
+                it.relationType in listOf("PARENT", "PREQUEL", "SOURCE", "MAIN", "ALTERNATIVE", "SIDE_STORY", "SPIN_OFF", "OTHER") 
+            }
+
             val backdrop = media.bannerImage
                 ?: (if (!effectiveImdbId.isNullOrBlank()) "https://images.metahub.space/background/medium/$effectiveImdbId/img" else null)
+                ?: parentRelation?.bannerImage
                 ?: episode1Thumb
                 ?: poster
 
@@ -429,8 +434,13 @@ object AnilistMetaDetailsResolver {
                         overview = kitsuEp?.overview ?: v.overview,
                     )
                 }
+                val parentRelation = media?.relations?.firstOrNull { 
+                    it.relationType in listOf("PARENT", "PREQUEL", "SOURCE", "MAIN", "ALTERNATIVE", "SIDE_STORY", "SPIN_OFF", "OTHER") 
+                }
                 val updatedBackdrop = if (!effectiveImdbId.isNullOrBlank() && (current.background == null || current.background == current.poster)) {
                     "https://images.metahub.space/background/medium/$effectiveImdbId/img"
+                } else if ((current.background == null || current.background == current.poster) && !parentRelation?.bannerImage.isNullOrBlank()) {
+                    parentRelation?.bannerImage
                 } else current.background
                 val updatedLogo = if (!effectiveImdbId.isNullOrBlank()) {
                     "https://images.metahub.space/logo/medium/$effectiveImdbId/img"
