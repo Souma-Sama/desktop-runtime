@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -114,7 +115,7 @@ internal fun MainTabsDestination(
                         NavItem(
                             selected = selectedTab == AppScreenTab.AniChart,
                             onClick = { onTabSelected(AppScreenTab.AniChart) },
-                            icon = androidx.compose.material.icons.Icons.Rounded.CalendarMonth,
+                            icon = Icons.Rounded.CalendarMonth,
                             contentDescription = "AniChart",
                         )
                         NavItem(
@@ -207,7 +208,7 @@ internal fun MainTabsDestination(
                         NavItem(
                             selected = selectedTab == AppScreenTab.AniChart,
                             onClick = { onTabSelected(AppScreenTab.AniChart) },
-                            icon = androidx.compose.material.icons.Icons.Rounded.CalendarMonth,
+                            icon = Icons.Rounded.CalendarMonth,
                             contentDescription = "AniChart",
                             label = "AniChart",
                         )

@@ -4,6 +4,7 @@ import co.touchlab.kermit.Logger
 import com.nuvio.app.features.anilist.AnilistApi
 import com.nuvio.app.features.anilist.AnilistPreferencesRepository
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -42,7 +43,7 @@ object AniChartRepository {
         _uiState.value = _uiState.value.copy(mode = mode)
         if (mode == AniChartMode.SEASONAL && _uiState.value.seasonalItems.isEmpty()) {
             scope.launch { loadSeasonal(_uiState.value.selectedSeason, _uiState.value.selectedYear) }
-        } else if (mode == AniChartMode.WEEKLY && _uiState.value.scheduleItems.isEmpty()) {
+        } else if (mode == AniChartMode.SCHEDULE && _uiState.value.scheduleItems.isEmpty()) {
             scope.launch { loadWeeklySchedule() }
         }
     }
