@@ -69,10 +69,7 @@ object AnilistMetaDetailsResolver {
             val media = mediaDeferred.await() ?: return@coroutineScope null
             val armMapping = armDeferred.await()
 
-            val effectiveImdbId = armMapping.imdbId
-                ?: media.relations.firstOrNull { it.relationType in listOf("PARENT", "PREQUEL", "SOURCE", "MAIN", "ALTERNATIVE", "SIDE_STORY", "SPIN_OFF", "OTHER") }?.let {
-                    resolveArmMapping(it.id).imdbId
-                }
+            val effectiveImdbId = resolveEffectiveImdbId(media, armMapping.imdbId)
             val isSpecial = isSpecialAnime(media)
             val targetSeason = when {
                 armMapping.season == 0 -> 0
@@ -400,10 +397,7 @@ object AnilistMetaDetailsResolver {
         val arm = armDeferred.await()
         val kitsuId = arm.kitsuId?.removePrefix("kitsu:")?.takeIf { it.isNotBlank() }
             ?: resolveKitsuId(anilistId, media)
-        val effectiveImdbId = arm.imdbId
-            ?: media?.relations?.firstOrNull { it.relationType in listOf("PARENT", "PREQUEL", "SOURCE", "MAIN", "ALTERNATIVE", "SIDE_STORY", "SPIN_OFF", "OTHER") }?.let {
-                resolveArmMapping(it.id).imdbId
-            }
+        val effectiveImdbId = resolveEffectiveImdbId(media, arm.imdbId)
 
         if (!kitsuId.isNullOrBlank() || !effectiveImdbId.isNullOrBlank()) {
             val isSpecial = isSpecialAnime(media)
@@ -494,7 +488,29 @@ object AnilistMetaDetailsResolver {
         } ?: ArmMapping(null, null, null, null, null, 1)
     }
 
-    suspend fun resolveArmImdbId(anilistId: Int): String? = resolveArmMapping(anilistId).imdbId
+    suspend fun resolveEffectiveImdbId(media: AnilistMedia?, directImdbId: String?): String? {
+        if (!directImdbId.isNullOrBlank()) return directImdbId
+        if (media == null) return null
+
+        val priorityTypes = listOf("PARENT", "MAIN", "SOURCE", "PREQUEL", "ALTERNATIVE", "SIDE_STORY", "SPIN_OFF", "OTHER")
+        val sortedRelations = media.relations.sortedBy { rel ->
+            val idx = priorityTypes.indexOf(rel.relationType?.uppercase())
+            if (idx >= 0) idx else 99
+        }
+        for (rel in sortedRelations) {
+            val mapped = resolveArmMapping(rel.id).imdbId
+            if (!mapped.isNullOrBlank()) return mapped
+        }
+
+        for (rel in sortedRelations) {
+            for (nested in rel.relations) {
+                val mapped = resolveArmMapping(nested.id).imdbId
+                if (!mapped.isNullOrBlank()) return mapped
+            }
+        }
+
+        return null
+    }
 
     suspend fun adaptCinemetaForAnilist(
         cinemetaMeta: MetaDetails,
@@ -516,11 +532,10 @@ object AnilistMetaDetailsResolver {
             isSpecial -> 0
             else -> mapping.season
         }
-        val effectiveImdbId = mapping.imdbId
-            ?: cinemetaMeta.id.takeIf { it.startsWith("tt") }
-            ?: media?.relations?.firstOrNull { it.relationType in listOf("PARENT", "PREQUEL", "SOURCE", "MAIN", "ALTERNATIVE") }?.let {
-                resolveArmMapping(it.id).imdbId
-            }
+        val effectiveImdbId = resolveEffectiveImdbId(
+            media = media,
+            directImdbId = mapping.imdbId ?: cinemetaMeta.id.takeIf { it.startsWith("tt") }
+        )
 
         val isMovie = media?.format == "MOVIE"
 
