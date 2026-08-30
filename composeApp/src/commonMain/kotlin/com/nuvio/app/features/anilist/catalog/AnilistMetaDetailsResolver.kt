@@ -440,7 +440,7 @@ object AnilistMetaDetailsResolver {
                         trailers = if (primaryTrailer.isNotEmpty()) primaryTrailer else current.trailers,
                         director = if (directors.isNotEmpty()) directors else current.director,
                         writer = if (writers.isNotEmpty()) writers else current.writer,
-                        description = cleanDescription.ifBlank { current.description },
+                        description = cleanDescription?.takeIf { it.isNotBlank() } ?: current.description,
                         status = media.status ?: current.status,
                     )
                 }
