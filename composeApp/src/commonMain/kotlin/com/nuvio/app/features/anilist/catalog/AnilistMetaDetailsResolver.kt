@@ -99,13 +99,14 @@ object AnilistMetaDetailsResolver {
             val episode1Thumb = kitsuEpisodes[1]?.thumbnail?.takeIf { it.isNotBlank() }
                 ?: media.streamingEpisodes.firstOrNull()?.thumbnail?.takeIf { it.isNotBlank() }
 
-            val parentRelation = media.relations.firstOrNull { 
-                it.relationType in listOf("PARENT", "PREQUEL", "SOURCE", "MAIN", "ALTERNATIVE", "SIDE_STORY", "SPIN_OFF", "OTHER") 
-            }
+            val parentBanner = if (isSpecial || media.bannerImage.isNullOrBlank()) {
+                media.relations.mapNotNull { it.bannerImage }.firstOrNull { it.isNotBlank() }
+                    ?: media.relations.flatMap { it.relations }.mapNotNull { it.bannerImage }.firstOrNull { it.isNotBlank() }
+            } else null
 
             val backdrop = media.bannerImage
+                ?: parentBanner
                 ?: (if (!effectiveImdbId.isNullOrBlank()) "https://images.metahub.space/background/medium/$effectiveImdbId/img" else null)
-                ?: parentRelation?.bannerImage
                 ?: episode1Thumb
                 ?: poster
 
@@ -436,14 +437,15 @@ object AnilistMetaDetailsResolver {
                         overview = kitsuEp?.overview ?: v.overview,
                     )
                 }
-                val parentRelation = media?.relations?.firstOrNull { 
-                    it.relationType in listOf("PARENT", "PREQUEL", "SOURCE", "MAIN", "ALTERNATIVE", "SIDE_STORY", "SPIN_OFF", "OTHER") 
-                }
-                val updatedBackdrop = if (!effectiveImdbId.isNullOrBlank() && (current.background == null || current.background == current.poster)) {
-                    "https://images.metahub.space/background/medium/$effectiveImdbId/img"
-                } else if ((current.background == null || current.background == current.poster) && !parentRelation?.bannerImage.isNullOrBlank()) {
-                    parentRelation?.bannerImage
-                } else current.background
+                val parentBanner = if (isSpecial || media?.bannerImage.isNullOrBlank()) {
+                    media?.relations?.mapNotNull { it.bannerImage }?.firstOrNull { it.isNotBlank() }
+                        ?: media?.relations?.flatMap { it.relations }?.mapNotNull { it.bannerImage }?.firstOrNull { it.isNotBlank() }
+                } else null
+                val updatedBackdrop = media?.bannerImage
+                    ?: current.background?.takeIf { it.isNotBlank() && it != current.poster }
+                    ?: parentBanner
+                    ?: (if (!effectiveImdbId.isNullOrBlank()) "https://images.metahub.space/background/medium/$effectiveImdbId/img" else null)
+                    ?: current.background
                 val updatedLogo = if (!isSpecial && !effectiveImdbId.isNullOrBlank()) {
                     "https://images.metahub.space/logo/medium/$effectiveImdbId/img"
                 } else if (isSpecial) null else current.logo
@@ -845,6 +847,11 @@ object AnilistMetaDetailsResolver {
             }
         }
 
+        val parentBanner = if (isSpecial || media?.bannerImage.isNullOrBlank()) {
+            media?.relations?.mapNotNull { it.bannerImage }?.firstOrNull { it.isNotBlank() }
+                ?: media?.relations?.flatMap { it.relations }?.mapNotNull { it.bannerImage }?.firstOrNull { it.isNotBlank() }
+        } else null
+
         cinemetaMeta.copy(
             id = rawId,
             name = media?.title?.displayTitle ?: cinemetaMeta.name,
@@ -853,7 +860,12 @@ object AnilistMetaDetailsResolver {
             releaseInfo = releaseYear,
             status = media?.status ?: cinemetaMeta.status,
             lastAirDate = media?.endDateYear?.toString() ?: releaseYear,
-            background = cinemetaMeta.background ?: "https://images.metahub.space/background/medium/$effectiveImdbId/img",
+            background = media?.bannerImage
+                ?: (if (isSpecial) parentBanner else null)
+                ?: cinemetaMeta.background
+                ?: (if (!effectiveImdbId.isNullOrBlank()) "https://images.metahub.space/background/medium/$effectiveImdbId/img" else null)
+                ?: parentBanner
+                ?: cinemetaMeta.poster,
             logo = if (isSpecial || targetSeason == 0) null else (cinemetaMeta.logo ?: "https://images.metahub.space/logo/medium/$effectiveImdbId/img"),
             cast = if (anilistCast.isNotEmpty()) anilistCast else cinemetaMeta.cast,
             productionCompanies = if (animationStudios.isNotEmpty()) animationStudios else cinemetaMeta.productionCompanies,

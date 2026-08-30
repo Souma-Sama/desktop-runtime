@@ -1475,6 +1475,23 @@ object AnilistApi {
                         large
                       }
                       bannerImage
+                      relations {
+                        edges {
+                          relationType
+                          node {
+                            id
+                            title {
+                              english
+                              romaji
+                              native
+                            }
+                            format
+                            episodes
+                            status
+                            bannerImage
+                          }
+                        }
+                      }
                     }
                   }
                 }
@@ -1796,6 +1813,7 @@ object AnilistApi {
             }
             val banner = node["bannerImage"].asStringOrNull()
             val status = node["status"].asStringOrNull()
+            val nestedRelations = parseRelations(node)
             AnilistRelation(
                 relationType = relType,
                 id = nId,
@@ -1805,6 +1823,7 @@ object AnilistApi {
                 status = status,
                 coverImage = cov,
                 bannerImage = banner,
+                relations = nestedRelations,
             )
         }
     }
