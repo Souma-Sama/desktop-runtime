@@ -30,7 +30,8 @@ data class HomeCatalogDefinition(
 }
 
 fun buildHomeCatalogRefreshSignature(addons: List<ManagedAddon>): List<String> {
-    val isAnilistEnabled = addons.any { (it.manifestUrl == "native://anilist" || it.manifestUrl == "builtin://anilist" || it.manifest?.id.equals("anilist", ignoreCase = true)) && it.enabled }
+    val prefs = com.nuvio.app.features.anilist.AnilistPreferencesRepository.snapshot()
+    val isAnilistEnabled = prefs.enabled && addons.any { (it.manifestUrl == "native://anilist" || it.manifestUrl == "builtin://anilist" || it.manifest?.id.equals("anilist", ignoreCase = true)) && it.enabled }
     val anilistSignatures = if (isAnilistEnabled) {
         com.nuvio.app.features.anilist.catalog.AnilistCatalogRepository.getCatalogDefinitions()
             .map { it.descriptorSignature }
@@ -49,7 +50,8 @@ fun buildHomeCatalogRefreshSignature(addons: List<ManagedAddon>): List<String> {
 }
 
 fun buildHomeCatalogDefinitions(addons: List<ManagedAddon>): List<HomeCatalogDefinition> {
-    val isAnilistEnabled = addons.any { (it.manifestUrl == "native://anilist" || it.manifestUrl == "builtin://anilist" || it.manifest?.id.equals("anilist", ignoreCase = true)) && it.enabled }
+    val prefs = com.nuvio.app.features.anilist.AnilistPreferencesRepository.snapshot()
+    val isAnilistEnabled = prefs.enabled && addons.any { (it.manifestUrl == "native://anilist" || it.manifestUrl == "builtin://anilist" || it.manifest?.id.equals("anilist", ignoreCase = true)) && it.enabled }
     val anilistCatalogs = if (isAnilistEnabled) {
         com.nuvio.app.features.anilist.catalog.AnilistCatalogRepository.getCatalogDefinitions()
     } else emptyList()

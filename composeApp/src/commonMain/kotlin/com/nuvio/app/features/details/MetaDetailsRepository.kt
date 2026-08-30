@@ -120,7 +120,8 @@ object MetaDetailsRepository {
         _uiState.value = MetaDetailsUiState(isLoading = true)
 
         scope.launch {
-            val isAnilistItem = id.startsWith("ani_", ignoreCase = true) || id.startsWith("anilist:", ignoreCase = true)
+            val anilistEnabled = com.nuvio.app.features.anilist.AnilistPreferencesRepository.snapshot().enabled
+            val isAnilistItem = anilistEnabled && (id.startsWith("ani_", ignoreCase = true) || id.startsWith("anilist:", ignoreCase = true))
             val effectiveType = if (type == "movie") "movie" else "series"
 
             val anilistId = if (isAnilistItem) {
@@ -476,7 +477,8 @@ object MetaDetailsRepository {
             }
         }
 
-        if (isAnilist) {
+        val anilistEnabled = com.nuvio.app.features.anilist.AnilistPreferencesRepository.snapshot().enabled
+        if (isAnilist && anilistEnabled) {
             com.nuvio.app.features.anilist.catalog.AnilistMetaDetailsResolver.enrichAnimeForMetaScreen(
                 meta = meta,
                 onUpdate = { transform -> emitUpdate(transform) },

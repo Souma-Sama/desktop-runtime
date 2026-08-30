@@ -25,6 +25,10 @@ object AnilistPreferencesRepository {
         return _preferences.value
     }
 
+    fun setEnabled(enabled: Boolean) {
+        updateAndPersist { it.copy(enabled = enabled) }
+    }
+
     fun setAutoMarkEpisodeWatched(enabled: Boolean) {
         updateAndPersist { it.copy(autoMarkEpisodeWatched = enabled) }
     }

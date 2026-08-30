@@ -10,6 +10,7 @@ data class AnilistSectionSettings(
 
 @Serializable
 data class AnilistPreferences(
+    val enabled: Boolean = true,
     val autoMarkEpisodeWatched: Boolean = true,
     val watchedPercentageThreshold: Int = 85,
     val autoMoveToWatchingOnStart: Boolean = true,

@@ -109,23 +109,62 @@ internal fun LazyListScope.anilistSettingsContent(
     isTablet: Boolean,
 ) {
     item {
-        AnilistAccountSection(isTablet = isTablet)
+        AnilistMasterSwitchSection(isTablet = isTablet)
     }
 
     item {
-        AnilistPlaybackSection(isTablet = isTablet)
+        val prefs by AnilistPreferencesRepository.preferences.collectAsStateWithLifecycle()
+        if (prefs.enabled) {
+            AnilistAccountSection(isTablet = isTablet)
+        }
     }
 
     item {
-        AnilistPosterDisplaySection(isTablet = isTablet)
+        val prefs by AnilistPreferencesRepository.preferences.collectAsStateWithLifecycle()
+        if (prefs.enabled) {
+            AnilistPlaybackSection(isTablet = isTablet)
+        }
     }
 
     item {
-        AnilistLibrarySectionsSection(isTablet = isTablet)
+        val prefs by AnilistPreferencesRepository.preferences.collectAsStateWithLifecycle()
+        if (prefs.enabled) {
+            AnilistPosterDisplaySection(isTablet = isTablet)
+        }
     }
 
     item {
-        AnilistDisplayPreferencesSection(isTablet = isTablet)
+        val prefs by AnilistPreferencesRepository.preferences.collectAsStateWithLifecycle()
+        if (prefs.enabled) {
+            AnilistLibrarySectionsSection(isTablet = isTablet)
+        }
+    }
+
+    item {
+        val prefs by AnilistPreferencesRepository.preferences.collectAsStateWithLifecycle()
+        if (prefs.enabled) {
+            AnilistDisplayPreferencesSection(isTablet = isTablet)
+        }
+    }
+}
+
+@Composable
+private fun AnilistMasterSwitchSection(isTablet: Boolean) {
+    val prefs by AnilistPreferencesRepository.preferences.collectAsStateWithLifecycle()
+
+    SettingsSection(
+        title = "AniList Integration (Nuvio-Kai)",
+        isTablet = isTablet,
+    ) {
+        SettingsGroup(isTablet = isTablet) {
+            SettingsSwitchRow(
+                title = "Enable AniList Integration",
+                description = "Master kill switch. When turned off, completely removes all AniList catalogs, tracking, metadata enhancements, and reverts Nuvio to standard stock behavior.",
+                checked = prefs.enabled,
+                isTablet = isTablet,
+                onCheckedChange = AnilistPreferencesRepository::setEnabled,
+            )
+        }
     }
 }
 

@@ -48,9 +48,9 @@ fun HomePosterCard(
         }
     }
 
-    val effectiveLogoUrl = if (anilistPrefs.showPosterTitleLogos) lazyLogoUrl else null
-    val effectiveAnilistScore = if (anilistPrefs.showPosterAnilistScore) item.anilistScore else null
-    val effectiveMalScore = if (anilistPrefs.showPosterMalScore) lazyMalScore else null
+    val effectiveLogoUrl = if (anilistPrefs.enabled && anilistPrefs.showPosterTitleLogos) lazyLogoUrl else null
+    val effectiveAnilistScore = if (anilistPrefs.enabled && anilistPrefs.showPosterAnilistScore) item.anilistScore else null
+    val effectiveMalScore = if (anilistPrefs.enabled && anilistPrefs.showPosterMalScore) lazyMalScore else null
 
     HomePosterHoverPreview(
         item = item,
