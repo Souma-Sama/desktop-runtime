@@ -132,7 +132,7 @@ fun DesktopDetailHero(
                         scaleX = 1f
                         scaleY = 1f
                     },
-                alignment = Alignment.Center,
+                alignment = Alignment.TopCenter,
                 contentScale = ContentScale.Crop,
                 desktopImageScaling = NuvioDesktopImageScaling.Disabled,
                 onSuccess = { state -> onBackdropLoaded(state.painter) },
