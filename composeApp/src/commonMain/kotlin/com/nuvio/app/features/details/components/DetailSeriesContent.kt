@@ -684,7 +684,8 @@ private fun EpisodeHorizontalCard(
     val ratingLabel = remember(imdbRating) { imdbRating?.takeIf { it > 0.0 }?.let(::formatEpisodeRating) }
     val formattedDate = remember(video.released) { video.released?.let { formatReleaseDateForDisplay(it) } }
     val runtimeLabel = remember(video.runtime) { video.runtime?.takeIf { it > 0 }?.let(::formatEpisodeRuntime) }
-    val imageUrl = video.thumbnail ?: fallbackImage
+    var imageLoadFailed by remember(video.id, video.thumbnail) { mutableStateOf(false) }
+    val imageUrl = if (imageLoadFailed) fallbackImage else (video.thumbnail ?: fallbackImage)
     val visibleProgressEntry = progressEntry?.takeIf { it.durationMs > 0L && !it.isCompleted }
     val progressBarHeight = 4.dp
     val progressBarContentSpacing = 6.dp
@@ -721,6 +722,7 @@ private fun EpisodeHorizontalCard(
                     .fillMaxSize()
                     .then(if (shouldBlurArtwork) Modifier.blur(18.dp) else Modifier),
                 contentScale = ContentScale.Crop,
+                onError = { imageLoadFailed = true },
             )
         }
 
@@ -1095,7 +1097,8 @@ private fun EpisodeListCard(
                     .fillMaxHeight()
                     .clip(RoundedCornerShape(topStart = sizing.cardRadius, bottomStart = sizing.cardRadius)),
             ) {
-                val imageUrl = video.thumbnail ?: fallbackImage
+                var imageLoadFailed by remember(video.id, video.thumbnail) { mutableStateOf(false) }
+                val imageUrl = if (imageLoadFailed) fallbackImage else (video.thumbnail ?: fallbackImage)
                 val shouldBlurArtwork = blurUnwatchedEpisodes && !isWatched
                 if (imageUrl != null) {
                     AsyncImage(
@@ -1105,6 +1108,7 @@ private fun EpisodeListCard(
                             .fillMaxSize()
                             .then(if (shouldBlurArtwork) Modifier.blur(18.dp) else Modifier),
                         contentScale = ContentScale.Crop,
+                        onError = { imageLoadFailed = true },
                     )
                 } else {
                     Box(
