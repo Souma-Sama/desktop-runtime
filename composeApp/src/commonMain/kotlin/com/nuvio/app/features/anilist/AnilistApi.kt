@@ -1926,4 +1926,232 @@ object AnilistApi {
             emptyList()
         }
     }
+
+    suspend fun fetchMediaReviews(
+        mediaId: Int,
+        page: Int = 1,
+        perPage: Int = 10,
+        token: String? = null,
+    ): com.nuvio.app.features.anilist.community.AnilistReviewPage {
+        val query = """
+            query (${'$'}mediaId: Int, ${'$'}page: Int, ${'$'}perPage: Int) {
+              Page(page: ${'$'}page, perPage: ${'$'}perPage) {
+                pageInfo {
+                  total
+                  currentPage
+                  hasNextPage
+                }
+                reviews(mediaId: ${'$'}mediaId, sort: [RATING_DESC, CREATED_AT_DESC]) {
+                  id
+                  userId
+                  mediaId
+                  summary
+                  body
+                  rating
+                  ratingAmount
+                  userRating
+                  score
+                  siteUrl
+                  createdAt
+                  updatedAt
+                  user {
+                    id
+                    name
+                    avatar {
+                      large
+                      medium
+                    }
+                    bannerImage
+                    donatorBadge
+                  }
+                }
+              }
+            }
+        """.trimIndent()
+
+        val variables = buildJsonObject {
+            put("mediaId", mediaId)
+            put("page", page)
+            put("perPage", perPage)
+        }
+
+        val root = executeGraphQL(query = query, variables = variables, token = token)
+        val pageObj = root?.get("data").asJsonObjectOrNull()?.get("Page").asJsonObjectOrNull()
+            ?: return com.nuvio.app.features.anilist.community.AnilistReviewPage()
+
+        val pageInfo = pageObj["pageInfo"].asJsonObjectOrNull()
+        val total = pageInfo?.get("total").asIntOrNull() ?: 0
+        val hasNextPage = pageInfo?.get("hasNextPage")?.jsonPrimitive?.contentOrNull?.toBoolean() ?: false
+        val reviewsArray = pageObj["reviews"].asJsonArrayOrNull().orEmpty()
+
+        val items = reviewsArray.mapNotNull { element ->
+            val rObj = element.asJsonObjectOrNull() ?: return@mapNotNull null
+            parseReview(rObj)
+        }
+
+        return com.nuvio.app.features.anilist.community.AnilistReviewPage(
+            items = items,
+            page = page,
+            hasNextPage = hasNextPage,
+            total = total,
+        )
+    }
+
+    suspend fun saveReview(
+        mediaId: Int,
+        summary: String,
+        body: String,
+        score: Int,
+        token: String,
+        reviewId: Int? = null,
+    ): com.nuvio.app.features.anilist.community.AnilistReview? {
+        val mutation = """
+            mutation (${'$'}mediaId: Int, ${'$'}summary: String, ${'$'}body: String, ${'$'}score: Int, ${'$'}reviewId: Int) {
+              SaveReview(mediaId: ${'$'}mediaId, summary: ${'$'}summary, body: ${'$'}body, score: ${'$'}score, id: ${'$'}reviewId) {
+                id
+                userId
+                mediaId
+                summary
+                body
+                rating
+                ratingAmount
+                userRating
+                score
+                siteUrl
+                createdAt
+                updatedAt
+                user {
+                  id
+                  name
+                  avatar {
+                    large
+                    medium
+                  }
+                  bannerImage
+                  donatorBadge
+                }
+              }
+            }
+        """.trimIndent()
+
+        val variables = buildJsonObject {
+            put("mediaId", mediaId)
+            put("summary", summary)
+            put("body", body)
+            put("score", score)
+            if (reviewId != null && reviewId > 0) {
+                put("reviewId", reviewId)
+            }
+        }
+
+        val root = executeGraphQL(query = mutation, variables = variables, token = token)
+        val rObj = root?.get("data").asJsonObjectOrNull()?.get("SaveReview").asJsonObjectOrNull() ?: return null
+        return parseReview(rObj)
+    }
+
+    suspend fun rateReview(
+        reviewId: Int,
+        rating: String,
+        token: String,
+    ): com.nuvio.app.features.anilist.community.AnilistReview? {
+        val mutation = """
+            mutation (${'$'}reviewId: Int, ${'$'}rating: ReviewRating) {
+              RateReview(reviewId: ${'$'}reviewId, rating: ${'$'}rating) {
+                id
+                rating
+                ratingAmount
+                userRating
+              }
+            }
+        """.trimIndent()
+
+        val variables = buildJsonObject {
+            put("reviewId", reviewId)
+            put("rating", rating)
+        }
+
+        val root = executeGraphQL(query = mutation, variables = variables, token = token)
+        val rObj = root?.get("data").asJsonObjectOrNull()?.get("RateReview").asJsonObjectOrNull() ?: return null
+        val id = rObj["id"].asIntOrNull() ?: reviewId
+        val updatedRating = rObj["rating"].asIntOrNull() ?: 0
+        val updatedRatingAmount = rObj["ratingAmount"].asIntOrNull() ?: 0
+        val updatedUserRating = rObj["userRating"].asStringOrNull()
+        return com.nuvio.app.features.anilist.community.AnilistReview(
+            id = id,
+            rating = updatedRating,
+            ratingAmount = updatedRatingAmount,
+            userRating = updatedUserRating,
+        )
+    }
+
+    suspend fun deleteReview(
+        reviewId: Int,
+        token: String,
+    ): Boolean {
+        val mutation = """
+            mutation (${'$'}id: Int) {
+              DeleteReview(id: ${'$'}id) {
+                deleted
+              }
+            }
+        """.trimIndent()
+
+        val variables = buildJsonObject {
+            put("id", reviewId)
+        }
+
+        val root = executeGraphQL(query = mutation, variables = variables, token = token)
+        return root?.get("data").asJsonObjectOrNull()?.get("DeleteReview").asJsonObjectOrNull()
+            ?.get("deleted")?.jsonPrimitive?.contentOrNull?.toBoolean() ?: false
+    }
+
+    private fun parseReview(rObj: JsonObject): com.nuvio.app.features.anilist.community.AnilistReview? {
+        val id = rObj["id"].asIntOrNull() ?: return null
+        val userId = rObj["userId"].asIntOrNull() ?: 0
+        val mediaId = rObj["mediaId"].asIntOrNull() ?: 0
+        val summary = rObj["summary"].asStringOrNull().orEmpty()
+        val body = rObj["body"].asStringOrNull().orEmpty()
+        val rating = rObj["rating"].asIntOrNull() ?: 0
+        val ratingAmount = rObj["ratingAmount"].asIntOrNull() ?: 0
+        val userRating = rObj["userRating"].asStringOrNull()
+        val score = rObj["score"].asIntOrNull() ?: 0
+        val siteUrl = rObj["siteUrl"].asStringOrNull()
+        val createdAt = rObj["createdAt"].asLongOrNull() ?: 0L
+        val updatedAt = rObj["updatedAt"].asLongOrNull() ?: 0L
+
+        val userObj = rObj["user"].asJsonObjectOrNull()
+        val user = userObj?.let { u ->
+            val uId = u["id"].asIntOrNull() ?: 0
+            val uName = u["name"].asStringOrNull().orEmpty()
+            val avObj = u["avatar"].asJsonObjectOrNull()
+            val avLarge = avObj?.get("large").asStringOrNull()
+            val avMedium = avObj?.get("medium").asStringOrNull()
+            val banner = u["bannerImage"].asStringOrNull()
+            val badge = u["donatorBadge"].asStringOrNull()
+            com.nuvio.app.features.anilist.community.AnilistUserSummary(
+                id = uId,
+                name = uName,
+                avatarLarge = avLarge,
+                avatarMedium = avMedium,
+                bannerImage = banner,
+                donatorBadge = badge,
+            )
+        }
+
+        return com.nuvio.app.features.anilist.community.AnilistReview(
+            id = id,
+            userId = userId,
+            mediaId = mediaId,
+            summary = summary,
+            body = body,
+            rating = rating,
+            ratingAmount = ratingAmount,
+            userRating = userRating,
+            score = score,
+            siteUrl = siteUrl,
+            createdAt = createdAt,
+            updatedAt = updatedAt,
+            user = user,
+        )
+    }
 }

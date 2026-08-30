@@ -2098,7 +2098,11 @@ private fun metaSectionHasContent(
         MetaScreenSectionKey.OVERVIEW -> true
         MetaScreenSectionKey.PRODUCTION -> hasProductionSection
         MetaScreenSectionKey.CAST -> meta.cast.isNotEmpty()
-        MetaScreenSectionKey.COMMENTS -> shouldShowComments && (isCommentsLoading || comments.isNotEmpty() || !commentsError.isNullOrBlank())
+        MetaScreenSectionKey.COMMENTS -> {
+            val isAnilistItem = meta.id.startsWith("ani_") || meta.id.startsWith("anilist:")
+            if (isAnilistItem) true
+            else shouldShowComments && (isCommentsLoading || comments.isNotEmpty() || !commentsError.isNullOrBlank())
+        }
         MetaScreenSectionKey.TRAILERS -> hasTrailersSection
         MetaScreenSectionKey.EPISODES -> hasEpisodes
         MetaScreenSectionKey.DETAILS -> hasAdditionalInfoSection
@@ -2164,7 +2168,11 @@ private fun ConfiguredMetaSections(
             MetaScreenSectionKey.OVERVIEW -> true
             MetaScreenSectionKey.PRODUCTION -> hasProductionSection
             MetaScreenSectionKey.CAST -> meta.cast.isNotEmpty()
-            MetaScreenSectionKey.COMMENTS -> shouldShowComments && (isCommentsLoading || comments.isNotEmpty() || !commentsError.isNullOrBlank())
+            MetaScreenSectionKey.COMMENTS -> {
+                val isAnilistItem = meta.id.startsWith("ani_") || meta.id.startsWith("anilist:")
+                if (isAnilistItem) true
+                else shouldShowComments && (isCommentsLoading || comments.isNotEmpty() || !commentsError.isNullOrBlank())
+            }
             MetaScreenSectionKey.TRAILERS -> hasTrailersSection
             MetaScreenSectionKey.EPISODES -> hasEpisodes
             MetaScreenSectionKey.DETAILS -> hasAdditionalInfoSection
@@ -2239,7 +2247,20 @@ private fun ConfiguredMetaSections(
                 )
             }
             MetaScreenSectionKey.COMMENTS -> {
-                if (shouldShowComments && (isCommentsLoading || comments.isNotEmpty() || !commentsError.isNullOrBlank())) {
+                val isAnilistItem = meta.id.startsWith("ani_") || meta.id.startsWith("anilist:")
+                val anilistMediaId = if (isAnilistItem) {
+                    com.nuvio.app.features.anilist.AnilistTrackerCoordinator.extractAnilistId(meta.id)
+                } else null
+
+                if (anilistMediaId != null && anilistMediaId > 0) {
+                    com.nuvio.app.features.anilist.community.DetailAnilistReviewsSection(
+                        mediaId = anilistMediaId,
+                        animeTitle = meta.name,
+                        showHeader = showHeader,
+                        headerHorizontalPadding = headerHorizontalPadding,
+                        horizontalScrollPadding = horizontalScrollPadding,
+                    )
+                } else if (shouldShowComments && (isCommentsLoading || comments.isNotEmpty() || !commentsError.isNullOrBlank())) {
                     DetailCommentsSection(
                         comments = comments,
                         isLoading = isCommentsLoading,
