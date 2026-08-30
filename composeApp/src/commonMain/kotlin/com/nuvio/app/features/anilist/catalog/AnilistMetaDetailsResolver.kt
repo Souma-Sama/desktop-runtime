@@ -395,17 +395,13 @@ object AnilistMetaDetailsResolver {
             }
         }
 
-        // Apply ARM and Kitsu episode thumbnails/titles when ready
         val arm = armDeferred.await()
         val kitsuId = arm.kitsuId?.removePrefix("kitsu:")?.takeIf { it.isNotBlank() }
+            ?: resolveKitsuId(anilistId, media)
         val effectiveImdbId = arm.imdbId
 
-        val hasMissingThumbnails = meta.videos.isEmpty() || meta.videos.any { 
-            it.thumbnail.isNullOrBlank() || it.thumbnail == meta.poster || it.thumbnail == meta.background 
-        }
-
         if (!kitsuId.isNullOrBlank() || !effectiveImdbId.isNullOrBlank()) {
-            val kitsuEpisodes = if (hasMissingThumbnails && !kitsuId.isNullOrBlank()) {
+            val kitsuEpisodes = if (!kitsuId.isNullOrBlank()) {
                 runCatching {
                     withTimeoutOrNull(3000L) { fetchKitsuEpisodes(kitsuId) }
                 }.getOrNull() ?: emptyMap()
@@ -420,9 +416,12 @@ object AnilistMetaDetailsResolver {
                     val metahubEpThumb = if (!effectiveImdbId.isNullOrBlank()) {
                         "https://episodes.metahub.space/$effectiveImdbId/${v.season ?: 1}/$epNum/w780.jpg"
                     } else null
-                    val currentThumb = v.thumbnail?.takeIf { it.isNotBlank() && it != current.poster && it != current.background }
-                    val epThumbnail = currentThumb
-                        ?: kitsuThumb
+                    val currentVerifiedThumb = v.thumbnail?.takeIf { 
+                        it.isNotBlank() && it != current.poster && it != current.background && !it.contains("episodes.metahub.space") 
+                    }
+                    val epThumbnail = kitsuThumb
+                        ?: currentVerifiedThumb
+                        ?: v.thumbnail?.takeIf { it.isNotBlank() && it != current.poster && it != current.background }
                         ?: metahubEpThumb
                         ?: v.thumbnail
                     val videoId = if (!kitsuId.isNullOrBlank()) "kitsu:$kitsuId:$epNum" else v.id
@@ -540,13 +539,8 @@ object AnilistMetaDetailsResolver {
             )
         }.orEmpty()
 
-        val hasCinemetaThumbnails = cinemetaMeta.videos.any {
-            (it.season == targetSeason || (targetSeason == 1 && it.season == null)) && !it.thumbnail.isNullOrBlank()
-        }
-
-        val kitsuId = if (!hasCinemetaThumbnails) {
-            mapping.kitsuId?.removePrefix("kitsu:")?.takeIf { it.isNotBlank() } ?: resolveKitsuId(anilistId, media)
-        } else null
+        val kitsuId = mapping.kitsuId?.removePrefix("kitsu:")?.takeIf { it.isNotBlank() }
+            ?: resolveKitsuId(anilistId, media)
 
         val kitsuEpisodes = if (!kitsuId.isNullOrBlank()) {
             fetchKitsuEpisodes(kitsuId)
