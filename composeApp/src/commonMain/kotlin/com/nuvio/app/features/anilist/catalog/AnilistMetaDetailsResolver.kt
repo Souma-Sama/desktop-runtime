@@ -212,10 +212,13 @@ object AnilistMetaDetailsResolver {
                 cinemetaVideos = emptyList(),
             )
 
+            val hasValidImdbId = effectiveImdbId?.startsWith("tt", ignoreCase = true) == true
+            val fallbackThumb = media.bannerImage ?: media.coverImage?.bestUrl
+
             val mappedVideos = if (isMovie) {
                 emptyList()
             } else if (targetSeason == 0) {
-                val totalEps = media.episodes ?: media.streamingEpisodes.size.takeIf { it > 0 } ?: 1
+                val totalEps = media.episodes ?: media.streamingEpisodes.size.takeIf { it > 0 } ?: kitsuEpisodes.size.takeIf { it > 0 } ?: 1
                 val startsAtZero = media.description?.contains("Includes Episode 0", ignoreCase = true) == true ||
                     (media.description?.contains("Episode 0", ignoreCase = true) == true && media.streamingEpisodes.any { it.title?.contains("Episode 0", ignoreCase = true) == true })
                 val epRange = if (startsAtZero) (0 until totalEps) else (1..totalEps)
@@ -225,11 +228,11 @@ object AnilistMetaDetailsResolver {
                     val kitsuEp = kitsuEpisodes[epNum] ?: (if (startsAtZero && epNum == 0) kitsuEpisodes[0] else null)
                     val rawTitle = kitsuEp?.title?.takeIf { it.isNotBlank() }
                         ?: streamingEp?.title?.takeIf { it.isNotBlank() }
-                        ?: if (epNum == 0) "Episode 0" else media.title?.displayTitle
+                        ?: if (epNum == 0) "Episode 0" else "Episode $epNum"
                     val epTitle = cleanEpisodeTitle(rawTitle, epNum)
-                    val metahubEpThumb = if (!effectiveImdbId.isNullOrBlank()) {
+                    val metahubEpThumb = if (hasValidImdbId) {
                         "https://episodes.metahub.space/$effectiveImdbId/0/$epNum/w780.jpg"
-                    } else null
+                    } else fallbackThumb
                     val epThumbnail = kitsuEp?.thumbnail?.takeIf { it.isNotBlank() }
                         ?: streamingEp?.thumbnail?.takeIf { it.isNotBlank() }
                         ?: metahubEpThumb
@@ -254,9 +257,9 @@ object AnilistMetaDetailsResolver {
                     val rawTitle = kitsuEp?.title?.takeIf { it.isNotBlank() }
                         ?: streamingEp?.title?.takeIf { it.isNotBlank() }
                     val epTitle = cleanEpisodeTitle(rawTitle, actualEpNumber)
-                    val metahubEpThumb = if (!effectiveImdbId.isNullOrBlank()) {
+                    val metahubEpThumb = if (hasValidImdbId) {
                         "https://episodes.metahub.space/$effectiveImdbId/$targetSeason/$actualEpNumber/w780.jpg"
-                    } else null
+                    } else fallbackThumb
                     val epThumbnail = kitsuEp?.thumbnail?.takeIf { it.isNotBlank() }
                         ?: streamingEp?.thumbnail?.takeIf { it.isNotBlank() }
                         ?: metahubEpThumb
@@ -530,7 +533,7 @@ object AnilistMetaDetailsResolver {
         }.orEmpty()
 
         val kitsuId = mapping.kitsuId?.removePrefix("kitsu:")?.takeIf { it.isNotBlank() }
-            ?: resolveKitsuId(anilistId, media?.title?.displayTitle.orEmpty())
+            ?: resolveKitsuId(anilistId, media)
 
         val kitsuEpisodes = if (!kitsuId.isNullOrBlank()) {
             fetchKitsuEpisodes(kitsuId)
@@ -593,7 +596,7 @@ object AnilistMetaDetailsResolver {
             )
         }.orEmpty()
 
-        val trailers = if (media?.trailer?.id != null) {
+        val trailers = if (media?.trailer != null && media.trailer.id != null) {
             listOf(
                 com.nuvio.app.features.details.MetaTrailer(
                     id = media.trailer.id,
@@ -640,42 +643,61 @@ object AnilistMetaDetailsResolver {
         // For seasons, isolate and map that season's episodes cleanly using Kitsu IDs
         val seasonVideos = if (targetSeason == 0 && cinemetaMeta.videos.any { it.season == 0 }) {
             val specialVideos = cinemetaMeta.videos.filter { it.season == 0 }
-            val matchedSpecial = findSpecialMatch(media, specialVideos)
-            if (matchedSpecial != null) {
+            val isSingleSpecial = (media?.episodes ?: 1) == 1 && specialVideos.size <= 1
+            if (isSingleSpecial) {
+                val matchedSpecial = findSpecialMatch(media, specialVideos) ?: specialVideos.first()
                 val epNum = matchedSpecial.episode ?: 1
                 val videoId = if (!kitsuId.isNullOrBlank()) "kitsu:$kitsuId:$epNum" else "anilist:$anilistId:$epNum"
                 val kitsuEp = kitsuEpisodes[epNum] ?: (if (epNum == 0) kitsuEpisodes[0] else null)
+                val streamingEp = media?.streamingEpisodes?.firstOrNull()
+                val epThumbnail = kitsuEp?.thumbnail?.takeIf { it.isNotBlank() }
+                    ?: streamingEp?.thumbnail?.takeIf { it.isNotBlank() }
+                    ?: matchedSpecial.thumbnail?.takeIf { it.isNotBlank() }
+                    ?: (if (hasValidImdbId) "https://episodes.metahub.space/$effectiveImdbId/0/$epNum/w780.jpg" else fallbackThumb)
                 listOf(
                     matchedSpecial.copy(
                         id = videoId,
                         season = 0,
                         episode = epNum,
                         title = matchedSpecial.title?.takeIf { it.isNotBlank() } ?: media?.title?.displayTitle ?: "Special",
-                        thumbnail = matchedSpecial.thumbnail?.takeIf { it.isNotBlank() }
-                            ?: (if (hasValidImdbId) "https://episodes.metahub.space/$effectiveImdbId/0/$epNum/w780.jpg" else fallbackThumb),
+                        thumbnail = epThumbnail,
                         released = resolveEpisodeAirDate(epNum, kitsuEp?.airdate, matchedSpecial.released, media),
                     )
                 )
             } else {
-                specialVideos.mapIndexed { idx, v ->
-                    val epNum = v.episode ?: (idx + 1)
-                    val videoId = if (!kitsuId.isNullOrBlank()) "kitsu:$kitsuId:$epNum" else "anilist:$anilistId:$epNum"
-                    val kitsuEp = kitsuEpisodes[epNum] ?: (if (epNum == 0) kitsuEpisodes[0] else null)
-                    v.copy(
+                // Multi-episode Special / ONA / Mini-Series (e.g. Sousou no Frieren: ●● no Mahou with 11 episodes)
+                val totalEps = media?.episodes ?: specialVideos.size.takeIf { it > 0 } ?: kitsuEpisodes.size.takeIf { it > 0 } ?: 1
+                (1..totalEps).map { idx ->
+                    val matchingCinemetaEp = specialVideos.firstOrNull { it.episode == idx }
+                    val videoId = if (!kitsuId.isNullOrBlank()) "kitsu:$kitsuId:$idx" else "anilist:$anilistId:$idx"
+                    val kitsuEp = kitsuEpisodes[idx]
+                    val streamingEp = media?.streamingEpisodes?.getOrNull(idx - 1)
+                    val rawTitle = kitsuEp?.title?.takeIf { it.isNotBlank() }
+                        ?: streamingEp?.title?.takeIf { it.isNotBlank() }
+                        ?: matchingCinemetaEp?.title?.takeIf { it.isNotBlank() }
+                        ?: "Episode $idx"
+                    val epTitle = cleanEpisodeTitle(rawTitle, idx)
+                    val epThumbnail = kitsuEp?.thumbnail?.takeIf { it.isNotBlank() }
+                        ?: streamingEp?.thumbnail?.takeIf { it.isNotBlank() }
+                        ?: matchingCinemetaEp?.thumbnail?.takeIf { it.isNotBlank() }
+                        ?: (if (hasValidImdbId) "https://episodes.metahub.space/$effectiveImdbId/0/$idx/w780.jpg" else fallbackThumb)
+
+                    MetaVideo(
                         id = videoId,
                         season = 0,
-                        episode = epNum,
-                        title = v.title?.takeIf { it.isNotBlank() } ?: "Special $epNum",
-                        thumbnail = v.thumbnail?.takeIf { it.isNotBlank() }
-                            ?: (if (hasValidImdbId) "https://episodes.metahub.space/$effectiveImdbId/0/$epNum/w780.jpg" else fallbackThumb),
-                        released = resolveEpisodeAirDate(epNum, kitsuEp?.airdate, v.released, media),
+                        episode = idx,
+                        title = epTitle,
+                        thumbnail = epThumbnail,
+                        overview = kitsuEp?.overview ?: matchingCinemetaEp?.overview,
+                        runtime = media?.duration,
+                        released = resolveEpisodeAirDate(idx, kitsuEp?.airdate, matchingCinemetaEp?.released, media),
                     )
                 }
             }
         } else if (targetSeason == 0) {
-            val totalEps = media?.episodes ?: 1
+            val totalEps = media?.episodes ?: media?.streamingEpisodes?.size.takeIf { it > 0 } ?: kitsuEpisodes.size.takeIf { it > 0 } ?: 1
             val startsAtZero = media?.description?.contains("Includes Episode 0", ignoreCase = true) == true ||
-                (media?.description?.contains("Episode 0", ignoreCase = true) == true && media.streamingEpisodes.any { it.title?.contains("Episode 0", ignoreCase = true) == true })
+                (media?.description?.contains("Episode 0", ignoreCase = true) == true && media?.streamingEpisodes?.any { it.title?.contains("Episode 0", ignoreCase = true) == true } == true)
             val epRange = if (startsAtZero) (0 until totalEps) else (1..totalEps)
 
             epRange.map { epNum ->
@@ -683,10 +705,10 @@ object AnilistMetaDetailsResolver {
                 val kitsuEp = kitsuEpisodes[epNum] ?: (if (startsAtZero && epNum == 0) kitsuEpisodes[0] else null)
                 val rawTitle = kitsuEp?.title?.takeIf { it.isNotBlank() }
                     ?: streamingEp?.title?.takeIf { it.isNotBlank() }
-                    ?: if (epNum == 0) "Episode 0" else media?.title?.displayTitle
+                    ?: if (epNum == 0) "Episode 0" else "Episode $epNum"
                 val epTitle = cleanEpisodeTitle(rawTitle, epNum)
                 val epThumbnail = kitsuEp?.thumbnail?.takeIf { it.isNotBlank() }
-                    ?: streamingEp?.thumbnail
+                    ?: streamingEp?.thumbnail?.takeIf { it.isNotBlank() }
                     ?: (if (hasValidImdbId) "https://episodes.metahub.space/$effectiveImdbId/0/$epNum/w780.jpg" else fallbackThumb)
                 val videoId = if (!kitsuId.isNullOrBlank()) "kitsu:$kitsuId:$epNum" else "anilist:$anilistId:$epNum"
                 MetaVideo(
@@ -952,8 +974,9 @@ object AnilistMetaDetailsResolver {
             .trim()
     }
 
-    private suspend fun resolveKitsuId(anilistId: Int, title: String): String? {
-        val cacheKey = "$anilistId:$title"
+    private suspend fun resolveKitsuId(anilistId: Int, media: AnilistMedia? = null, rawTitle: String? = null): String? {
+        val displayTitle = media?.title?.displayTitle ?: rawTitle.orEmpty()
+        val cacheKey = "$anilistId:$displayTitle"
         kitsuIdCache[cacheKey]?.let { return it }
         return runCatching {
             val armUrl = "https://arm.haglund.dev/api/v2/ids?source=anilist&id=$anilistId&include=kitsu"
@@ -966,17 +989,27 @@ object AnilistMetaDetailsResolver {
                     return@runCatching kitsuId
                 }
             }
-            if (title.isNotBlank()) {
-                val safeTitle = title.trim().replace(" ", "%20")
-                val kitsuSearchUrl = "https://kitsu.io/api/edge/anime?filter%5Btext%5D=$safeTitle&page%5Blimit%5D=1"
-                val searchRes = httpGetText(kitsuSearchUrl) ?: return@runCatching null
-                val sObj = json.parseToJsonElement(searchRes).asJsonObjectOrNull() ?: return@runCatching null
+            val titlesToTry = listOfNotNull(
+                media?.title?.romaji,
+                media?.title?.english,
+                media?.title?.displayTitle,
+                rawTitle,
+            ).map { it.replace(Regex("[●★☆【】・:—–\\-_]"), " ").replace(Regex("\\s+"), " ").trim() }
+                .filter { it.isNotBlank() }
+                .distinct()
+
+            for (tryTitle in titlesToTry) {
+                val encodedQuery = tryTitle.encodeUnsafeHttpUrlCharacters()
+                val kitsuSearchUrl = "https://kitsu.io/api/edge/anime?filter%5Btext%5D=$encodedQuery&page%5Blimit%5D=1"
+                val searchRes = httpGetText(kitsuSearchUrl) ?: continue
+                val sObj = json.parseToJsonElement(searchRes).asJsonObjectOrNull() ?: continue
                 val id = sObj["data"].asJsonArrayOrNull()?.firstOrNull()?.asJsonObjectOrNull()?.get("id").asStringOrNull()
                 if (!id.isNullOrBlank()) {
                     kitsuIdCache[cacheKey] = id
-                    id
-                } else null
-            } else null
+                    return@runCatching id
+                }
+            }
+            null
         }.getOrNull()
     }
 
