@@ -216,17 +216,13 @@ fun ReviewDetailSheet(
                 Spacer(modifier = Modifier.height(14.dp))
             }
 
-            // Scrollable Body Content
-            val scrollState = rememberScrollState()
-            Column(
+            // Scrollable Lazy Body Content
+            AnilistRichContentRenderer(
+                body = review.body,
                 modifier = Modifier
                     .weight(1f)
-                    .fillMaxWidth()
-                    .verticalScroll(scrollState),
-            ) {
-                AnilistRichContentRenderer(body = review.body)
-                Spacer(modifier = Modifier.height(24.dp))
-            }
+                    .fillMaxWidth(),
+            )
 
             Spacer(modifier = Modifier.height(12.dp))
 

@@ -96,6 +96,15 @@ internal actual fun ReviewMediaImage(
     }
 }
 
+private data class GifFrameMeta(
+    val delayMs: Long,
+    val disposalMethod: String,
+    val left: Int,
+    val top: Int,
+    val width: Int,
+    val height: Int,
+)
+
 private fun decodeGifFrames(bytes: ByteArray): List<Pair<ImageBitmap, Long>> {
     val result = mutableListOf<Pair<ImageBitmap, Long>>()
     val stream = ImageIO.createImageInputStream(ByteArrayInputStream(bytes)) ?: return emptyList()
@@ -106,36 +115,73 @@ private fun decodeGifFrames(bytes: ByteArray): List<Pair<ImageBitmap, Long>> {
 
     try {
         val numImages = reader.getNumImages(true)
-        var masterImage: java.awt.image.BufferedImage? = null
+        if (numImages <= 0) return emptyList()
+
+        val masterWidth = maxOf(1, reader.getWidth(0))
+        val masterHeight = maxOf(1, reader.getHeight(0))
+
+        val masterImage = java.awt.image.BufferedImage(
+            masterWidth,
+            masterHeight,
+            java.awt.image.BufferedImage.TYPE_INT_ARGB,
+        )
+        val masterGraphics = masterImage.createGraphics()
+        masterGraphics.background = java.awt.Color(0, 0, 0, 0)
+
+        var previousSnapshot: java.awt.image.BufferedImage? = null
+        var prevDisposal = "none"
+        var prevLeft = 0
+        var prevTop = 0
+        var prevWidth = masterWidth
+        var prevHeight = masterHeight
 
         for (i in 0 until numImages) {
             val frameImage = reader.read(i)
-            val metadata = reader.getImageMetadata(i)
-            val delayMs = getFrameDelayMs(metadata)
+            val meta = getFrameMeta(reader.getImageMetadata(i), frameImage.width, frameImage.height)
 
-            if (masterImage == null) {
-                masterImage = java.awt.image.BufferedImage(
-                    frameImage.width,
-                    frameImage.height,
-                    java.awt.image.BufferedImage.TYPE_INT_ARGB,
-                )
+            // Apply previous frame disposal
+            when (prevDisposal.lowercase()) {
+                "restoretobackgroundcolor" -> {
+                    masterGraphics.composite = java.awt.AlphaComposite.Clear
+                    masterGraphics.fillRect(prevLeft, prevTop, prevWidth, prevHeight)
+                    masterGraphics.composite = java.awt.AlphaComposite.SrcOver
+                }
+                "restoretoprevious" -> {
+                    if (previousSnapshot != null) {
+                        masterGraphics.composite = java.awt.AlphaComposite.Src
+                        masterGraphics.drawImage(previousSnapshot, 0, 0, null)
+                        masterGraphics.composite = java.awt.AlphaComposite.SrcOver
+                    }
+                }
             }
 
-            val g = masterImage.createGraphics()
-            g.drawImage(frameImage, 0, 0, null)
-            g.dispose()
+            // Save snapshot if current frame requests restoreToPrevious
+            if (meta.disposalMethod.equals("restoreToPrevious", ignoreCase = true)) {
+                val snap = java.awt.image.BufferedImage(masterWidth, masterHeight, java.awt.image.BufferedImage.TYPE_INT_ARGB)
+                val sg = snap.createGraphics()
+                sg.drawImage(masterImage, 0, 0, null)
+                sg.dispose()
+                previousSnapshot = snap
+            }
 
-            val snapshot = java.awt.image.BufferedImage(
-                masterImage.width,
-                masterImage.height,
-                java.awt.image.BufferedImage.TYPE_INT_ARGB,
-            )
-            val sg = snapshot.createGraphics()
-            sg.drawImage(masterImage, 0, 0, null)
-            sg.dispose()
+            // Draw frame image with its offset
+            masterGraphics.drawImage(frameImage, meta.left, meta.top, null)
 
-            result.add(Pair(snapshot.toComposeImageBitmap(), delayMs))
+            // Create frame snapshot for Compose
+            val frameSnapshot = java.awt.image.BufferedImage(masterWidth, masterHeight, java.awt.image.BufferedImage.TYPE_INT_ARGB)
+            val fg = frameSnapshot.createGraphics()
+            fg.drawImage(masterImage, 0, 0, null)
+            fg.dispose()
+
+            result.add(Pair(frameSnapshot.toComposeImageBitmap(), meta.delayMs))
+
+            prevDisposal = meta.disposalMethod
+            prevLeft = meta.left
+            prevTop = meta.top
+            prevWidth = meta.width
+            prevHeight = meta.height
         }
+        masterGraphics.dispose()
     } catch (_: Exception) {
     } finally {
         reader.dispose()
@@ -144,8 +190,16 @@ private fun decodeGifFrames(bytes: ByteArray): List<Pair<ImageBitmap, Long>> {
     return result
 }
 
-private fun getFrameDelayMs(metadata: javax.imageio.metadata.IIOMetadata?): Long {
-    if (metadata == null) return 100L
+private fun getFrameMeta(metadata: javax.imageio.metadata.IIOMetadata?, defaultWidth: Int, defaultHeight: Int): GifFrameMeta {
+    var delayMs = 100L
+    var disposalMethod = "none"
+    var left = 0
+    var top = 0
+    var width = defaultWidth
+    var height = defaultHeight
+
+    if (metadata == null) return GifFrameMeta(delayMs, disposalMethod, left, top, width, height)
+
     try {
         val root = metadata.getAsTree(metadata.nativeMetadataFormatName)
         for (i in 0 until root.childNodes.length) {
@@ -153,11 +207,22 @@ private fun getFrameDelayMs(metadata: javax.imageio.metadata.IIOMetadata?): Long
             if (node.nodeName.equals("GraphicControlExtension", ignoreCase = true)) {
                 val delayTime = (node as? IIOMetadataNode)?.getAttribute("delayTime")?.toIntOrNull()
                 if (delayTime != null && delayTime > 0) {
-                    return delayTime * 10L
+                    delayMs = delayTime * 10L
                 }
+                val disposal = (node as? IIOMetadataNode)?.getAttribute("disposalMethod")
+                if (!disposal.isNullOrBlank()) {
+                    disposalMethod = disposal
+                }
+            } else if (node.nodeName.equals("ImageDescriptor", ignoreCase = true)) {
+                val elem = node as? IIOMetadataNode
+                left = elem?.getAttribute("imageLeftPosition")?.toIntOrNull() ?: 0
+                top = elem?.getAttribute("imageTopPosition")?.toIntOrNull() ?: 0
+                width = elem?.getAttribute("imageWidth")?.toIntOrNull() ?: defaultWidth
+                height = elem?.getAttribute("imageHeight")?.toIntOrNull() ?: defaultHeight
             }
         }
     } catch (_: Exception) {
     }
-    return 100L
+
+    return GifFrameMeta(delayMs, disposalMethod, left, top, width, height)
 }

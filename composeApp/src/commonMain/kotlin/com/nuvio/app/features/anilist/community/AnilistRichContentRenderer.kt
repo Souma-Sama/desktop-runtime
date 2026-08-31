@@ -1,21 +1,23 @@
 package com.nuvio.app.features.anilist.community
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.ClickableText
 import androidx.compose.material3.HorizontalDivider
@@ -34,6 +36,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.platform.UriHandler
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
@@ -44,7 +47,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil3.compose.AsyncImage
+import com.nuvio.app.core.ui.NuvioDesktopVerticalScrollbar
 
 /**
  * Visual AST block elements for AniList rich markdown & HTML.
@@ -62,6 +65,7 @@ sealed interface AnilistContentBlock {
 fun AnilistRichContentRenderer(
     body: String,
     modifier: Modifier = Modifier,
+    listState: LazyListState = rememberLazyListState(),
 ) {
     val primaryColor = MaterialTheme.colorScheme.primary
     val blocks = remember(body, primaryColor) {
@@ -69,124 +73,153 @@ fun AnilistRichContentRenderer(
     }
     val uriHandler = LocalUriHandler.current
 
-    Column(
-        modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
-    ) {
-        blocks.forEach { block ->
-            when (block) {
-                is AnilistContentBlock.Header -> {
-                    val fontSize = when (block.level) {
-                        1 -> 20.sp
-                        2 -> 18.sp
-                        3 -> 16.sp
-                        else -> 15.sp
-                    }
-                    val alignment = if (block.isCentered) TextAlign.Center else TextAlign.Start
-
-                    Text(
-                        text = block.text,
-                        style = MaterialTheme.typography.titleMedium.copy(
-                            fontSize = fontSize,
-                            fontWeight = FontWeight.Bold,
-                            lineHeight = (fontSize.value * 1.35f).sp,
-                            textAlign = alignment,
-                        ),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 8.dp),
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-                }
-
-                is AnilistContentBlock.Image -> {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 4.dp),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        val shape = RoundedCornerShape(12.dp)
-                        ReviewMediaImage(
-                            url = block.url,
-                            contentDescription = "Review media",
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .heightIn(min = 120.dp, max = 420.dp)
-                                .clip(shape)
-                                .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.15f), shape),
-                            contentScale = ContentScale.Fit,
-                        )
-                    }
-                }
-
-                is AnilistContentBlock.Quote -> {
-                    val shape = RoundedCornerShape(8.dp)
-                    val alignment = if (block.isCentered) TextAlign.Center else TextAlign.Start
-
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(shape)
-                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
-                            .padding(12.dp)
-                            .height(IntrinsicSize.Min),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .width(3.5.dp)
-                                .fillMaxHeight()
-                                .clip(RoundedCornerShape(2.dp))
-                                .background(MaterialTheme.colorScheme.primary),
-                        )
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Text(
-                            text = block.text,
-                            style = MaterialTheme.typography.bodyMedium.copy(
-                                fontStyle = FontStyle.Italic,
-                                lineHeight = 22.sp,
-                                textAlign = alignment,
-                            ),
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.weight(1f),
-                        )
-                    }
-                }
-
-                is AnilistContentBlock.Divider -> {
-                    HorizontalDivider(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 6.dp),
-                        thickness = 1.dp,
-                        color = MaterialTheme.colorScheme.outline.copy(alpha = 0.25f),
-                    )
-                }
-
-                is AnilistContentBlock.Spoiler -> {
-                    InteractiveSpoilerBlock(
-                        rawContent = block.content,
-                        isCentered = block.isCentered,
-                        primaryColor = primaryColor,
-                    )
-                }
-
-                is AnilistContentBlock.Paragraph -> {
-                    val alignment = if (block.isCentered) TextAlign.Center else TextAlign.Start
-                    ClickableRichText(
-                        annotatedString = block.text,
-                        style = MaterialTheme.typography.bodyLarge.copy(
-                            lineHeight = 24.sp,
-                            textAlign = alignment,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.92f),
-                        ),
-                        onUrlClick = { url ->
-                            uriHandler.openUri(url)
-                        },
-                    )
-                }
+    Box(modifier = modifier) {
+        LazyColumn(
+            state = listState,
+            modifier = Modifier.fillMaxSize(),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            items(
+                count = blocks.size,
+                key = { index -> "anilist-block-$index" },
+            ) { index ->
+                AnilistContentBlockItem(
+                    block = blocks[index],
+                    primaryColor = primaryColor,
+                    uriHandler = uriHandler,
+                )
             }
+            item(key = "review-bottom-spacer") {
+                Spacer(modifier = Modifier.height(24.dp))
+            }
+        }
+
+        NuvioDesktopVerticalScrollbar(
+            listState = listState,
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .padding(vertical = 4.dp),
+        )
+    }
+}
+
+@Composable
+internal fun AnilistContentBlockItem(
+    block: AnilistContentBlock,
+    primaryColor: Color,
+    uriHandler: UriHandler,
+) {
+    when (block) {
+        is AnilistContentBlock.Header -> {
+            val fontSize = when (block.level) {
+                1 -> 20.sp
+                2 -> 18.sp
+                3 -> 16.sp
+                else -> 15.sp
+            }
+            val alignment = if (block.isCentered) TextAlign.Center else TextAlign.Start
+
+            Text(
+                text = block.text,
+                style = MaterialTheme.typography.titleMedium.copy(
+                    fontSize = fontSize,
+                    fontWeight = FontWeight.Bold,
+                    lineHeight = (fontSize.value * 1.35f).sp,
+                    textAlign = alignment,
+                ),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp),
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+        }
+
+        is AnilistContentBlock.Image -> {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 4.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                val shape = RoundedCornerShape(12.dp)
+                ReviewMediaImage(
+                    url = block.url,
+                    contentDescription = "Review media",
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 120.dp, max = 420.dp)
+                        .clip(shape)
+                        .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.15f), shape),
+                    contentScale = ContentScale.Fit,
+                )
+            }
+        }
+
+        is AnilistContentBlock.Quote -> {
+            val shape = RoundedCornerShape(8.dp)
+            val alignment = if (block.isCentered) TextAlign.Center else TextAlign.Start
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(shape)
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+                    .padding(12.dp)
+                    .height(IntrinsicSize.Min),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box(
+                    modifier = Modifier
+                        .width(3.5.dp)
+                        .fillMaxHeight()
+                        .clip(RoundedCornerShape(2.dp))
+                        .background(MaterialTheme.colorScheme.primary),
+                )
+                Spacer(modifier = Modifier.width(10.dp))
+                Text(
+                    text = block.text,
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        fontStyle = FontStyle.Italic,
+                        lineHeight = 22.sp,
+                        textAlign = alignment,
+                    ),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+        }
+
+        is AnilistContentBlock.Divider -> {
+            HorizontalDivider(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 6.dp),
+                thickness = 1.dp,
+                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.25f),
+            )
+        }
+
+        is AnilistContentBlock.Spoiler -> {
+            InteractiveSpoilerBlock(
+                rawContent = block.content,
+                isCentered = block.isCentered,
+                primaryColor = primaryColor,
+            )
+        }
+
+        is AnilistContentBlock.Paragraph -> {
+            val alignment = if (block.isCentered) TextAlign.Center else TextAlign.Start
+            ClickableRichText(
+                annotatedString = block.text,
+                style = MaterialTheme.typography.bodyLarge.copy(
+                    lineHeight = 24.sp,
+                    textAlign = alignment,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.92f),
+                ),
+                onUrlClick = { url ->
+                    uriHandler.openUri(url)
+                },
+            )
         }
     }
 }
