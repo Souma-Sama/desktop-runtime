@@ -2310,11 +2310,19 @@ private fun ConfiguredMetaSections(
                 } else null
 
                 if (anilistMediaId != null && anilistMediaId > 0) {
-                    com.nuvio.app.features.anilist.community.DetailAnilistReviewsSection(
+                    com.nuvio.app.features.anilist.ui.AnilistCommunityHub(
                         mediaId = anilistMediaId,
                         animeTitle = meta.name,
-                        showHeader = showHeader,
                         horizontalScrollPadding = horizontalScrollPadding,
+                        onAnimeClick = { targetAnilistId ->
+                            onOpenMeta?.invoke(
+                                com.nuvio.app.features.home.MetaPreview(
+                                    id = "anilist:$targetAnilistId",
+                                    type = "series",
+                                    name = "",
+                                )
+                            )
+                        },
                     )
                 } else if (shouldShowComments && (isCommentsLoading || comments.isNotEmpty() || !commentsError.isNullOrBlank())) {
                     DetailCommentsSection(

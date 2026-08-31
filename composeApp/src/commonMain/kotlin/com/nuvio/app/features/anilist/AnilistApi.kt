@@ -2600,5 +2600,148 @@ object AnilistApi {
         val root = executeGraphQL(query = mutation, variables = variables, token = token)
         return root?.get("data") != null
     }
+
+    suspend fun getMediaRecommendations(
+        mediaId: Int,
+        page: Int = 1,
+        token: String? = null,
+    ): com.nuvio.app.features.anilist.recommendations.AnilistRecommendationPage {
+        val query = """
+            query (${'$'}mediaId: Int, ${'$'}page: Int) {
+              Media(id: ${'$'}mediaId) {
+                recommendations(sort: [RATING_DESC], page: ${'$'}page, perPage: 20) {
+                  pageInfo {
+                    hasNextPage
+                    currentPage
+                  }
+                  nodes {
+                    id
+                    rating
+                    userRating
+                    mediaRecommendation {
+                      id
+                      title {
+                        userPreferred
+                        romaji
+                        english
+                      }
+                      coverImage {
+                        large
+                        medium
+                      }
+                      averageScore
+                      format
+                      status
+                      episodes
+                    }
+                    user {
+                      id
+                      name
+                      avatar {
+                        medium
+                      }
+                      donatorBadge
+                    }
+                  }
+                }
+              }
+            }
+        """.trimIndent()
+
+        val variables = buildJsonObject {
+            put("mediaId", mediaId)
+            put("page", page)
+        }
+
+        val root = executeGraphQL(query = query, variables = variables, token = token)
+        val recObj = root?.get("data").asJsonObjectOrNull()
+            ?.get("Media").asJsonObjectOrNull()
+            ?.get("recommendations").asJsonObjectOrNull() ?: return com.nuvio.app.features.anilist.recommendations.AnilistRecommendationPage()
+
+        val hasNextPage = recObj["pageInfo"].asJsonObjectOrNull()?.get("hasNextPage")?.jsonPrimitive?.contentOrNull?.toBoolean() ?: false
+        val nodes = recObj["nodes"].asJsonArrayOrNull() ?: return com.nuvio.app.features.anilist.recommendations.AnilistRecommendationPage()
+
+        val list = nodes.mapNotNull { item ->
+            val node = item.asJsonObjectOrNull() ?: return@mapNotNull null
+            val id = node["id"].asIntOrNull() ?: return@mapNotNull null
+            val rating = node["rating"].asIntOrNull() ?: 0
+            val userRating = node["userRating"].asStringOrNull()
+
+            val mediaRec = node["mediaRecommendation"].asJsonObjectOrNull() ?: return@mapNotNull null
+            val mId = mediaRec["id"].asIntOrNull() ?: return@mapNotNull null
+            val titleObj = mediaRec["title"].asJsonObjectOrNull()
+            val mTitle = titleObj?.get("userPreferred").asStringOrNull()
+                ?: titleObj?.get("romaji").asStringOrNull()
+                ?: titleObj?.get("english").asStringOrNull()
+                ?: "Anime"
+            val covObj = mediaRec["coverImage"].asJsonObjectOrNull()
+            val mCover = covObj?.get("large").asStringOrNull() ?: covObj?.get("medium").asStringOrNull()
+            val avgScore = mediaRec["averageScore"].asIntOrNull()
+            val format = mediaRec["format"].asStringOrNull()
+            val status = mediaRec["status"].asStringOrNull()
+            val episodes = mediaRec["episodes"].asIntOrNull()
+
+            val uObj = node["user"].asJsonObjectOrNull()
+            val user = uObj?.let { u ->
+                val uId = u["id"].asIntOrNull() ?: 0
+                val uName = u["name"].asStringOrNull().orEmpty()
+                val av = u["avatar"].asJsonObjectOrNull()
+                val avMed = av?.get("medium").asStringOrNull()
+                val badge = u["donatorBadge"].asStringOrNull()
+                com.nuvio.app.features.anilist.community.AnilistUserSummary(
+                    id = uId,
+                    name = uName,
+                    avatarMedium = avMed,
+                    donatorBadge = badge,
+                )
+            }
+
+            com.nuvio.app.features.anilist.recommendations.AnilistRecommendation(
+                id = id,
+                rating = rating,
+                userRating = userRating,
+                mediaId = mId,
+                title = mTitle,
+                coverImage = mCover,
+                averageScore = avgScore,
+                format = format,
+                status = status,
+                episodes = episodes,
+                user = user,
+            )
+        }
+
+        return com.nuvio.app.features.anilist.recommendations.AnilistRecommendationPage(
+            recommendations = list,
+            page = page,
+            hasNextPage = hasNextPage,
+        )
+    }
+
+    suspend fun saveRecommendationVote(
+        mediaId: Int,
+        mediaRecommendationId: Int,
+        rating: String, // "RATE_UP", "RATE_DOWN", "NO_RATING"
+        token: String,
+    ): Boolean {
+        val mutation = """
+            mutation (${'$'}mediaId: Int, ${'$'}mediaRecommendationId: Int, ${'$'}rating: RecommendationRating) {
+              SaveRecommendation(mediaId: ${'$'}mediaId, mediaRecommendationId: ${'$'}mediaRecommendationId, rating: ${'$'}rating) {
+                id
+                rating
+                userRating
+              }
+            }
+        """.trimIndent()
+
+        val variables = buildJsonObject {
+            put("mediaId", mediaId)
+            put("mediaRecommendationId", mediaRecommendationId)
+            put("rating", rating)
+        }
+
+        val root = executeGraphQL(query = mutation, variables = variables, token = token)
+        return root?.get("data") != null
+    }
 }
 
