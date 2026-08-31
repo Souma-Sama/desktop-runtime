@@ -46,7 +46,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
-import com.nuvio.app.core.ui.AutoScrollToStart
 import kotlinx.coroutines.launch
 
 @Composable
@@ -119,7 +118,9 @@ fun DetailAnilistThreadsSection(
                 CircularProgressIndicator(color = MaterialTheme.colorScheme.primary, modifier = Modifier.size(28.dp))
             }
         } else {
-            AutoScrollToStart(listState, mediaId)
+            LaunchedEffect(mediaId) {
+                listState.scrollToItem(0)
+            }
 
             LazyRow(
                 state = listState,

@@ -2542,7 +2542,7 @@ object AnilistApi {
         val tId = c["threadId"].asIntOrNull() ?: threadId
         val commentText = c["comment"].asStringOrNull().orEmpty()
         val likeCount = c["likeCount"].asIntOrNull() ?: 0
-        val createdAt = c["createdAt"].asLongOrNull() ?: (kotlinx.datetime.Clock.System.now().toEpochMilliseconds() / 1000)
+        val createdAt = c["createdAt"].asLongOrNull() ?: (io.ktor.util.date.GMTDate().timestamp / 1000)
 
         val uObj = c["user"].asJsonObjectOrNull()
         val user = uObj?.let { u ->

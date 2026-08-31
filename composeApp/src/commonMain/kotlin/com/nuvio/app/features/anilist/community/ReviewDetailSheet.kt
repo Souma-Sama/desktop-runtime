@@ -296,6 +296,8 @@ fun ReviewDetailSheet(
                             Text("AniList", fontSize = 12.sp)
                         }
                     }
+                }
+            }
         }
     }
 
