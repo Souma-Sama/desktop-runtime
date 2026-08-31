@@ -23,6 +23,7 @@ data class AnilistPreferences(
     val showPosterAnilistScore: Boolean = true,
     val showPosterMalScore: Boolean = true,
     val posterScoreFormat: AnilistPosterScoreFormat = AnilistPosterScoreFormat.PERCENTAGE,
+    val hideAdultContent: Boolean = true,
     val librarySections: List<AnilistSectionSettings> = defaultAuthenticatedSections,
     val streamIdOverrides: Map<Int, String> = emptyMap(),
 ) {

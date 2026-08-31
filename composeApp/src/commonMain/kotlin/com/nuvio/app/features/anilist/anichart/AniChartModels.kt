@@ -70,6 +70,14 @@ enum class AniChartFormatFilter(val label: String) {
     OVA_ONA("OVA / ONA"),
 }
 
+enum class AniChartSort(val label: String) {
+    POPULARITY("Popularity"),
+    SCORE("Highest Score"),
+    TITLE("Title (A-Z)"),
+    EPISODES("Episodes"),
+    AIRING_TIME("Airing Time"),
+}
+
 @Serializable
 data class AniChartMedia(
     val id: Int,
@@ -81,6 +89,7 @@ data class AniChartMedia(
     val status: String?,
     val genres: List<String> = emptyList(),
     val score: Double? = null,
+    val popularity: Int? = null,
     val studio: String? = null,
     val source: String? = null,
     val airingAt: Long? = null,
@@ -89,6 +98,7 @@ data class AniChartMedia(
     val startDate: String? = null,
     val description: String? = null,
     val isContinuing: Boolean = false,
+    val isAdult: Boolean = false,
 )
 
 data class AniChartUiState(
@@ -97,6 +107,8 @@ data class AniChartUiState(
     val selectedYear: Int = AniChartSeason.currentYear(),
     val selectedDay: AniChartDay = AniChartDay.today(),
     val selectedFormat: AniChartFormatFilter = AniChartFormatFilter.ALL,
+    val selectedGenre: String? = null,
+    val selectedSort: AniChartSort = AniChartSort.POPULARITY,
     val seasonalItems: List<AniChartMedia> = emptyList(),
     val scheduleItems: Map<AniChartDay, List<AniChartMedia>> = emptyMap(),
     val isLoading: Boolean = false,

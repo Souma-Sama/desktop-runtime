@@ -294,7 +294,8 @@ object AnilistCatalogRepository {
             else -> emptyList()
         }
 
-        val previews = mediaList.map { media ->
+        val filteredMediaList = if (prefs.hideAdultContent) mediaList.filter { !it.isAdult } else mediaList
+        val previews = filteredMediaList.map { media ->
             val itemId = "ani_${media.id}"
             val itemType = if (media.format == "MOVIE") "movie" else "series"
 

@@ -228,14 +228,15 @@ object AnilistApi {
         perPage: Int = 25,
     ): List<AnilistMedia> {
         val query = """
-            query FetchTrendingAnime(${'$'}page: Int, ${'$'}perPage: Int) {
+            query FetchTrendingAnime(${'$'}page: Int, ${'$'}perPage: Int, ${'$'}isAdult: Boolean) {
               Page(page: ${'$'}page, perPage: ${'$'}perPage) {
                 pageInfo {
                   hasNextPage
                 }
-                media(type: ANIME, sort: [TRENDING_DESC, POPULARITY_DESC]) {
+                media(type: ANIME, sort: [TRENDING_DESC, POPULARITY_DESC], isAdult: ${'$'}isAdult) {
                   id
                   idMal
+                  isAdult
                   title {
                     romaji
                     english
@@ -285,9 +286,11 @@ object AnilistApi {
             }
         """.trimIndent()
 
+        val hideAdult = AnilistPreferencesRepository.snapshot().hideAdultContent
         val variables = buildJsonObject {
             put("page", page)
             put("perPage", perPage)
+            if (hideAdult) put("isAdult", false)
         }
 
         val root = executeGraphQL(query = query, variables = variables)
@@ -297,6 +300,7 @@ object AnilistApi {
             .asJsonArrayOrNull() ?: return emptyList()
 
         return mediaArray.mapNotNull { it.asJsonObjectOrNull()?.let { obj -> parseMedia(obj) } }
+            .filter { if (hideAdult) !it.isAdult else true }
     }
 
     suspend fun fetchPopularSeasonAnime(
@@ -306,14 +310,15 @@ object AnilistApi {
         perPage: Int = 25,
     ): List<AnilistMedia> {
         val query = """
-            query FetchPopularSeasonAnime(${'$'}season: MediaSeason, ${'$'}seasonYear: Int, ${'$'}page: Int, ${'$'}perPage: Int) {
+            query FetchPopularSeasonAnime(${'$'}season: MediaSeason, ${'$'}seasonYear: Int, ${'$'}page: Int, ${'$'}perPage: Int, ${'$'}isAdult: Boolean) {
               Page(page: ${'$'}page, perPage: ${'$'}perPage) {
                 pageInfo {
                   hasNextPage
                 }
-                media(type: ANIME, season: ${'$'}season, seasonYear: ${'$'}seasonYear, sort: [POPULARITY_DESC]) {
+                media(type: ANIME, season: ${'$'}season, seasonYear: ${'$'}seasonYear, sort: [POPULARITY_DESC], isAdult: ${'$'}isAdult) {
                   id
                   idMal
+                  isAdult
                   title {
                     romaji
                     english
@@ -363,11 +368,13 @@ object AnilistApi {
             }
         """.trimIndent()
 
+        val hideAdult = AnilistPreferencesRepository.snapshot().hideAdultContent
         val variables = buildJsonObject {
             if (!season.isNullOrBlank()) put("season", season.uppercase())
             if (seasonYear != null && seasonYear > 0) put("seasonYear", seasonYear)
             put("page", page)
             put("perPage", perPage)
+            if (hideAdult) put("isAdult", false)
         }
 
         val root = executeGraphQL(query = query, variables = variables)
@@ -377,6 +384,7 @@ object AnilistApi {
             .asJsonArrayOrNull() ?: return emptyList()
 
         return mediaArray.mapNotNull { it.asJsonObjectOrNull()?.let { obj -> parseMedia(obj) } }
+            .filter { if (hideAdult) !it.isAdult else true }
     }
 
     suspend fun fetchTopRatedAnime(
@@ -384,14 +392,15 @@ object AnilistApi {
         perPage: Int = 25,
     ): List<AnilistMedia> {
         val query = """
-            query FetchTopRatedAnime(${'$'}page: Int, ${'$'}perPage: Int) {
+            query FetchTopRatedAnime(${'$'}page: Int, ${'$'}perPage: Int, ${'$'}isAdult: Boolean) {
               Page(page: ${'$'}page, perPage: ${'$'}perPage) {
                 pageInfo {
                   hasNextPage
                 }
-                media(type: ANIME, sort: [SCORE_DESC]) {
+                media(type: ANIME, sort: [SCORE_DESC], isAdult: ${'$'}isAdult) {
                   id
                   idMal
+                  isAdult
                   title {
                     romaji
                     english
@@ -441,9 +450,11 @@ object AnilistApi {
             }
         """.trimIndent()
 
+        val hideAdult = AnilistPreferencesRepository.snapshot().hideAdultContent
         val variables = buildJsonObject {
             put("page", page)
             put("perPage", perPage)
+            if (hideAdult) put("isAdult", false)
         }
 
         val root = executeGraphQL(query = query, variables = variables)
@@ -453,6 +464,7 @@ object AnilistApi {
             .asJsonArrayOrNull() ?: return emptyList()
 
         return mediaArray.mapNotNull { it.asJsonObjectOrNull()?.let { obj -> parseMedia(obj) } }
+            .filter { if (hideAdult) !it.isAdult else true }
     }
 
     suspend fun fetchAiringAnime(
@@ -460,14 +472,15 @@ object AnilistApi {
         perPage: Int = 25,
     ): List<AnilistMedia> {
         val query = """
-            query FetchAiringAnime(${'$'}page: Int, ${'$'}perPage: Int) {
+            query FetchAiringAnime(${'$'}page: Int, ${'$'}perPage: Int, ${'$'}isAdult: Boolean) {
               Page(page: ${'$'}page, perPage: ${'$'}perPage) {
                 pageInfo {
                   hasNextPage
                 }
-                media(type: ANIME, status: RELEASING, sort: [POPULARITY_DESC]) {
+                media(type: ANIME, status: RELEASING, sort: [POPULARITY_DESC], isAdult: ${'$'}isAdult) {
                   id
                   idMal
+                  isAdult
                   title {
                     romaji
                     english
@@ -517,9 +530,11 @@ object AnilistApi {
             }
         """.trimIndent()
 
+        val hideAdult = AnilistPreferencesRepository.snapshot().hideAdultContent
         val variables = buildJsonObject {
             put("page", page)
             put("perPage", perPage)
+            if (hideAdult) put("isAdult", false)
         }
 
         val root = executeGraphQL(query = query, variables = variables)
@@ -529,21 +544,28 @@ object AnilistApi {
             .asJsonArrayOrNull() ?: return emptyList()
 
         return mediaArray.mapNotNull { it.asJsonObjectOrNull()?.let { obj -> parseMedia(obj) } }
+            .filter { if (hideAdult) !it.isAdult else true }
     }
 
     suspend fun searchAnime(
         query: String,
         token: String? = null,
+        genre: String? = null,
+        tag: String? = null,
+        sort: List<String> = listOf("SEARCH_MATCH", "POPULARITY_DESC"),
+        page: Int = 1,
+        perPage: Int = 25,
     ): List<AnilistMedia> {
         val cleanQuery = query.trim()
-        if (cleanQuery.isBlank()) return emptyList()
+        if (cleanQuery.isBlank() && genre.isNullOrBlank() && tag.isNullOrBlank()) return emptyList()
 
         val graphQLQuery = """
-            query SearchAnime(${'$'}search: String) {
-              Page(page: 1, perPage: 25) {
-                media(search: ${'$'}search, type: ANIME, sort: [SEARCH_MATCH, POPULARITY_DESC]) {
+            query SearchAnime(${'$'}search: String, ${'$'}genre: String, ${'$'}tag: String, ${'$'}sort: [MediaSort], ${'$'}isAdult: Boolean, ${'$'}page: Int, ${'$'}perPage: Int) {
+              Page(page: ${'$'}page, perPage: ${'$'}perPage) {
+                media(search: ${'$'}search, genre: ${'$'}genre, tag: ${'$'}tag, type: ANIME, sort: ${'$'}sort, isAdult: ${'$'}isAdult) {
                   id
                   idMal
+                  isAdult
                   title {
                     romaji
                     english
@@ -601,8 +623,15 @@ object AnilistApi {
             }
         """.trimIndent()
 
+        val hideAdult = AnilistPreferencesRepository.snapshot().hideAdultContent
         val variables = buildJsonObject {
-            put("search", cleanQuery)
+            if (cleanQuery.isNotBlank()) put("search", cleanQuery)
+            if (!genre.isNullOrBlank()) put("genre", genre)
+            if (!tag.isNullOrBlank()) put("tag", tag)
+            put("sort", kotlinx.serialization.json.JsonArray(sort.map { kotlinx.serialization.json.JsonPrimitive(it) }))
+            if (hideAdult) put("isAdult", false)
+            put("page", page)
+            put("perPage", perPage)
         }
 
         val root = executeGraphQL(query = graphQLQuery, variables = variables, token = token)
@@ -611,9 +640,27 @@ object AnilistApi {
             .asJsonObjectOrNull()?.get("media")
             .asJsonArrayOrNull() ?: return emptyList()
 
-        return mediaList.mapNotNull { element ->
-            element.asJsonObjectOrNull()?.let { parseMedia(it) }
-        }
+        return mediaList.mapNotNull { it.asJsonObjectOrNull()?.let { obj -> parseMedia(obj) } }
+            .filter { if (hideAdult) !it.isAdult else true }
+    }
+
+    suspend fun browseAnime(
+        genre: String? = null,
+        tag: String? = null,
+        sort: AnilistSortOption = AnilistSortOption.POPULARITY,
+        page: Int = 1,
+        perPage: Int = 25,
+        token: String? = null,
+    ): List<AnilistMedia> {
+        return searchAnime(
+            query = "",
+            token = token,
+            genre = genre,
+            tag = tag,
+            sort = listOf(sort.apiSortValue),
+            page = page,
+            perPage = perPage,
+        )
     }
 
     suspend fun fetchStaffDetail(
@@ -1836,6 +1883,8 @@ object AnilistApi {
         val entryObj = obj["mediaListEntry"].asJsonObjectOrNull()
         val mediaListEntry = entryObj?.let { parseMediaListEntry(it, defaultMediaId = id) }
 
+        val isAdult = obj["isAdult"].asBooleanOrNull() ?: false
+
         val media = AnilistMedia(
             id = id,
             idMal = idMal,
@@ -1863,6 +1912,7 @@ object AnilistApi {
             airingSchedule = airingScheduleMap,
             mediaListEntry = mediaListEntry,
             relations = relations,
+            isAdult = isAdult,
             isFullDetails = isFullDetails,
         )
         val existing = mediaCache[id]

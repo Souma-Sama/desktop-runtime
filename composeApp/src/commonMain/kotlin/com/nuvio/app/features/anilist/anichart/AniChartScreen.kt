@@ -44,15 +44,19 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Sort
 import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.foundation.Image
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import com.nuvio.app.features.anilist.AnilistGenres
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -146,6 +150,16 @@ fun AniChartScreen(
             )
         }
 
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // Genre & Sort Filter Bar
+        AniChartGenreAndSortBar(
+            selectedGenre = state.selectedGenre,
+            selectedSort = state.selectedSort,
+            onGenreSelected = { AniChartRepository.setGenreFilter(it) },
+            onSortSelected = { AniChartRepository.setSortOption(it) },
+        )
+
         Spacer(modifier = Modifier.height(10.dp))
 
         // Content Area with Adaptive Grid
@@ -195,13 +209,28 @@ fun AniChartScreen(
                 }
             } else {
                 if (state.mode == AniChartMode.SEASONAL) {
-                    val filteredItems = remember(state.seasonalItems, state.selectedFormat) {
-                        when (state.selectedFormat) {
+                    val filteredItems = remember(
+                        state.seasonalItems,
+                        state.selectedFormat,
+                        state.selectedGenre,
+                        state.selectedSort,
+                    ) {
+                        var list = when (state.selectedFormat) {
                             AniChartFormatFilter.ALL -> state.seasonalItems
                             AniChartFormatFilter.TV -> state.seasonalItems.filter { it.format == "TV" }
                             AniChartFormatFilter.TV_SHORT -> state.seasonalItems.filter { it.format == "TV_SHORT" }
                             AniChartFormatFilter.MOVIE -> state.seasonalItems.filter { it.format == "MOVIE" }
                             AniChartFormatFilter.OVA_ONA -> state.seasonalItems.filter { it.format in listOf("OVA", "ONA", "SPECIAL") }
+                        }
+                        if (!state.selectedGenre.isNullOrBlank()) {
+                            list = list.filter { it.genres.any { g -> g.equals(state.selectedGenre, ignoreCase = true) } }
+                        }
+                        when (state.selectedSort) {
+                            AniChartSort.POPULARITY -> list.sortedByDescending { it.popularity ?: 0 }
+                            AniChartSort.SCORE -> list.sortedByDescending { it.score ?: 0.0 }
+                            AniChartSort.TITLE -> list.sortedBy { it.title.lowercase() }
+                            AniChartSort.EPISODES -> list.sortedByDescending { it.episodes ?: 0 }
+                            AniChartSort.AIRING_TIME -> list.sortedBy { it.airingAt ?: Long.MAX_VALUE }
                         }
                     }
                     AniChartSeasonalGrid(
@@ -209,7 +238,24 @@ fun AniChartScreen(
                         onAnimeClick = onAnimeClick,
                     )
                 } else {
-                    val dayItems = state.scheduleItems[state.selectedDay].orEmpty()
+                    val dayItems = remember(
+                        state.scheduleItems,
+                        state.selectedDay,
+                        state.selectedGenre,
+                        state.selectedSort,
+                    ) {
+                        var list = state.scheduleItems[state.selectedDay].orEmpty()
+                        if (!state.selectedGenre.isNullOrBlank()) {
+                            list = list.filter { it.genres.any { g -> g.equals(state.selectedGenre, ignoreCase = true) } }
+                        }
+                        when (state.selectedSort) {
+                            AniChartSort.POPULARITY -> list.sortedByDescending { it.popularity ?: 0 }
+                            AniChartSort.SCORE -> list.sortedByDescending { it.score ?: 0.0 }
+                            AniChartSort.TITLE -> list.sortedBy { it.title.lowercase() }
+                            AniChartSort.EPISODES -> list.sortedByDescending { it.episodes ?: 0 }
+                            AniChartSort.AIRING_TIME -> list.sortedBy { it.airingAt ?: Long.MAX_VALUE }
+                        }
+                    }
                     AniChartScheduleGrid(
                         items = dayItems,
                         onAnimeClick = onAnimeClick,
@@ -579,6 +625,152 @@ private fun AniChartScheduleGrid(
                 item = preview,
                 onClick = { onAnimeClick(preview) },
             )
+        }
+    }
+}
+
+@Composable
+private fun AniChartGenreAndSortBar(
+    selectedGenre: String?,
+    selectedSort: AniChartSort,
+    onGenreSelected: (String?) -> Unit,
+    onSortSelected: (AniChartSort) -> Unit,
+) {
+    val prefs by AnilistPreferencesRepository.preferences.collectAsStateWithLifecycle()
+    val genres = remember(prefs.hideAdultContent) {
+        AnilistGenres.getAvailableGenres(prefs.hideAdultContent)
+    }
+    var showSortMenu by remember { mutableStateOf(false) }
+    val genreScrollState = rememberScrollState()
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        // Sort Selector Button
+        Box {
+            Surface(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(10.dp))
+                    .clickable { showSortMenu = true },
+                shape = RoundedCornerShape(10.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)),
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(5.dp),
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Sort,
+                        contentDescription = "Sort",
+                        modifier = Modifier.size(15.dp),
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
+                    Text(
+                        text = selectedSort.label,
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 11.sp,
+                        ),
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                }
+            }
+
+            DropdownMenu(
+                expanded = showSortMenu,
+                onDismissRequest = { showSortMenu = false },
+                modifier = Modifier.background(MaterialTheme.colorScheme.surface),
+            ) {
+                AniChartSort.entries.forEach { sortOption ->
+                    val isSelected = sortOption == selectedSort
+                    DropdownMenuItem(
+                        text = {
+                            Text(
+                                text = sortOption.label,
+                                style = MaterialTheme.typography.bodySmall.copy(
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                ),
+                                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                            )
+                        },
+                        onClick = {
+                            onSortSelected(sortOption)
+                            showSortMenu = false
+                        },
+                    )
+                }
+            }
+        }
+
+        // Horizontal Scrollable Genre Chips
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .horizontalScroll(genreScrollState)
+                .nuvioDesktopDragScroll(genreScrollState),
+        ) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                // "All Genres" Chip
+                val isAllSelected = selectedGenre == null
+                Surface(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable { onGenreSelected(null) },
+                    shape = RoundedCornerShape(8.dp),
+                    color = if (isAllSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.22f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                    border = BorderStroke(
+                        1.dp,
+                        if (isAllSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = 0.12f),
+                    ),
+                ) {
+                    Text(
+                        text = "All Genres",
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontWeight = if (isAllSelected) FontWeight.Bold else FontWeight.Medium,
+                            fontSize = 11.sp,
+                        ),
+                        color = if (isAllSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp),
+                    )
+                }
+
+                // Individual Genres
+                genres.forEach { genre ->
+                    val isSelected = selectedGenre.equals(genre, ignoreCase = true)
+                    Surface(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable {
+                                onGenreSelected(if (isSelected) null else genre)
+                            },
+                        shape = RoundedCornerShape(8.dp),
+                        color = if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.22f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                        border = BorderStroke(
+                            1.dp,
+                            if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = 0.12f),
+                        ),
+                    ) {
+                        Text(
+                            text = genre,
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                fontSize = 11.sp,
+                            ),
+                            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp),
+                        )
+                    }
+                }
+            }
         }
     }
 }

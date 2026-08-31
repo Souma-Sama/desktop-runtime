@@ -64,6 +64,29 @@ object AniChartRepository {
         _uiState.value = _uiState.value.copy(selectedFormat = format)
     }
 
+    fun setGenreFilter(genre: String?) {
+        _uiState.value = _uiState.value.copy(selectedGenre = genre)
+    }
+
+    fun setSortOption(sort: AniChartSort) {
+        _uiState.value = _uiState.value.copy(selectedSort = sort)
+    }
+
+    fun clearCache() {
+        scope.launch {
+            mutex.withLock {
+                seasonalCache.clear()
+                weeklyScheduleCache = null
+                weeklyScheduleCachedAtMs = 0L
+            }
+            if (_uiState.value.mode == AniChartMode.SEASONAL) {
+                loadSeasonal(_uiState.value.selectedSeason, _uiState.value.selectedYear, force = true)
+            } else {
+                loadWeeklySchedule(force = true)
+            }
+        }
+    }
+
     suspend fun loadSeasonal(season: AniChartSeason, year: Int, force: Boolean = false) {
         val cacheKey = "${season.apiName}_$year"
         if (!force) {
@@ -126,10 +149,12 @@ object AniChartRepository {
 
     private suspend fun fetchSeasonalFromApi(season: AniChartSeason, year: Int): List<AniChartMedia> = withContext(Dispatchers.Default) {
         val query = """
-            query (${'$'}season: MediaSeason, ${'$'}seasonYear: Int, ${'$'}page: Int) {
+            query (${'$'}season: MediaSeason, ${'$'}seasonYear: Int, ${'$'}page: Int, ${'$'}isAdult: Boolean) {
               Page(page: ${'$'}page, perPage: 50) {
-                media(season: ${'$'}season, seasonYear: ${'$'}seasonYear, type: ANIME, sort: [POPULARITY_DESC], isAdult: false) {
+                media(season: ${'$'}season, seasonYear: ${'$'}seasonYear, type: ANIME, sort: [POPULARITY_DESC], isAdult: ${'$'}isAdult) {
                   id
+                  isAdult
+                  popularity
                   title {
                     english
                     romaji
@@ -168,10 +193,12 @@ object AniChartRepository {
             }
         """.trimIndent()
 
+        val hideAdult = AnilistPreferencesRepository.snapshot().hideAdultContent
         val variables = buildJsonObject {
             put("season", season.apiName)
             put("seasonYear", year)
             put("page", 1)
+            if (hideAdult) put("isAdult", false)
         }
 
         val json = AnilistApi.executeGraphQL(query, variables) ?: return@withContext emptyList()
@@ -181,11 +208,9 @@ object AniChartRepository {
             ?: return@withContext emptyList()
 
         val preferredLang = AnilistPreferencesRepository.snapshot().preferredTitleLanguage.name
-
-        mediaArray.mapNotNull { itemElem ->
-            val obj = itemElem.asJsonObjectOrNull() ?: return@mapNotNull null
-            parseAniChartMedia(obj, preferredLang, currentSeason = season, currentYear = year)
-        }
+        mediaArray.mapNotNull {
+            it.asJsonObjectOrNull()?.let { obj -> parseAniChartMedia(obj, preferredLang, currentSeason = season, currentYear = year) }
+        }.filter { if (hideAdult) !it.isAdult else true }
     }
 
     private suspend fun fetchWeeklyScheduleFromApi(): Map<AniChartDay, List<AniChartMedia>> = withContext(Dispatchers.Default) {
@@ -206,6 +231,8 @@ object AniChartRepository {
                   timeUntilAiring
                   media {
                     id
+                    isAdult
+                    popularity
                     title {
                       english
                       romaji
@@ -246,6 +273,7 @@ object AniChartRepository {
             ?.get("airingSchedules").asJsonArrayOrNull()
             ?: return@withContext emptyMap()
 
+        val hideAdult = AnilistPreferencesRepository.snapshot().hideAdultContent
         val preferredLang = AnilistPreferencesRepository.snapshot().preferredTitleLanguage.name
         val resultMap = mutableMapOf<AniChartDay, MutableList<AniChartMedia>>()
         AniChartDay.entries.forEach { resultMap[it] = mutableListOf() }
@@ -258,7 +286,7 @@ object AniChartRepository {
             val mediaObj = sObj["media"].asJsonObjectOrNull() ?: return@forEach
 
             val media = parseAniChartMedia(mediaObj, preferredLang, explicitAiringAt = airingAt, explicitNextEp = episode, explicitTimeUntil = timeUntil)
-            if (media != null) {
+            if (media != null && (!hideAdult || !media.isAdult)) {
                 val day = AniChartDay.fromEpochSeconds(airingAt)
                 resultMap[day]?.add(media)
             }
@@ -277,6 +305,8 @@ object AniChartRepository {
         explicitTimeUntil: Long? = null,
     ): AniChartMedia? {
         val id = obj["id"].asIntOrNull() ?: return null
+        val isAdult = obj["isAdult"].asBooleanOrNull() ?: false
+        val popularity = obj["popularity"].asIntOrNull()
         val titleObj = obj["title"].asJsonObjectOrNull()
         val english = titleObj?.get("english").asStringOrNull()
         val romaji = titleObj?.get("romaji").asStringOrNull()
@@ -333,6 +363,7 @@ object AniChartRepository {
             status = status,
             genres = genres,
             score = score,
+            popularity = popularity,
             studio = studio,
             source = source,
             airingAt = airingAt,
@@ -341,6 +372,7 @@ object AniChartRepository {
             startDate = startDateStr,
             description = desc,
             isContinuing = isContinuing,
+            isAdult = isAdult,
         )
     }
 

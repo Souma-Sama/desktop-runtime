@@ -697,6 +697,16 @@ private fun AnilistDisplayPreferencesSection(isTablet: Boolean) {
                 isTablet = isTablet,
                 onClick = { activePicker = AnilistPickerType.SCORE_FORMAT.name },
             )
+
+            SettingsGroupDivider(isTablet = isTablet)
+
+            SettingsSwitchRow(
+                title = "Hide 18+ / NSFW Content",
+                description = "Filter out 18+ hentai and explicit adult content across catalogs, search, and charts. Standard anime and Ecchi titles remain visible.",
+                checked = prefs.hideAdultContent,
+                isTablet = isTablet,
+                onCheckedChange = AnilistPreferencesRepository::setHideAdultContent,
+            )
         }
     }
 

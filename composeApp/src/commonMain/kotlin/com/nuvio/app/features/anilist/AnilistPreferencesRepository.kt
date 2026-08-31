@@ -157,6 +157,11 @@ object AnilistPreferencesRepository {
         updateAndPersist { it.copy(posterScoreFormat = format) }
     }
 
+    fun setHideAdultContent(enabled: Boolean) {
+        updateAndPersist { it.copy(hideAdultContent = enabled) }
+        com.nuvio.app.features.anilist.anichart.AniChartRepository.clearCache()
+    }
+
     private fun updateAndPersist(transform: (AnilistPreferences) -> AnilistPreferences) {
         ensureLoaded()
         _preferences.update { current ->

@@ -156,6 +156,7 @@ data class AnilistMedia(
     val airingSchedule: Map<Int, Long> = emptyMap(),
     val mediaListEntry: AnilistMediaListEntry? = null,
     val relations: List<AnilistRelation> = emptyList(),
+    val isAdult: Boolean = false,
     val isFullDetails: Boolean = false,
 )
 
