@@ -66,6 +66,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.nuvio.app.core.ui.NuvioDesktopVerticalScrollbar
+import com.nuvio.app.core.ui.nuvioDesktopDragScroll
 import com.nuvio.app.features.anilist.AnilistAuthRepository
 import com.nuvio.app.features.anilist.community.AnilistContentBlockItem
 import com.nuvio.app.features.anilist.community.parseAnilistRichContent
@@ -406,9 +407,14 @@ fun AnilistUserProfileSheet(
                                         color = MaterialTheme.colorScheme.onSurface,
                                     )
                                     Spacer(modifier = Modifier.height(10.dp))
+                                    val favAnimeListState = rememberLazyListState()
                                     LazyRow(
+                                        state = favAnimeListState,
                                         horizontalArrangement = Arrangement.spacedBy(12.dp),
                                         contentPadding = PaddingValues(bottom = 12.dp),
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .nuvioDesktopDragScroll(favAnimeListState),
                                     ) {
                                         items(user.favoriteAnime, key = { it.id }) { anime ->
                                             FavoriteAnimeCard(
@@ -427,9 +433,14 @@ fun AnilistUserProfileSheet(
                                         color = MaterialTheme.colorScheme.onSurface,
                                     )
                                     Spacer(modifier = Modifier.height(10.dp))
+                                    val favCharListState = rememberLazyListState()
                                     LazyRow(
+                                        state = favCharListState,
                                         horizontalArrangement = Arrangement.spacedBy(12.dp),
                                         contentPadding = PaddingValues(bottom = 12.dp),
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .nuvioDesktopDragScroll(favCharListState),
                                     ) {
                                         items(user.favoriteCharacters, key = { it.id }) { char ->
                                             FavoriteCharacterCard(character = char)

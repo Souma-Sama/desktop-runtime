@@ -46,6 +46,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
+import com.nuvio.app.core.ui.nuvioDesktopDragScroll
 import kotlinx.coroutines.launch
 
 @Composable
@@ -136,7 +137,9 @@ fun DetailAnilistThreadsSection(
                 state = listState,
                 contentPadding = horizontalScrollPadding,
                 horizontalArrangement = Arrangement.spacedBy(14.dp),
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .nuvioDesktopDragScroll(listState),
             ) {
                 items(threads, key = { it.id }) { thread ->
                     ThreadCard(
