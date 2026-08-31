@@ -220,7 +220,7 @@ private fun StreamIdOptionCard(
             Column(modifier = Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        text = option.formattedLabel,
+                        text = "${option.type.displayName} ($queryPreview)",
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.SemiBold,
                         color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
@@ -248,20 +248,6 @@ private fun StreamIdOptionCard(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                Spacer(modifier = Modifier.height(4.dp))
-                Surface(
-                    shape = RoundedCornerShape(4.dp),
-                    color = if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.18f) else MaterialTheme.colorScheme.surface.copy(alpha = 0.6f),
-                ) {
-                    Text(
-                        text = "Query: $queryPreview",
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Medium,
-                        color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                        fontSize = 10.sp,
-                    )
-                }
             }
 
             if (isSelected) {
@@ -320,7 +306,7 @@ private fun StreamIdCustomCard(
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = if (customValue.isNotBlank() && isSelected) "Custom ID ($customValue)" else "Custom Manual ID Override",
+                        text = if (!queryPreview.isNullOrBlank()) "Custom ($queryPreview)" else "Custom Manual ID Override",
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.SemiBold,
                         color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
@@ -330,22 +316,6 @@ private fun StreamIdCustomCard(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    if (!queryPreview.isNullOrBlank()) {
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Surface(
-                            shape = RoundedCornerShape(4.dp),
-                            color = if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.18f) else MaterialTheme.colorScheme.surface.copy(alpha = 0.6f),
-                        ) {
-                            Text(
-                                text = "Query: $queryPreview",
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.Medium,
-                                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                fontSize = 10.sp,
-                            )
-                        }
-                    }
                 }
 
                 Icon(
@@ -406,14 +376,6 @@ fun AnimeStreamIdQuickBar(
     val activeOption = remember(anilistId, anilistPrefs) {
         AnimeStreamIdManager.getActiveOption(anilistId)
     }
-    val currentQueryId = remember(activeOption, seasonNumber, episodeNumber, isMovie) {
-        AnimeStreamIdFormatter.formatVideoId(
-            option = activeOption,
-            season = seasonNumber ?: 1,
-            episode = episodeNumber ?: 1,
-            isMovie = isMovie,
-        )
-    }
     var showSheet by remember { mutableStateOf(false) }
     val scrollState = rememberScrollState()
 
@@ -421,31 +383,31 @@ fun AnimeStreamIdQuickBar(
         modifier = modifier
             .fillMaxWidth()
             .horizontalScroll(scrollState)
-            .padding(horizontal = 12.dp, vertical = 4.dp),
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
+            .padding(horizontal = 12.dp, vertical = 5.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Surface(
-            shape = RoundedCornerShape(8.dp),
+            shape = RoundedCornerShape(10.dp),
             color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
         ) {
             Row(
-                modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Icon(
                     painter = appIconPainter(AppIconResource.PlayerPlay),
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(13.dp),
+                    modifier = Modifier.size(15.dp),
                 )
-                Spacer(modifier = Modifier.width(3.dp))
+                Spacer(modifier = Modifier.width(5.dp))
                 Text(
-                    text = "ID: $currentQueryId",
+                    text = "STREAM ID:",
                     style = MaterialTheme.typography.labelSmall,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.primary,
-                    fontSize = 9.sp,
+                    fontSize = 11.sp,
                 )
             }
         }
@@ -453,63 +415,73 @@ fun AnimeStreamIdQuickBar(
         options.forEach { option ->
             val isSelected = activeOption.type == option.type &&
                 (option.type != AnimeStreamIdType.CUSTOM || activeOption.rawId == option.rawId)
-            val chipShape = RoundedCornerShape(8.dp)
-            val bgColor = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+            val fullOptionId = AnimeStreamIdFormatter.formatVideoId(
+                option = option,
+                season = seasonNumber ?: 1,
+                episode = episodeNumber ?: 1,
+                isMovie = isMovie,
+            )
+            val chipLabel = when (option.type) {
+                AnimeStreamIdType.CUSTOM -> "Custom ($fullOptionId)"
+                else -> "${option.type.displayName} ($fullOptionId)"
+            }
+            val chipShape = RoundedCornerShape(10.dp)
+            val bgColor = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
             val contentColor = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
+            val borderColor = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)
 
             Surface(
                 modifier = Modifier
                     .clip(chipShape)
+                    .border(width = if (isSelected) 1.5.dp else 1.dp, color = borderColor, shape = chipShape)
                     .clickable {
                         AnimeStreamIdManager.selectOption(anilistId, option.type)
-                        val newId = AnimeStreamIdFormatter.formatVideoId(
-                            option = option,
-                            season = seasonNumber ?: 1,
-                            episode = episodeNumber ?: 1,
-                            isMovie = isMovie,
-                        )
-                        onOptionChanged(newId)
+                        onOptionChanged(fullOptionId)
                     },
                 shape = chipShape,
                 color = bgColor,
                 contentColor = contentColor,
             ) {
                 Text(
-                    text = option.formattedLabel,
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                    text = chipLabel,
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
                     style = MaterialTheme.typography.labelMedium,
-                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                    fontSize = 11.sp,
+                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold,
+                    fontSize = 12.sp,
                 )
             }
         }
 
         Surface(
             modifier = Modifier
-                .clip(RoundedCornerShape(8.dp))
+                .clip(RoundedCornerShape(10.dp))
+                .border(width = 1.dp, color = MaterialTheme.colorScheme.outline.copy(alpha = 0.25f), shape = RoundedCornerShape(10.dp))
                 .clickable { showSheet = true },
-            shape = RoundedCornerShape(8.dp),
-            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+            shape = RoundedCornerShape(10.dp),
+            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
         ) {
             Row(
-                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Icon(
                     imageVector = Icons.Default.Edit,
                     contentDescription = "Custom",
-                    modifier = Modifier.size(12.dp),
+                    modifier = Modifier.size(14.dp),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                Spacer(modifier = Modifier.width(4.dp))
+                Spacer(modifier = Modifier.width(5.dp))
                 Text(
                     text = "Custom...",
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Medium,
+                    fontSize = 12.sp,
                 )
             }
         }
+
+        Spacer(modifier = Modifier.width(32.dp))
     }
 
     if (showSheet) {
