@@ -613,9 +613,16 @@ object AnilistMetaDetailsResolver {
                 }
 
                 val defaultVidId = if (isMovie) {
-                    if (!kitsuId.isNullOrBlank()) "kitsu:$kitsuId"
-                    else if (!effectiveImdbId.isNullOrBlank()) effectiveImdbId
-                    else "anilist:$anilistId"
+                    val fallbackId = if (!kitsuId.isNullOrBlank()) "kitsu:$kitsuId"
+                        else if (!effectiveImdbId.isNullOrBlank()) effectiveImdbId
+                        else "anilist:$anilistId"
+                    AnimeStreamIdManager.resolvePlaybackVideoId(
+                        parentMetaId = "ani_$anilistId",
+                        season = 1,
+                        episode = 1,
+                        isMovie = true,
+                        fallbackVideoId = fallbackId,
+                    )
                 } else updatedVideos.firstOrNull()?.id
 
                 onUpdate { current ->
@@ -833,7 +840,13 @@ object AnilistMetaDetailsResolver {
                 networks = if (networks.isNotEmpty()) networks else cinemetaMeta.networks,
                 relations = relations,
                 trailers = trailers,
-                defaultVideoId = if (!kitsuId.isNullOrBlank()) "kitsu:$kitsuId" else "anilist:$anilistId",
+                defaultVideoId = AnimeStreamIdManager.resolvePlaybackVideoId(
+                    parentMetaId = "ani_$anilistId",
+                    season = 1,
+                    episode = 1,
+                    isMovie = true,
+                    fallbackVideoId = if (!kitsuId.isNullOrBlank()) "kitsu:$kitsuId" else if (!effectiveImdbId.isNullOrBlank()) effectiveImdbId else "anilist:$anilistId",
+                ),
                 moreLikeThis = recommendations.ifEmpty { cinemetaMeta.moreLikeThis },
             )
         }
@@ -854,7 +867,13 @@ object AnilistMetaDetailsResolver {
             if (isSingleSpecial) {
                 val matchedSpecial = findSpecialMatch(media, specialVideos) ?: specialVideos.first()
                 val epNum = matchedSpecial.episode ?: 1
-                val videoId = if (!kitsuId.isNullOrBlank()) "kitsu:$kitsuId:$epNum" else "anilist:$anilistId:$epNum"
+                val videoId = resolveEpisodeVideoId(
+                    anilistId = anilistId,
+                    season = 0,
+                    episode = epNum,
+                    effectiveImdbId = if (hasValidImdbId) effectiveImdbId else null,
+                    kitsuId = kitsuId,
+                )
                 val kitsuEp = kitsuEpisodes[epNum] ?: (if (epNum == 0) kitsuEpisodes[0] else null)
                 val streamingEp = media?.streamingEpisodes?.firstOrNull()
                 val epThumbnail = matchedSpecial.thumbnail?.takeIf { it.isNotBlank() }
@@ -1211,16 +1230,6 @@ object AnilistMetaDetailsResolver {
         return null
     }
 
-    private fun String.cleanAnilistDescription(): String {
-        return this
-            .replace(Regex("<br\\s*/?>", RegexOption.IGNORE_CASE), "\n")
-            .replace(Regex("<[^>]*>"), "")
-            .replace(Regex("(?i)\\(Source:.*?\\)"), "")
-            .replace(Regex("(?i)\\[Written by.*?\\]"), "")
-            .replace(Regex("(?i)Source:.*"), "")
-            .trim()
-    }
-
     private suspend fun resolveKitsuId(anilistId: Int, media: AnilistMedia? = null, rawTitle: String? = null): String? {
         val displayTitle = media?.title?.displayTitle ?: rawTitle.orEmpty()
         val cacheKey = "$anilistId:$displayTitle"
@@ -1292,7 +1301,8 @@ object AnilistMetaDetailsResolver {
                     ),
                 )
             }.getOrNull() ?: httpGetText(url)
-            val root = json.parseToJsonElement(response)
+            if (response.isNullOrBlank()) return 0
+            val root = runCatching { json.parseToJsonElement(response) }.getOrNull() ?: return 0
             val dataArray = root.asJsonObjectOrNull()?.get("data").asJsonArrayOrNull() ?: return 0
 
             dataArray.forEach { item ->
