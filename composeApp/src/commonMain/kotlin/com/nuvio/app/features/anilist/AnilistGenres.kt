@@ -72,5 +72,16 @@ enum class AnilistSortOption(
     TITLE_AZ("Title (A-Z)", "TITLE_ROMAJI"),
     FAVORITES("Most Favorites", "FAVOURITES_DESC"),
     EPISODES("Episode Count", "EPISODES_DESC"),
-    UPDATED("Recently Updated", "UPDATED_AT_DESC"),
+    UPDATED("Recently Updated", "UPDATED_AT_DESC");
+
+    companion object {
+        fun fromLabelOrNull(label: String?): AnilistSortOption? {
+            if (label.isNullOrBlank()) return null
+            return entries.firstOrNull {
+                it.label.equals(label, ignoreCase = true) ||
+                    it.name.equals(label, ignoreCase = true) ||
+                    it.apiSortValue.equals(label, ignoreCase = true)
+            }
+        }
+    }
 }

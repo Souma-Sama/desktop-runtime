@@ -32,6 +32,7 @@ data class DiscoverCatalogOption(
     val catalogId: String,
     val catalogName: String,
     val genreOptions: List<String> = emptyList(),
+    val sortOptions: List<String> = emptyList(),
     val genreRequired: Boolean = false,
     val supportsPagination: Boolean = false,
 )
@@ -42,6 +43,7 @@ data class DiscoverUiState(
     val catalogOptions: List<DiscoverCatalogOption> = emptyList(),
     val selectedCatalogKey: String? = null,
     val selectedGenre: String? = null,
+    val selectedSort: String? = null,
     val items: List<MetaPreview> = emptyList(),
     val isLoading: Boolean = false,
     val nextSkip: Int? = null,
@@ -54,6 +56,9 @@ data class DiscoverUiState(
 
     val genreOptions: List<String>
         get() = selectedCatalog?.genreOptions.orEmpty()
+
+    val sortOptions: List<String>
+        get() = selectedCatalog?.sortOptions.orEmpty()
 
     val canLoadMore: Boolean
         get() = nextSkip != null

@@ -45,7 +45,7 @@ data class AnilistPreferences(
             AnilistSectionSettings("Completed", enabled = true),
             AnilistSectionSettings("Rewatching", enabled = true),
             AnilistSectionSettings("Paused", enabled = true),
-            AnilistSectionSettings("Dropped", enabled = false),
+            AnilistSectionSettings("Dropped", enabled = true),
         )
 
         val defaultLibrarySections = defaultAuthenticatedSections

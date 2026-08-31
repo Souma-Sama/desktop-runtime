@@ -309,6 +309,7 @@ fun SearchScreen(
                     onTypeSelected = SearchRepository::selectDiscoverType,
                     onCatalogSelected = SearchRepository::selectDiscoverCatalog,
                     onGenreSelected = SearchRepository::selectDiscoverGenre,
+                    onSortSelected = SearchRepository::selectDiscoverSort,
                     onRetry = {
                         NetworkStatusRepository.requestRefresh(force = true)
                         SearchRepository.refreshDiscover(

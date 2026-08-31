@@ -37,6 +37,7 @@ internal fun LazyListScope.discoverContent(
     onTypeSelected: (String) -> Unit,
     onCatalogSelected: (String) -> Unit,
     onGenreSelected: (String?) -> Unit,
+    onSortSelected: (String?) -> Unit = {},
     onRetry: (() -> Unit)? = null,
     watchedKeys: Set<String> = emptySet(),
     fullyWatchedSeriesKeys: Set<String> = emptySet(),
@@ -53,7 +54,18 @@ internal fun LazyListScope.discoverContent(
             onTypeSelected = onTypeSelected,
             onCatalogSelected = onCatalogSelected,
             onGenreSelected = onGenreSelected,
+            onSortSelected = onSortSelected,
         )
+    }
+    if (state.genreOptions.isNotEmpty()) {
+        item {
+            DiscoverQuickGenreChipsRow(
+                genres = state.genreOptions,
+                selectedGenre = state.selectedGenre,
+                onGenreSelected = onGenreSelected,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+            )
+        }
     }
     state.selectedCatalog?.let { selectedCatalog ->
         item {
@@ -134,6 +146,7 @@ private fun DiscoverFilterRow(
     onTypeSelected: (String) -> Unit,
     onCatalogSelected: (String) -> Unit,
     onGenreSelected: (String?) -> Unit,
+    onSortSelected: (String?) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Row(
@@ -174,6 +187,88 @@ private fun DiscoverFilterRow(
                 onGenreSelected(option.key.ifBlank { null })
             },
         )
+
+        if (state.sortOptions.isNotEmpty()) {
+            val sortOptions = state.sortOptions.map { sort -> NuvioDropdownOption(key = sort, label = sort) }
+            val currentSortLabel = state.selectedSort ?: sortOptions.firstOrNull()?.label ?: "Popularity"
+            NuvioDropdownChip(
+                title = "Sort",
+                label = currentSortLabel,
+                selectedKey = state.selectedSort ?: sortOptions.firstOrNull()?.key,
+                options = sortOptions,
+                enabled = true,
+                onSelected = { option ->
+                    onSortSelected(option.key)
+                },
+            )
+        }
+    }
+}
+
+@Composable
+private fun DiscoverQuickGenreChipsRow(
+    genres: List<String>,
+    selectedGenre: String?,
+    onGenreSelected: (String?) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val scrollState = rememberScrollState()
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .horizontalScroll(scrollState),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        val isAllSelected = selectedGenre == null
+        androidx.compose.material3.Surface(
+            modifier = Modifier
+                .androidx.compose.ui.draw.clip(androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
+                .clickable { onGenreSelected(null) },
+            shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp),
+            color = if (isAllSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.22f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+            border = androidx.compose.foundation.BorderStroke(
+                1.dp,
+                if (isAllSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = 0.12f),
+            ),
+        ) {
+            Text(
+                text = "All",
+                style = MaterialTheme.typography.labelSmall.copy(
+                    fontWeight = if (isAllSelected) FontWeight.Bold else FontWeight.Medium,
+                    fontSize = 11.sp,
+                ),
+                color = if (isAllSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+            )
+        }
+
+        genres.forEach { genre ->
+            val isSelected = selectedGenre.equals(genre, ignoreCase = true)
+            androidx.compose.material3.Surface(
+                modifier = Modifier
+                    .androidx.compose.ui.draw.clip(androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
+                    .clickable {
+                        onGenreSelected(if (isSelected) null else genre)
+                    },
+                shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp),
+                color = if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.22f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                border = androidx.compose.foundation.BorderStroke(
+                    1.dp,
+                    if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = 0.12f),
+                ),
+            ) {
+                Text(
+                    text = genre,
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                        fontSize = 11.sp,
+                    ),
+                    color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                )
+            }
+        }
     }
 }
 

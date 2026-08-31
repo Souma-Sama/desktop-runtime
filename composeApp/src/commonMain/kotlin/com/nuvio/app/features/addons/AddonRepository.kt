@@ -362,6 +362,13 @@ object AddonRepository {
             try {
                 val result = runCatching {
                     if (manifestUrl.startsWith("native://anilist") || manifestUrl.startsWith("builtin://anilist")) {
+                        val hideAdult = com.nuvio.app.features.anilist.AnilistPreferencesRepository.snapshot().hideAdultContent
+                        val genres = com.nuvio.app.features.anilist.AnilistGenres.getAvailableGenres(hideAdult)
+                        val sorts = com.nuvio.app.features.anilist.AnilistSortOption.entries.map { it.label }
+                        val animeExtras = listOf(
+                            AddonExtraProperty(name = "genre", isRequired = false, options = genres),
+                            AddonExtraProperty(name = "sort", isRequired = false, options = sorts),
+                        )
                         AddonManifest(
                             id = "org.nuvio.anilist",
                             name = "AniList Anime Catalog",
@@ -373,13 +380,16 @@ object AddonRepository {
                                 AddonResource(name = "meta", types = listOf("anime", "series", "movie"), idPrefixes = listOf("ani_", "anilist:")),
                             ),
                             catalogs = listOf(
-                                AddonCatalog(type = "anime", id = "anilist:watching", name = "Currently Watching"),
-                                AddonCatalog(type = "anime", id = "anilist:planning", name = "Plan to Watch"),
-                                AddonCatalog(type = "anime", id = "anilist:trending", name = "Trending Anime"),
-                                AddonCatalog(type = "anime", id = "anilist:airing", name = "Currently Airing"),
-                                AddonCatalog(type = "anime", id = "anilist:popular", name = "Popular This Season"),
-                                AddonCatalog(type = "anime", id = "anilist:top-rated", name = "Top Rated Anime"),
-                                AddonCatalog(type = "anime", id = "anilist:completed", name = "Completed"),
+                                AddonCatalog(type = "anime", id = "anilist:watching", name = "Currently Watching", extra = animeExtras),
+                                AddonCatalog(type = "anime", id = "anilist:planning", name = "Plan to Watch", extra = animeExtras),
+                                AddonCatalog(type = "anime", id = "anilist:completed", name = "Completed", extra = animeExtras),
+                                AddonCatalog(type = "anime", id = "anilist:rewatching", name = "Rewatching", extra = animeExtras),
+                                AddonCatalog(type = "anime", id = "anilist:paused", name = "Paused", extra = animeExtras),
+                                AddonCatalog(type = "anime", id = "anilist:dropped", name = "Dropped", extra = animeExtras),
+                                AddonCatalog(type = "anime", id = "anilist:trending", name = "Trending Anime", extra = animeExtras),
+                                AddonCatalog(type = "anime", id = "anilist:airing", name = "Currently Airing", extra = animeExtras),
+                                AddonCatalog(type = "anime", id = "anilist:popular", name = "Popular This Season", extra = animeExtras),
+                                AddonCatalog(type = "anime", id = "anilist:top-rated", name = "Top Rated Anime", extra = animeExtras),
                             ),
                             idPrefixes = listOf("ani_", "anilist:"),
                             logoUrl = "https://anilist.co/img/icons/icon.svg",

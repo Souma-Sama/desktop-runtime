@@ -353,6 +353,24 @@ object SearchRepository {
         )
     }
 
+    fun selectDiscoverSort(sort: String?) {
+        val current = _discoverUiState.value
+        if (current.selectedSort == sort) return
+
+        _discoverUiState.value = current.copy(
+            selectedSort = sort,
+            items = emptyList(),
+            isLoading = false,
+            nextSkip = null,
+            emptyStateReason = null,
+            errorMessage = null,
+        )
+        loadDiscoverFeed(
+            reset = true,
+            forceRefresh = false,
+        )
+    }
+
     fun loadMoreDiscover() {
         val current = _discoverUiState.value
         if (current.isLoading || current.nextSkip == null) return
@@ -412,6 +430,7 @@ object SearchRepository {
                 .filter { catalog -> catalog.supportsDiscover() }
                 .map { catalog ->
                     val genreExtra = catalog.genreExtra()
+                    val sortExtra = catalog.extra.firstOrNull { it.name.equals("sort", ignoreCase = true) }
                     DiscoverCatalogOption(
                         key = "${manifest.id}:${catalog.type}:${catalog.id}",
                         addonName = addon.displayTitle,
@@ -420,6 +439,7 @@ object SearchRepository {
                         catalogId = catalog.id,
                         catalogName = catalog.name,
                         genreOptions = genreExtra?.options.orEmpty(),
+                        sortOptions = sortExtra?.options.orEmpty(),
                         genreRequired = genreExtra?.isRequired == true,
                         supportsPagination = catalog.supportsPagination(),
                     )
@@ -540,13 +560,14 @@ object SearchRepository {
                     type = selectedCatalog.type,
                     catalogId = selectedCatalog.catalogId,
                     genre = current.selectedGenre,
+                    sort = current.selectedSort,
                     skip = requestedSkip.takeIf { it > 0 },
                     forceRefresh = forceRefresh,
                 ).withUnreleasedFilter()
             }.fold(
                 onSuccess = { page ->
                     val latest = _discoverUiState.value
-                    if (latest.selectedCatalogKey != selectedCatalog.key || latest.selectedGenre != current.selectedGenre) {
+                    if (latest.selectedCatalogKey != selectedCatalog.key || latest.selectedGenre != current.selectedGenre || latest.selectedSort != current.selectedSort) {
                         return@fold
                     }
                     val mergedItems = if (reset) {
