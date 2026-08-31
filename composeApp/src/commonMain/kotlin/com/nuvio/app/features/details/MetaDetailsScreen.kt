@@ -2149,14 +2149,14 @@ private fun metaSectionHasContent(
     comments: List<TraktCommentReview>,
     isCommentsLoading: Boolean,
     commentsError: String?,
-): Boolean =
-    when (key) {
+): Boolean {
+    val isAnilistItem = meta.id.startsWith("ani_") || meta.id.startsWith("anilist:")
+    return when (key) {
         MetaScreenSectionKey.ACTIONS -> true
         MetaScreenSectionKey.OVERVIEW -> true
         MetaScreenSectionKey.PRODUCTION -> hasProductionSection
         MetaScreenSectionKey.CAST -> meta.cast.isNotEmpty()
         MetaScreenSectionKey.COMMENTS -> {
-            val isAnilistItem = meta.id.startsWith("ani_") || meta.id.startsWith("anilist:")
             if (isAnilistItem) true
             else shouldShowComments && (isCommentsLoading || comments.isNotEmpty() || !commentsError.isNullOrBlank())
         }
@@ -2166,6 +2166,7 @@ private fun metaSectionHasContent(
         MetaScreenSectionKey.COLLECTION -> !hasEpisodes && hasCollectionSection
         MetaScreenSectionKey.MORE_LIKE_THIS -> if (isAnilistItem) false else (hasMoreLikeThisSection || meta.relations.isNotEmpty())
     }
+}
 
 @Composable
 @OptIn(ExperimentalSharedTransitionApi::class)
