@@ -147,103 +147,40 @@ private fun SegmentedTabsContainer(
     relatedCount: Int,
     modifier: Modifier = Modifier,
 ) {
-    Surface(
-        shape = RoundedCornerShape(24.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
-        border = androidx.compose.foundation.BorderStroke(
-            width = 1.dp,
-            color = MaterialTheme.colorScheme.outline.copy(alpha = 0.12f),
-        ),
-        modifier = modifier,
-    ) {
-        Row(
-            modifier = Modifier.padding(4.dp),
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            HubTabPill(
-                tab = AnilistHubTab.DISCUSSIONS,
-                isSelected = selectedTab == AnilistHubTab.DISCUSSIONS,
-                count = discussionCount,
-                onClick = { onTabSelected(AnilistHubTab.DISCUSSIONS) },
+    val tabs = remember(relatedCount) {
+        if (relatedCount > 0) {
+            listOf(
+                AnilistHubTab.DISCUSSIONS,
+                AnilistHubTab.REVIEWS,
+                AnilistHubTab.RECOMMENDATIONS,
+                AnilistHubTab.RELATED,
             )
-            HubTabPill(
-                tab = AnilistHubTab.REVIEWS,
-                isSelected = selectedTab == AnilistHubTab.REVIEWS,
-                count = reviewCount,
-                onClick = { onTabSelected(AnilistHubTab.REVIEWS) },
+        } else {
+            listOf(
+                AnilistHubTab.DISCUSSIONS,
+                AnilistHubTab.REVIEWS,
+                AnilistHubTab.RECOMMENDATIONS,
             )
-            HubTabPill(
-                tab = AnilistHubTab.RECOMMENDATIONS,
-                isSelected = selectedTab == AnilistHubTab.RECOMMENDATIONS,
-                count = recommendationCount,
-                onClick = { onTabSelected(AnilistHubTab.RECOMMENDATIONS) },
-            )
-            if (relatedCount > 0) {
-                HubTabPill(
-                    tab = AnilistHubTab.RELATED,
-                    isSelected = selectedTab == AnilistHubTab.RELATED,
-                    count = relatedCount,
-                    onClick = { onTabSelected(AnilistHubTab.RELATED) },
-                )
-            }
         }
     }
-}
 
-@Composable
-private fun WriteReviewActionButton(
-    userHasReview: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    OutlinedButton(
-        onClick = onClick,
-        shape = RoundedCornerShape(20.dp),
-        colors = ButtonDefaults.outlinedButtonColors(
-            containerColor = if (userHasReview) MaterialTheme.colorScheme.primary.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-            contentColor = MaterialTheme.colorScheme.primary,
-        ),
-        border = androidx.compose.foundation.BorderStroke(
-            width = 1.dp,
-            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.35f),
-        ),
-        modifier = modifier.wrapContentWidth(),
-    ) {
-        Icon(
-            imageVector = if (userHasReview) Icons.Default.Add else Icons.Outlined.RateReview,
-            contentDescription = null,
-            modifier = Modifier.size(16.dp),
-        )
-        Spacer(modifier = Modifier.width(6.dp))
-        Text(
-            text = if (userHasReview) "Edit Your Review" else "Write Review",
-            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-            maxLines = 1,
-        )
-    }
-}
+    com.nuvio.app.core.ui.FluidSlidingSegmentedBar(
+        items = tabs,
+        selectedItem = selectedTab,
+        onItemSelected = onTabSelected,
+        modifier = modifier,
+    ) { tab, isSelected ->
+        val count = when (tab) {
+            AnilistHubTab.DISCUSSIONS -> discussionCount
+            AnilistHubTab.REVIEWS -> reviewCount
+            AnilistHubTab.RECOMMENDATIONS -> recommendationCount
+            AnilistHubTab.RELATED -> relatedCount
+        }
 
-@Composable
-private fun HubTabPill(
-    tab: AnilistHubTab,
-    isSelected: Boolean,
-    count: Int,
-    onClick: () -> Unit,
-) {
-    val activeColor = MaterialTheme.colorScheme.primary
-    val containerColor = if (isSelected) activeColor else Color.Transparent
-    val contentColor = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+        val contentColor = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
 
-    Box(
-        modifier = Modifier
-            .clip(RoundedCornerShape(20.dp))
-            .background(containerColor)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 7.dp),
-        contentAlignment = Alignment.Center,
-    ) {
         Row(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
@@ -284,5 +221,38 @@ private fun HubTabPill(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun WriteReviewActionButton(
+    userHasReview: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    OutlinedButton(
+        onClick = onClick,
+        shape = RoundedCornerShape(20.dp),
+        colors = ButtonDefaults.outlinedButtonColors(
+            containerColor = if (userHasReview) MaterialTheme.colorScheme.primary.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+            contentColor = MaterialTheme.colorScheme.primary,
+        ),
+        border = androidx.compose.foundation.BorderStroke(
+            width = 1.dp,
+            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.35f),
+        ),
+        modifier = modifier.wrapContentWidth(),
+    ) {
+        Icon(
+            imageVector = if (userHasReview) Icons.Default.Add else Icons.Outlined.RateReview,
+            contentDescription = null,
+            modifier = Modifier.size(16.dp),
+        )
+        Spacer(modifier = Modifier.width(6.dp))
+        Text(
+            text = if (userHasReview) "Edit Your Review" else "Write Review",
+            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+            maxLines = 1,
+        )
     }
 }

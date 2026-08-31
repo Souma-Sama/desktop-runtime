@@ -99,25 +99,59 @@ fun DetailCastSection(
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             if (categories.isNotEmpty()) {
-                val chipRowState = rememberLazyListState()
-                LazyRow(
-                    state = chipRowState,
+                val scrollState = androidx.compose.foundation.rememberScrollState()
+                Box(
                     modifier = Modifier
                         .nuvioHorizontalScrollBleed(horizontalScrollPadding)
                         .fillMaxWidth()
-                        .nuvioDesktopDragScroll(chipRowState),
-                    contentPadding = PaddingValues(horizontal = horizontalScrollPadding),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        .androidx.compose.foundation.horizontalScroll(scrollState)
+                        .nuvioDesktopDragScroll(scrollState)
+                        .padding(horizontal = horizontalScrollPadding),
                 ) {
-                    items(
+                    com.nuvio.app.core.ui.FluidSlidingSegmentedBar(
                         items = categories,
-                        key = { it },
-                    ) { cat ->
-                        CastCategoryFilterChip(
-                            label = cat,
-                            isSelected = cat == selectedCategory,
-                            onClick = { selectedCategory = cat },
-                        )
+                        selectedItem = selectedCategory,
+                        onItemSelected = { selectedCategory = it },
+                    ) { cat, isSelected ->
+                        val count = remember(cast, cat) { cast.count { it.category == cat } }
+                        val contentColor = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+
+                        Row(
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        ) {
+                            Text(
+                                text = cat,
+                                style = MaterialTheme.typography.labelMedium.copy(
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                    fontSize = 13.sp,
+                                ),
+                                color = contentColor,
+                                maxLines = 1,
+                            )
+                            if (count > 0) {
+                                Box(
+                                    modifier = Modifier
+                                        .clip(CircleShape)
+                                        .background(
+                                            if (isSelected) MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.22f)
+                                            else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
+                                        )
+                                        .padding(horizontal = 6.dp, vertical = 1.dp),
+                                ) {
+                                    Text(
+                                        text = if (count > 999) "${count / 1000}k" else "$count",
+                                        style = MaterialTheme.typography.labelSmall.copy(
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.ExtraBold,
+                                        ),
+                                        color = contentColor,
+                                        maxLines = 1,
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -161,66 +195,6 @@ fun DetailCastSection(
                 }
             }
         }
-    }
-}
-
-@Composable
-private fun CastCategoryFilterChip(
-    label: String,
-    isSelected: Boolean,
-    onClick: () -> Unit,
-) {
-    val interactionSource = remember { MutableInteractionSource() }
-    val isPressed by interactionSource.collectIsPressedAsState()
-    val scale by animateFloatAsState(
-        targetValue = if (isPressed) 0.96f else 1f,
-        animationSpec = tween(durationMillis = 140),
-        label = "cast_filter_chip_scale",
-    )
-    val containerColor by animateColorAsState(
-        targetValue = if (isSelected) {
-            MaterialTheme.colorScheme.primary
-        } else {
-            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
-        },
-        animationSpec = tween(durationMillis = 180),
-        label = "cast_filter_chip_container",
-    )
-    val contentColor by animateColorAsState(
-        targetValue = if (isSelected) {
-            MaterialTheme.colorScheme.onPrimary
-        } else {
-            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f)
-        },
-        animationSpec = tween(durationMillis = 180),
-        label = "cast_filter_chip_content",
-    )
-
-    Box(
-        modifier = Modifier
-            .graphicsLayer {
-                scaleX = scale
-                scaleY = scale
-            }
-            .clip(RoundedCornerShape(8.dp))
-            .background(containerColor)
-            .clickable(
-                interactionSource = interactionSource,
-                indication = null,
-                onClick = onClick,
-            )
-            .padding(horizontal = 12.dp, vertical = 6.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelMedium.copy(
-                fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
-                fontSize = 12.sp,
-            ),
-            color = contentColor,
-            maxLines = 1,
-        )
     }
 }
 
