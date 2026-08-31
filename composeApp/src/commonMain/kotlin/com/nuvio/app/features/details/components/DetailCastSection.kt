@@ -6,17 +6,20 @@ import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.draw.clip
 import androidx.compose.material3.MaterialTheme
@@ -99,12 +102,12 @@ fun DetailCastSection(
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             if (categories.isNotEmpty()) {
-                val scrollState = androidx.compose.foundation.rememberScrollState()
+                val scrollState = rememberScrollState()
                 Box(
                     modifier = Modifier
                         .nuvioHorizontalScrollBleed(horizontalScrollPadding)
                         .fillMaxWidth()
-                        .androidx.compose.foundation.horizontalScroll(scrollState)
+                        .horizontalScroll(scrollState)
                         .nuvioDesktopDragScroll(scrollState)
                         .padding(horizontal = horizontalScrollPadding),
                 ) {
