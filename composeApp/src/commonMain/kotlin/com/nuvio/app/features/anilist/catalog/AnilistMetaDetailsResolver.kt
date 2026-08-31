@@ -268,24 +268,55 @@ object AnilistMetaDetailsResolver {
     suspend fun resolveMetaDetails(rawId: String): MetaDetails? = coroutineScope {
         val anilistId = AnilistTrackerCoordinator.extractAnilistId(rawId) ?: return@coroutineScope null
         val token = AnilistAuthRepository.token.value
+        val cached = AnilistApi.getCachedMedia(anilistId)
+
+        // If we already have cached media (from home/catalog/search/anichart), construct baseMeta instantly!
+        if (cached != null) {
+            val cachedArm = armMappingCache[anilistId]
+            val isSpecial = isSpecialAnime(cached)
+            val targetSeason = when {
+                cachedArm?.season == 0 -> 0
+                isSpecial -> 0
+                else -> cachedArm?.season ?: 1
+            }
+            val effectiveImdbId = cachedArm?.imdbId ?: MetaHubArtwork.getImdbId(rawId)
+            val backdrop = if (!effectiveImdbId.isNullOrBlank()) {
+                "https://images.metahub.space/background/medium/$effectiveImdbId/img"
+            } else cached.bannerImage
+
+            val logo = if (!isSpecial && targetSeason != 0 && !effectiveImdbId.isNullOrBlank()) {
+                "https://images.metahub.space/logo/medium/$effectiveImdbId/img"
+            } else null
+
+            AnimeStreamIdManager.registerOptions(
+                anilistId = anilistId,
+                imdbId = effectiveImdbId,
+                kitsuId = cachedArm?.kitsuId,
+                tmdbId = cachedArm?.tmdbId,
+                season = targetSeason,
+            )
+
+            return@coroutineScope buildBaseMetaFromAnilistMedia(
+                media = cached,
+                backdrop = backdrop,
+                logo = logo,
+                season = targetSeason,
+                imdbId = effectiveImdbId,
+            )
+        }
 
         val mediaDeferred = async {
-            val cached = AnilistApi.getCachedMedia(anilistId)
-            if (cached != null && cached.isFullDetails) {
-                cached
-            } else {
-                runCatching {
-                    withTimeoutOrNull(2500L) {
-                        AnilistApi.fetchMediaById(anilistId, token = token)
-                    }
-                }.getOrNull() ?: cached
-            }
+            runCatching {
+                withTimeoutOrNull(2000L) {
+                    AnilistApi.fetchMediaById(anilistId, token = token)
+                }
+            }.getOrNull() ?: cached
         }
 
         val armDeferred = async {
             val cachedArm = armMappingCache[anilistId]
             cachedArm ?: runCatching {
-                withTimeoutOrNull(2000L) { resolveArmMapping(anilistId) }
+                withTimeoutOrNull(1500L) { resolveArmMapping(anilistId) }
             }.getOrNull() ?: ArmMapping(null, null, null, null, null, 1)
         }
 
@@ -301,13 +332,13 @@ object AnilistMetaDetailsResolver {
 
         val backdrop = if (!effectiveImdbId.isNullOrBlank()) {
             "https://images.metahub.space/background/medium/$effectiveImdbId/img"
-        } else null
+        } else media.bannerImage
 
         val logo = if (!isSpecial && targetSeason != 0 && !effectiveImdbId.isNullOrBlank()) {
             "https://images.metahub.space/logo/medium/$effectiveImdbId/img"
         } else null
 
-        com.nuvio.app.features.anilist.streams.AnimeStreamIdManager.registerOptions(
+        AnimeStreamIdManager.registerOptions(
             anilistId = anilistId,
             imdbId = effectiveImdbId,
             kitsuId = arm.kitsuId,
@@ -1447,7 +1478,7 @@ object AnilistMetaDetailsResolver {
         return specials.firstOrNull()
     }
 
-    private fun isSpecialAnime(media: AnilistMedia?): Boolean {
+    fun isSpecialAnime(media: AnilistMedia?): Boolean {
         if (media == null) return false
         val format = media.format?.uppercase()
         if (format == "TV" || format == "TV_SHORT" || format == "MOVIE") return false
@@ -1457,6 +1488,7 @@ object AnilistMetaDetailsResolver {
             media.title?.romaji.orEmpty() + " " +
             media.title?.english.orEmpty()
         ).lowercase()
+        val descText = media.description.orEmpty().lowercase()
 
         return titleText.contains("special") ||
             titleText.contains("mini anime") ||
@@ -1465,7 +1497,15 @@ object AnilistMetaDetailsResolver {
             titleText.contains("picture drama") ||
             titleText.contains("omake") ||
             titleText.contains("bonus") ||
-            (format == "ONA" && (titleText.contains("short") || titleText.contains("sp") || (media.episodes != null && media.episodes <= 13 && media.duration != null && media.duration <= 10)))
+            titleText.contains("short") ||
+            titleText.contains("sp") ||
+            descText.contains("chibi short") ||
+            descText.contains("mini anime") ||
+            descText.contains("batch of the") ||
+            (format == "ONA" && (
+                (media.duration != null && media.duration <= 10) ||
+                (media.episodes != null && media.episodes <= 13 && (media.duration == null || media.duration <= 15))
+            ))
     }
 
     private fun resolveEpisodeVideoId(

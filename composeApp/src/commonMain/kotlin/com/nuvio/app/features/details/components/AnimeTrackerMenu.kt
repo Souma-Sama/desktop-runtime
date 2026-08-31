@@ -939,7 +939,136 @@ fun AnimeTrackerSheetContent(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // --- 9. ADVANCED DETAILS (Dates, Repeat, Privacy, Notes) ---
+        // --- 9. TRACKING DATES (Start Date & Finish Date) ---
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(16.dp),
+            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.1f)),
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(14.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp),
+            ) {
+                // Start Date
+                val startedAt = entry?.startedAt
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.CalendarMonth,
+                            contentDescription = null,
+                            modifier = Modifier.size(17.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Column {
+                            Text(
+                                text = "Start Date",
+                                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                            )
+                            Text(
+                                text = startedAt?.formatted() ?: "Not set",
+                                style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
+                                color = if (startedAt?.isSet == true) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+
+                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        TextButton(
+                            onClick = {
+                                val now = io.ktor.util.date.GMTDate()
+                                val today = AnilistFuzzyDate(
+                                    year = now.year,
+                                    month = now.month.ordinal + 1,
+                                    day = now.dayOfMonth,
+                                )
+                                AnilistTrackerCoordinator.updateStartedAt(today)
+                            },
+                        ) {
+                            Text("Set Today", fontSize = 12.sp)
+                        }
+                        if (startedAt?.isSet == true) {
+                            IconButton(
+                                onClick = { AnilistTrackerCoordinator.updateStartedAt(null) },
+                                modifier = Modifier.size(30.dp),
+                            ) {
+                                Icon(imageVector = Icons.Default.Close, contentDescription = "Clear", modifier = Modifier.size(15.dp))
+                            }
+                        }
+                    }
+                }
+
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+
+                // Finish / End Date
+                val completedAt = entry?.completedAt
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.CalendarToday,
+                            contentDescription = null,
+                            modifier = Modifier.size(17.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Column {
+                            Text(
+                                text = "Finish Date",
+                                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                            )
+                            Text(
+                                text = completedAt?.formatted() ?: "Not set",
+                                style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
+                                color = if (completedAt?.isSet == true) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+
+                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        TextButton(
+                            onClick = {
+                                val now = io.ktor.util.date.GMTDate()
+                                val today = AnilistFuzzyDate(
+                                    year = now.year,
+                                    month = now.month.ordinal + 1,
+                                    day = now.dayOfMonth,
+                                )
+                                AnilistTrackerCoordinator.updateCompletedAt(today)
+                            },
+                        ) {
+                            Text("Set Today", fontSize = 12.sp)
+                        }
+                        if (completedAt?.isSet == true) {
+                            IconButton(
+                                onClick = { AnilistTrackerCoordinator.updateCompletedAt(null) },
+                                modifier = Modifier.size(30.dp),
+                            ) {
+                                Icon(imageVector = Icons.Default.Close, contentDescription = "Clear", modifier = Modifier.size(15.dp))
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // --- 10. ADVANCED DETAILS (Repeat, Privacy, Notes) ---
         var showAdvancedOptions by remember { mutableStateOf(false) }
 
         Surface(
@@ -999,119 +1128,6 @@ fun AnimeTrackerSheetContent(
                             .padding(top = 14.dp),
                         verticalArrangement = Arrangement.spacedBy(14.dp),
                     ) {
-                        // Start Date
-                        val startedAt = entry?.startedAt
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.CalendarMonth,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(17.dp),
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                                Column {
-                                    Text(
-                                        text = "Start Date",
-                                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
-                                    )
-                                    Text(
-                                        text = startedAt?.formatted() ?: "Not set",
-                                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
-                                        color = if (startedAt?.isSet == true) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
-                                }
-                            }
-
-                            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                                TextButton(
-                                    onClick = {
-                                        val now = io.ktor.util.date.GMTDate()
-                                        val today = AnilistFuzzyDate(
-                                            year = now.year,
-                                            month = now.month.ordinal + 1,
-                                            day = now.dayOfMonth,
-                                        )
-                                        AnilistTrackerCoordinator.updateStartedAt(today)
-                                    },
-                                ) {
-                                    Text("Set Today", fontSize = 12.sp)
-                                }
-                                if (startedAt?.isSet == true) {
-                                    IconButton(
-                                        onClick = { AnilistTrackerCoordinator.updateStartedAt(null) },
-                                        modifier = Modifier.size(30.dp),
-                                    ) {
-                                        Icon(imageVector = Icons.Default.Close, contentDescription = "Clear", modifier = Modifier.size(15.dp))
-                                    }
-                                }
-                            }
-                        }
-
-                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
-
-                        // Finish / End Date
-                        val completedAt = entry?.completedAt
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.CalendarToday,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(17.dp),
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                                Column {
-                                    Text(
-                                        text = "Finish Date",
-                                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
-                                    )
-                                    Text(
-                                        text = completedAt?.formatted() ?: "Not set",
-                                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
-                                        color = if (completedAt?.isSet == true) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
-                                }
-                            }
-
-                            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                                TextButton(
-                                    onClick = {
-                                        val now = io.ktor.util.date.GMTDate()
-                                        val today = AnilistFuzzyDate(
-                                            year = now.year,
-                                            month = now.month.ordinal + 1,
-                                            day = now.dayOfMonth,
-                                        )
-                                        AnilistTrackerCoordinator.updateCompletedAt(today)
-                                    },
-                                ) {
-                                    Text("Set Today", fontSize = 12.sp)
-                                }
-                                if (completedAt?.isSet == true) {
-                                    IconButton(
-                                        onClick = { AnilistTrackerCoordinator.updateCompletedAt(null) },
-                                        modifier = Modifier.size(30.dp),
-                                    ) {
-                                        Icon(imageVector = Icons.Default.Close, contentDescription = "Clear", modifier = Modifier.size(15.dp))
-                                    }
-                                }
-                            }
-                        }
-
-                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
 
                         // Repeat Count Stepper
                         val currentRepeat = entry?.repeat ?: 0

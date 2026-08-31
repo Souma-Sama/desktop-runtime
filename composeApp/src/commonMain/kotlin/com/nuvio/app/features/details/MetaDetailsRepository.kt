@@ -198,10 +198,28 @@ object MetaDetailsRepository {
         if (currentMeta != null) return currentMeta
 
         val metaScreenSettingsFingerprint = buildMetaScreenSettingsFingerprint(MdbListSettingsRepository.snapshot())
-        val cachedEntry = cachedMetaByRequestKey[requestKey] ?: return null
-        return cachedEntry.metaScreenMeta
-            ?.takeIf { cachedEntry.metaScreenSettingsFingerprint == metaScreenSettingsFingerprint }
-            ?: cachedEntry.baseMeta
+        val cachedEntry = cachedMetaByRequestKey[requestKey]
+        if (cachedEntry != null) {
+            return cachedEntry.metaScreenMeta
+                ?.takeIf { cachedEntry.metaScreenSettingsFingerprint == metaScreenSettingsFingerprint }
+                ?: cachedEntry.baseMeta
+        }
+
+        if (id.startsWith("ani_", ignoreCase = true) || id.startsWith("anilist:", ignoreCase = true)) {
+            val anilistId = com.nuvio.app.features.anilist.AnilistTrackerCoordinator.extractAnilistId(id)
+            if (anilistId != null) {
+                val cachedMedia = com.nuvio.app.features.anilist.AnilistApi.getCachedMedia(anilistId)
+                if (cachedMedia != null) {
+                    val isSpecial = com.nuvio.app.features.anilist.catalog.AnilistMetaDetailsResolver.isSpecialAnime(cachedMedia)
+                    return com.nuvio.app.features.anilist.catalog.AnilistMetaDetailsResolver.buildBaseMetaFromAnilistMedia(
+                        media = cachedMedia,
+                        season = if (isSpecial) 0 else 1,
+                    )
+                }
+            }
+        }
+
+        return null
     }
 
     fun clear() {
