@@ -86,6 +86,8 @@ fun DetailAnilistReviewsSection(
     var selectedReview by remember { mutableStateOf<AnilistReview?>(null) }
     var showWriteDialog by remember { mutableStateOf(false) }
     var reviewToEdit by remember { mutableStateOf<AnilistReview?>(null) }
+    var profileToViewId by remember { mutableStateOf<Int?>(null) }
+    var profileToViewName by remember { mutableStateOf<String?>(null) }
 
     val scope = rememberCoroutineScope()
     val isLoggedIn = AnilistAuthRepository.isAuthenticated.value
@@ -275,6 +277,10 @@ fun DetailAnilistReviewsSection(
                         ReviewCard(
                             review = review,
                             onClick = { selectedReview = review },
+                            onAuthorClick = {
+                                profileToViewId = review.user?.id
+                                profileToViewName = review.user?.name
+                            },
                         )
                     }
 
@@ -297,6 +303,13 @@ fun DetailAnilistReviewsSection(
                 }
             }
         }
+
+        // Community Discussions Carousel
+        com.nuvio.app.features.anilist.threads.DetailAnilistThreadsSection(
+            mediaId = mediaId,
+            showHeader = true,
+            horizontalScrollPadding = PaddingValues(horizontal = horizontalScrollPadding),
+        )
     }
 
     // Detail Sheet Modal
@@ -354,12 +367,25 @@ fun DetailAnilistReviewsSection(
             },
         )
     }
+
+    // User Profile Modal
+    if (profileToViewId != null || profileToViewName != null) {
+        com.nuvio.app.features.anilist.profile.AnilistUserProfileSheet(
+            userId = profileToViewId,
+            username = profileToViewName,
+            onDismiss = {
+                profileToViewId = null
+                profileToViewName = null
+            },
+        )
+    }
 }
 
 @Composable
 private fun ReviewCard(
     review: AnilistReview,
     onClick: () -> Unit,
+    onAuthorClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val cardShape = RoundedCornerShape(16.dp)
@@ -391,6 +417,10 @@ private fun ReviewCard(
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable(onClick = onAuthorClick)
+                        .padding(2.dp),
                 ) {
                     val avatarUrl = review.user?.avatarMedium ?: review.user?.avatarLarge
                     if (avatarUrl != null) {

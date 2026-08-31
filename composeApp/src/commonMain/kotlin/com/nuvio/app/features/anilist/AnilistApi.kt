@@ -19,6 +19,7 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.longOrNull
 import kotlinx.serialization.json.put
+import kotlin.math.roundToInt
 
 object AnilistApi {
     private val log = Logger.withTag("AnilistApi")
@@ -2158,4 +2159,446 @@ object AnilistApi {
             user = user,
         )
     }
+
+    suspend fun getUserProfile(
+        userId: Int? = null,
+        username: String? = null,
+        token: String? = null,
+    ): com.nuvio.app.features.anilist.profile.AnilistFullUserProfile? {
+        val query = """
+            query (${'$'}id: Int, ${'$'}name: String) {
+              User(id: ${'$'}id, name: ${'$'}name) {
+                id
+                name
+                about
+                avatar {
+                  large
+                  medium
+                }
+                bannerImage
+                donatorTier
+                donatorBadge
+                isFollowing
+                isFollower
+                statistics {
+                  anime {
+                    count
+                    episodesWatched
+                    minutesWatched
+                    meanScore
+                  }
+                }
+                favourites {
+                  anime {
+                    nodes {
+                      id
+                      title {
+                        userPreferred
+                        romaji
+                        english
+                      }
+                      coverImage {
+                        large
+                        medium
+                      }
+                      format
+                      averageScore
+                    }
+                  }
+                  characters {
+                    nodes {
+                      id
+                      name {
+                        userPreferred
+                        full
+                      }
+                      image {
+                        large
+                        medium
+                      }
+                    }
+                  }
+                }
+              }
+            }
+        """.trimIndent()
+
+        val variables = buildJsonObject {
+            if (userId != null && userId > 0) put("id", userId)
+            if (!username.isNullOrBlank()) put("name", username)
+        }
+
+        val root = executeGraphQL(query = query, variables = variables, token = token)
+        val userObj = root?.get("data").asJsonObjectOrNull()?.get("User").asJsonObjectOrNull() ?: return null
+
+        val id = userObj["id"].asIntOrNull() ?: return null
+        val name = userObj["name"].asStringOrNull().orEmpty()
+        val about = userObj["about"].asStringOrNull()
+        val avObj = userObj["avatar"].asJsonObjectOrNull()
+        val avLarge = avObj?.get("large").asStringOrNull()
+        val avMedium = avObj?.get("medium").asStringOrNull()
+        val banner = userObj["bannerImage"].asStringOrNull()
+        val donatorTier = userObj["donatorTier"].asIntOrNull() ?: 0
+        val donatorBadge = userObj["donatorBadge"].asStringOrNull()
+        val isFollowing = userObj["isFollowing"]?.jsonPrimitive?.contentOrNull?.toBoolean() ?: false
+        val isFollower = userObj["isFollower"]?.jsonPrimitive?.contentOrNull?.toBoolean() ?: false
+
+        val statsObj = userObj["statistics"].asJsonObjectOrNull()?.get("anime").asJsonObjectOrNull()
+        val animeCount = statsObj?.get("count").asIntOrNull() ?: 0
+        val episodesWatched = statsObj?.get("episodesWatched").asIntOrNull() ?: 0
+        val minutesWatched = statsObj?.get("minutesWatched").asLongOrNull() ?: 0L
+        val daysWatched = (minutesWatched / 1440.0 * 10).roundToInt() / 10.0
+        val meanScore = statsObj?.get("meanScore")?.jsonPrimitive?.contentOrNull?.toDoubleOrNull() ?: 0.0
+
+        val favsObj = userObj["favourites"].asJsonObjectOrNull()
+        val favoriteAnime = favsObj?.get("anime").asJsonObjectOrNull()?.get("nodes").asJsonArrayOrNull()?.mapNotNull { item ->
+            val a = item.asJsonObjectOrNull() ?: return@mapNotNull null
+            val aId = a["id"].asIntOrNull() ?: return@mapNotNull null
+            val titleObj = a["title"].asJsonObjectOrNull()
+            val aTitle = titleObj?.get("userPreferred").asStringOrNull()
+                ?: titleObj?.get("romaji").asStringOrNull()
+                ?: titleObj?.get("english").asStringOrNull()
+                ?: "Anime"
+            val covObj = a["coverImage"].asJsonObjectOrNull()
+            val aCover = covObj?.get("large").asStringOrNull() ?: covObj?.get("medium").asStringOrNull()
+            val aFormat = a["format"].asStringOrNull()
+            val aScore = a["averageScore"].asIntOrNull()
+            com.nuvio.app.features.anilist.profile.AnilistProfileFavoriteAnime(
+                id = aId,
+                title = aTitle,
+                coverImage = aCover,
+                format = aFormat,
+                averageScore = aScore,
+            )
+        } ?: emptyList()
+
+        val favoriteCharacters = favsObj?.get("characters").asJsonObjectOrNull()?.get("nodes").asJsonArrayOrNull()?.mapNotNull { item ->
+            val c = item.asJsonObjectOrNull() ?: return@mapNotNull null
+            val cId = c["id"].asIntOrNull() ?: return@mapNotNull null
+            val nameObj = c["name"].asJsonObjectOrNull()
+            val cName = nameObj?.get("userPreferred").asStringOrNull()
+                ?: nameObj?.get("full").asStringOrNull()
+                ?: "Character"
+            val imgObj = c["image"].asJsonObjectOrNull()
+            val cImage = imgObj?.get("large").asStringOrNull() ?: imgObj?.get("medium").asStringOrNull()
+            com.nuvio.app.features.anilist.profile.AnilistProfileFavoriteCharacter(
+                id = cId,
+                name = cName,
+                image = cImage,
+            )
+        } ?: emptyList()
+
+        return com.nuvio.app.features.anilist.profile.AnilistFullUserProfile(
+            id = id,
+            name = name,
+            about = about,
+            avatarLarge = avLarge,
+            avatarMedium = avMedium,
+            bannerImage = banner,
+            donatorTier = donatorTier,
+            donatorBadge = donatorBadge,
+            isFollowing = isFollowing,
+            isFollower = isFollower,
+            animeCount = animeCount,
+            episodesWatched = episodesWatched,
+            minutesWatched = minutesWatched,
+            daysWatched = daysWatched,
+            meanScore = meanScore,
+            favoriteAnime = favoriteAnime,
+            favoriteCharacters = favoriteCharacters,
+        )
+    }
+
+    suspend fun toggleFollowUser(userId: Int, token: String): Boolean {
+        val mutation = """
+            mutation (${'$'}userId: Int) {
+              ToggleFollow(userId: ${'$'}userId) {
+                isFollowing
+              }
+            }
+        """.trimIndent()
+
+        val variables = buildJsonObject {
+            put("userId", userId)
+        }
+
+        val root = executeGraphQL(query = mutation, variables = variables, token = token)
+        return root?.get("data").asJsonObjectOrNull()?.get("ToggleFollow").asJsonObjectOrNull()
+            ?.get("isFollowing")?.jsonPrimitive?.contentOrNull?.toBoolean() ?: false
+    }
+
+    suspend fun getMediaThreads(
+        mediaId: Int,
+        page: Int = 1,
+        token: String? = null,
+    ): com.nuvio.app.features.anilist.threads.AnilistThreadPage {
+        val query = """
+            query (${'$'}mediaId: Int, ${'$'}page: Int) {
+              Page(page: ${'$'}page, perPage: 20) {
+                pageInfo {
+                  hasNextPage
+                  currentPage
+                }
+                threads(mediaCategoryId: ${'$'}mediaId, sort: [IS_STICKY_DESC, REPLIED_AT_DESC]) {
+                  id
+                  title
+                  body
+                  replyCount
+                  viewCount
+                  isSticky
+                  isLocked
+                  isLiked
+                  likeCount
+                  createdAt
+                  user {
+                    id
+                    name
+                    avatar {
+                      medium
+                      large
+                    }
+                    bannerImage
+                    donatorBadge
+                  }
+                }
+              }
+            }
+        """.trimIndent()
+
+        val variables = buildJsonObject {
+            put("mediaId", mediaId)
+            put("page", page)
+        }
+
+        val root = executeGraphQL(query = query, variables = variables, token = token)
+        val pageObj = root?.get("data").asJsonObjectOrNull()?.get("Page").asJsonObjectOrNull()
+        val hasNextPage = pageObj?.get("pageInfo").asJsonObjectOrNull()?.get("hasNextPage")?.jsonPrimitive?.contentOrNull?.toBoolean() ?: false
+        val threadsArray = pageObj?.get("threads").asJsonArrayOrNull() ?: return com.nuvio.app.features.anilist.threads.AnilistThreadPage()
+
+        val threads = threadsArray.mapNotNull { item ->
+            val t = item.asJsonObjectOrNull() ?: return@mapNotNull null
+            val id = t["id"].asIntOrNull() ?: return@mapNotNull null
+            val title = t["title"].asStringOrNull().orEmpty()
+            val body = t["body"].asStringOrNull().orEmpty()
+            val replyCount = t["replyCount"].asIntOrNull() ?: 0
+            val viewCount = t["viewCount"].asIntOrNull() ?: 0
+            val isSticky = t["isSticky"]?.jsonPrimitive?.contentOrNull?.toBoolean() ?: false
+            val isLocked = t["isLocked"]?.jsonPrimitive?.contentOrNull?.toBoolean() ?: false
+            val isLiked = t["isLiked"]?.jsonPrimitive?.contentOrNull?.toBoolean() ?: false
+            val likeCount = t["likeCount"].asIntOrNull() ?: 0
+            val createdAt = t["createdAt"].asLongOrNull() ?: 0L
+
+            val uObj = t["user"].asJsonObjectOrNull()
+            val user = uObj?.let { u ->
+                val uId = u["id"].asIntOrNull() ?: 0
+                val uName = u["name"].asStringOrNull().orEmpty()
+                val av = u["avatar"].asJsonObjectOrNull()
+                val avMed = av?.get("medium").asStringOrNull()
+                val avLg = av?.get("large").asStringOrNull()
+                val banner = u["bannerImage"].asStringOrNull()
+                val badge = u["donatorBadge"].asStringOrNull()
+                com.nuvio.app.features.anilist.community.AnilistUserSummary(
+                    id = uId,
+                    name = uName,
+                    avatarMedium = avMed,
+                    avatarLarge = avLg,
+                    bannerImage = banner,
+                    donatorBadge = badge,
+                )
+            }
+
+            com.nuvio.app.features.anilist.threads.AnilistThread(
+                id = id,
+                title = title,
+                body = body,
+                replyCount = replyCount,
+                viewCount = viewCount,
+                isSticky = isSticky,
+                isLocked = isLocked,
+                isLiked = isLiked,
+                likeCount = likeCount,
+                createdAt = createdAt,
+                user = user,
+            )
+        }
+
+        return com.nuvio.app.features.anilist.threads.AnilistThreadPage(
+            threads = threads,
+            page = page,
+            hasNextPage = hasNextPage,
+        )
+    }
+
+    suspend fun getThreadComments(
+        threadId: Int,
+        page: Int = 1,
+        token: String? = null,
+    ): List<com.nuvio.app.features.anilist.threads.AnilistThreadComment> {
+        val query = """
+            query (${'$'}threadId: Int, ${'$'}page: Int) {
+              Page(page: ${'$'}page, perPage: 30) {
+                threadComments(threadId: ${'$'}threadId) {
+                  id
+                  threadId
+                  comment
+                  isLiked
+                  likeCount
+                  createdAt
+                  user {
+                    id
+                    name
+                    avatar {
+                      medium
+                      large
+                    }
+                    donatorBadge
+                  }
+                }
+              }
+            }
+        """.trimIndent()
+
+        val variables = buildJsonObject {
+            put("threadId", threadId)
+            put("page", page)
+        }
+
+        val root = executeGraphQL(query = query, variables = variables, token = token)
+        val commentsArray = root?.get("data").asJsonObjectOrNull()
+            ?.get("Page").asJsonObjectOrNull()
+            ?.get("threadComments").asJsonArrayOrNull() ?: return emptyList()
+
+        return commentsArray.mapNotNull { item ->
+            val c = item.asJsonObjectOrNull() ?: return@mapNotNull null
+            val id = c["id"].asIntOrNull() ?: return@mapNotNull null
+            val tId = c["threadId"].asIntOrNull() ?: threadId
+            val comment = c["comment"].asStringOrNull().orEmpty()
+            val isLiked = c["isLiked"]?.jsonPrimitive?.contentOrNull?.toBoolean() ?: false
+            val likeCount = c["likeCount"].asIntOrNull() ?: 0
+            val createdAt = c["createdAt"].asLongOrNull() ?: 0L
+
+            val uObj = c["user"].asJsonObjectOrNull()
+            val user = uObj?.let { u ->
+                val uId = u["id"].asIntOrNull() ?: 0
+                val uName = u["name"].asStringOrNull().orEmpty()
+                val av = u["avatar"].asJsonObjectOrNull()
+                val avMed = av?.get("medium").asStringOrNull()
+                val avLg = av?.get("large").asStringOrNull()
+                val badge = u["donatorBadge"].asStringOrNull()
+                com.nuvio.app.features.anilist.community.AnilistUserSummary(
+                    id = uId,
+                    name = uName,
+                    avatarMedium = avMed,
+                    avatarLarge = avLg,
+                    donatorBadge = badge,
+                )
+            }
+
+            com.nuvio.app.features.anilist.threads.AnilistThreadComment(
+                id = id,
+                threadId = tId,
+                comment = comment,
+                isLiked = isLiked,
+                likeCount = likeCount,
+                createdAt = createdAt,
+                user = user,
+            )
+        }
+    }
+
+    suspend fun saveThreadComment(
+        threadId: Int,
+        comment: String,
+        token: String,
+    ): com.nuvio.app.features.anilist.threads.AnilistThreadComment? {
+        val mutation = """
+            mutation (${'$'}threadId: Int, ${'$'}comment: String) {
+              SaveThreadComment(threadId: ${'$'}threadId, comment: ${'$'}comment) {
+                id
+                threadId
+                comment
+                likeCount
+                createdAt
+                user {
+                  id
+                  name
+                  avatar {
+                    medium
+                  }
+                  donatorBadge
+                }
+              }
+            }
+        """.trimIndent()
+
+        val variables = buildJsonObject {
+            put("threadId", threadId)
+            put("comment", comment)
+        }
+
+        val root = executeGraphQL(query = mutation, variables = variables, token = token)
+        val c = root?.get("data").asJsonObjectOrNull()?.get("SaveThreadComment").asJsonObjectOrNull() ?: return null
+        val id = c["id"].asIntOrNull() ?: return null
+        val tId = c["threadId"].asIntOrNull() ?: threadId
+        val commentText = c["comment"].asStringOrNull().orEmpty()
+        val likeCount = c["likeCount"].asIntOrNull() ?: 0
+        val createdAt = c["createdAt"].asLongOrNull() ?: (kotlinx.datetime.Clock.System.now().toEpochMilliseconds() / 1000)
+
+        val uObj = c["user"].asJsonObjectOrNull()
+        val user = uObj?.let { u ->
+            val uId = u["id"].asIntOrNull() ?: 0
+            val uName = u["name"].asStringOrNull().orEmpty()
+            val av = u["avatar"].asJsonObjectOrNull()
+            val avMed = av?.get("medium").asStringOrNull()
+            val badge = u["donatorBadge"].asStringOrNull()
+            com.nuvio.app.features.anilist.community.AnilistUserSummary(
+                id = uId,
+                name = uName,
+                avatarMedium = avMed,
+                donatorBadge = badge,
+            )
+        }
+
+        return com.nuvio.app.features.anilist.threads.AnilistThreadComment(
+            id = id,
+            threadId = tId,
+            comment = commentText,
+            isLiked = false,
+            likeCount = likeCount,
+            createdAt = createdAt,
+            user = user,
+        )
+    }
+
+    suspend fun toggleLikeV2(
+        id: Int,
+        type: String, // "THREAD", "THREAD_COMMENT"
+        token: String,
+    ): Boolean {
+        val mutation = """
+            mutation (${'$'}id: Int, ${'$'}type: LikeableType) {
+              ToggleLikeV2(id: ${'$'}id, type: ${'$'}type) {
+                ... on Thread {
+                  id
+                  isLiked
+                  likeCount
+                }
+                ... on ThreadComment {
+                  id
+                  isLiked
+                  likeCount
+                }
+              }
+            }
+        """.trimIndent()
+
+        val variables = buildJsonObject {
+            put("id", id)
+            put("type", type)
+        }
+
+        val root = executeGraphQL(query = mutation, variables = variables, token = token)
+        return root?.get("data") != null
+    }
 }
+

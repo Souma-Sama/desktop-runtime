@@ -78,6 +78,8 @@ fun ReviewDetailSheet(
         mutableStateOf(review.rating)
     }
 
+    var showUserProfile by remember { mutableStateOf(false) }
+
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
@@ -89,8 +91,8 @@ fun ReviewDetailSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .fillMaxHeight(0.88f)
-                .padding(horizontal = 24.dp, vertical = 20.dp),
+                .height(680.dp)
+                .padding(horizontal = 20.dp, vertical = 16.dp),
         ) {
             // Header: User Profile & Close Button
             Row(
@@ -101,6 +103,10 @@ fun ReviewDetailSheet(
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(12.dp))
+                        .clickable { showUserProfile = true }
+                        .padding(4.dp),
                 ) {
                     val avatarUrl = review.user?.avatarLarge ?: review.user?.avatarMedium
                     if (avatarUrl != null) {
@@ -290,9 +296,15 @@ fun ReviewDetailSheet(
                             Text("AniList", fontSize = 12.sp)
                         }
                     }
-                }
-            }
         }
+    }
+
+    if (showUserProfile) {
+        com.nuvio.app.features.anilist.profile.AnilistUserProfileSheet(
+            userId = review.user?.id,
+            username = review.user?.name,
+            onDismiss = { showUserProfile = false },
+        )
     }
 }
 
