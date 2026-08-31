@@ -609,7 +609,7 @@ object AnilistMetaDetailsResolver {
     suspend fun resolveArmMapping(anilistId: Int): ArmMapping {
         armMappingCache[anilistId]?.let { return it }
 
-        return withTimeoutOrNull(1500L) {
+        return withTimeoutOrNull(2500L) {
             runCatching {
                 val url = "https://arm.haglund.dev/api/v2/ids?source=anilist&id=$anilistId"
                 val text = httpGetText(url) ?: return@runCatching ArmMapping(null, null, null, null, null, 1)
@@ -641,21 +641,15 @@ object AnilistMetaDetailsResolver {
         if (!directImdbId.isNullOrBlank()) return directImdbId
         if (media == null) return null
 
-        val priorityTypes = listOf("PARENT", "MAIN", "SOURCE", "PREQUEL", "ALTERNATIVE", "SIDE_STORY", "SPIN_OFF", "OTHER")
-        val sortedRelations = media.relations.sortedBy { rel ->
-            val idx = priorityTypes.indexOf(rel.relationType?.uppercase())
-            if (idx >= 0) idx else 99
+        // Only look at PARENT or PREQUEL relations (e.g. for Season 2 / cour 2 referencing Season 1)
+        // NEVER look at SPIN_OFF, SIDE_STORY, ALTERNATIVE, or OTHER which can cross-contaminate unrelated spin-offs!
+        val priorityTypes = listOf("PARENT", "PREQUEL")
+        val candidateRelations = media.relations.filter { rel ->
+            rel.relationType?.uppercase() in priorityTypes
         }
-        for (rel in sortedRelations) {
+        for (rel in candidateRelations) {
             val mapped = resolveArmMapping(rel.id).imdbId
             if (!mapped.isNullOrBlank()) return mapped
-        }
-
-        for (rel in sortedRelations) {
-            for (nested in rel.relations) {
-                val mapped = resolveArmMapping(nested.id).imdbId
-                if (!mapped.isNullOrBlank()) return mapped
-            }
         }
 
         return null
@@ -1366,23 +1360,21 @@ object AnilistMetaDetailsResolver {
     private fun isSpecialAnime(media: AnilistMedia?): Boolean {
         if (media == null) return false
         val format = media.format?.uppercase()
+        if (format == "TV" || format == "TV_SHORT" || format == "MOVIE") return false
         if (format == "SPECIAL" || format == "OVA") return true
-        val fullText = (
+        val titleText = (
             media.title?.displayTitle.orEmpty() + " " +
             media.title?.romaji.orEmpty() + " " +
-            media.title?.english.orEmpty() + " " +
-            media.description.orEmpty()
+            media.title?.english.orEmpty()
         ).lowercase()
 
-        return fullText.contains("mahou") ||
-            fullText.contains("special") ||
-            fullText.contains("mini anime") ||
-            fullText.contains("chibi") ||
-            fullText.contains("parody") ||
-            fullText.contains("picture drama") ||
-            fullText.contains("omake") ||
-            fullText.contains("bonus") ||
-            fullText.contains("includes episode 0") ||
-            (format == "ONA" && (fullText.contains("short") || fullText.contains("sp") || (media.episodes != null && media.episodes <= 13 && media.duration != null && media.duration <= 10)))
+        return titleText.contains("special") ||
+            titleText.contains("mini anime") ||
+            titleText.contains("chibi") ||
+            titleText.contains("parody") ||
+            titleText.contains("picture drama") ||
+            titleText.contains("omake") ||
+            titleText.contains("bonus") ||
+            (format == "ONA" && (titleText.contains("short") || titleText.contains("sp") || (media.episodes != null && media.episodes <= 13 && media.duration != null && media.duration <= 10)))
     }
 }
