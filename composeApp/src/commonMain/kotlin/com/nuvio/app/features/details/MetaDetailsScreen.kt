@@ -2164,7 +2164,7 @@ private fun metaSectionHasContent(
         MetaScreenSectionKey.EPISODES -> hasEpisodes
         MetaScreenSectionKey.DETAILS -> hasAdditionalInfoSection
         MetaScreenSectionKey.COLLECTION -> !hasEpisodes && hasCollectionSection
-        MetaScreenSectionKey.MORE_LIKE_THIS -> hasMoreLikeThisSection || meta.relations.isNotEmpty()
+        MetaScreenSectionKey.MORE_LIKE_THIS -> if (isAnilistItem) false else (hasMoreLikeThisSection || meta.relations.isNotEmpty())
     }
 
 @Composable
@@ -2234,7 +2234,10 @@ private fun ConfiguredMetaSections(
             MetaScreenSectionKey.EPISODES -> hasEpisodes
             MetaScreenSectionKey.DETAILS -> hasAdditionalInfoSection
             MetaScreenSectionKey.COLLECTION -> !hasEpisodes && hasCollectionSection
-            MetaScreenSectionKey.MORE_LIKE_THIS -> hasMoreLikeThisSection || meta.relations.isNotEmpty()
+            MetaScreenSectionKey.MORE_LIKE_THIS -> {
+                val isAnilistItem = meta.id.startsWith("ani_") || meta.id.startsWith("anilist:")
+                if (isAnilistItem) false else (hasMoreLikeThisSection || meta.relations.isNotEmpty())
+            }
         }
     }
 
@@ -2313,6 +2316,7 @@ private fun ConfiguredMetaSections(
                     com.nuvio.app.features.anilist.ui.AnilistCommunityHub(
                         mediaId = anilistMediaId,
                         animeTitle = meta.name,
+                        relations = meta.relations,
                         horizontalScrollPadding = horizontalScrollPadding,
                         onAnimeClick = { targetAnilistId ->
                             onOpenMeta?.invoke(
@@ -2320,6 +2324,16 @@ private fun ConfiguredMetaSections(
                                     id = "anilist:$targetAnilistId",
                                     type = "series",
                                     name = "",
+                                )
+                            )
+                        },
+                        onRelationClick = { relation ->
+                            onOpenMeta?.invoke(
+                                com.nuvio.app.features.home.MetaPreview(
+                                    id = relation.id,
+                                    type = relation.type,
+                                    name = relation.title,
+                                    poster = relation.poster,
                                 )
                             )
                         },
@@ -2386,42 +2400,45 @@ private fun ConfiguredMetaSections(
                 }
             }
             MetaScreenSectionKey.MORE_LIKE_THIS -> {
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(24.dp),
-                ) {
-                    if (meta.relations.isNotEmpty()) {
-                        com.nuvio.app.features.details.components.DetailRelationsSection(
-                            relations = meta.relations,
-                            showHeader = true,
-                            horizontalScrollPadding = horizontalScrollPadding,
-                            onRelationClick = { relation ->
-                                onOpenMeta?.invoke(
-                                    com.nuvio.app.features.home.MetaPreview(
-                                        id = relation.id,
-                                        type = relation.type,
-                                        name = relation.title,
-                                        poster = relation.poster,
+                val isAnilistItem = meta.id.startsWith("ani_") || meta.id.startsWith("anilist:")
+                if (!isAnilistItem) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(24.dp),
+                    ) {
+                        if (meta.relations.isNotEmpty()) {
+                            com.nuvio.app.features.details.components.DetailRelationsSection(
+                                relations = meta.relations,
+                                showHeader = true,
+                                horizontalScrollPadding = horizontalScrollPadding,
+                                onRelationClick = { relation ->
+                                    onOpenMeta?.invoke(
+                                        com.nuvio.app.features.home.MetaPreview(
+                                            id = relation.id,
+                                            type = relation.type,
+                                            name = relation.title,
+                                            poster = relation.poster,
+                                        )
                                     )
-                                )
-                            },
-                        )
-                    }
-                    if (hasMoreLikeThisSection) {
-                        val sourceLabel = when (meta.moreLikeThisSource) {
-                            MoreLikeThisSource.TMDB -> stringResource(Res.string.detail_more_like_this_powered_by_tmdb)
-                            MoreLikeThisSource.TRAKT -> stringResource(Res.string.detail_more_like_this_powered_by_trakt)
-                            null -> null
+                                },
+                            )
                         }
-                        DetailPosterRailSection(
-                            title = stringResource(Res.string.details_more_like_this),
-                            items = meta.moreLikeThis,
-                            watchedKeys = watchedKeys,
-                            showHeader = true,
-                            horizontalScrollPadding = horizontalScrollPadding,
-                            sourceLabel = sourceLabel,
-                            onPosterClick = onOpenMeta,
-                        )
+                        if (hasMoreLikeThisSection) {
+                            val sourceLabel = when (meta.moreLikeThisSource) {
+                                MoreLikeThisSource.TMDB -> stringResource(Res.string.detail_more_like_this_powered_by_tmdb)
+                                MoreLikeThisSource.TRAKT -> stringResource(Res.string.detail_more_like_this_powered_by_trakt)
+                                null -> null
+                            }
+                            DetailPosterRailSection(
+                                title = stringResource(Res.string.details_more_like_this),
+                                items = meta.moreLikeThis,
+                                watchedKeys = watchedKeys,
+                                showHeader = true,
+                                horizontalScrollPadding = horizontalScrollPadding,
+                                sourceLabel = sourceLabel,
+                                onPosterClick = onOpenMeta,
+                            )
+                        }
                     }
                 }
             }

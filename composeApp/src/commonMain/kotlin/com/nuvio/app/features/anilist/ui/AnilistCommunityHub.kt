@@ -47,7 +47,9 @@ import com.nuvio.app.features.anilist.threads.AnilistThreadsRepository
 import com.nuvio.app.features.anilist.threads.ThreadDetailSheet
 import com.nuvio.app.features.anilist.ui.components.AnilistDiscussionCard
 import com.nuvio.app.features.anilist.ui.components.AnilistRecommendationCard
+import com.nuvio.app.features.anilist.ui.components.AnilistRelationCard
 import com.nuvio.app.features.anilist.ui.components.AnilistReviewCard
+import com.nuvio.app.features.details.MetaRelation
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 
@@ -56,8 +58,10 @@ fun AnilistCommunityHub(
     mediaId: Int,
     animeTitle: String,
     modifier: Modifier = Modifier,
+    relations: List<MetaRelation> = emptyList(),
     horizontalScrollPadding: Dp = 16.dp,
     onAnimeClick: ((Int) -> Unit)? = null,
+    onRelationClick: ((MetaRelation) -> Unit)? = null,
 ) {
     var selectedTab by remember(mediaId) { mutableStateOf(AnilistHubTab.DISCUSSIONS) }
 
@@ -90,10 +94,11 @@ fun AnilistCommunityHub(
     val currentUserId = AnilistAuthRepository.currentUser.value?.id
     val userReview = reviews.firstOrNull { it.userId == currentUserId }
 
-    // Lazy list states for smooth scrolling
+    // Lazy list states for smooth mouse drag scrolling
     val threadListState = rememberLazyListState()
     val reviewListState = rememberLazyListState()
     val recListState = rememberLazyListState()
+    val relatedListState = rememberLazyListState()
 
     // 1. Fetch Discussions
     LaunchedEffect(mediaId) {
@@ -161,7 +166,7 @@ fun AnilistCommunityHub(
     }
 
     // Hide entire section if nothing exists and loading finished
-    val hasAnyData = threads.isNotEmpty() || reviews.isNotEmpty() || recommendations.isNotEmpty()
+    val hasAnyData = threads.isNotEmpty() || reviews.isNotEmpty() || recommendations.isNotEmpty() || relations.isNotEmpty()
     val isAnyLoading = isLoadingThreads || isLoadingReviews || isLoadingRecommendations
     if (!hasAnyData && !isAnyLoading) {
         return
@@ -179,6 +184,7 @@ fun AnilistCommunityHub(
             discussionCount = threads.size,
             reviewCount = if (totalReviews > 0) totalReviews else reviews.size,
             recommendationCount = recommendations.size,
+            relatedCount = relations.size,
             isLoggedIn = isLoggedIn,
             userHasReview = userReview != null,
             onWriteReviewClick = {
@@ -194,7 +200,7 @@ fun AnilistCommunityHub(
         AnimatedContent(
             targetState = selectedTab,
             transitionSpec = {
-                fadeIn(animationSpec = tween(220)) togetherWith fadeOut(animationSpec = tween(180))
+                fadeIn(animationSpec = tween(200)) togetherWith fadeOut(animationSpec = tween(150))
             },
             label = "HubShelfTransition",
         ) { targetTab ->
@@ -295,6 +301,28 @@ fun AnilistCommunityHub(
                                     onClick = {
                                         onAnimeClick?.invoke(rec.mediaId)
                                     },
+                                )
+                            }
+                        }
+                    }
+                }
+
+                AnilistHubTab.RELATED -> {
+                    if (relations.isEmpty()) {
+                        HubEmptyState(text = "No related franchise entries found.")
+                    } else {
+                        LazyRow(
+                            state = relatedListState,
+                            contentPadding = PaddingValues(horizontal = horizontalScrollPadding),
+                            horizontalArrangement = Arrangement.spacedBy(14.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .nuvioDesktopDragScroll(relatedListState),
+                        ) {
+                            items(relations, key = { "rel_${it.id}_${it.relationType}" }) { relation ->
+                                AnilistRelationCard(
+                                    relation = relation,
+                                    onClick = onRelationClick?.let { { it(relation) } },
                                 )
                             }
                         }
