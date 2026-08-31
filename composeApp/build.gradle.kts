@@ -959,7 +959,6 @@ kotlin {
             implementation("io.coil-kt.coil3:coil-svg:${libs.versions.coil.get()}") {
                 exclude(group = "org.jetbrains.skiko", module = "skiko")
             }
-            implementation(libs.coil.gif)
             implementation("dev.chrisbanes.haze:haze:1.7.2")
             implementation(libs.compose.runtime)
             implementation(libs.compose.foundation)
