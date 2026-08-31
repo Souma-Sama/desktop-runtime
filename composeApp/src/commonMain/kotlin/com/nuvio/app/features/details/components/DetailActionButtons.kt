@@ -281,6 +281,9 @@ fun AnimeStreamIdButton(
     if (showSheet) {
         com.nuvio.app.features.anilist.streams.AnimeStreamIdSelectorSheet(
             anilistId = anilistId,
+            seasonNumber = 1,
+            episodeNumber = 1,
+            isMovie = meta?.type == "movie",
             onDismiss = { showSheet = false },
         )
     }

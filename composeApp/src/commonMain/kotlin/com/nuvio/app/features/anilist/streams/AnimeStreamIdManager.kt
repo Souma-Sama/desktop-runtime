@@ -75,7 +75,7 @@ object AnimeStreamIdManager {
     }
 
     fun getOptions(anilistId: Int): List<AnimeStreamIdOption> {
-        return _availableOptions.value[anilistId] ?: listOf(
+        val base = _availableOptions.value[anilistId] ?: listOf(
             AnimeStreamIdOption(
                 type = AnimeStreamIdType.ANILIST,
                 rawId = "$anilistId",
@@ -83,6 +83,19 @@ object AnimeStreamIdManager {
                 description = "Native anime provider queries",
             )
         )
+        val preferences = AnilistPreferencesRepository.snapshot()
+        val overrideString = preferences.streamIdOverrides[anilistId]
+        if (!overrideString.isNullOrBlank() && overrideString.startsWith("custom:", ignoreCase = true)) {
+            val customVal = overrideString.removePrefix("custom:")
+            val customOpt = AnimeStreamIdOption(
+                type = AnimeStreamIdType.CUSTOM,
+                rawId = customVal,
+                formattedLabel = "Custom ($customVal)",
+                description = "User specified ID override",
+            )
+            return base + customOpt
+        }
+        return base
     }
 
     fun getActiveOption(anilistId: Int): AnimeStreamIdOption {

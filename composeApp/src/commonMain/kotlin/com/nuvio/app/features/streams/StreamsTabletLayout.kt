@@ -68,6 +68,7 @@ internal fun TabletStreamsLayout(
     appendInstantServiceToDefaultName: Boolean,
     resumePositionMs: Long?,
     resumeProgressFraction: Float?,
+    onVideoIdChanged: (String) -> Unit = {},
     onStreamSelected: (stream: StreamItem, resumePositionMs: Long?, resumeProgressFraction: Float?) -> Unit,
     onStreamLongPress: (StreamItem) -> Unit,
     onRefresh: () -> Unit,
@@ -206,6 +207,7 @@ internal fun TabletStreamsLayout(
                                 episodeNumber = episodeNumber,
                                 isMovie = type == "movie",
                                 onOptionChanged = { newVideoId ->
+                                    onVideoIdChanged(newVideoId)
                                     StreamsRepository.reload(
                                         type = type,
                                         videoId = newVideoId,

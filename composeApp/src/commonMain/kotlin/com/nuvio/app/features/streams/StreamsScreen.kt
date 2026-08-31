@@ -124,6 +124,7 @@ fun StreamsScreen(
     resumeProgressFraction: Float? = null,
     manualSelection: Boolean = false,
     startFromBeginning: Boolean = false,
+    onVideoIdChange: (newVideoId: String) -> Unit = {},
     onStreamSelected: (stream: StreamItem, resumePositionMs: Long?, resumeProgressFraction: Float?) -> Unit = { _, _, _ -> },
     onStreamActionOpen: (
         stream: StreamItem,
@@ -134,6 +135,24 @@ fun StreamsScreen(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val anilistIdForStream = remember(parentMetaId) {
+        com.nuvio.app.features.anilist.AnilistTrackerCoordinator.extractAnilistId(parentMetaId)
+    }
+    val initialEffectiveId = remember(anilistIdForStream, videoId, seasonNumber, episodeNumber) {
+        if (anilistIdForStream != null) {
+            com.nuvio.app.features.anilist.streams.AnimeStreamIdManager.resolvePlaybackVideoId(
+                parentMetaId = parentMetaId,
+                season = seasonNumber ?: 1,
+                episode = episodeNumber ?: 1,
+                isMovie = type == "movie",
+                fallbackVideoId = videoId,
+            )
+        } else {
+            videoId
+        }
+    }
+    var activeVideoId by remember(initialEffectiveId) { mutableStateOf(initialEffectiveId) }
+
     val uiState by StreamsRepository.uiState.collectAsStateWithLifecycle()
     val playerSettings by remember {
         PlayerSettingsRepository.ensureLoaded()
@@ -164,13 +183,13 @@ fun StreamsScreen(
     val clipboardManager = LocalClipboardManager.current
     val streamLinkCopiedText = stringResource(Res.string.streams_link_copied)
     val noDirectStreamLinkText = stringResource(Res.string.streams_no_direct_link)
-    var streamActionsTarget by remember(videoId) { mutableStateOf<StreamItem?>(null) }
+    var streamActionsTarget by remember(activeVideoId) { mutableStateOf<StreamItem?>(null) }
     val downloadScope = rememberCoroutineScope()
-    var preferredFilterApplied by remember(videoId) { mutableStateOf(false) }
+    var preferredFilterApplied by remember(activeVideoId) { mutableStateOf(false) }
     var autoPlayOverlayLogoLoadError by remember(logo) { mutableStateOf(false) }
     val autoPlayOverlayLogoUrl = logo?.takeIf { it.isNotBlank() }
     val episodeProgress = watchProgressUiState.progressForVideo(
-        videoId = videoId,
+        videoId = activeVideoId,
         parentMetaId = parentMetaId,
         seasonNumber = seasonNumber,
         episodeNumber = episodeNumber,
@@ -203,10 +222,10 @@ fun StreamsScreen(
         }
     }
 
-    LaunchedEffect(type, videoId, seasonNumber, episodeNumber, manualSelection) {
+    LaunchedEffect(type, activeVideoId, seasonNumber, episodeNumber, manualSelection) {
         StreamsRepository.load(
             type = type,
-            videoId = videoId,
+            videoId = activeVideoId,
             parentMetaId = parentMetaId,
             season = seasonNumber,
             episode = episodeNumber,
@@ -241,7 +260,7 @@ fun StreamsScreen(
     val reloadStreams: () -> Unit = {
         StreamsRepository.reload(
             type = type,
-            videoId = videoId,
+            videoId = activeVideoId,
             parentMetaId = parentMetaId,
             season = seasonNumber,
             episode = episodeNumber,
@@ -274,6 +293,10 @@ fun StreamsScreen(
                 appendInstantServiceToDefaultName = debridSettings.canResolvePlayableLinks && !debridSettings.hasCustomStreamFormatting,
                 resumePositionMs = effectiveResumePositionMs,
                 resumeProgressFraction = effectiveResumeProgressFraction,
+                onVideoIdChanged = { newVideoId ->
+                    activeVideoId = newVideoId
+                    onVideoIdChange(newVideoId)
+                },
                 onStreamSelected = { stream, positionMs, progressFraction ->
                     onStreamSelected(stream, positionMs, progressFraction)
                 },
@@ -297,6 +320,10 @@ fun StreamsScreen(
                 appendInstantServiceToDefaultName = debridSettings.canResolvePlayableLinks && !debridSettings.hasCustomStreamFormatting,
                 resumePositionMs = effectiveResumePositionMs,
                 resumeProgressFraction = effectiveResumeProgressFraction,
+                onVideoIdChanged = { newVideoId ->
+                    activeVideoId = newVideoId
+                    onVideoIdChange(newVideoId)
+                },
                 onStreamSelected = { stream, positionMs, progressFraction ->
                     onStreamSelected(stream, positionMs, progressFraction)
                 },
@@ -495,6 +522,7 @@ private fun MobileStreamsLayout(
     appendInstantServiceToDefaultName: Boolean,
     resumePositionMs: Long?,
     resumeProgressFraction: Float?,
+    onVideoIdChanged: (String) -> Unit = {},
     onStreamSelected: (stream: StreamItem, resumePositionMs: Long?, resumeProgressFraction: Float?) -> Unit,
     onStreamLongPress: (StreamItem) -> Unit,
     onRefresh: () -> Unit,
@@ -577,6 +605,7 @@ private fun MobileStreamsLayout(
                             episodeNumber = episodeNumber,
                             isMovie = type == "movie",
                             onOptionChanged = { newVideoId ->
+                                onVideoIdChanged(newVideoId)
                                 StreamsRepository.reload(
                                     type = type,
                                     videoId = newVideoId,

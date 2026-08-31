@@ -57,6 +57,9 @@ import kotlinx.coroutines.launch
 @Composable
 fun AnimeStreamIdSelectorSheet(
     anilistId: Int,
+    seasonNumber: Int? = null,
+    episodeNumber: Int? = null,
+    isMovie: Boolean = false,
     onDismiss: () -> Unit,
     onOptionSelected: ((AnimeStreamIdOption) -> Unit)? = null,
 ) {
@@ -124,8 +127,15 @@ fun AnimeStreamIdSelectorSheet(
             ) {
                 options.forEach { option ->
                     val isSelected = activeOption.type == option.type && (option.type != AnimeStreamIdType.CUSTOM || activeOption.rawId == option.rawId)
+                    val queryPreview = AnimeStreamIdFormatter.formatVideoId(
+                        option = option,
+                        season = seasonNumber ?: 1,
+                        episode = episodeNumber ?: 1,
+                        isMovie = isMovie,
+                    )
                     StreamIdOptionCard(
                         option = option,
+                        queryPreview = queryPreview,
                         isSelected = isSelected,
                         onClick = {
                             AnimeStreamIdManager.selectOption(anilistId, option.type)
@@ -137,9 +147,25 @@ fun AnimeStreamIdSelectorSheet(
 
                 // Custom ID Option
                 val isCustomSelected = activeOption.type == AnimeStreamIdType.CUSTOM
+                val customVal = if (isCustomSelected) activeOption.rawId else customIdInput
+                val customQueryPreview = if (customVal.isNotBlank()) {
+                    AnimeStreamIdFormatter.formatVideoId(
+                        option = AnimeStreamIdOption(
+                            type = AnimeStreamIdType.CUSTOM,
+                            rawId = customVal,
+                            formattedLabel = "Custom ($customVal)",
+                            description = "",
+                        ),
+                        season = seasonNumber ?: 1,
+                        episode = episodeNumber ?: 1,
+                        isMovie = isMovie,
+                    )
+                } else null
+
                 StreamIdCustomCard(
                     isSelected = isCustomSelected,
-                    customValue = if (isCustomSelected) activeOption.rawId else customIdInput,
+                    customValue = customVal,
+                    queryPreview = customQueryPreview,
                     isEditing = showCustomInput,
                     onToggleEdit = { showCustomInput = !showCustomInput },
                     onSaveCustom = { entered ->
@@ -167,6 +193,7 @@ fun AnimeStreamIdSelectorSheet(
 @Composable
 private fun StreamIdOptionCard(
     option: AnimeStreamIdOption,
+    queryPreview: String,
     isSelected: Boolean,
     onClick: () -> Unit,
 ) {
@@ -221,6 +248,20 @@ private fun StreamIdOptionCard(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                Spacer(modifier = Modifier.height(4.dp))
+                Surface(
+                    shape = RoundedCornerShape(4.dp),
+                    color = if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.18f) else MaterialTheme.colorScheme.surface.copy(alpha = 0.6f),
+                ) {
+                    Text(
+                        text = "Query: $queryPreview",
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Medium,
+                        color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 10.sp,
+                    )
+                }
             }
 
             if (isSelected) {
@@ -247,6 +288,7 @@ private fun StreamIdOptionCard(
 private fun StreamIdCustomCard(
     isSelected: Boolean,
     customValue: String,
+    queryPreview: String?,
     isEditing: Boolean,
     onToggleEdit: () -> Unit,
     onSaveCustom: (String) -> Unit,
@@ -284,10 +326,26 @@ private fun StreamIdCustomCard(
                         color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
                     )
                     Text(
-                        text = "Manually specify any IMDb (tt...) or Kitsu ID for rare releases",
+                        text = "Manually specify any IMDb (tt...), Kitsu, or show ID to test scrapers",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                    if (!queryPreview.isNullOrBlank()) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Surface(
+                            shape = RoundedCornerShape(4.dp),
+                            color = if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.18f) else MaterialTheme.colorScheme.surface.copy(alpha = 0.6f),
+                        ) {
+                            Text(
+                                text = "Query: $queryPreview",
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Medium,
+                                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontSize = 10.sp,
+                            )
+                        }
+                    }
                 }
 
                 Icon(
@@ -309,7 +367,7 @@ private fun StreamIdCustomCard(
                         value = text,
                         onValueChange = { text = it },
                         modifier = Modifier.fillMaxWidth(),
-                        placeholder = { Text("e.g. tt1234567 or kitsu:1234") },
+                        placeholder = { Text("e.g. tt1234567, kitsu:1234, or raw ID") },
                         singleLine = true,
                     )
                     Row(
@@ -348,6 +406,14 @@ fun AnimeStreamIdQuickBar(
     val activeOption = remember(anilistId, anilistPrefs) {
         AnimeStreamIdManager.getActiveOption(anilistId)
     }
+    val currentQueryId = remember(activeOption, seasonNumber, episodeNumber, isMovie) {
+        AnimeStreamIdFormatter.formatVideoId(
+            option = activeOption,
+            season = seasonNumber ?: 1,
+            episode = episodeNumber ?: 1,
+            isMovie = isMovie,
+        )
+    }
     var showSheet by remember { mutableStateOf(false) }
     val scrollState = rememberScrollState()
 
@@ -375,7 +441,7 @@ fun AnimeStreamIdQuickBar(
                 )
                 Spacer(modifier = Modifier.width(3.dp))
                 Text(
-                    text = "STREAM ID:",
+                    text = "ID: $currentQueryId",
                     style = MaterialTheme.typography.labelSmall,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.primary,
@@ -449,6 +515,9 @@ fun AnimeStreamIdQuickBar(
     if (showSheet) {
         AnimeStreamIdSelectorSheet(
             anilistId = anilistId,
+            seasonNumber = seasonNumber,
+            episodeNumber = episodeNumber,
+            isMovie = isMovie,
             onDismiss = { showSheet = false },
             onOptionSelected = { selectedOpt ->
                 val newId = AnimeStreamIdFormatter.formatVideoId(
