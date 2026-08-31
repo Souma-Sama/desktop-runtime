@@ -50,6 +50,7 @@ import com.nuvio.app.core.ui.AppIconResource
 import com.nuvio.app.core.ui.appIconPainter
 import com.nuvio.app.core.ui.NuvioModalBottomSheet
 import com.nuvio.app.core.ui.dismissNuvioBottomSheet
+import com.nuvio.app.core.ui.nuvioDesktopDragScroll
 import com.nuvio.app.features.anilist.AnilistPreferencesRepository
 import kotlinx.coroutines.launch
 
@@ -382,6 +383,7 @@ fun AnimeStreamIdQuickBar(
     Row(
         modifier = modifier
             .fillMaxWidth()
+            .nuvioDesktopDragScroll(scrollState)
             .horizontalScroll(scrollState)
             .padding(horizontal = 12.dp, vertical = 5.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
