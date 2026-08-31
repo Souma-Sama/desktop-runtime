@@ -369,6 +369,182 @@ object AnilistTrackerCoordinator {
         }
     }
 
+    fun updateRepeat(repeat: Int) {
+        val currentMedia = _trackerState.value.media ?: return
+        val token = AnilistAuthRepository.token.value ?: return
+        val safeRepeat = repeat.coerceAtLeast(0)
+
+        scope.launch {
+            _trackerState.update { it.copy(isSyncing = true) }
+            val updatedEntry = AnilistApi.updateMediaListEntry(
+                mediaId = currentMedia.id,
+                repeat = safeRepeat,
+                token = token,
+            )
+            com.nuvio.app.features.anilist.catalog.AnilistCatalogRepository.clearCache()
+            _trackerState.update {
+                it.copy(
+                    isSyncing = false,
+                    entry = updatedEntry ?: it.entry?.copy(repeat = safeRepeat),
+                )
+            }
+        }
+    }
+
+    fun updatePrivate(isPrivate: Boolean) {
+        val currentMedia = _trackerState.value.media ?: return
+        val token = AnilistAuthRepository.token.value ?: return
+
+        scope.launch {
+            _trackerState.update { it.copy(isSyncing = true) }
+            val updatedEntry = AnilistApi.updateMediaListEntry(
+                mediaId = currentMedia.id,
+                private = isPrivate,
+                token = token,
+            )
+            com.nuvio.app.features.anilist.catalog.AnilistCatalogRepository.clearCache()
+            _trackerState.update {
+                it.copy(
+                    isSyncing = false,
+                    entry = updatedEntry ?: it.entry?.copy(private = isPrivate),
+                )
+            }
+        }
+    }
+
+    fun updateHiddenFromStatusLists(hidden: Boolean) {
+        val currentMedia = _trackerState.value.media ?: return
+        val token = AnilistAuthRepository.token.value ?: return
+
+        scope.launch {
+            _trackerState.update { it.copy(isSyncing = true) }
+            val updatedEntry = AnilistApi.updateMediaListEntry(
+                mediaId = currentMedia.id,
+                hiddenFromStatusLists = hidden,
+                token = token,
+            )
+            com.nuvio.app.features.anilist.catalog.AnilistCatalogRepository.clearCache()
+            _trackerState.update {
+                it.copy(
+                    isSyncing = false,
+                    entry = updatedEntry ?: it.entry?.copy(hiddenFromStatusLists = hidden),
+                )
+            }
+        }
+    }
+
+    fun updateNotes(notes: String) {
+        val currentMedia = _trackerState.value.media ?: return
+        val token = AnilistAuthRepository.token.value ?: return
+
+        scope.launch {
+            _trackerState.update { it.copy(isSyncing = true) }
+            val updatedEntry = AnilistApi.updateMediaListEntry(
+                mediaId = currentMedia.id,
+                notes = notes,
+                token = token,
+            )
+            com.nuvio.app.features.anilist.catalog.AnilistCatalogRepository.clearCache()
+            _trackerState.update {
+                it.copy(
+                    isSyncing = false,
+                    entry = updatedEntry ?: it.entry?.copy(notes = notes),
+                )
+            }
+        }
+    }
+
+    fun updateStartedAt(date: AnilistFuzzyDate?) {
+        val currentMedia = _trackerState.value.media ?: return
+        val token = AnilistAuthRepository.token.value ?: return
+
+        scope.launch {
+            _trackerState.update { it.copy(isSyncing = true) }
+            val updatedEntry = AnilistApi.updateMediaListEntry(
+                mediaId = currentMedia.id,
+                startedAt = date,
+                token = token,
+            )
+            com.nuvio.app.features.anilist.catalog.AnilistCatalogRepository.clearCache()
+            _trackerState.update {
+                it.copy(
+                    isSyncing = false,
+                    entry = updatedEntry ?: it.entry?.copy(startedAt = date),
+                )
+            }
+        }
+    }
+
+    fun updateCompletedAt(date: AnilistFuzzyDate?) {
+        val currentMedia = _trackerState.value.media ?: return
+        val token = AnilistAuthRepository.token.value ?: return
+
+        scope.launch {
+            _trackerState.update { it.copy(isSyncing = true) }
+            val updatedEntry = AnilistApi.updateMediaListEntry(
+                mediaId = currentMedia.id,
+                completedAt = date,
+                token = token,
+            )
+            com.nuvio.app.features.anilist.catalog.AnilistCatalogRepository.clearCache()
+            _trackerState.update {
+                it.copy(
+                    isSyncing = false,
+                    entry = updatedEntry ?: it.entry?.copy(completedAt = date),
+                )
+            }
+        }
+    }
+
+    fun updateFullEntry(
+        status: AnilistMediaListStatus? = null,
+        progress: Int? = null,
+        score: Double? = null,
+        repeat: Int? = null,
+        private: Boolean? = null,
+        hiddenFromStatusLists: Boolean? = null,
+        notes: String? = null,
+        startedAt: AnilistFuzzyDate? = null,
+        completedAt: AnilistFuzzyDate? = null,
+    ) {
+        val currentMedia = _trackerState.value.media ?: return
+        val token = AnilistAuthRepository.token.value ?: return
+
+        scope.launch {
+            _trackerState.update { it.copy(isSyncing = true) }
+            val updatedEntry = AnilistApi.updateMediaListEntry(
+                mediaId = currentMedia.id,
+                status = status,
+                progress = progress,
+                score = score,
+                repeat = repeat,
+                private = private,
+                hiddenFromStatusLists = hiddenFromStatusLists,
+                notes = notes,
+                startedAt = startedAt,
+                completedAt = completedAt,
+                token = token,
+            )
+            com.nuvio.app.features.anilist.catalog.AnilistCatalogRepository.clearCache()
+            _trackerState.update {
+                it.copy(
+                    isSyncing = false,
+                    entry = updatedEntry ?: it.entry?.copy(
+                        status = status ?: it.entry?.status,
+                        progress = progress ?: it.entry?.progress ?: 0,
+                        score = score ?: it.entry?.score ?: 0.0,
+                        repeat = repeat ?: it.entry?.repeat ?: 0,
+                        private = private ?: it.entry?.private ?: false,
+                        hiddenFromStatusLists = hiddenFromStatusLists ?: it.entry?.hiddenFromStatusLists ?: false,
+                        notes = notes ?: it.entry?.notes,
+                        startedAt = startedAt ?: it.entry?.startedAt,
+                        completedAt = completedAt ?: it.entry?.completedAt,
+                    ),
+                )
+            }
+        }
+    }
+
     fun deleteEntry() {
         val entryId = _trackerState.value.entry?.id ?: return
         val token = AnilistAuthRepository.token.value ?: return

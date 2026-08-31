@@ -25,26 +25,28 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Bookmark
-import androidx.compose.material.icons.filled.BookmarkBorder
+import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
-import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DeleteOutline
+import androidx.compose.material.icons.filled.EditNote
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.OpenInNew
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Replay
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.StarBorder
+import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.PauseCircle
 import androidx.compose.material.icons.outlined.PlayCircle
@@ -61,6 +63,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -74,10 +78,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalClipboardManager
@@ -92,6 +94,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.nuvio.app.features.anilist.AnilistAuthRepository
+import com.nuvio.app.features.anilist.AnilistFuzzyDate
 import com.nuvio.app.features.anilist.AnilistMediaListStatus
 import com.nuvio.app.features.anilist.AnilistTrackerCoordinator
 import kotlinx.coroutines.launch
@@ -220,7 +223,7 @@ fun AnimeTrackerButton(
             expanded = menuExpanded,
             onDismissRequest = { menuExpanded = false },
             modifier = Modifier
-                .widthIn(min = 340.dp, max = 380.dp)
+                .widthIn(min = 340.dp, max = 390.dp)
                 .background(
                     color = MaterialTheme.colorScheme.surface,
                     shape = RoundedCornerShape(20.dp),
@@ -359,7 +362,7 @@ fun AnimeTrackerDropdownContent(
             ) {
                 Column(modifier = Modifier.padding(12.dp)) {
                     Text(
-                        text = "Connect your AniList account to sync watch progress, ratings, and library status across devices.",
+                        text = "Connect your AniList account to sync watch progress, ratings, dates, notes, and custom lists across devices.",
                         style = MaterialTheme.typography.bodySmall.copy(
                             fontSize = 12.sp,
                             lineHeight = 16.sp,
@@ -661,7 +664,7 @@ fun AnimeTrackerDropdownContent(
         val currentStatus = entry?.status
         val statuses = listOf(
             Triple(AnilistMediaListStatus.CURRENT, Icons.Outlined.PlayCircle, StatusColorWatching),
-            Triple(AnilistMediaListStatus.PLANNING, Icons.Default.BookmarkBorder, StatusColorPlanning),
+            Triple(AnilistMediaListStatus.PLANNING, Icons.Default.CalendarToday, StatusColorPlanning),
             Triple(AnilistMediaListStatus.COMPLETED, Icons.Outlined.CheckCircle, StatusColorCompleted),
             Triple(AnilistMediaListStatus.PAUSED, Icons.Outlined.PauseCircle, StatusColorOnHold),
             Triple(AnilistMediaListStatus.DROPPED, Icons.Outlined.RemoveCircleOutline, StatusColorDropped),
@@ -916,7 +919,393 @@ fun AnimeTrackerDropdownContent(
             }
         }
 
-        // --- 9. REMOVE FROM ANILIST / DIAGNOSTICS ACTIONS ---
+        Spacer(modifier = Modifier.height(14.dp))
+
+        // --- 9. ADVANCED DETAILS (Dates, Repeat, Privacy, Notes) ---
+        var showAdvancedOptions by remember { mutableStateOf(false) }
+
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(14.dp),
+            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.1f)),
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(12.dp),
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable { showAdvancedOptions = !showAdvancedOptions },
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Tune,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp),
+                            tint = MaterialTheme.colorScheme.primary,
+                        )
+                        Text(
+                            text = "Advanced Tracking Details",
+                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                    }
+
+                    Text(
+                        text = if (showAdvancedOptions) "Hide ▲" else "Expand ▼",
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 11.sp,
+                        ),
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
+
+                AnimatedVisibility(
+                    visible = showAdvancedOptions,
+                    enter = expandVertically() + fadeIn(),
+                    exit = shrinkVertically() + fadeOut(),
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 12.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        // Start Date
+                        val startedAt = entry?.startedAt
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.CalendarMonth,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                                Column {
+                                    Text(
+                                        text = "Start Date",
+                                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                                    )
+                                    Text(
+                                        text = startedAt?.formatted() ?: "Not set",
+                                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+                                        color = if (startedAt?.isSet == true) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                            }
+
+                            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                TextButton(
+                                    onClick = {
+                                        val now = io.ktor.util.date.GMTDate()
+                                        val today = AnilistFuzzyDate(
+                                            year = now.year,
+                                            month = now.month.ordinal + 1,
+                                            day = now.dayOfMonth,
+                                        )
+                                        AnilistTrackerCoordinator.updateStartedAt(today)
+                                    },
+                                ) {
+                                    Text("Set Today", fontSize = 11.sp)
+                                }
+                                if (startedAt?.isSet == true) {
+                                    IconButton(
+                                        onClick = { AnilistTrackerCoordinator.updateStartedAt(null) },
+                                        modifier = Modifier.size(28.dp),
+                                    ) {
+                                        Icon(imageVector = Icons.Default.Close, contentDescription = "Clear", modifier = Modifier.size(14.dp))
+                                    }
+                                }
+                            }
+                        }
+
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+
+                        // Finish / End Date
+                        val completedAt = entry?.completedAt
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.CalendarToday,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                                Column {
+                                    Text(
+                                        text = "Finish Date",
+                                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                                    )
+                                    Text(
+                                        text = completedAt?.formatted() ?: "Not set",
+                                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+                                        color = if (completedAt?.isSet == true) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                            }
+
+                            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                TextButton(
+                                    onClick = {
+                                        val now = io.ktor.util.date.GMTDate()
+                                        val today = AnilistFuzzyDate(
+                                            year = now.year,
+                                            month = now.month.ordinal + 1,
+                                            day = now.dayOfMonth,
+                                        )
+                                        AnilistTrackerCoordinator.updateCompletedAt(today)
+                                    },
+                                ) {
+                                    Text("Set Today", fontSize = 11.sp)
+                                }
+                                if (completedAt?.isSet == true) {
+                                    IconButton(
+                                        onClick = { AnilistTrackerCoordinator.updateCompletedAt(null) },
+                                        modifier = Modifier.size(28.dp),
+                                    ) {
+                                        Icon(imageVector = Icons.Default.Close, contentDescription = "Clear", modifier = Modifier.size(14.dp))
+                                    }
+                                }
+                            }
+                        }
+
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+
+                        // Repeat Count Stepper
+                        val currentRepeat = entry?.repeat ?: 0
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Replay,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                                Column {
+                                    Text(
+                                        text = "Rewatch Count",
+                                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                                    )
+                                    Text(
+                                        text = "$currentRepeat times rewatched",
+                                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                            }
+
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            ) {
+                                Surface(
+                                    modifier = Modifier.size(28.dp),
+                                    shape = CircleShape,
+                                    color = MaterialTheme.colorScheme.surfaceVariant,
+                                ) {
+                                    IconButton(
+                                        onClick = {
+                                            if (currentRepeat > 0) {
+                                                AnilistTrackerCoordinator.updateRepeat(currentRepeat - 1)
+                                            }
+                                        },
+                                        enabled = currentRepeat > 0,
+                                        modifier = Modifier.size(28.dp),
+                                    ) {
+                                        Icon(imageVector = Icons.Default.Remove, contentDescription = null, modifier = Modifier.size(14.dp))
+                                    }
+                                }
+
+                                Text(
+                                    text = "$currentRepeat",
+                                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                                    modifier = Modifier.padding(horizontal = 6.dp),
+                                )
+
+                                Surface(
+                                    modifier = Modifier.size(28.dp),
+                                    shape = CircleShape,
+                                    color = MaterialTheme.colorScheme.surfaceVariant,
+                                ) {
+                                    IconButton(
+                                        onClick = { AnilistTrackerCoordinator.updateRepeat(currentRepeat + 1) },
+                                        modifier = Modifier.size(28.dp),
+                                    ) {
+                                        Icon(imageVector = Icons.Default.Add, contentDescription = null, modifier = Modifier.size(14.dp))
+                                    }
+                                }
+                            }
+                        }
+
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+
+                        // Private Entry Switch
+                        val isPrivate = entry?.private ?: false
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Lock,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                                Column {
+                                    Text(
+                                        text = "Private Entry",
+                                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                                    )
+                                    Text(
+                                        text = "Hide this anime from your public profile",
+                                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                            }
+
+                            Switch(
+                                checked = isPrivate,
+                                onCheckedChange = { AnilistTrackerCoordinator.updatePrivate(it) },
+                                modifier = Modifier.size(width = 44.dp, height = 24.dp),
+                            )
+                        }
+
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+
+                        // Hidden from Status Lists Switch
+                        val isHidden = entry?.hiddenFromStatusLists ?: false
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.VisibilityOff,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                                Column {
+                                    Text(
+                                        text = "Hide from Status Lists",
+                                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                                    )
+                                    Text(
+                                        text = "Only show in custom lists",
+                                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                            }
+
+                            Switch(
+                                checked = isHidden,
+                                onCheckedChange = { AnilistTrackerCoordinator.updateHiddenFromStatusLists(it) },
+                                modifier = Modifier.size(width = 44.dp, height = 24.dp),
+                            )
+                        }
+
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+
+                        // Personal Notes Text Field
+                        var notesText by remember(entry?.notes) { mutableStateOf(entry?.notes.orEmpty()) }
+                        var isNotesDirty by remember(entry?.notes) { mutableStateOf(false) }
+
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.EditNote,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                                Text(
+                                    text = "Personal Notes",
+                                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                                )
+                            }
+
+                            OutlinedTextField(
+                                value = notesText,
+                                onValueChange = {
+                                    notesText = it
+                                    isNotesDirty = true
+                                },
+                                placeholder = { Text("Write your thoughts or reminders...", fontSize = 11.sp) },
+                                minLines = 2,
+                                maxLines = 4,
+                                shape = RoundedCornerShape(10.dp),
+                                textStyle = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+
+                            if (isNotesDirty) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.End,
+                                ) {
+                                    Button(
+                                        onClick = {
+                                            AnilistTrackerCoordinator.updateNotes(notesText)
+                                            isNotesDirty = false
+                                        },
+                                        shape = RoundedCornerShape(8.dp),
+                                    ) {
+                                        Text("Save Notes", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // --- 10. REMOVE FROM ANILIST & MATCH DIAGNOSTICS ---
         if (entry != null) {
             Spacer(modifier = Modifier.height(10.dp))
 

@@ -174,6 +174,27 @@ data class AnilistRelation(
 )
 
 @Serializable
+data class AnilistFuzzyDate(
+    val year: Int? = null,
+    val month: Int? = null,
+    val day: Int? = null,
+) {
+    val isSet: Boolean
+        get() = year != null || month != null || day != null
+
+    fun formatted(): String {
+        if (!isSet) return "Not set"
+        val months = listOf("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+        val monthStr = if (month != null && month in 1..12) months[month - 1] else null
+        return listOfNotNull(
+            day?.toString(),
+            monthStr,
+            year?.toString(),
+        ).joinToString(" ")
+    }
+}
+
+@Serializable
 data class AnilistMediaListEntry(
     val id: Int = 0,
     val mediaId: Int = 0,
@@ -181,6 +202,11 @@ data class AnilistMediaListEntry(
     val score: Double = 0.0,
     val progress: Int = 0,
     val repeat: Int = 0,
+    val private: Boolean = false,
+    val hiddenFromStatusLists: Boolean = false,
+    val notes: String? = null,
+    val startedAt: AnilistFuzzyDate? = null,
+    val completedAt: AnilistFuzzyDate? = null,
     val updatedAt: Long = 0L,
 )
 

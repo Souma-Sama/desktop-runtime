@@ -1337,6 +1337,19 @@ object AnilistApi {
               score
               progress
               repeat
+              private
+              hiddenFromStatusLists
+              notes
+              startedAt {
+                year
+                month
+                day
+              }
+              completedAt {
+                year
+                month
+                day
+              }
               updatedAt
             }
             """.trimIndent()
@@ -1511,22 +1524,63 @@ object AnilistApi {
         return parseMedia(mediaObj, isFullDetails = true)
     }
 
-    suspend fun saveMediaListEntry(
+    suspend fun updateMediaListEntry(
         mediaId: Int,
         status: AnilistMediaListStatus? = null,
         progress: Int? = null,
         score: Double? = null,
+        repeat: Int? = null,
+        private: Boolean? = null,
+        hiddenFromStatusLists: Boolean? = null,
+        notes: String? = null,
+        startedAt: AnilistFuzzyDate? = null,
+        completedAt: AnilistFuzzyDate? = null,
         token: String,
     ): AnilistMediaListEntry? {
         val mutation = """
-            mutation SaveMediaListEntry(${'$'}mediaId: Int, ${'$'}status: MediaListStatus, ${'$'}progress: Int, ${'$'}score: Float) {
-              SaveMediaListEntry(mediaId: ${'$'}mediaId, status: ${'$'}status, progress: ${'$'}progress, score: ${'$'}score) {
+            mutation SaveMediaListEntry(
+              ${'$'}mediaId: Int,
+              ${'$'}status: MediaListStatus,
+              ${'$'}progress: Int,
+              ${'$'}score: Float,
+              ${'$'}repeat: Int,
+              ${'$'}private: Boolean,
+              ${'$'}hiddenFromStatusLists: Boolean,
+              ${'$'}notes: String,
+              ${'$'}startedAt: FuzzyDateInput,
+              ${'$'}completedAt: FuzzyDateInput
+            ) {
+              SaveMediaListEntry(
+                mediaId: ${'$'}mediaId,
+                status: ${'$'}status,
+                progress: ${'$'}progress,
+                score: ${'$'}score,
+                repeat: ${'$'}repeat,
+                private: ${'$'}private,
+                hiddenFromStatusLists: ${'$'}hiddenFromStatusLists,
+                notes: ${'$'}notes,
+                startedAt: ${'$'}startedAt,
+                completedAt: ${'$'}completedAt
+              ) {
                 id
                 mediaId
                 status
                 score
                 progress
                 repeat
+                private
+                hiddenFromStatusLists
+                notes
+                startedAt {
+                  year
+                  month
+                  day
+                }
+                completedAt {
+                  year
+                  month
+                  day
+                }
                 updatedAt
               }
             }
@@ -1543,12 +1597,64 @@ object AnilistApi {
             if (score != null) {
                 put("score", score)
             }
+            if (repeat != null) {
+                put("repeat", repeat)
+            }
+            if (private != null) {
+                put("private", private)
+            }
+            if (hiddenFromStatusLists != null) {
+                put("hiddenFromStatusLists", hiddenFromStatusLists)
+            }
+            if (notes != null) {
+                put("notes", notes)
+            }
+            if (startedAt != null) {
+                putJsonObject("startedAt") {
+                    if (startedAt.year != null) put("year", startedAt.year)
+                    if (startedAt.month != null) put("month", startedAt.month)
+                    if (startedAt.day != null) put("day", startedAt.day)
+                }
+            }
+            if (completedAt != null) {
+                putJsonObject("completedAt") {
+                    if (completedAt.year != null) put("year", completedAt.year)
+                    if (completedAt.month != null) put("month", completedAt.month)
+                    if (completedAt.day != null) put("day", completedAt.day)
+                }
+            }
         }
 
         val root = executeGraphQL(query = mutation, variables = variables, token = token)
         val entryObj = root?.get("data").asJsonObjectOrNull()?.get("SaveMediaListEntry").asJsonObjectOrNull() ?: return null
         return parseMediaListEntry(entryObj, defaultMediaId = mediaId)
     }
+
+    suspend fun saveMediaListEntry(
+        mediaId: Int,
+        status: AnilistMediaListStatus? = null,
+        progress: Int? = null,
+        score: Double? = null,
+        repeat: Int? = null,
+        private: Boolean? = null,
+        hiddenFromStatusLists: Boolean? = null,
+        notes: String? = null,
+        startedAt: AnilistFuzzyDate? = null,
+        completedAt: AnilistFuzzyDate? = null,
+        token: String,
+    ): AnilistMediaListEntry? = updateMediaListEntry(
+        mediaId = mediaId,
+        status = status,
+        progress = progress,
+        score = score,
+        repeat = repeat,
+        private = private,
+        hiddenFromStatusLists = hiddenFromStatusLists,
+        notes = notes,
+        startedAt = startedAt,
+        completedAt = completedAt,
+        token = token,
+    )
 
     suspend fun deleteMediaListEntry(
         entryId: Int,
@@ -1773,6 +1879,26 @@ object AnilistApi {
         val score = obj["score"].asDoubleOrNull() ?: 0.0
         val progress = obj["progress"].asIntOrNull() ?: 0
         val repeat = obj["repeat"].asIntOrNull() ?: 0
+        val privateVal = obj["private"]?.jsonPrimitive?.contentOrNull?.toBoolean() ?: false
+        val hiddenVal = obj["hiddenFromStatusLists"]?.jsonPrimitive?.contentOrNull?.toBoolean() ?: false
+        val notes = obj["notes"].asStringOrNull()
+
+        val startedAtObj = obj["startedAt"].asJsonObjectOrNull()
+        val startedAt = startedAtObj?.let {
+            val y = it["year"].asIntOrNull()
+            val m = it["month"].asIntOrNull()
+            val d = it["day"].asIntOrNull()
+            if (y != null || m != null || d != null) AnilistFuzzyDate(y, m, d) else null
+        }
+
+        val completedAtObj = obj["completedAt"].asJsonObjectOrNull()
+        val completedAt = completedAtObj?.let {
+            val y = it["year"].asIntOrNull()
+            val m = it["month"].asIntOrNull()
+            val d = it["day"].asIntOrNull()
+            if (y != null || m != null || d != null) AnilistFuzzyDate(y, m, d) else null
+        }
+
         val updatedAt = obj["updatedAt"].asLongOrNull() ?: 0L
 
         AnilistMediaListEntry(
@@ -1782,6 +1908,11 @@ object AnilistApi {
             score = score,
             progress = progress,
             repeat = repeat,
+            private = privateVal,
+            hiddenFromStatusLists = hiddenVal,
+            notes = notes,
+            startedAt = startedAt,
+            completedAt = completedAt,
             updatedAt = updatedAt,
         )
     }.getOrElse {
@@ -1792,6 +1923,11 @@ object AnilistApi {
             score = 0.0,
             progress = 0,
             repeat = 0,
+            private = false,
+            hiddenFromStatusLists = false,
+            notes = null,
+            startedAt = null,
+            completedAt = null,
             updatedAt = 0L,
         )
     }
