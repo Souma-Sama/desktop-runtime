@@ -128,9 +128,10 @@ fun AnimeStreamIdSelectorSheet(
             ) {
                 options.forEach { option ->
                     val isSelected = activeOption.type == option.type && (option.type != AnimeStreamIdType.CUSTOM || activeOption.rawId == option.rawId)
+                    val effectiveSeason = if (option.season == 0 || seasonNumber == 0) 0 else (seasonNumber ?: option.season)
                     val queryPreview = AnimeStreamIdFormatter.formatVideoId(
                         option = option,
-                        season = seasonNumber ?: 1,
+                        season = effectiveSeason,
                         episode = episodeNumber ?: 1,
                         isMovie = isMovie,
                     )
@@ -150,14 +151,16 @@ fun AnimeStreamIdSelectorSheet(
                 val isCustomSelected = activeOption.type == AnimeStreamIdType.CUSTOM
                 val customVal = if (isCustomSelected) activeOption.rawId else customIdInput
                 val customQueryPreview = if (customVal.isNotBlank()) {
+                    val effectiveCustomSeason = if (seasonNumber == 0) 0 else (seasonNumber ?: 1)
                     AnimeStreamIdFormatter.formatVideoId(
                         option = AnimeStreamIdOption(
                             type = AnimeStreamIdType.CUSTOM,
                             rawId = customVal,
                             formattedLabel = "Custom ($customVal)",
                             description = "",
+                            season = effectiveCustomSeason,
                         ),
-                        season = seasonNumber ?: 1,
+                        season = effectiveCustomSeason,
                         episode = episodeNumber ?: 1,
                         isMovie = isMovie,
                     )
@@ -417,9 +420,10 @@ fun AnimeStreamIdQuickBar(
         options.forEach { option ->
             val isSelected = activeOption.type == option.type &&
                 (option.type != AnimeStreamIdType.CUSTOM || activeOption.rawId == option.rawId)
+            val effectiveSeason = if (option.season == 0 || seasonNumber == 0) 0 else (seasonNumber ?: option.season)
             val fullOptionId = AnimeStreamIdFormatter.formatVideoId(
                 option = option,
-                season = seasonNumber ?: 1,
+                season = effectiveSeason,
                 episode = episodeNumber ?: 1,
                 isMovie = isMovie,
             )
@@ -494,9 +498,10 @@ fun AnimeStreamIdQuickBar(
             isMovie = isMovie,
             onDismiss = { showSheet = false },
             onOptionSelected = { selectedOpt ->
+                val effectiveSeason = if (selectedOpt.season == 0 || seasonNumber == 0) 0 else (seasonNumber ?: selectedOpt.season)
                 val newId = AnimeStreamIdFormatter.formatVideoId(
                     option = selectedOpt,
-                    season = seasonNumber ?: 1,
+                    season = effectiveSeason,
                     episode = episodeNumber ?: 1,
                     isMovie = isMovie,
                 )

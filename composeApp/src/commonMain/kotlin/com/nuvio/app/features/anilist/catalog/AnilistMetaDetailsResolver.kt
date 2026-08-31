@@ -286,7 +286,7 @@ object AnilistMetaDetailsResolver {
             val cachedArm = armMappingCache[anilistId]
             cachedArm ?: runCatching {
                 withTimeoutOrNull(2000L) { resolveArmMapping(anilistId) }
-            }.getOrNull() ?: ArmMapping(null, null, null, null, 1)
+            }.getOrNull() ?: ArmMapping(null, null, null, null, null, 1)
         }
 
         val media = mediaDeferred.await() ?: return@coroutineScope null
@@ -350,7 +350,7 @@ object AnilistMetaDetailsResolver {
             val cachedArm = armMappingCache[anilistId]
             cachedArm ?: runCatching {
                 withTimeoutOrNull(2000L) { resolveArmMapping(anilistId) }
-            }.getOrNull() ?: ArmMapping(null, null, null, null, 1)
+            }.getOrNull() ?: ArmMapping(null, null, null, null, null, 1)
         }
 
         // 3. MAL score in background
@@ -684,11 +684,25 @@ object AnilistMetaDetailsResolver {
         if (!directImdbId.isNullOrBlank()) return directImdbId
         if (media == null) return null
 
-        // Only look at PARENT or PREQUEL relations (e.g. for Season 2 / cour 2 referencing Season 1)
+        // A long-running mainline TV show (e.g. One Piece, Detective Conan) with direct episodes should never borrow
+        // an ID from external spin-off relations like one-shot ONA prequels (e.g. Monsters 103 Mercies).
+        val isMainlineTvSeries = media.format == "TV" && (media.episodes == null || media.episodes > 24)
+        if (isMainlineTvSeries) return null
+
+        // Only look at PARENT or valid PREQUEL relations (e.g. for Season 2 / cour 2 referencing Season 1)
         // NEVER look at SPIN_OFF, SIDE_STORY, ALTERNATIVE, or OTHER which can cross-contaminate unrelated spin-offs!
         val priorityTypes = listOf("PARENT", "PREQUEL")
         val candidateRelations = media.relations.filter { rel ->
-            rel.relationType?.uppercase() in priorityTypes
+            val type = rel.relationType?.uppercase()
+            if (type !in priorityTypes) return@filter false
+            // If checking PREQUEL, ensure the candidate is not an ONA/MOVIE/SPECIAL one-shot when current is a TV series
+            if (type == "PREQUEL") {
+                val relFormat = rel.format?.uppercase()
+                if (media.format == "TV" && relFormat in listOf("ONA", "MOVIE", "SPECIAL", "OVA", "MUSIC")) {
+                    return@filter false
+                }
+            }
+            true
         }
         for (rel in candidateRelations) {
             val mapped = resolveArmMapping(rel.id).imdbId

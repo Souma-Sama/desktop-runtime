@@ -138,9 +138,10 @@ object AnimeStreamIdManager {
         val anilistId = AnilistTrackerCoordinator.extractAnilistId(parentMetaId)
             ?: return fallbackVideoId
         val activeOption = getActiveOption(anilistId)
+        val targetSeason = if (activeOption.season == 0 || season == 0) 0 else if (activeOption.season > 0) activeOption.season else season
         return AnimeStreamIdFormatter.formatVideoId(
             option = activeOption,
-            season = if (activeOption.season > 0) activeOption.season else season,
+            season = targetSeason,
             episode = episode,
             isMovie = isMovie,
         )
