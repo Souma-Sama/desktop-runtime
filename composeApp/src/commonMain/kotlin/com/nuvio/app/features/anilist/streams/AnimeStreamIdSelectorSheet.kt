@@ -46,6 +46,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.nuvio.app.core.ui.AppIconResource
+import com.nuvio.app.core.ui.appIconPainter
 import com.nuvio.app.core.ui.NuvioModalBottomSheet
 import com.nuvio.app.core.ui.dismissNuvioBottomSheet
 import com.nuvio.app.features.anilist.AnilistPreferencesRepository
@@ -93,10 +95,10 @@ fun AnimeStreamIdSelectorSheet(
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(
-                        imageVector = Icons.Default.PlayArrow,
+                        painter = appIconPainter(AppIconResource.PlayerPlay),
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(20.dp),
+                        modifier = Modifier.size(18.dp),
                     )
                 }
                 Spacer(modifier = Modifier.width(12.dp))
@@ -366,7 +368,7 @@ fun AnimeStreamIdQuickBar(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Icon(
-                    imageVector = Icons.Default.PlayArrow,
+                    painter = appIconPainter(AppIconResource.PlayerPlay),
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(13.dp),
