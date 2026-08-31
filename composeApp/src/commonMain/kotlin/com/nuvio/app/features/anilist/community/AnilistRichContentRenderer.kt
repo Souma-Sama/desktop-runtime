@@ -94,7 +94,7 @@ fun AnilistRichContentRenderer(
                         ),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(top = 6.dp),
+                            .padding(top = 8.dp),
                         color = MaterialTheme.colorScheme.onSurface,
                     )
                 }
@@ -109,10 +109,10 @@ fun AnilistRichContentRenderer(
                         val shape = RoundedCornerShape(12.dp)
                         AsyncImage(
                             model = block.url,
-                            contentDescription = "Review image",
+                            contentDescription = "Review media",
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .heightIn(min = 120.dp, max = 400.dp)
+                                .heightIn(min = 120.dp, max = 420.dp)
                                 .clip(shape)
                                 .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.15f), shape),
                             contentScale = ContentScale.Fit,
@@ -264,120 +264,223 @@ private fun ClickableRichText(
 }
 
 /**
- * Parses raw AniList markdown and HTML into visual blocks.
+ * Decodes all HTML entities including decimal (e.g. &#120328; for Unicode Math symbols) and hex.
+ */
+fun decodeHtmlEntities(input: String): String {
+    if (input.isBlank()) return ""
+
+    var text = input
+        .replace("&quot;", "\"")
+        .replace("&amp;", "&")
+        .replace("&apos;", "'")
+        .replace("&#039;", "'")
+        .replace("&lt;", "<")
+        .replace("&gt;", ">")
+        .replace("&nbsp;", " ")
+
+    // Decimal entities: &#120328; -> Unicode Character
+    text = Regex("&#(\\d+);").replace(text) { match ->
+        val code = match.groupValues[1].toIntOrNull()
+        if (code != null && code in 1..0x10FFFF) {
+            try {
+                if (code <= 0xFFFF) {
+                    code.toChar().toString()
+                } else {
+                    val high = ((code - 0x10000) ushr 10) + 0xD800
+                    val low = ((code - 0x10000) and 0x3FF) + 0xDC00
+                    charArrayOf(high.toChar(), low.toChar()).concatToString()
+                }
+            } catch (e: Exception) {
+                match.value
+            }
+        } else {
+            match.value
+        }
+    }
+
+    // Hex entities: &#x1D608; -> Unicode Character
+    text = Regex("&#x([0-9a-fA-F]+);", RegexOption.IGNORE_CASE).replace(text) { match ->
+        val code = match.groupValues[1].toIntOrNull(16)
+        if (code != null && code in 1..0x10FFFF) {
+            try {
+                if (code <= 0xFFFF) {
+                    code.toChar().toString()
+                } else {
+                    val high = ((code - 0x10000) ushr 10) + 0xD800
+                    val low = ((code - 0x10000) and 0x3FF) + 0xDC00
+                    charArrayOf(high.toChar(), low.toChar()).concatToString()
+                }
+            } catch (e: Exception) {
+                match.value
+            }
+        } else {
+            match.value
+        }
+    }
+
+    return text
+}
+
+/**
+ * Parses raw AniList markdown and HTML into structured visual blocks.
  */
 internal fun parseAnilistRichContent(rawText: String, primaryColor: Color): List<AnilistContentBlock> {
     if (rawText.isBlank()) return emptyList()
 
-    val rawBlocks = rawText.split(Regex("(?:\r?\n){2,}")).map { it.trim() }.filter { it.isNotBlank() }
-    val result = mutableListOf<AnilistContentBlock>()
+    val decodedText = decodeHtmlEntities(rawText)
+    val lines = decodedText.lines()
+    val blocks = mutableListOf<AnilistContentBlock>()
 
-    for (rawBlock in rawBlocks) {
-        // 1. Check for standalone dividers: <hr>, <hr/>, ---, ***, ___
-        if (rawBlock.matches(Regex("^(?:<hr\\s*/?>|[-*_~]{3,})$", RegexOption.IGNORE_CASE))) {
-            result.add(AnilistContentBlock.Divider)
-            continue
-        }
+    val currentParagraphLines = mutableListOf<String>()
+    var currentParagraphCentered = false
 
-        // 2. Check for AniList img tag: img900(url), img(url), img100%(url), or <img src="...">
-        val anilistImgMatch = Regex("^(?:<center>|~~~)?\\s*img(?:\\d+%?)?\\((https?://[^)]+)\\)\\s*(?:</center>|~~~)?$", RegexOption.IGNORE_CASE).find(rawBlock)
-        if (anilistImgMatch != null) {
-            val url = anilistImgMatch.groupValues[1]
-            result.add(AnilistContentBlock.Image(url = url))
-            continue
-        }
-
-        val htmlImgMatch = Regex("^(?:<center>|~~~)?\\s*<img[^>]*src=[\"'](https?://[^\"']+)[\"'][^>]*>\\s*(?:</center>|~~~)?$", RegexOption.IGNORE_CASE).find(rawBlock)
-        if (htmlImgMatch != null) {
-            val url = htmlImgMatch.groupValues[1]
-            result.add(AnilistContentBlock.Image(url = url))
-            continue
-        }
-
-        // 3. Check for standalone spoiler block: ~! ... !~
-        if (rawBlock.startsWith("~!") && rawBlock.endsWith("!~") && rawBlock.length > 4) {
-            val inner = rawBlock.removePrefix("~!").removeSuffix("!~").trim()
-            val isCentered = inner.startsWith("~~~") && inner.endsWith("~~~") ||
-                inner.startsWith("<center>", ignoreCase = true) && inner.endsWith("</center>", ignoreCase = true)
-            val cleaned = inner
-                .removePrefix("~~~").removeSuffix("~~~")
-                .replace(Regex("^<center>", RegexOption.IGNORE_CASE), "")
-                .replace(Regex("</center>$", RegexOption.IGNORE_CASE), "")
-                .trim()
-            result.add(AnilistContentBlock.Spoiler(content = cleaned, isCentered = isCentered))
-            continue
-        }
-
-        // 4. Check for headers: # Title, ## Title, #<center>Title</center>, #<center><a>Title</a></center>
-        val headerMatch = Regex("^(#{1,6})\\s*(.*)$", RegexOption.DOT_MATCHES_ALL).find(rawBlock)
-        if (headerMatch != null) {
-            val level = headerMatch.groupValues[1].length
-            var headerContent = headerMatch.groupValues[2].trim()
-            val isCentered = headerContent.startsWith("~~~") ||
-                headerContent.startsWith("<center>", ignoreCase = true)
-
-            headerContent = headerContent
-                .replace(Regex("^<center>", RegexOption.IGNORE_CASE), "")
-                .replace(Regex("</center>$", RegexOption.IGNORE_CASE), "")
-                .removePrefix("~~~").removeSuffix("~~~")
-                .trim()
-
-            val parsedHeader = parseInlineAnilistMarkdown(headerContent, primaryColor)
-            result.add(AnilistContentBlock.Header(text = parsedHeader, level = level, isCentered = isCentered))
-            continue
-        }
-
-        // 5. Check for Blockquotes: > Quote or ># Quote
-        if (rawBlock.startsWith(">")) {
-            val isCentered = rawBlock.contains("<center>", ignoreCase = true) || rawBlock.contains("~~~")
-            val cleanQuote = rawBlock
-                .lines()
-                .joinToString(" ") { line ->
-                    line.trim()
-                        .replace(Regex("^>+\\s*"), "")
-                        .replace(Regex("^#+\\s*"), "")
-                }
-                .replace(Regex("^<center>", RegexOption.IGNORE_CASE), "")
-                .replace(Regex("</center>$", RegexOption.IGNORE_CASE), "")
-                .removePrefix("~~~").removeSuffix("~~~")
-                .trim()
-
-            val parsedQuote = parseInlineAnilistMarkdown(cleanQuote, primaryColor)
-            result.add(AnilistContentBlock.Quote(text = parsedQuote, isCentered = isCentered))
-            continue
-        }
-
-        // 6. Check for Centered Paragraphs: ~~~Text~~~ or <center>Text</center>
-        val isExplicitCenter = (rawBlock.startsWith("~~~") && rawBlock.endsWith("~~~")) ||
-            (rawBlock.startsWith("<center>", ignoreCase = true) && rawBlock.endsWith("</center>", ignoreCase = true))
-
-        var cleanParagraph = rawBlock
-            .replace(Regex("^<center>", RegexOption.IGNORE_CASE), "")
-            .replace(Regex("</center>$", RegexOption.IGNORE_CASE), "")
-            .removePrefix("~~~").removeSuffix("~~~")
-            .trim()
-
-        // Handle inline <hr> if present inside <center> block
-        if (cleanParagraph.contains("<hr>", ignoreCase = true) || cleanParagraph.contains("<hr/>", ignoreCase = true)) {
-            val parts = cleanParagraph.split(Regex("<hr\\s*/?>", RegexOption.IGNORE_CASE))
-            parts.forEachIndexed { index, part ->
-                val trimmedPart = part.trim()
-                if (trimmedPart.isNotBlank()) {
-                    val parsed = parseInlineAnilistMarkdown(trimmedPart, primaryColor)
-                    result.add(AnilistContentBlock.Paragraph(text = parsed, isCentered = isExplicitCenter))
-                }
-                if (index < parts.size - 1) {
-                    result.add(AnilistContentBlock.Divider)
-                }
+    fun flushParagraph() {
+        if (currentParagraphLines.isNotEmpty()) {
+            val content = currentParagraphLines.joinToString("\n").trim()
+            if (content.isNotBlank()) {
+                val parsed = parseInlineAnilistMarkdown(content, primaryColor)
+                blocks.add(AnilistContentBlock.Paragraph(text = parsed, isCentered = currentParagraphCentered))
             }
-            continue
+            currentParagraphLines.clear()
+            currentParagraphCentered = false
         }
-
-        val parsedText = parseInlineAnilistMarkdown(cleanParagraph, primaryColor)
-        result.add(AnilistContentBlock.Paragraph(text = parsedText, isCentered = isExplicitCenter))
     }
 
-    return result
+    var i = 0
+    while (i < lines.size) {
+        val rawLine = lines[i]
+        val trimmed = rawLine.trim()
+
+        if (trimmed.isBlank()) {
+            flushParagraph()
+            i++
+            continue
+        }
+
+        // 1. Divider line (e.g. ***, ---, ____, **********, <hr>, <hr/>, <center><hr></center>)
+        if (trimmed.matches(Regex("^(?:<center>)?\\s*(?:<hr\\s*/?>|[-*_~]{3,})\\s*(?:</center>)?$", RegexOption.IGNORE_CASE))) {
+            flushParagraph()
+            blocks.add(AnilistContentBlock.Divider)
+            i++
+            continue
+        }
+
+        // 2. Standalone image line: img(url), img900(url), ~~~img(url)~~~, img(url)~~~, <center>img(url)</center>, <img src="...">
+        val anilistImgMatch = Regex("^(?:<center>|~~~)?\\s*img(?:\\d+%?)?\\((https?://[^)]+)\\)\\s*(?:</center>|~~~)?$", RegexOption.IGNORE_CASE).find(trimmed)
+        if (anilistImgMatch != null) {
+            flushParagraph()
+            val url = anilistImgMatch.groupValues[1]
+            blocks.add(AnilistContentBlock.Image(url = url))
+            i++
+            continue
+        }
+
+        val htmlImgMatch = Regex("^(?:<center>|~~~)?\\s*<img[^>]*src=[\"'](https?://[^\"']+)[\"'][^>]*>\\s*(?:</center>|~~~)?$", RegexOption.IGNORE_CASE).find(trimmed)
+        if (htmlImgMatch != null) {
+            flushParagraph()
+            val url = htmlImgMatch.groupValues[1]
+            blocks.add(AnilistContentBlock.Image(url = url))
+            i++
+            continue
+        }
+
+        // 3. Multi-line or single-line spoiler: ~! ... !~
+        if (trimmed.startsWith("~!")) {
+            flushParagraph()
+            val spoilerLines = mutableListOf<String>()
+            if (trimmed.endsWith("!~") && trimmed.length > 4) {
+                spoilerLines.add(trimmed.removePrefix("~!").removeSuffix("!~"))
+            } else {
+                spoilerLines.add(trimmed.removePrefix("~!"))
+                i++
+                while (i < lines.size && !lines[i].contains("!~")) {
+                    spoilerLines.add(lines[i])
+                    i++
+                }
+                if (i < lines.size) {
+                    spoilerLines.add(lines[i].substringBefore("!~"))
+                }
+            }
+            val spoilerBody = spoilerLines.joinToString("\n").trim()
+            val isCentered = (spoilerBody.startsWith("~~~") && spoilerBody.endsWith("~~~")) ||
+                (spoilerBody.startsWith("<center>", ignoreCase = true) && spoilerBody.endsWith("</center>", ignoreCase = true))
+            val cleanSpoiler = spoilerBody
+                .replace(Regex("^<center>", RegexOption.IGNORE_CASE), "")
+                .replace(Regex("</center>$", RegexOption.IGNORE_CASE), "")
+                .removePrefix("~~~").removeSuffix("~~~")
+                .trim()
+            blocks.add(AnilistContentBlock.Spoiler(content = cleanSpoiler, isCentered = isCentered))
+            i++
+            continue
+        }
+
+        // 4. Header line: # Heading, ## Heading, # <a>~~~Heading~~~</a>, #<center>Heading</center>
+        val headerMatch = Regex("^(#{1,6})\\s*(.*)$").find(trimmed)
+        if (headerMatch != null) {
+            flushParagraph()
+            val level = headerMatch.groupValues[1].length
+            var headerText = headerMatch.groupValues[2].trim()
+            val isCentered = headerText.contains("<center>", ignoreCase = true) ||
+                headerText.contains("~~~")
+
+            headerText = headerText
+                .replace(Regex("^<center>", RegexOption.IGNORE_CASE), "")
+                .replace(Regex("</center>$", RegexOption.IGNORE_CASE), "")
+                .replace(Regex("^~{3,}|~{3,}$"), "")
+                .replace(Regex("^<a[^>]*>", RegexOption.IGNORE_CASE), "")
+                .replace(Regex("</a>$", RegexOption.IGNORE_CASE), "")
+                .trim()
+
+            val parsed = parseInlineAnilistMarkdown(headerText, primaryColor)
+            blocks.add(AnilistContentBlock.Header(text = parsed, level = level, isCentered = isCentered))
+            i++
+            continue
+        }
+
+        // 5. Quote line: > Quote or ># Quote
+        if (trimmed.startsWith(">")) {
+            flushParagraph()
+            val quoteLines = mutableListOf<String>()
+            while (i < lines.size && lines[i].trim().startsWith(">")) {
+                val qLine = lines[i].trim()
+                    .replace(Regex("^>+\\s*"), "")
+                    .replace(Regex("^#+\\s*"), "")
+                quoteLines.add(qLine)
+                i++
+            }
+            val quoteText = quoteLines.joinToString(" ").trim()
+            val isCentered = quoteText.contains("<center>", ignoreCase = true) || quoteText.contains("~~~")
+            val cleanQuote = quoteText
+                .replace(Regex("^<center>", RegexOption.IGNORE_CASE), "")
+                .replace(Regex("</center>$", RegexOption.IGNORE_CASE), "")
+                .replace(Regex("^~{3,}|~{3,}$"), "")
+                .trim()
+            val parsed = parseInlineAnilistMarkdown(cleanQuote, primaryColor)
+            blocks.add(AnilistContentBlock.Quote(text = parsed, isCentered = isCentered))
+            continue
+        }
+
+        // 6. Regular Paragraph Line (Check if centered with ~~~ or <center>)
+        val lineIsCentered = (trimmed.startsWith("~~~") && trimmed.endsWith("~~~")) ||
+            (trimmed.startsWith("<center>", ignoreCase = true) && trimmed.endsWith("</center>", ignoreCase = true))
+
+        var cleanLine = trimmed
+            .replace(Regex("^<center>", RegexOption.IGNORE_CASE), "")
+            .replace(Regex("</center>$", RegexOption.IGNORE_CASE), "")
+            .replace(Regex("^~{3,}|~{3,}$"), "")
+            .trim()
+
+        if (cleanLine.isNotBlank()) {
+            if (currentParagraphLines.isEmpty()) {
+                currentParagraphCentered = lineIsCentered
+            }
+            currentParagraphLines.add(cleanLine)
+        }
+        i++
+    }
+
+    flushParagraph()
+    return blocks
 }
 
 /**
@@ -390,20 +493,8 @@ internal fun parseInlineAnilistMarkdown(input: String, linkColor: Color): Annota
         .replace("<br>", "\n")
         .replace("<br/>", "\n")
         .replace("<br />", "\n")
-        .replace("&quot;", "\"")
-        .replace("&amp;", "&")
-        .replace("&#039;", "'")
-        .replace("&lt;", "<")
-        .replace("&gt;", ">")
-        .replace("&nbsp;", " ")
 
     return buildAnnotatedString {
-        val inlineImgRegex = Regex("img(?:\\d+%?)?\\((https?://[^)]+)\\)", RegexOption.IGNORE_CASE)
-
-        // Replace inline img with clean label
-        text = inlineImgRegex.replace(text) { match -> "[Image: ${match.groupValues[1]}]" }
-
-        // Tokenize and format
         var remaining = text
         while (remaining.isNotEmpty()) {
             val boldMatch = Regex("^(?:\\*\\*(.*?)\\*\\*|<b>(.*?)</b>|<strong>(.*?)</strong>)", RegexOption.DOT_MATCHES_ALL).find(remaining)

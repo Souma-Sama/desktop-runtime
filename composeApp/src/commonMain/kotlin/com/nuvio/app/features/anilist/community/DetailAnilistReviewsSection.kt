@@ -688,9 +688,9 @@ private fun ReviewEmptyState(
 }
 
 private fun cleanSnippet(body: String): String {
-    val withoutHtml = body
+    val decoded = decodeHtmlEntities(body)
+    val withoutHtml = decoded
         .replace(Regex("<[^>]*>"), " ")
-        .replace(Regex("&[a-zA-Z0-9#]+;"), " ")
         .replace(Regex("img(?:\\d+%?)?\\([^)]+\\)", RegexOption.IGNORE_CASE), "")
 
     val lines = withoutHtml.lines().map { line ->
