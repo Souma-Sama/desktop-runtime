@@ -270,7 +270,7 @@ fun AnimeStreamIdButton(
             contentAlignment = Alignment.Center,
         ) {
             Icon(
-                imageVector = androidx.compose.material.icons.Icons.Default.ElectricBolt,
+                imageVector = androidx.compose.material.icons.Icons.Default.PlayArrow,
                 contentDescription = "Stream ID: ${activeOption.formattedLabel}",
                 tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(20.dp),

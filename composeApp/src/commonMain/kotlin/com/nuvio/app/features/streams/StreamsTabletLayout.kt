@@ -52,6 +52,8 @@ import org.jetbrains.compose.resources.stringResource
 
 @Composable
 internal fun TabletStreamsLayout(
+    type: String,
+    parentMetaId: String,
     isEpisode: Boolean,
     title: String,
     logo: String?,

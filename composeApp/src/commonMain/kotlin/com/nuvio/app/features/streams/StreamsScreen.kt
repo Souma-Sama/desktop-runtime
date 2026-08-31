@@ -258,6 +258,8 @@ fun StreamsScreen(
 
         if (isTabletLayout) {
             TabletStreamsLayout(
+                type = type,
+                parentMetaId = parentMetaId,
                 isEpisode = isEpisode,
                 title = title,
                 logo = logo,
@@ -280,6 +282,8 @@ fun StreamsScreen(
             )
         } else {
             MobileStreamsLayout(
+                type = type,
+                parentMetaId = parentMetaId,
                 isEpisode = isEpisode,
                 title = title,
                 logo = logo,
@@ -476,6 +480,8 @@ fun StreamsScreen(
 
 @Composable
 private fun MobileStreamsLayout(
+    type: String,
+    parentMetaId: String,
     isEpisode: Boolean,
     title: String,
     logo: String?,
