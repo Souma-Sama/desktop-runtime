@@ -499,8 +499,9 @@ private fun AniChartSeasonalGrid(
                     banner = anime.banner,
                     anilistScore = anime.score?.toDouble(),
                     releaseInfo = buildString {
-                        if (anime.startDateYear != null) {
-                            append(anime.startDateYear)
+                        val year = anime.startDate?.take(4)
+                        if (!year.isNullOrBlank()) {
+                            append(year)
                         }
                         if (anime.episodes != null && anime.episodes > 0) {
                             if (isNotEmpty()) append("  •  ")
@@ -563,8 +564,9 @@ private fun AniChartScheduleGrid(
                     banner = anime.banner,
                     anilistScore = anime.score?.toDouble(),
                     releaseInfo = buildString {
-                        if (anime.startDateYear != null) {
-                            append(anime.startDateYear)
+                        val year = anime.startDate?.take(4)
+                        if (!year.isNullOrBlank()) {
+                            append(year)
                         }
                         if (anime.episodes != null && anime.episodes > 0) {
                             if (isNotEmpty()) append("  •  ")
