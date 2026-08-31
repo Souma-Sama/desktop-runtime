@@ -280,7 +280,7 @@ fun AnimeStreamIdButton(
 
     if (showSheet) {
         val firstVideo = meta?.videos?.firstOrNull()
-        val effectiveSeason = firstVideo?.season ?: if (meta?.isSpecial == true || meta?.season == 0) 0 else 1
+        val effectiveSeason = firstVideo?.season ?: 1
         val effectiveEpisode = firstVideo?.episode ?: 1
         com.nuvio.app.features.anilist.streams.AnimeStreamIdSelectorSheet(
             anilistId = anilistId,
