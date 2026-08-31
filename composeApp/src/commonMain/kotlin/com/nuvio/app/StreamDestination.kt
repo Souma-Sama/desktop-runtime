@@ -112,6 +112,7 @@ internal fun StreamDestination(
 
         hasResolvedVideoId = false
         val metaType = launch.parentMetaType ?: launch.type
+        val metaId = launch.parentMetaId ?: return@LaunchedEffect
         val resolvedVideoId = runCatching {
             MetaDetailsRepository.fetch(metaType, metaId)
         }.getOrNull()

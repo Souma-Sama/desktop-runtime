@@ -9,6 +9,7 @@ import com.nuvio.app.features.anilist.AnilistAuthRepository
 import com.nuvio.app.features.anilist.AnilistMedia
 import com.nuvio.app.features.anilist.AnilistRelation
 import com.nuvio.app.features.anilist.AnilistTrackerCoordinator
+import com.nuvio.app.features.anilist.streams.AnimeStreamIdManager
 import com.nuvio.app.features.artwork.MetaHubArtwork
 import com.nuvio.app.features.details.MetaDetails
 import com.nuvio.app.features.details.MetaTrailer
@@ -190,7 +191,7 @@ object AnilistMetaDetailsResolver {
                     season = season,
                     episode = epNum,
                     effectiveImdbId = imdbId,
-                    kitsuId = kitsuId,
+                    kitsuId = null,
                 )
                 MetaVideo(
                     id = videoId,
