@@ -419,19 +419,16 @@ internal fun parseAnilistRichContent(rawText: String, primaryColor: Color): List
         if (headerMatch != null) {
             flushParagraph()
             val level = headerMatch.groupValues[1].length
-            var headerText = headerMatch.groupValues[2].trim()
-            val isCentered = headerText.contains("<center>", ignoreCase = true) ||
-                headerText.contains("~~~")
+            val rawHeaderText = headerMatch.groupValues[2].trim()
+            val isCentered = rawHeaderText.contains("<center>", ignoreCase = true) ||
+                rawHeaderText.contains("~~~")
 
-            headerText = headerText
-                .replace(Regex("^<center>", RegexOption.IGNORE_CASE), "")
-                .replace(Regex("</center>$", RegexOption.IGNORE_CASE), "")
-                .replace(Regex("^~{3,}|~{3,}$"), "")
-                .replace(Regex("^<a[^>]*>", RegexOption.IGNORE_CASE), "")
-                .replace(Regex("</a>$", RegexOption.IGNORE_CASE), "")
+            val cleanHeaderText = rawHeaderText
+                .replace(Regex("</?[a-zA-Z0-9]+[^>]*>"), "")
+                .replace(Regex("~+"), "")
                 .trim()
 
-            val parsed = parseInlineAnilistMarkdown(headerText, primaryColor)
+            val parsed = parseInlineAnilistMarkdown(cleanHeaderText, primaryColor)
             blocks.add(AnilistContentBlock.Header(text = parsed, level = level, isCentered = isCentered))
             i++
             continue
@@ -451,9 +448,8 @@ internal fun parseAnilistRichContent(rawText: String, primaryColor: Color): List
             val quoteText = quoteLines.joinToString(" ").trim()
             val isCentered = quoteText.contains("<center>", ignoreCase = true) || quoteText.contains("~~~")
             val cleanQuote = quoteText
-                .replace(Regex("^<center>", RegexOption.IGNORE_CASE), "")
-                .replace(Regex("</center>$", RegexOption.IGNORE_CASE), "")
-                .replace(Regex("^~{3,}|~{3,}$"), "")
+                .replace(Regex("</?[a-zA-Z0-9]+[^>]*>"), "")
+                .replace(Regex("~+"), "")
                 .trim()
             val parsed = parseInlineAnilistMarkdown(cleanQuote, primaryColor)
             blocks.add(AnilistContentBlock.Quote(text = parsed, isCentered = isCentered))
@@ -500,7 +496,7 @@ internal fun parseInlineAnilistMarkdown(input: String, linkColor: Color): Annota
             val boldMatch = Regex("^(?:\\*\\*(.*?)\\*\\*|<b>(.*?)</b>|<strong>(.*?)</strong>)", RegexOption.DOT_MATCHES_ALL).find(remaining)
             val italicMatch = Regex("^(?:\\*(.*?)\\*|_(.*?)_|<i>(.*?)</i>|<em>(.*?)</em>)", RegexOption.DOT_MATCHES_ALL).find(remaining)
             val underlineMatch = Regex("^<u>(.*?)</u>", RegexOption.DOT_MATCHES_ALL).find(remaining)
-            val strikeMatch = Regex("^(?:~~(.*?)~~|~(.*?)~|<s>(.*?)</s>|<del>(.*?)</del>)", RegexOption.DOT_MATCHES_ALL).find(remaining)
+            val strikeMatch = Regex("^(?:~~(.*?)~~|<s>(.*?)</s>|<del>(.*?)</del>)", RegexOption.DOT_MATCHES_ALL).find(remaining)
             val linkMatch = Regex("^\\[(.*?)\\]\\((https?://.*?)\\)").find(remaining)
             val htmlLinkMatch = Regex("^<a\\s+href=[\"'](https?://[^\"']+)[\"'][^>]*>(.*?)</a>", RegexOption.IGNORE_CASE).find(remaining)
             val plainHtmlMatch = Regex("^<(/?[a-zA-Z0-9]+)[^>]*>").find(remaining)
