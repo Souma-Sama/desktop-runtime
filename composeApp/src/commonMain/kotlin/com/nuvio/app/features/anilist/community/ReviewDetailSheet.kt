@@ -224,7 +224,7 @@ fun ReviewDetailSheet(
                     .fillMaxWidth()
                     .verticalScroll(scrollState),
             ) {
-                FormattedReviewBody(body = review.body)
+                AnilistRichContentRenderer(body = review.body)
                 Spacer(modifier = Modifier.height(24.dp))
             }
 
@@ -298,81 +298,6 @@ fun ReviewDetailSheet(
             }
         }
     }
-}
-
-@Composable
-fun FormattedReviewBody(
-    body: String,
-    modifier: Modifier = Modifier,
-) {
-    val paragraphs = remember(body) { body.split("\n\n").filter { it.isNotBlank() } }
-
-    Column(
-        modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
-    ) {
-        paragraphs.forEach { paragraph ->
-            if (paragraph.contains("~!") && paragraph.contains("!~")) {
-                SpoilerParagraph(paragraph = paragraph)
-            } else {
-                Text(
-                    text = cleanReviewMarkdown(paragraph),
-                    style = MaterialTheme.typography.bodyLarge.copy(
-                        lineHeight = 24.sp,
-                    ),
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.92f),
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun SpoilerParagraph(paragraph: String) {
-    var revealed by remember { mutableStateOf(false) }
-
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(8.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-            .clickable { revealed = !revealed }
-            .padding(12.dp),
-    ) {
-        val cleanText = cleanReviewMarkdown(paragraph.replace("~!", "").replace("!~", ""))
-        Text(
-            text = cleanText,
-            style = MaterialTheme.typography.bodyLarge.copy(lineHeight = 24.sp),
-            color = MaterialTheme.colorScheme.onSurface,
-            modifier = if (!revealed) Modifier.blur(8.dp) else Modifier,
-        )
-
-        if (!revealed) {
-            Surface(
-                color = Color.Black.copy(alpha = 0.72f),
-                shape = RoundedCornerShape(6.dp),
-                modifier = Modifier.align(Alignment.Center),
-            ) {
-                Text(
-                    text = "⚠️ Spoiler (Tap to reveal)",
-                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-                    color = Color.White,
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                )
-            }
-        }
-    }
-}
-
-private fun cleanReviewMarkdown(text: String): String {
-    return text
-        .replace(Regex("<img[^>]*>"), "")
-        .replace(Regex("\\[([^\\]]+)\\]\\([^)]+\\)"), "$1")
-        .replace(Regex("_{1,2}([^_]+)_{1,2}"), "$1")
-        .replace(Regex("\\*{1,2}([^*]+)\\*{1,2}"), "$1")
-        .replace("~!", "")
-        .replace("!~", "")
-        .trim()
 }
 
 private fun formatReviewDate(timestampSeconds: Long): String {

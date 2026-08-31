@@ -691,6 +691,7 @@ private fun cleanSnippet(body: String): String {
     val withoutHtml = body
         .replace(Regex("<[^>]*>"), " ")
         .replace(Regex("&[a-zA-Z0-9#]+;"), " ")
+        .replace(Regex("img(?:\\d+%?)?\\([^)]+\\)", RegexOption.IGNORE_CASE), "")
 
     val lines = withoutHtml.lines().map { line ->
         var l = line.trim()
