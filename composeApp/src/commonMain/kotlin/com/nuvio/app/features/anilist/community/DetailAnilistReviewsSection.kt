@@ -313,6 +313,9 @@ fun DetailAnilistReviewsSection(
                     )
                     result.onSuccess { updated ->
                         reviews = reviews.map { if (it.id == rev.id) it.copy(rating = updated.rating, ratingAmount = updated.ratingAmount, userRating = updated.userRating) else it }
+                        selectedReview = selectedReview?.let {
+                            if (it.id == rev.id) it.copy(rating = updated.rating, ratingAmount = updated.ratingAmount, userRating = updated.userRating) else it
+                        }
                     }
                 }
             },

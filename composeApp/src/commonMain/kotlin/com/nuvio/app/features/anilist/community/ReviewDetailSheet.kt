@@ -239,8 +239,8 @@ fun ReviewDetailSheet(
                     onClick = {
                         val newVoted = !userVoted
                         userVoted = newVoted
-                        localRating += if (newVoted) 1 else -1
-                        onVote(review, if (newVoted) AnilistReviewVote.UP_VOTE else AnilistReviewVote.NO_RATING)
+                        localRating = maxOf(0, localRating + if (newVoted) 1 else -1)
+                        onVote(review, if (newVoted) AnilistReviewVote.UP_VOTE else AnilistReviewVote.NO_VOTE)
                     },
                     colors = ButtonDefaults.outlinedButtonColors(
                         containerColor = if (userVoted) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,

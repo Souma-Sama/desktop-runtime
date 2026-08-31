@@ -49,7 +49,7 @@ object AnilistCommunityRepository {
             ?: return@withContext Result.failure(IllegalStateException("Must be logged in to rate reviews"))
 
         val ratingString = when (rating) {
-            AnilistReviewVote.NO_RATING -> "NO_RATING"
+            AnilistReviewVote.NO_VOTE, AnilistReviewVote.NO_RATING -> "NO_VOTE"
             AnilistReviewVote.UP_VOTE -> "UP_VOTE"
             AnilistReviewVote.DOWN_VOTE -> "DOWN_VOTE"
         }

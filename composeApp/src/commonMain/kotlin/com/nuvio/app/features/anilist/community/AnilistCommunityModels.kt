@@ -44,6 +44,7 @@ data class AnilistReviewPage(
 )
 
 enum class AnilistReviewVote {
+    NO_VOTE,
     NO_RATING,
     UP_VOTE,
     DOWN_VOTE,
