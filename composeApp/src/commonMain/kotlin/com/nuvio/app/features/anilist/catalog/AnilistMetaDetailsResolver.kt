@@ -1394,41 +1394,55 @@ object AnilistMetaDetailsResolver {
         cinemetaVideos: List<MetaVideo>,
     ): Int {
         if (media == null) return 0
-        val title = media.title?.displayTitle.orEmpty()
+        val title = (media.title?.displayTitle.orEmpty() + " " + media.title?.romaji.orEmpty() + " " + media.title?.english.orEmpty())
         val partNum = extractPartNumber(title)
+        if (partNum <= 1) return 0
 
-        if (partNum > 1) {
-            // 1. Recursively sum all prequels that belong to this split-cour sequence (handles different episode counts per cour!)
-            val prequelSum = sumPrequelEpisodes(media.relations, title)
-            if (prequelSum > 0) {
-                return prequelSum
-            }
+        // 1. Traverse all prequels in the chain
+        val traversed = collectPrequelChain(media.relations, title)
+        val accountedParts = traversed.map { it.partNumber }.toSet()
+        var totalOffset = traversed.sumOf { it.episodes }
 
-            // 2. Fallback heuristic if prequel episode count was not specified in metadata
-            val prequels = media.relations.filter { it.relationType.equals("PREQUEL", ignoreCase = true) }
-            val prequelEps = prequels.mapNotNull { it.episodes }.firstOrNull { it > 0 }
+        // 2. If some earlier parts were not reached in relations (e.g. shallow API relations cache),
+        // fill in missing parts using the closest known prequel's episode count
+        val missingParts = (1 until partNum).filter { it !in accountedParts }
+        if (missingParts.isNotEmpty()) {
+            val avgPrequelEps = traversed.firstOrNull { it.episodes > 0 }?.episodes
                 ?: media.episodes
                 ?: (cinemetaVideos.count { it.season == targetSeason } / partNum).coerceAtLeast(11)
-
-            return (partNum - 1) * prequelEps
+            totalOffset += missingParts.size * avgPrequelEps
         }
 
-        return 0
+        return totalOffset
     }
 
-    private fun sumPrequelEpisodes(relations: List<AnilistRelation>, currentTitle: String): Int {
-        var total = 0
+    private data class PrequelPartInfo(val partNumber: Int, val episodes: Int)
+
+    private fun collectPrequelChain(relations: List<AnilistRelation>, currentTitle: String): List<PrequelPartInfo> {
+        val result = mutableListOf<PrequelPartInfo>()
         val prequels = relations.filter { it.relationType.equals("PREQUEL", ignoreCase = true) }
+        val currentPart = extractPartNumber(currentTitle)
+
         for (prequel in prequels) {
-            val pTitle = prequel.title?.displayTitle.orEmpty()
-            val currentPart = extractPartNumber(currentTitle)
+            val pTitle = (prequel.title?.displayTitle.orEmpty() + " " + prequel.title?.romaji.orEmpty() + " " + prequel.title?.english.orEmpty())
             val prequelPart = extractPartNumber(pTitle)
-            if (currentPart > 1 && (prequelPart < currentPart || prequelPart == 1)) {
-                val eps = prequel.episodes ?: 0
-                total += eps + sumPrequelEpisodes(prequel.relations, pTitle.ifEmpty { currentTitle })
+            if (currentPart > 1 && (prequelPart < currentPart || (prequelPart == 1 && currentPart > 1))) {
+                val cachedMedia = AnilistApi.getCachedMedia(prequel.id)
+                val eps = prequel.episodes ?: cachedMedia?.episodes ?: 0
+                result.add(PrequelPartInfo(partNumber = prequelPart, episodes = eps))
+
+                val nestedRelations = if (prequel.relations.isNotEmpty()) {
+                    prequel.relations
+                } else {
+                    cachedMedia?.relations.orEmpty()
+                }
+
+                if (nestedRelations.isNotEmpty()) {
+                    result.addAll(collectPrequelChain(nestedRelations, pTitle.ifEmpty { currentTitle }))
+                }
             }
         }
-        return total
+        return result
     }
 
     private fun extractPartNumber(title: String): Int {
