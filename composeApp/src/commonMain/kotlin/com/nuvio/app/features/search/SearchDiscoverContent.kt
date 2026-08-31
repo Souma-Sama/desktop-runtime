@@ -1,5 +1,7 @@
 package com.nuvio.app.features.search
 
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -10,12 +12,15 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import com.nuvio.app.core.ui.NuvioLoadingIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -221,13 +226,13 @@ private fun DiscoverQuickGenreChipsRow(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         val isAllSelected = selectedGenre == null
-        androidx.compose.material3.Surface(
+        Surface(
             modifier = Modifier
-                .androidx.compose.ui.draw.clip(androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
+                .clip(RoundedCornerShape(8.dp))
                 .clickable { onGenreSelected(null) },
-            shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp),
+            shape = RoundedCornerShape(8.dp),
             color = if (isAllSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.22f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
-            border = androidx.compose.foundation.BorderStroke(
+            border = BorderStroke(
                 1.dp,
                 if (isAllSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = 0.12f),
             ),
@@ -245,15 +250,15 @@ private fun DiscoverQuickGenreChipsRow(
 
         genres.forEach { genre ->
             val isSelected = selectedGenre.equals(genre, ignoreCase = true)
-            androidx.compose.material3.Surface(
+            Surface(
                 modifier = Modifier
-                    .androidx.compose.ui.draw.clip(androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
+                    .clip(RoundedCornerShape(8.dp))
                     .clickable {
                         onGenreSelected(if (isSelected) null else genre)
                     },
-                shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp),
+                shape = RoundedCornerShape(8.dp),
                 color = if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.22f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
-                border = androidx.compose.foundation.BorderStroke(
+                border = BorderStroke(
                     1.dp,
                     if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = 0.12f),
                 ),
