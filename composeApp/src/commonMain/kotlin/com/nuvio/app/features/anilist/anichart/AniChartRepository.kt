@@ -17,6 +17,7 @@ import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.intOrNull
@@ -382,4 +383,5 @@ object AniChartRepository {
     private fun JsonElement?.asIntOrNull(): Int? = if (this is JsonPrimitive) this.intOrNull else null
     private fun JsonElement?.asLongOrNull(): Long? = if (this is JsonPrimitive) this.longOrNull else null
     private fun JsonElement?.asDoubleOrNull(): Double? = if (this is JsonPrimitive) this.doubleOrNull else null
+    private fun JsonElement?.asBooleanOrNull(): Boolean? = if (this is JsonPrimitive && this !is JsonNull) (this.booleanOrNull ?: this.contentOrNull?.toBooleanStrictOrNull()) else null
 }

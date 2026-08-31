@@ -11,6 +11,7 @@ import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.intOrNull
@@ -98,6 +99,9 @@ object AnilistApi {
 
     private fun JsonElement?.asLongOrNull(): Long? =
         if (this is JsonPrimitive && this !is JsonNull) (this.longOrNull ?: this.contentOrNull?.toLongOrNull()) else null
+
+    private fun JsonElement?.asBooleanOrNull(): Boolean? =
+        if (this is JsonPrimitive && this !is JsonNull) (this.booleanOrNull ?: this.contentOrNull?.toBooleanStrictOrNull()) else null
 
     suspend fun fetchCurrentUser(token: String): AnilistUser? {
         val query = """
