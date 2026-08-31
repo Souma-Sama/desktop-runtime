@@ -53,6 +53,18 @@ object AnilistPreferencesRepository {
         updateAndPersist { it.copy(autoAddNewAnime = enabled) }
     }
 
+    fun setStreamIdOverride(anilistId: Int, overrideValue: String?) {
+        updateAndPersist { current ->
+            val updated = current.streamIdOverrides.toMutableMap()
+            if (overrideValue != null) {
+                updated[anilistId] = overrideValue
+            } else {
+                updated.remove(anilistId)
+            }
+            current.copy(streamIdOverrides = updated)
+        }
+    }
+
     fun getEffectiveSections(isAuthenticated: Boolean): List<AnilistSectionSettings> {
         ensureLoaded()
         val savedSections = _preferences.value.librarySections

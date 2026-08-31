@@ -561,6 +561,27 @@ private fun MobileStreamsLayout(
                             modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
                         )
                     }
+                    val anilistIdForStreamQuickBar = remember(parentMetaId) {
+                        com.nuvio.app.features.anilist.AnilistTrackerCoordinator.extractAnilistId(parentMetaId)
+                    }
+                    if (anilistIdForStreamQuickBar != null) {
+                        com.nuvio.app.features.anilist.streams.AnimeStreamIdQuickBar(
+                            anilistId = anilistIdForStreamQuickBar,
+                            seasonNumber = seasonNumber,
+                            episodeNumber = episodeNumber,
+                            isMovie = type == "movie",
+                            onOptionChanged = { newVideoId ->
+                                StreamsRepository.reload(
+                                    type = type,
+                                    videoId = newVideoId,
+                                    parentMetaId = parentMetaId,
+                                    season = seasonNumber,
+                                    episode = episodeNumber,
+                                    manualSelection = true,
+                                )
+                            },
+                        )
+                    }
                     ProviderFilterRow(
                         groups = uiState.groups,
                         selectedFilter = uiState.selectedFilter,

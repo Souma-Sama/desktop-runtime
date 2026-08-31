@@ -299,6 +299,14 @@ object AnilistMetaDetailsResolver {
             "https://images.metahub.space/logo/medium/$effectiveImdbId/img"
         } else null
 
+        com.nuvio.app.features.anilist.streams.AnimeStreamIdManager.registerOptions(
+            anilistId = anilistId,
+            imdbId = effectiveImdbId,
+            kitsuId = arm.kitsuId,
+            tmdbId = arm.tmdbId,
+            season = targetSeason,
+        )
+
         buildBaseMetaFromAnilistMedia(
             media = media,
             backdrop = backdrop,
@@ -488,6 +496,14 @@ object AnilistMetaDetailsResolver {
 
             val kitsuId = arm.kitsuId?.removePrefix("kitsu:")?.takeIf { it.isNotBlank() }
                 ?: resolveKitsuId(anilistId, media)
+
+            com.nuvio.app.features.anilist.streams.AnimeStreamIdManager.registerOptions(
+                anilistId = anilistId,
+                imdbId = effectiveImdbId,
+                kitsuId = kitsuId,
+                tmdbId = arm.tmdbId,
+                season = targetSeason,
+            )
 
             // Update Metahub backdrop immediately as soon as IMDb ID resolves
             if (!effectiveImdbId.isNullOrBlank()) {

@@ -228,9 +228,61 @@ fun DetailActionButtons(
 
             if (trackerState.isAnime || isAnimeCandidate) {
                 Spacer(modifier = Modifier.width(12.dp))
+                AnimeStreamIdButton(meta = meta, size = iconButtonSize)
+                Spacer(modifier = Modifier.width(12.dp))
                 AnimeTrackerButton(meta = meta, title = title, size = iconButtonSize)
             }
         }
+    }
+}
+
+@Composable
+fun AnimeStreamIdButton(
+    meta: com.nuvio.app.features.details.MetaDetails?,
+    size: Dp,
+    modifier: Modifier = Modifier,
+) {
+    val anilistPrefs by com.nuvio.app.features.anilist.AnilistPreferencesRepository.preferences.collectAsState()
+    if (!anilistPrefs.enabled) return
+
+    val anilistId = remember(meta?.id) {
+        com.nuvio.app.features.anilist.AnilistTrackerCoordinator.extractAnilistId(meta?.id)
+    } ?: return
+
+    val activeOption = remember(anilistId, anilistPrefs) {
+        com.nuvio.app.features.anilist.streams.AnimeStreamIdManager.getActiveOption(anilistId)
+    }
+    var showSheet by remember { mutableStateOf(false) }
+
+    Surface(
+        modifier = modifier.size(size),
+        shape = CircleShape,
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.82f),
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        tonalElevation = 6.dp,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(size)
+                .clickable(role = Role.Button) {
+                    showSheet = true
+                },
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = androidx.compose.material.icons.Icons.Default.ElectricBolt,
+                contentDescription = "Stream ID: ${activeOption.formattedLabel}",
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(20.dp),
+            )
+        }
+    }
+
+    if (showSheet) {
+        com.nuvio.app.features.anilist.streams.AnimeStreamIdSelectorSheet(
+            anilistId = anilistId,
+            onDismiss = { showSheet = false },
+        )
     }
 }
 

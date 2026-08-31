@@ -24,6 +24,7 @@ data class AnilistPreferences(
     val showPosterMalScore: Boolean = true,
     val posterScoreFormat: AnilistPosterScoreFormat = AnilistPosterScoreFormat.PERCENTAGE,
     val librarySections: List<AnilistSectionSettings> = defaultAuthenticatedSections,
+    val streamIdOverrides: Map<Int, String> = emptyMap(),
 ) {
     companion object {
         val defaultUnauthenticatedSections = listOf(

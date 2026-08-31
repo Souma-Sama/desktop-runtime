@@ -618,9 +618,21 @@ fun MetaDetailsScreen(
                 val seriesPauseDescription = remember(seriesActionVideo) {
                     seriesActionVideo?.overview
                 }
-                val seriesStreamVideoId = remember(seriesAction, seriesActionVideo) {
+                val anilistPrefsForStreamId by com.nuvio.app.features.anilist.AnilistPreferencesRepository.preferences.collectAsState()
+                val seriesStreamVideoId = remember(seriesAction, seriesActionVideo, anilistPrefsForStreamId) {
                     val action = seriesAction ?: return@remember null
-                    seriesActionVideo?.id?.takeIf { it.isNotBlank() } ?: action.videoId
+                    val raw = seriesActionVideo?.id?.takeIf { it.isNotBlank() } ?: action.videoId
+                    if (meta.id.startsWith("ani_") || meta.id.startsWith("anilist:")) {
+                        com.nuvio.app.features.anilist.streams.AnimeStreamIdManager.resolvePlaybackVideoId(
+                            parentMetaId = meta.id,
+                            season = action.seasonNumber ?: 1,
+                            episode = action.episodeNumber ?: 1,
+                            isMovie = meta.type == "movie",
+                            fallbackVideoId = raw,
+                        )
+                    } else {
+                        raw
+                    }
                 }
                 val hasEpisodes = meta.videos.any { it.season != null || it.episode != null }
                 val hasProductionSection = remember(meta) {
@@ -754,9 +766,20 @@ fun MetaDetailsScreen(
                         }
 
                         else -> {
+                            val movieVideoId = if (meta.id.startsWith("ani_") || meta.id.startsWith("anilist:")) {
+                                com.nuvio.app.features.anilist.streams.AnimeStreamIdManager.resolvePlaybackVideoId(
+                                    parentMetaId = meta.id,
+                                    season = 1,
+                                    episode = 1,
+                                    isMovie = true,
+                                    fallbackVideoId = meta.id,
+                                )
+                            } else {
+                                meta.id
+                            }
                             onPlay?.invoke(
                                 meta.type,
-                                meta.id,
+                                movieVideoId,
                                 meta.id,
                                 meta.type,
                                 meta.name,
@@ -800,9 +823,20 @@ fun MetaDetailsScreen(
                                 }
 
                                 else -> {
+                                    val movieVideoId = if (meta.id.startsWith("ani_") || meta.id.startsWith("anilist:")) {
+                                        com.nuvio.app.features.anilist.streams.AnimeStreamIdManager.resolvePlaybackVideoId(
+                                            parentMetaId = meta.id,
+                                            season = 1,
+                                            episode = 1,
+                                            isMovie = true,
+                                            fallbackVideoId = meta.id,
+                                        )
+                                    } else {
+                                        meta.id
+                                    }
                                     manualPlay(
                                         meta.type,
-                                        meta.id,
+                                        movieVideoId,
                                         meta.id,
                                         meta.type,
                                         meta.name,
@@ -829,7 +863,18 @@ fun MetaDetailsScreen(
                         episodeNumber = episode,
                         fallbackVideoId = video.id,
                     )
-                    val streamVideoId = video.id.takeIf { it.isNotBlank() } ?: playbackVideoId
+                    val rawStreamVideoId = video.id.takeIf { it.isNotBlank() } ?: playbackVideoId
+                    val streamVideoId = if (meta.id.startsWith("ani_") || meta.id.startsWith("anilist:")) {
+                        com.nuvio.app.features.anilist.streams.AnimeStreamIdManager.resolvePlaybackVideoId(
+                            parentMetaId = meta.id,
+                            season = season ?: 1,
+                            episode = episode ?: 1,
+                            isMovie = meta.type == "movie",
+                            fallbackVideoId = rawStreamVideoId,
+                        )
+                    } else {
+                        rawStreamVideoId
+                    }
                     val savedProgress = watchProgressUiState.progressForVideo(
                         videoId = streamVideoId,
                         parentMetaId = meta.id,
@@ -863,7 +908,18 @@ fun MetaDetailsScreen(
                         episodeNumber = episode,
                         fallbackVideoId = video.id,
                     )
-                    val streamVideoId = video.id.takeIf { it.isNotBlank() } ?: playbackVideoId
+                    val rawStreamVideoId = video.id.takeIf { it.isNotBlank() } ?: playbackVideoId
+                    val streamVideoId = if (meta.id.startsWith("ani_") || meta.id.startsWith("anilist:")) {
+                        com.nuvio.app.features.anilist.streams.AnimeStreamIdManager.resolvePlaybackVideoId(
+                            parentMetaId = meta.id,
+                            season = season ?: 1,
+                            episode = episode ?: 1,
+                            isMovie = meta.type == "movie",
+                            fallbackVideoId = rawStreamVideoId,
+                        )
+                    } else {
+                        rawStreamVideoId
+                    }
                     val savedProgress = watchProgressUiState.progressForVideo(
                         videoId = streamVideoId,
                         parentMetaId = meta.id,
