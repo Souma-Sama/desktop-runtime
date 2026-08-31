@@ -2339,7 +2339,7 @@ object AnilistApi {
                   hasNextPage
                   currentPage
                 }
-                threads(mediaCategoryId: ${'$'}mediaId, sort: [IS_STICKY_DESC, REPLIED_AT_DESC]) {
+                threads(mediaCategoryId: ${'$'}mediaId, sort: [IS_STICKY, REPLIED_AT_DESC]) {
                   id
                   title
                   body
