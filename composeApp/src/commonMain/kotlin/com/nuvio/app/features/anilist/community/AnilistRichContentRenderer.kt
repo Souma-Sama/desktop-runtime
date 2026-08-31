@@ -107,8 +107,8 @@ fun AnilistRichContentRenderer(
                         contentAlignment = Alignment.Center,
                     ) {
                         val shape = RoundedCornerShape(12.dp)
-                        AsyncImage(
-                            model = block.url,
+                        ReviewMediaImage(
+                            url = block.url,
                             contentDescription = "Review media",
                             modifier = Modifier
                                 .fillMaxWidth()
