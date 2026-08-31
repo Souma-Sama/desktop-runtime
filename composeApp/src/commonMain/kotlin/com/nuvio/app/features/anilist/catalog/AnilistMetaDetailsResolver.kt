@@ -279,7 +279,7 @@ object AnilistMetaDetailsResolver {
                 isSpecial -> 0
                 else -> cachedArm?.season ?: 1
             }
-            val effectiveImdbId = cachedArm?.imdbId ?: MetaHubArtwork.getImdbId(rawId)
+            val effectiveImdbId = cachedArm?.imdbId ?: MetaHubArtwork.extractImdbId(rawId)
             val backdrop = if (!effectiveImdbId.isNullOrBlank()) {
                 "https://images.metahub.space/background/medium/$effectiveImdbId/img"
             } else cached.bannerImage
