@@ -95,7 +95,7 @@ fun AnilistRichContentRenderer(
         }
 
         NuvioDesktopVerticalScrollbar(
-            listState = listState,
+            state = listState,
             modifier = Modifier
                 .align(Alignment.CenterEnd)
                 .padding(vertical = 4.dp),
