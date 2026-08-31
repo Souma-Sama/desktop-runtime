@@ -24,7 +24,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -33,7 +32,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.CalendarToday
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.DeleteOutline
@@ -54,7 +52,7 @@ import androidx.compose.material.icons.outlined.RemoveCircleOutline
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -64,11 +62,10 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -93,6 +90,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
+import com.nuvio.app.core.ui.NuvioModalBottomSheet
+import com.nuvio.app.core.ui.dismissNuvioBottomSheet
 import com.nuvio.app.features.anilist.AnilistAuthRepository
 import com.nuvio.app.features.anilist.AnilistFuzzyDate
 import com.nuvio.app.features.anilist.AnilistMediaListStatus
@@ -127,7 +126,7 @@ fun AnimeTrackerButton(
     title: String? = null,
     size: Dp = 52.dp,
 ) {
-    var menuExpanded by remember { mutableStateOf(false) }
+    var showSheet by remember { mutableStateOf(false) }
     val trackerState by AnilistTrackerCoordinator.trackerState.collectAsState()
     val isTrackingActive = trackerState.entry?.status != null
     val currentStatus = trackerState.entry?.status
@@ -139,7 +138,7 @@ fun AnimeTrackerButton(
     val containerColor by animateColorAsState(
         targetValue = when {
             isTrackingActive -> statusColor.copy(alpha = 0.16f)
-            menuExpanded -> MaterialTheme.colorScheme.onBackground
+            showSheet -> MaterialTheme.colorScheme.onBackground
             else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.85f)
         },
         animationSpec = tween(250),
@@ -149,7 +148,7 @@ fun AnimeTrackerButton(
     val borderColor by animateColorAsState(
         targetValue = when {
             isTrackingActive -> statusColor.copy(alpha = 0.65f)
-            menuExpanded -> MaterialTheme.colorScheme.primary
+            showSheet -> MaterialTheme.colorScheme.primary
             else -> MaterialTheme.colorScheme.outline.copy(alpha = 0.18f)
         },
         animationSpec = tween(250),
@@ -162,7 +161,7 @@ fun AnimeTrackerButton(
                 .size(size)
                 .clip(CircleShape)
                 .border(
-                    width = if (isTrackingActive || menuExpanded) 1.5.dp else 1.dp,
+                    width = if (isTrackingActive || showSheet) 1.5.dp else 1.dp,
                     color = borderColor,
                     shape = CircleShape,
                 ),
@@ -175,8 +174,8 @@ fun AnimeTrackerButton(
                     .size(size)
                     .clickable(role = Role.Button) {
                         hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                        menuExpanded = !menuExpanded
-                        if (menuExpanded && trackerState.media == null) {
+                        showSheet = true
+                        if (trackerState.media == null) {
                             val metaYear = meta?.releaseInfo?.take(4)?.toIntOrNull()
                             AnilistTrackerCoordinator.loadForMedia(
                                 title = effectiveTitle,
@@ -219,33 +218,48 @@ fun AnimeTrackerButton(
             }
         }
 
-        DropdownMenu(
-            expanded = menuExpanded,
-            onDismissRequest = { menuExpanded = false },
-            modifier = Modifier
-                .widthIn(min = 340.dp, max = 390.dp)
-                .background(
-                    color = MaterialTheme.colorScheme.surface,
-                    shape = RoundedCornerShape(20.dp),
-                )
-                .border(
-                    width = 1.dp,
-                    color = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f),
-                    shape = RoundedCornerShape(20.dp),
-                )
-                .padding(4.dp),
-        ) {
-            AnimeTrackerDropdownContent(
+        if (showSheet) {
+            AnimeTrackerSheet(
                 meta = meta,
                 title = effectiveTitle,
-                onClose = { menuExpanded = false },
+                onDismiss = { showSheet = false },
             )
         }
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AnimeTrackerDropdownContent(
+fun AnimeTrackerSheet(
+    meta: com.nuvio.app.features.details.MetaDetails? = null,
+    title: String? = null,
+    onDismiss: () -> Unit,
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val coroutineScope = rememberCoroutineScope()
+
+    NuvioModalBottomSheet(
+        onDismissRequest = {
+            coroutineScope.launch {
+                dismissNuvioBottomSheet(sheetState = sheetState, onDismiss = onDismiss)
+            }
+        },
+        sheetState = sheetState,
+    ) {
+        AnimeTrackerSheetContent(
+            meta = meta,
+            title = title,
+            onClose = {
+                coroutineScope.launch {
+                    dismissNuvioBottomSheet(sheetState = sheetState, onDismiss = onDismiss)
+                }
+            },
+        )
+    }
+}
+
+@Composable
+fun AnimeTrackerSheetContent(
     meta: com.nuvio.app.features.details.MetaDetails? = null,
     title: String? = null,
     onClose: () -> Unit,
@@ -261,7 +275,8 @@ fun AnimeTrackerDropdownContent(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(14.dp),
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 20.dp, vertical = 8.dp),
     ) {
         // --- 1. HEADER BAR ---
         Row(
@@ -271,18 +286,18 @@ fun AnimeTrackerDropdownContent(
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 Surface(
                     color = Color(0xFF00A2FF).copy(alpha = 0.15f),
-                    shape = RoundedCornerShape(8.dp),
+                    shape = RoundedCornerShape(10.dp),
                 ) {
                     Image(
                         painter = painterResource(Res.drawable.rating_anilist),
                         contentDescription = null,
                         modifier = Modifier
-                            .padding(4.dp)
-                            .size(20.dp),
+                            .padding(6.dp)
+                            .size(22.dp),
                     )
                 }
                 Column {
@@ -290,7 +305,7 @@ fun AnimeTrackerDropdownContent(
                         text = "AniList Tracker",
                         style = MaterialTheme.typography.titleMedium.copy(
                             fontWeight = FontWeight.Bold,
-                            fontSize = 15.sp,
+                            fontSize = 17.sp,
                         ),
                         color = MaterialTheme.colorScheme.onSurface,
                     )
@@ -299,7 +314,7 @@ fun AnimeTrackerDropdownContent(
 
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 if (trackerState.isAuthenticated) {
                     val user = trackerState.user
@@ -309,8 +324,8 @@ fun AnimeTrackerDropdownContent(
                     ) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
-                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
                         ) {
                             val avatarUrl = user?.avatarUrl
                             if (avatarUrl != null) {
@@ -318,7 +333,7 @@ fun AnimeTrackerDropdownContent(
                                     model = avatarUrl,
                                     contentDescription = null,
                                     modifier = Modifier
-                                        .size(16.dp)
+                                        .size(18.dp)
                                         .clip(CircleShape),
                                     contentScale = ContentScale.Crop,
                                 )
@@ -327,7 +342,7 @@ fun AnimeTrackerDropdownContent(
                                 text = user?.name ?: "Connected",
                                 style = MaterialTheme.typography.labelSmall.copy(
                                     fontWeight = FontWeight.Bold,
-                                    fontSize = 11.sp,
+                                    fontSize = 12.sp,
                                 ),
                                 color = MaterialTheme.colorScheme.primary,
                                 maxLines = 1,
@@ -338,49 +353,49 @@ fun AnimeTrackerDropdownContent(
 
                 IconButton(
                     onClick = onClose,
-                    modifier = Modifier.size(28.dp),
+                    modifier = Modifier.size(32.dp),
                 ) {
                     Icon(
                         imageVector = Icons.Default.Close,
                         contentDescription = "Close",
-                        modifier = Modifier.size(16.dp),
+                        modifier = Modifier.size(18.dp),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
         }
 
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(14.dp))
 
         // --- 2. AUTHENTICATION PROMPT (If not logged in) ---
         if (!trackerState.isAuthenticated) {
             Surface(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(14.dp),
+                shape = RoundedCornerShape(16.dp),
                 color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.12f)),
             ) {
-                Column(modifier = Modifier.padding(12.dp)) {
+                Column(modifier = Modifier.padding(16.dp)) {
                     Text(
                         text = "Connect your AniList account to sync watch progress, ratings, dates, notes, and custom lists across devices.",
                         style = MaterialTheme.typography.bodySmall.copy(
-                            fontSize = 12.sp,
-                            lineHeight = 16.sp,
+                            fontSize = 13.sp,
+                            lineHeight = 18.sp,
                         ),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
 
                     if (!showTokenInput) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
                         ) {
                             Button(
                                 onClick = {
                                     uriHandler.openUri(AnilistAuthRepository.OAUTH_AUTHORIZE_URL)
                                 },
-                                shape = RoundedCornerShape(10.dp),
+                                shape = RoundedCornerShape(12.dp),
                                 modifier = Modifier.weight(1f),
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = Color(0xFF00A2FF),
@@ -390,16 +405,16 @@ fun AnimeTrackerDropdownContent(
                                 Icon(
                                     imageVector = Icons.Default.OpenInNew,
                                     contentDescription = null,
-                                    modifier = Modifier.size(14.dp),
+                                    modifier = Modifier.size(15.dp),
                                 )
                                 Spacer(modifier = Modifier.width(6.dp))
-                                Text("Authorize", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                Text("Authorize", fontSize = 13.sp, fontWeight = FontWeight.Bold)
                             }
                             OutlinedButton(
                                 onClick = { showTokenInput = true },
-                                shape = RoundedCornerShape(10.dp),
+                                shape = RoundedCornerShape(12.dp),
                             ) {
-                                Text("Paste Token", fontSize = 12.sp)
+                                Text("Paste Token", fontSize = 13.sp)
                             }
                         }
                     } else {
@@ -407,16 +422,16 @@ fun AnimeTrackerDropdownContent(
                             OutlinedTextField(
                                 value = tokenInput,
                                 onValueChange = { tokenInput = it },
-                                placeholder = { Text("Paste AniList Token / Pin URL...", fontSize = 11.sp) },
+                                placeholder = { Text("Paste AniList Token / Pin URL...", fontSize = 12.sp) },
                                 singleLine = true,
-                                shape = RoundedCornerShape(10.dp),
-                                textStyle = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
+                                shape = RoundedCornerShape(12.dp),
+                                textStyle = MaterialTheme.typography.bodySmall.copy(fontSize = 13.sp),
                                 modifier = Modifier.fillMaxWidth(),
                             )
-                            Spacer(modifier = Modifier.height(6.dp))
+                            Spacer(modifier = Modifier.height(8.dp))
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
                             ) {
                                 Button(
                                     onClick = {
@@ -429,21 +444,22 @@ fun AnimeTrackerDropdownContent(
                                         }
                                     },
                                     enabled = tokenInput.isNotBlank(),
-                                    shape = RoundedCornerShape(8.dp),
+                                    shape = RoundedCornerShape(10.dp),
                                     modifier = Modifier.weight(1f),
                                 ) {
-                                    Text("Save Token", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                    Text("Save Token", fontSize = 13.sp, fontWeight = FontWeight.Bold)
                                 }
                                 TextButton(
                                     onClick = { showTokenInput = false },
                                 ) {
-                                    Text("Cancel", fontSize = 12.sp)
+                                    Text("Cancel", fontSize = 13.sp)
                                 }
                             }
                         }
                     }
                 }
             }
+            Spacer(modifier = Modifier.height(24.dp))
             return@Column
         }
 
@@ -452,25 +468,26 @@ fun AnimeTrackerDropdownContent(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(120.dp),
+                    .height(140.dp),
                 contentAlignment = Alignment.Center,
             ) {
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
                     CircularProgressIndicator(
-                        modifier = Modifier.size(24.dp),
+                        modifier = Modifier.size(28.dp),
                         strokeWidth = 2.5.dp,
                         color = Color(0xFF00A2FF),
                     )
                     Text(
                         text = "Matching anime on AniList...",
-                        style = MaterialTheme.typography.labelSmall,
+                        style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
+            Spacer(modifier = Modifier.height(24.dp))
             return@Column
         }
 
@@ -478,18 +495,18 @@ fun AnimeTrackerDropdownContent(
         if (trackerState.media == null) {
             Surface(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(14.dp),
+                shape = RoundedCornerShape(16.dp),
                 color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.12f)),
             ) {
-                Column(modifier = Modifier.padding(12.dp)) {
+                Column(modifier = Modifier.padding(14.dp)) {
                     Text(
                         text = trackerState.error ?: "Could not automatically match this anime on AniList.",
-                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
+                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 13.sp),
                         color = MaterialTheme.colorScheme.error,
                         fontWeight = FontWeight.Medium,
                     )
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(10.dp))
 
                     val effectiveRetryTitle = title?.takeIf { it.isNotBlank() } ?: meta?.name.orEmpty()
                     if (effectiveRetryTitle.isNotBlank() || meta != null) {
@@ -507,25 +524,25 @@ fun AnimeTrackerDropdownContent(
                                 )
                             },
                             modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(10.dp),
+                            shape = RoundedCornerShape(12.dp),
                         ) {
-                            Icon(imageVector = Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(14.dp))
+                            Icon(imageVector = Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(15.dp))
                             Spacer(modifier = Modifier.width(6.dp))
-                            Text("Retry Auto-Detect", fontSize = 12.sp)
+                            Text("Retry Auto-Detect", fontSize = 13.sp)
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(10.dp))
                     OutlinedTextField(
                         value = manualSearchText,
                         onValueChange = { manualSearchText = it },
-                        placeholder = { Text("Search title or enter AniList ID...", fontSize = 11.sp) },
+                        placeholder = { Text("Search title or enter AniList ID...", fontSize = 12.sp) },
                         singleLine = true,
-                        shape = RoundedCornerShape(10.dp),
-                        textStyle = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
+                        shape = RoundedCornerShape(12.dp),
+                        textStyle = MaterialTheme.typography.bodySmall.copy(fontSize = 13.sp),
                         modifier = Modifier.fillMaxWidth(),
                     )
-                    Spacer(modifier = Modifier.height(6.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
                     Button(
                         onClick = {
                             if (manualSearchText.isNotBlank()) {
@@ -546,13 +563,14 @@ fun AnimeTrackerDropdownContent(
                             }
                         },
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(10.dp),
+                        shape = RoundedCornerShape(12.dp),
                         enabled = manualSearchText.isNotBlank(),
                     ) {
-                        Text("Search AniList", fontSize = 12.sp)
+                        Text("Search AniList", fontSize = 13.sp)
                     }
                 }
             }
+            Spacer(modifier = Modifier.height(24.dp))
             return@Column
         }
 
@@ -562,23 +580,23 @@ fun AnimeTrackerDropdownContent(
         // --- 5. MATCHED ANIME IDENTITY CARD ---
         Surface(
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(14.dp),
+            shape = RoundedCornerShape(16.dp),
             color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.12f)),
         ) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(8.dp),
+                    .padding(10.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 // Cover Image
                 val cover = media.coverImage?.large ?: media.coverImage?.medium
                 Box(
                     modifier = Modifier
-                        .size(width = 44.dp, height = 62.dp)
-                        .clip(RoundedCornerShape(8.dp))
+                        .size(width = 48.dp, height = 68.dp)
+                        .clip(RoundedCornerShape(10.dp))
                         .background(MaterialTheme.colorScheme.surfaceVariant),
                 ) {
                     if (cover != null) {
@@ -599,8 +617,8 @@ fun AnimeTrackerDropdownContent(
                         text = media.title?.displayTitle ?: "Anime",
                         style = MaterialTheme.typography.titleSmall.copy(
                             fontWeight = FontWeight.Bold,
-                            fontSize = 13.sp,
-                            lineHeight = 17.sp,
+                            fontSize = 14.sp,
+                            lineHeight = 18.sp,
                         ),
                         color = MaterialTheme.colorScheme.onSurface,
                         maxLines = 2,
@@ -616,7 +634,7 @@ fun AnimeTrackerDropdownContent(
                     if (metaLine.isNotBlank()) {
                         Text(
                             text = metaLine,
-                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1,
                         )
@@ -625,18 +643,18 @@ fun AnimeTrackerDropdownContent(
                     if (media.averageScore != null && media.averageScore > 0) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(3.dp),
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Star,
                                 contentDescription = null,
                                 tint = Color(0xFFFFB800),
-                                modifier = Modifier.size(11.dp),
+                                modifier = Modifier.size(12.dp),
                             )
                             Text(
                                 text = "${media.averageScore}% community score",
                                 style = MaterialTheme.typography.labelSmall.copy(
-                                    fontSize = 10.sp,
+                                    fontSize = 11.sp,
                                     fontWeight = FontWeight.SemiBold,
                                 ),
                                 color = MaterialTheme.colorScheme.primary,
@@ -647,14 +665,14 @@ fun AnimeTrackerDropdownContent(
             }
         }
 
-        Spacer(modifier = Modifier.height(14.dp))
+        Spacer(modifier = Modifier.height(16.dp))
 
         // --- 6. WATCH STATUS CAPSULES GRID ---
         Text(
             text = "Watch Status",
             style = MaterialTheme.typography.labelMedium.copy(
                 fontWeight = FontWeight.Bold,
-                fontSize = 12.sp,
+                fontSize = 13.sp,
             ),
             color = MaterialTheme.colorScheme.onSurface,
         )
@@ -671,23 +689,23 @@ fun AnimeTrackerDropdownContent(
             Triple(AnilistMediaListStatus.REPEATING, Icons.Default.Replay, StatusColorRepeating),
         )
 
-        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             statuses.chunked(2).forEach { rowStatuses ->
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     rowStatuses.forEach { (status, icon, color) ->
                         val isSelected = currentStatus == status
                         Surface(
                             modifier = Modifier
                                 .weight(1f)
-                                .clip(RoundedCornerShape(12.dp))
+                                .clip(RoundedCornerShape(14.dp))
                                 .clickable {
                                     hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                     AnilistTrackerCoordinator.updateStatus(status)
                                 },
-                            shape = RoundedCornerShape(12.dp),
+                            shape = RoundedCornerShape(14.dp),
                             color = if (isSelected) color.copy(alpha = 0.18f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
                             border = BorderStroke(
                                 width = if (isSelected) 1.5.dp else 1.dp,
@@ -697,21 +715,21 @@ fun AnimeTrackerDropdownContent(
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(horizontal = 10.dp, vertical = 9.dp),
+                                    .padding(horizontal = 12.dp, vertical = 10.dp),
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
                             ) {
                                 Icon(
                                     imageVector = icon,
                                     contentDescription = null,
-                                    modifier = Modifier.size(15.dp),
+                                    modifier = Modifier.size(17.dp),
                                     tint = if (isSelected) color else MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                                 Text(
                                     text = status.label,
                                     style = MaterialTheme.typography.labelMedium.copy(
                                         fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                        fontSize = 12.sp,
+                                        fontSize = 13.sp,
                                     ),
                                     color = if (isSelected) color else MaterialTheme.colorScheme.onSurface,
                                     maxLines = 1,
@@ -723,7 +741,7 @@ fun AnimeTrackerDropdownContent(
             }
         }
 
-        Spacer(modifier = Modifier.height(14.dp))
+        Spacer(modifier = Modifier.height(16.dp))
 
         // --- 7. EPISODE PROGRESS STEPPER & PROGRESS BAR ---
         val episodesTotal = media.episodes
@@ -737,14 +755,14 @@ fun AnimeTrackerDropdownContent(
 
         Surface(
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(14.dp),
+            shape = RoundedCornerShape(16.dp),
             color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.1f)),
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(12.dp),
+                    .padding(14.dp),
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -753,7 +771,7 @@ fun AnimeTrackerDropdownContent(
                 ) {
                     Text(
                         text = "Episode Progress",
-                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, fontSize = 13.sp),
                         color = MaterialTheme.colorScheme.onSurface,
                     )
 
@@ -765,14 +783,14 @@ fun AnimeTrackerDropdownContent(
                         },
                         style = MaterialTheme.typography.labelMedium.copy(
                             fontWeight = FontWeight.ExtraBold,
-                            fontSize = 13.sp,
+                            fontSize = 14.sp,
                         ),
                         color = activeColor,
                     )
                 }
 
                 if (episodesTotal != null && episodesTotal > 0) {
-                    Spacer(modifier = Modifier.height(6.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
                     val animatedProgress by animateFloatAsState(
                         targetValue = progressFraction,
                         animationSpec = tween(300),
@@ -790,11 +808,11 @@ fun AnimeTrackerDropdownContent(
                     )
                 }
 
-                Spacer(modifier = Modifier.height(10.dp))
+                Spacer(modifier = Modifier.height(12.dp))
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     // Decrement Button
@@ -804,12 +822,12 @@ fun AnimeTrackerDropdownContent(
                             AnilistTrackerCoordinator.decrementProgress()
                         },
                         enabled = currentProgress > 0,
-                        shape = RoundedCornerShape(10.dp),
+                        shape = RoundedCornerShape(12.dp),
                         modifier = Modifier.weight(1f),
                     ) {
                         Icon(imageVector = Icons.Default.Remove, contentDescription = "Minus 1", modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text("-1", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        Text("-1", fontSize = 13.sp, fontWeight = FontWeight.Bold)
                     }
 
                     // Increment Button
@@ -819,7 +837,7 @@ fun AnimeTrackerDropdownContent(
                             AnilistTrackerCoordinator.incrementProgress()
                         },
                         enabled = episodesTotal == null || currentProgress < episodesTotal,
-                        shape = RoundedCornerShape(10.dp),
+                        shape = RoundedCornerShape(12.dp),
                         modifier = Modifier.weight(1f),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = activeColor,
@@ -828,13 +846,13 @@ fun AnimeTrackerDropdownContent(
                     ) {
                         Icon(imageVector = Icons.Default.Add, contentDescription = "Plus 1", modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text("+1 Ep", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        Text("+1 Ep", fontSize = 13.sp, fontWeight = FontWeight.Bold)
                     }
                 }
             }
         }
 
-        Spacer(modifier = Modifier.height(14.dp))
+        Spacer(modifier = Modifier.height(16.dp))
 
         // --- 8. SCORE RATING SECTION (1-10 STARS) ---
         val currentScore = entry?.score ?: 0.0
@@ -842,14 +860,14 @@ fun AnimeTrackerDropdownContent(
 
         Surface(
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(14.dp),
+            shape = RoundedCornerShape(16.dp),
             color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.1f)),
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(12.dp),
+                    .padding(14.dp),
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -858,7 +876,7 @@ fun AnimeTrackerDropdownContent(
                 ) {
                     Text(
                         text = "Score",
-                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, fontSize = 13.sp),
                         color = MaterialTheme.colorScheme.onSurface,
                     )
 
@@ -880,13 +898,13 @@ fun AnimeTrackerDropdownContent(
                         text = ratingLabel,
                         style = MaterialTheme.typography.labelSmall.copy(
                             fontWeight = FontWeight.Bold,
-                            fontSize = 11.sp,
+                            fontSize = 12.sp,
                         ),
                         color = if (scoreInt > 0) Color(0xFFFFB800) else MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
 
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(10.dp))
 
                 // Star Row
                 Row(
@@ -898,7 +916,7 @@ fun AnimeTrackerDropdownContent(
                         val isFilled = starIndex <= scoreInt
                         Box(
                             modifier = Modifier
-                                .size(26.dp)
+                                .size(28.dp)
                                 .clip(CircleShape)
                                 .clickable {
                                     hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
@@ -910,7 +928,7 @@ fun AnimeTrackerDropdownContent(
                             Icon(
                                 imageVector = if (isFilled) Icons.Default.Star else Icons.Default.StarBorder,
                                 contentDescription = "Rate $starIndex",
-                                modifier = Modifier.size(20.dp),
+                                modifier = Modifier.size(22.dp),
                                 tint = if (isFilled) Color(0xFFFFB800) else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f),
                             )
                         }
@@ -919,43 +937,43 @@ fun AnimeTrackerDropdownContent(
             }
         }
 
-        Spacer(modifier = Modifier.height(14.dp))
+        Spacer(modifier = Modifier.height(16.dp))
 
         // --- 9. ADVANCED DETAILS (Dates, Repeat, Privacy, Notes) ---
         var showAdvancedOptions by remember { mutableStateOf(false) }
 
         Surface(
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(14.dp),
+            shape = RoundedCornerShape(16.dp),
             color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.1f)),
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(12.dp),
+                    .padding(14.dp),
             ) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(8.dp))
+                        .clip(RoundedCornerShape(10.dp))
                         .clickable { showAdvancedOptions = !showAdvancedOptions },
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         Icon(
                             imageVector = Icons.Default.Tune,
                             contentDescription = null,
-                            modifier = Modifier.size(16.dp),
+                            modifier = Modifier.size(17.dp),
                             tint = MaterialTheme.colorScheme.primary,
                         )
                         Text(
                             text = "Advanced Tracking Details",
-                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, fontSize = 13.sp),
                             color = MaterialTheme.colorScheme.onSurface,
                         )
                     }
@@ -964,7 +982,7 @@ fun AnimeTrackerDropdownContent(
                         text = if (showAdvancedOptions) "Hide ▲" else "Expand ▼",
                         style = MaterialTheme.typography.labelSmall.copy(
                             fontWeight = FontWeight.Bold,
-                            fontSize = 11.sp,
+                            fontSize = 12.sp,
                         ),
                         color = MaterialTheme.colorScheme.primary,
                     )
@@ -978,8 +996,8 @@ fun AnimeTrackerDropdownContent(
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(top = 12.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                            .padding(top = 14.dp),
+                        verticalArrangement = Arrangement.spacedBy(14.dp),
                     ) {
                         // Start Date
                         val startedAt = entry?.startedAt
@@ -990,12 +1008,12 @@ fun AnimeTrackerDropdownContent(
                         ) {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.CalendarMonth,
                                     contentDescription = null,
-                                    modifier = Modifier.size(16.dp),
+                                    modifier = Modifier.size(17.dp),
                                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                                 Column {
@@ -1005,7 +1023,7 @@ fun AnimeTrackerDropdownContent(
                                     )
                                     Text(
                                         text = startedAt?.formatted() ?: "Not set",
-                                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+                                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
                                         color = if (startedAt?.isSet == true) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
                                 }
@@ -1023,14 +1041,14 @@ fun AnimeTrackerDropdownContent(
                                         AnilistTrackerCoordinator.updateStartedAt(today)
                                     },
                                 ) {
-                                    Text("Set Today", fontSize = 11.sp)
+                                    Text("Set Today", fontSize = 12.sp)
                                 }
                                 if (startedAt?.isSet == true) {
                                     IconButton(
                                         onClick = { AnilistTrackerCoordinator.updateStartedAt(null) },
-                                        modifier = Modifier.size(28.dp),
+                                        modifier = Modifier.size(30.dp),
                                     ) {
-                                        Icon(imageVector = Icons.Default.Close, contentDescription = "Clear", modifier = Modifier.size(14.dp))
+                                        Icon(imageVector = Icons.Default.Close, contentDescription = "Clear", modifier = Modifier.size(15.dp))
                                     }
                                 }
                             }
@@ -1047,12 +1065,12 @@ fun AnimeTrackerDropdownContent(
                         ) {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.CalendarToday,
                                     contentDescription = null,
-                                    modifier = Modifier.size(16.dp),
+                                    modifier = Modifier.size(17.dp),
                                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                                 Column {
@@ -1062,7 +1080,7 @@ fun AnimeTrackerDropdownContent(
                                     )
                                     Text(
                                         text = completedAt?.formatted() ?: "Not set",
-                                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+                                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
                                         color = if (completedAt?.isSet == true) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
                                 }
@@ -1080,14 +1098,14 @@ fun AnimeTrackerDropdownContent(
                                         AnilistTrackerCoordinator.updateCompletedAt(today)
                                     },
                                 ) {
-                                    Text("Set Today", fontSize = 11.sp)
+                                    Text("Set Today", fontSize = 12.sp)
                                 }
                                 if (completedAt?.isSet == true) {
                                     IconButton(
                                         onClick = { AnilistTrackerCoordinator.updateCompletedAt(null) },
-                                        modifier = Modifier.size(28.dp),
+                                        modifier = Modifier.size(30.dp),
                                     ) {
-                                        Icon(imageVector = Icons.Default.Close, contentDescription = "Clear", modifier = Modifier.size(14.dp))
+                                        Icon(imageVector = Icons.Default.Close, contentDescription = "Clear", modifier = Modifier.size(15.dp))
                                     }
                                 }
                             }
@@ -1104,12 +1122,12 @@ fun AnimeTrackerDropdownContent(
                         ) {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Replay,
                                     contentDescription = null,
-                                    modifier = Modifier.size(16.dp),
+                                    modifier = Modifier.size(17.dp),
                                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                                 Column {
@@ -1119,7 +1137,7 @@ fun AnimeTrackerDropdownContent(
                                     )
                                     Text(
                                         text = "$currentRepeat times rewatched",
-                                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+                                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
                                 }
@@ -1127,10 +1145,10 @@ fun AnimeTrackerDropdownContent(
 
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
                             ) {
                                 Surface(
-                                    modifier = Modifier.size(28.dp),
+                                    modifier = Modifier.size(30.dp),
                                     shape = CircleShape,
                                     color = MaterialTheme.colorScheme.surfaceVariant,
                                 ) {
@@ -1141,28 +1159,28 @@ fun AnimeTrackerDropdownContent(
                                             }
                                         },
                                         enabled = currentRepeat > 0,
-                                        modifier = Modifier.size(28.dp),
+                                        modifier = Modifier.size(30.dp),
                                     ) {
-                                        Icon(imageVector = Icons.Default.Remove, contentDescription = null, modifier = Modifier.size(14.dp))
+                                        Icon(imageVector = Icons.Default.Remove, contentDescription = null, modifier = Modifier.size(15.dp))
                                     }
                                 }
 
                                 Text(
                                     text = "$currentRepeat",
-                                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, fontSize = 13.sp),
                                     modifier = Modifier.padding(horizontal = 6.dp),
                                 )
 
                                 Surface(
-                                    modifier = Modifier.size(28.dp),
+                                    modifier = Modifier.size(30.dp),
                                     shape = CircleShape,
                                     color = MaterialTheme.colorScheme.surfaceVariant,
                                 ) {
                                     IconButton(
                                         onClick = { AnilistTrackerCoordinator.updateRepeat(currentRepeat + 1) },
-                                        modifier = Modifier.size(28.dp),
+                                        modifier = Modifier.size(30.dp),
                                     ) {
-                                        Icon(imageVector = Icons.Default.Add, contentDescription = null, modifier = Modifier.size(14.dp))
+                                        Icon(imageVector = Icons.Default.Add, contentDescription = null, modifier = Modifier.size(15.dp))
                                     }
                                 }
                             }
@@ -1179,12 +1197,13 @@ fun AnimeTrackerDropdownContent(
                         ) {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                modifier = Modifier.weight(1f),
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Lock,
                                     contentDescription = null,
-                                    modifier = Modifier.size(16.dp),
+                                    modifier = Modifier.size(17.dp),
                                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                                 Column {
@@ -1194,7 +1213,7 @@ fun AnimeTrackerDropdownContent(
                                     )
                                     Text(
                                         text = "Hide this anime from your public profile",
-                                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+                                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
                                 }
@@ -1203,7 +1222,6 @@ fun AnimeTrackerDropdownContent(
                             Switch(
                                 checked = isPrivate,
                                 onCheckedChange = { AnilistTrackerCoordinator.updatePrivate(it) },
-                                modifier = Modifier.size(width = 44.dp, height = 24.dp),
                             )
                         }
 
@@ -1218,12 +1236,13 @@ fun AnimeTrackerDropdownContent(
                         ) {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                modifier = Modifier.weight(1f),
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.VisibilityOff,
                                     contentDescription = null,
-                                    modifier = Modifier.size(16.dp),
+                                    modifier = Modifier.size(17.dp),
                                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                                 Column {
@@ -1233,7 +1252,7 @@ fun AnimeTrackerDropdownContent(
                                     )
                                     Text(
                                         text = "Only show in custom lists",
-                                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+                                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
                                 }
@@ -1242,7 +1261,6 @@ fun AnimeTrackerDropdownContent(
                             Switch(
                                 checked = isHidden,
                                 onCheckedChange = { AnilistTrackerCoordinator.updateHiddenFromStatusLists(it) },
-                                modifier = Modifier.size(width = 44.dp, height = 24.dp),
                             )
                         }
 
@@ -1252,15 +1270,15 @@ fun AnimeTrackerDropdownContent(
                         var notesText by remember(entry?.notes) { mutableStateOf(entry?.notes.orEmpty()) }
                         var isNotesDirty by remember(entry?.notes) { mutableStateOf(false) }
 
-                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.EditNote,
                                     contentDescription = null,
-                                    modifier = Modifier.size(16.dp),
+                                    modifier = Modifier.size(17.dp),
                                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                                 Text(
@@ -1275,11 +1293,11 @@ fun AnimeTrackerDropdownContent(
                                     notesText = it
                                     isNotesDirty = true
                                 },
-                                placeholder = { Text("Write your thoughts or reminders...", fontSize = 11.sp) },
+                                placeholder = { Text("Write your thoughts or reminders...", fontSize = 12.sp) },
                                 minLines = 2,
                                 maxLines = 4,
-                                shape = RoundedCornerShape(10.dp),
-                                textStyle = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
+                                shape = RoundedCornerShape(12.dp),
+                                textStyle = MaterialTheme.typography.bodySmall.copy(fontSize = 13.sp),
                                 modifier = Modifier.fillMaxWidth(),
                             )
 
@@ -1293,9 +1311,9 @@ fun AnimeTrackerDropdownContent(
                                             AnilistTrackerCoordinator.updateNotes(notesText)
                                             isNotesDirty = false
                                         },
-                                        shape = RoundedCornerShape(8.dp),
+                                        shape = RoundedCornerShape(10.dp),
                                     ) {
-                                        Text("Save Notes", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                        Text("Save Notes", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                                     }
                                 }
                             }
@@ -1307,7 +1325,7 @@ fun AnimeTrackerDropdownContent(
 
         // --- 10. REMOVE FROM ANILIST & MATCH DIAGNOSTICS ---
         if (entry != null) {
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
             TextButton(
                 onClick = {
@@ -1322,12 +1340,12 @@ fun AnimeTrackerDropdownContent(
                 Icon(
                     imageVector = Icons.Default.DeleteOutline,
                     contentDescription = null,
-                    modifier = Modifier.size(15.dp),
+                    modifier = Modifier.size(16.dp),
                 )
                 Spacer(modifier = Modifier.width(6.dp))
                 Text(
                     text = "Remove from AniList",
-                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
+                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
                 )
             }
         }
@@ -1335,11 +1353,11 @@ fun AnimeTrackerDropdownContent(
         // Expandable Match Diagnostics
         if (!trackerState.debugInfo.isNullOrBlank()) {
             var showDiagnostics by remember { mutableStateOf(false) }
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(6.dp))
             Surface(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(8.dp))
+                    .clip(RoundedCornerShape(10.dp))
                     .clickable { showDiagnostics = !showDiagnostics },
                 color = Color.Transparent,
             ) {
@@ -1352,13 +1370,13 @@ fun AnimeTrackerDropdownContent(
                 ) {
                     Text(
                         text = "Match Diagnostics",
-                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
+                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Text(
                         text = if (showDiagnostics) "Hide ▲" else "View ▼",
                         style = MaterialTheme.typography.labelSmall.copy(
-                            fontSize = 11.sp,
+                            fontSize = 12.sp,
                             fontWeight = FontWeight.Bold,
                         ),
                         color = MaterialTheme.colorScheme.primary,
@@ -1377,40 +1395,42 @@ fun AnimeTrackerDropdownContent(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(8.dp))
+                        .clip(RoundedCornerShape(12.dp))
                         .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-                        .padding(8.dp),
+                        .padding(10.dp),
                 ) {
                     Text(
                         text = trackerState.debugInfo.orEmpty(),
                         style = MaterialTheme.typography.bodySmall.copy(
-                            fontSize = 10.sp,
+                            fontSize = 11.sp,
                             fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
                         ),
                         color = MaterialTheme.colorScheme.onSurface,
                     )
-                    Spacer(modifier = Modifier.height(6.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
                     OutlinedButton(
                         onClick = {
                             clipboardManager.setText(AnnotatedString(trackerState.debugInfo.orEmpty()))
                             copied = true
                         },
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(8.dp),
+                        shape = RoundedCornerShape(10.dp),
                     ) {
                         Icon(
                             imageVector = Icons.Default.ContentCopy,
                             contentDescription = "Copy Log",
-                            modifier = Modifier.size(13.dp),
+                            modifier = Modifier.size(14.dp),
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
                             text = if (copied) "✓ Log Copied to Clipboard!" else "Copy Diagnostics Log",
-                            fontSize = 11.sp,
+                            fontSize = 12.sp,
                         )
                     }
                 }
             }
         }
+
+        Spacer(modifier = Modifier.height(36.dp))
     }
 }
