@@ -44,6 +44,11 @@ fun AnilistRecommendationCard(
     val baseWidth = desktopCatalogShelfPosterBaseWidthDp(posterCardStyle.widthDp)
     val itemMetaId = "anilist:${recommendation.mediaId}"
 
+    val isMangaOrNovel = remember(recommendation.format) {
+        val f = recommendation.format?.uppercase()?.replace("-", "_")?.replace(" ", "_")
+        f in listOf("MANGA", "NOVEL", "LIGHT_NOVEL", "ONE_SHOT")
+    }
+
     var lazyLogoUrl by remember(itemMetaId) { mutableStateOf<String?>(null) }
     var lazyMalScore by remember(itemMetaId) { mutableStateOf<Double?>(null) }
     var lazyPosterUrl by remember(recommendation.mediaId, recommendation.coverImage) {
@@ -79,7 +84,7 @@ fun AnilistRecommendationCard(
             anilistScore = if (anilistPrefs.showPosterAnilistScore) recommendation.averageScore?.toDouble() else null,
             malScore = if (anilistPrefs.showPosterMalScore) lazyMalScore else null,
             scoreFormat = anilistPrefs.posterScoreFormat,
-            onClick = onClick,
+            onClick = if (isMangaOrNovel) null else onClick,
         )
 
         // Community Agreement Badge (Top End)

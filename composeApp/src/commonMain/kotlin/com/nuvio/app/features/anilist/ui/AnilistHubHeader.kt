@@ -64,7 +64,7 @@ fun AnilistHubHeader(
     isLoggedIn: Boolean = false,
     userHasReview: Boolean = false,
     onWriteReviewClick: () -> Unit = {},
-    horizontalPadding: Dp = 16.dp,
+    horizontalPadding: Dp = 0.dp,
     modifier: Modifier = Modifier,
 ) {
     val scrollState = rememberScrollState()

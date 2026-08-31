@@ -2329,14 +2329,20 @@ private fun ConfiguredMetaSections(
                             )
                         },
                         onRelationClick = { relation ->
-                            onOpenMeta?.invoke(
-                                com.nuvio.app.features.home.MetaPreview(
-                                    id = relation.id,
-                                    type = relation.type,
-                                    name = relation.title,
-                                    poster = relation.poster,
+                            val f = relation.format?.uppercase()?.replace("-", "_")?.replace(" ", "_")
+                            val t = relation.type.uppercase().replace("-", "_").replace(" ", "_")
+                            val isMangaOrNovel = f in listOf("MANGA", "NOVEL", "LIGHT_NOVEL", "ONE_SHOT") ||
+                                t in listOf("MANGA", "NOVEL", "LIGHT_NOVEL", "ONE_SHOT")
+                            if (!isMangaOrNovel) {
+                                onOpenMeta?.invoke(
+                                    com.nuvio.app.features.home.MetaPreview(
+                                        id = relation.id,
+                                        type = relation.type,
+                                        name = relation.title,
+                                        poster = relation.poster,
+                                    )
                                 )
-                            )
+                            }
                         },
                     )
                 } else if (shouldShowComments && (isCommentsLoading || comments.isNotEmpty() || !commentsError.isNullOrBlank())) {

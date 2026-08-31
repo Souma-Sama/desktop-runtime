@@ -33,6 +33,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.nuvio.app.core.ui.nuvioDesktopDragScroll
+import com.nuvio.app.core.ui.nuvioHorizontalScrollBleed
 import com.nuvio.app.features.anilist.AnilistAuthRepository
 import com.nuvio.app.features.anilist.community.AnilistCommunityRepository
 import com.nuvio.app.features.anilist.community.AnilistReview
@@ -175,9 +176,9 @@ fun AnilistCommunityHub(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .padding(vertical = 12.dp),
+            .padding(vertical = 8.dp),
     ) {
-        // Header with Segmented Pill Switcher & Context Action
+        // Header with Segmented Pill Switcher & Context Action - flush aligned with section
         AnilistHubHeader(
             selectedTab = selectedTab,
             onTabSelected = { selectedTab = it },
@@ -191,7 +192,7 @@ fun AnilistCommunityHub(
                 reviewToEdit = userReview
                 showWriteReviewDialog = true
             },
-            horizontalPadding = horizontalScrollPadding,
+            horizontalPadding = 0.dp,
         )
 
         Spacer(modifier = Modifier.height(14.dp))
@@ -216,6 +217,7 @@ fun AnilistCommunityHub(
                             contentPadding = PaddingValues(horizontal = horizontalScrollPadding),
                             horizontalArrangement = Arrangement.spacedBy(14.dp),
                             modifier = Modifier
+                                .nuvioHorizontalScrollBleed(horizontalScrollPadding)
                                 .fillMaxWidth()
                                 .nuvioDesktopDragScroll(threadListState),
                         ) {
@@ -246,6 +248,7 @@ fun AnilistCommunityHub(
                             contentPadding = PaddingValues(horizontal = horizontalScrollPadding),
                             horizontalArrangement = Arrangement.spacedBy(14.dp),
                             modifier = Modifier
+                                .nuvioHorizontalScrollBleed(horizontalScrollPadding)
                                 .fillMaxWidth()
                                 .nuvioDesktopDragScroll(reviewListState),
                         ) {
@@ -292,14 +295,19 @@ fun AnilistCommunityHub(
                             contentPadding = PaddingValues(horizontal = horizontalScrollPadding),
                             horizontalArrangement = Arrangement.spacedBy(14.dp),
                             modifier = Modifier
+                                .nuvioHorizontalScrollBleed(horizontalScrollPadding)
                                 .fillMaxWidth()
                                 .nuvioDesktopDragScroll(recListState),
                         ) {
                             items(recommendations, key = { "rec_${it.id}" }) { rec ->
+                                val f = rec.format?.uppercase()?.replace("-", "_")?.replace(" ", "_")
+                                val isMangaOrNovel = f in listOf("MANGA", "NOVEL", "LIGHT_NOVEL", "ONE_SHOT")
                                 AnilistRecommendationCard(
                                     recommendation = rec,
                                     onClick = {
-                                        onAnimeClick?.invoke(rec.mediaId)
+                                        if (!isMangaOrNovel) {
+                                            onAnimeClick?.invoke(rec.mediaId)
+                                        }
                                     },
                                 )
                             }
@@ -316,13 +324,18 @@ fun AnilistCommunityHub(
                             contentPadding = PaddingValues(horizontal = horizontalScrollPadding),
                             horizontalArrangement = Arrangement.spacedBy(14.dp),
                             modifier = Modifier
+                                .nuvioHorizontalScrollBleed(horizontalScrollPadding)
                                 .fillMaxWidth()
                                 .nuvioDesktopDragScroll(relatedListState),
                         ) {
                             items(relations, key = { "rel_${it.id}_${it.relationType}" }) { relation ->
+                                val f = relation.format?.uppercase()?.replace("-", "_")?.replace(" ", "_")
+                                val t = relation.type.uppercase().replace("-", "_").replace(" ", "_")
+                                val isMangaOrNovel = f in listOf("MANGA", "NOVEL", "LIGHT_NOVEL", "ONE_SHOT") ||
+                                    t in listOf("MANGA", "NOVEL", "LIGHT_NOVEL", "ONE_SHOT")
                                 AnilistRelationCard(
                                     relation = relation,
-                                    onClick = onRelationClick?.let { { it(relation) } },
+                                    onClick = if (isMangaOrNovel) null else onRelationClick?.let { { it(relation) } },
                                 )
                             }
                         }

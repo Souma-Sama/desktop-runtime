@@ -43,6 +43,13 @@ fun AnilistRelationCard(
         mutableStateOf(relation.poster?.takeIf { it.isNotBlank() })
     }
 
+    val isMangaOrNovel = remember(relation.format, relation.type) {
+        val f = relation.format?.uppercase()?.replace("-", "_")?.replace(" ", "_")
+        val t = relation.type.uppercase().replace("-", "_").replace(" ", "_")
+        f in listOf("MANGA", "NOVEL", "LIGHT_NOVEL", "ONE_SHOT") ||
+            t in listOf("MANGA", "NOVEL", "LIGHT_NOVEL", "ONE_SHOT")
+    }
+
     LaunchedEffect(relation.id, relation.poster) {
         if (lazyPosterUrl.isNullOrBlank()) {
             val anilistId = com.nuvio.app.features.anilist.AnilistTrackerCoordinator.extractAnilistId(relation.id)
@@ -86,7 +93,7 @@ fun AnilistRelationCard(
             anilistScore = if (anilistPrefs.showPosterAnilistScore) relation.averageScore?.toDouble() else null,
             malScore = if (anilistPrefs.showPosterMalScore) lazyMalScore else null,
             scoreFormat = anilistPrefs.posterScoreFormat,
-            onClick = onClick,
+            onClick = if (isMangaOrNovel) null else onClick,
         )
 
         // Relation Type Badge (Prequel, Sequel, Side Story, Movie, etc.)
