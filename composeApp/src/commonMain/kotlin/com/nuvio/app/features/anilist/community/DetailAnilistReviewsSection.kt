@@ -4,9 +4,11 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -139,76 +141,82 @@ fun DetailAnilistReviewsSection(
     Column(
         modifier = modifier
             .fillMaxWidth()
+            .padding(top = 16.dp)
             .then(
                 if (isDesktop) Modifier.nuvioShelfHoverOverdraw(rowHoverInset) else Modifier
             ),
     ) {
         if (showHeader) {
-            Row(
+            BoxWithConstraints(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = horizontalScrollPadding),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
             ) {
+                val titleSize = if (maxWidth >= 720.dp) 22.sp else 20.sp
                 Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    Text(
-                        text = "Community Reviews",
-                        style = MaterialTheme.typography.titleLarge.copy(
-                            fontSize = 20.sp,
-                            fontWeight = FontWeight.SemiBold,
-                        ),
-                        color = MaterialTheme.colorScheme.onBackground,
-                    )
-                    if (totalReviews > 0) {
-                        Surface(
-                            color = MaterialTheme.colorScheme.surfaceVariant,
-                            shape = RoundedCornerShape(12.dp),
-                        ) {
-                            Text(
-                                text = "$totalReviews",
-                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
-                            )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Text(
+                            text = "Community Reviews",
+                            style = MaterialTheme.typography.titleLarge.copy(
+                                fontSize = titleSize,
+                                fontWeight = FontWeight.SemiBold,
+                            ),
+                            color = MaterialTheme.colorScheme.onBackground,
+                        )
+                        if (totalReviews > 0) {
+                            Surface(
+                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
+                                shape = RoundedCornerShape(8.dp),
+                            ) {
+                                Text(
+                                    text = "$totalReviews",
+                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp),
+                                )
+                            }
                         }
                     }
-                }
 
-                if (isLoggedIn) {
-                    Button(
-                        onClick = {
-                            reviewToEdit = userReview
-                            showWriteDialog = true
-                        },
-                        shape = RoundedCornerShape(12.dp),
-                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.primaryContainer,
-                            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                        ),
-                    ) {
-                        Icon(
-                            imageVector = if (userReview != null) Icons.Default.Edit else Icons.Default.Add,
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp),
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = if (userReview != null) "Your Review" else "Write Review",
-                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-                        )
-                    }
-                } else if (onLoginClick != null) {
-                    OutlinedButton(
-                        onClick = onLoginClick,
-                        shape = RoundedCornerShape(12.dp),
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
-                    ) {
-                        Text("Log In to Review", style = MaterialTheme.typography.labelSmall)
+                    if (isLoggedIn) {
+                        Button(
+                            onClick = {
+                                reviewToEdit = userReview
+                                showWriteDialog = true
+                            },
+                            shape = RoundedCornerShape(10.dp),
+                            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.9f),
+                                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                            ),
+                        ) {
+                            Icon(
+                                imageVector = if (userReview != null) Icons.Default.Edit else Icons.Default.Add,
+                                contentDescription = null,
+                                modifier = Modifier.size(15.dp),
+                            )
+                            Spacer(modifier = Modifier.width(5.dp))
+                            Text(
+                                text = if (userReview != null) "Your Review" else "Write Review",
+                                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                            )
+                        }
+                    } else if (onLoginClick != null) {
+                        OutlinedButton(
+                            onClick = onLoginClick,
+                            shape = RoundedCornerShape(10.dp),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                        ) {
+                            Text("Log In to Review", style = MaterialTheme.typography.labelSmall)
+                        }
                     }
                 }
             }
@@ -351,15 +359,17 @@ private fun ReviewCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val cardShape = RoundedCornerShape(16.dp)
     Card(
         modifier = modifier
-            .width(320.dp)
-            .height(204.dp)
-            .clip(RoundedCornerShape(16.dp))
+            .width(335.dp)
+            .height(208.dp)
+            .clip(cardShape)
+            .border(width = 1.dp, color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f), shape = cardShape)
             .clickable(onClick = onClick),
-        shape = RoundedCornerShape(16.dp),
+        shape = cardShape,
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {
@@ -517,12 +527,14 @@ private fun ReviewCard(
 
 @Composable
 private fun LoadingReviewCard() {
+    val cardShape = RoundedCornerShape(16.dp)
     Card(
         modifier = Modifier
-            .width(320.dp)
-            .height(204.dp)
-            .clip(RoundedCornerShape(16.dp)),
-        shape = RoundedCornerShape(16.dp),
+            .width(335.dp)
+            .height(208.dp)
+            .clip(cardShape)
+            .border(width = 1.dp, color = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f), shape = cardShape),
+        shape = cardShape,
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
         ),
@@ -676,14 +688,43 @@ private fun ReviewEmptyState(
 }
 
 private fun cleanSnippet(body: String): String {
-    return body
-        .replace(Regex("<img[^>]*>"), "")
-        .replace(Regex("\\[([^\\]]+)\\]\\([^)]+\\)"), "$1")
-        .replace(Regex("_{1,2}([^_]+)_{1,2}"), "$1")
-        .replace(Regex("\\*{1,2}([^*]+)\\*{1,2}"), "$1")
-        .replace("~!", "")
-        .replace("!~", "")
-        .trim()
+    val withoutHtml = body
+        .replace(Regex("<[^>]*>"), " ")
+        .replace(Regex("&[a-zA-Z0-9#]+;"), " ")
+
+    val lines = withoutHtml.lines().map { line ->
+        var l = line.trim()
+        // Strip blockquote markers (> or ># or >#####)
+        l = l.replace(Regex("^>+\\s*"), "")
+        // Strip markdown headers (#, ##, ###, etc.)
+        l = l.replace(Regex("^#{1,6}\\s*"), "")
+        // Strip center markers
+        l = l.replace(Regex("^~{3,}|~{3,}$"), "")
+        // Strip horizontal rules / divider symbols
+        l = l.replace(Regex("^[*_\\-~=]{3,}$"), "")
+        // Strip links [Text](url) -> Text
+        l = l.replace(Regex("\\[([^\\]]+)\\]\\([^)]+\\)"), "$1")
+        // Strip images ![Text](url)
+        l = l.replace(Regex("!\\[[^\\]]*\\]\\([^)]+\\)"), "")
+        // Strip bold / italics / strikethrough / underline markers
+        l = l.replace(Regex("_{1,3}([^_]+)_{1,3}"), "$1")
+        l = l.replace(Regex("\\*{1,3}([^*]+)\\*{1,3}"), "$1")
+        l = l.replace(Regex("~{1,2}([^~]+)~{1,2}"), "$1")
+        l = l.replace("~!", "").replace("!~", "")
+        l.trim()
+    }.filter { line ->
+        // Filter out empty lines, standalone divider punctuation, and common spoiler disclaimer boilerplate
+        val isBoilerplate = line.startsWith("This review is spoiler", ignoreCase = true) ||
+            line.startsWith("_This review is spoiler", ignoreCase = true) ||
+            line.startsWith("Contains spoilers", ignoreCase = true) ||
+            line.startsWith("[No Spoilers]", ignoreCase = true) ||
+            line.startsWith("[Contains Spoilers]", ignoreCase = true) ||
+            line.startsWith("(Note:", ignoreCase = true) ||
+            line.matches(Regex("^[\\s*~\\-_=#!>.]+$"))
+        line.isNotBlank() && !isBoilerplate
+    }
+
+    return lines.joinToString(" ").replace(Regex("\\s+"), " ").trim()
 }
 
 private fun formatReviewDateShort(timestampSeconds: Long): String {
