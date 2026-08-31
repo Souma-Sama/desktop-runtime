@@ -312,7 +312,7 @@ fun AnimeTrackerDropdownContent(
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
                             horizontalArrangement = Arrangement.spacedBy(4.dp),
                         ) {
-                            val avatarUrl = user?.avatar?.medium ?: user?.avatar?.large
+                            val avatarUrl = user?.avatarUrl
                             if (avatarUrl != null) {
                                 AsyncImage(
                                     model = avatarUrl,
@@ -610,7 +610,7 @@ fun AnimeTrackerDropdownContent(
                     val metaLine = listOfNotNull(
                         media.format?.takeIf { it.isNotBlank() },
                         media.episodes?.let { "$it eps" },
-                        media.seasonYear?.toString(),
+                        media.startDateYear?.toString(),
                     ).joinToString(" • ")
 
                     if (metaLine.isNotBlank()) {

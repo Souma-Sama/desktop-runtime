@@ -1610,18 +1610,18 @@ object AnilistApi {
                 put("notes", notes)
             }
             if (startedAt != null) {
-                putJsonObject("startedAt") {
+                put("startedAt", buildJsonObject {
                     if (startedAt.year != null) put("year", startedAt.year)
                     if (startedAt.month != null) put("month", startedAt.month)
                     if (startedAt.day != null) put("day", startedAt.day)
-                }
+                })
             }
             if (completedAt != null) {
-                putJsonObject("completedAt") {
+                put("completedAt", buildJsonObject {
                     if (completedAt.year != null) put("year", completedAt.year)
                     if (completedAt.month != null) put("month", completedAt.month)
                     if (completedAt.day != null) put("day", completedAt.day)
-                }
+                })
             }
         }
 
