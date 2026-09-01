@@ -706,17 +706,17 @@ object AnilistTrackerCoordinator {
 
     private fun AnilistLibraryItem.toMediaListEntry(): AnilistMediaListEntry =
         AnilistMediaListEntry(
-            id = 0,
+            id = entryId,
             mediaId = id,
             status = AnilistMediaListStatus.fromString(status),
             score = score ?: 0.0,
             progress = progress,
-            repeat = repeat ?: 0,
-            private = private ?: false,
+            repeat = 0,
+            private = false,
             hiddenFromStatusLists = false,
-            notes = notes,
-            startedAt = startedAt,
-            completedAt = completedAt,
+            notes = null,
+            startedAt = null,
+            completedAt = null,
             updatedAt = updatedAt,
         )
 
