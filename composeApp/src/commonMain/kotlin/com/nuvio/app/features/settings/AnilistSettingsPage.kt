@@ -161,7 +161,7 @@ private fun AnilistMasterSwitchSection(isTablet: Boolean) {
     val prefs by AnilistPreferencesRepository.preferences.collectAsStateWithLifecycle()
 
     SettingsSection(
-        title = "AniList Integration (Nuvio-Kai)",
+        title = "AniList Integration (Nuvio Kai)",
         isTablet = isTablet,
     ) {
         SettingsGroup(isTablet = isTablet) {

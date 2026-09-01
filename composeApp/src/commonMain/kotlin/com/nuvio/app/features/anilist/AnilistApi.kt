@@ -71,7 +71,7 @@ object AnilistApi {
 
         return requestSemaphore.withPermit {
             val headers = mutableMapOf(
-                "User-Agent" to "Nuvio-Kai/1.0",
+                "User-Agent" to "Nuvio Kai/1.0",
             )
             if (!token.isNullOrBlank()) {
                 val sanitized = token.trim().removePrefix("Bearer ").trim()

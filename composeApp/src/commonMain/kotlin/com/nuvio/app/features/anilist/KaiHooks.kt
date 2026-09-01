@@ -21,7 +21,7 @@ import com.nuvio.app.features.home.PosterShape
 import com.nuvio.app.features.catalog.CatalogTarget
 
 /**
- * KaiHooks: Central Sidecar Extension Bridge for Nuvio-Kai.
+ * KaiHooks: Central Sidecar Extension Bridge for Nuvio Kai.
  *
  * All Kai-specific anime features (AniList tracking, stream selection, AniChart,
  * score badges, and search enrichment) connect to upstream Nuvio through this

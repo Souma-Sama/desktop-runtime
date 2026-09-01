@@ -1012,7 +1012,7 @@ compose.desktop {
 
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb, TargetFormat.Rpm, TargetFormat.AppImage)
-            packageName = "Nuvio-Kai"
+            packageName = "Nuvio Kai"
             packageVersion = desktopReleasePackageVersion
             vendor = "Nuvio Kai"
             if (isMacHost) {

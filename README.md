@@ -4,7 +4,7 @@
   <br />
   <br />
 
-  <h1>Nuvio-Kai</h1>
+  <h1>Nuvio Kai</h1>
   <p><strong>A High-Performance Anime & Media Client with Native AniList & AniChart Integration</strong></p>
   <p>Built with Kotlin Multiplatform & Compose Multiplatform for macOS and Android.</p>
 
@@ -84,7 +84,7 @@ cd Nuvio-Kai
 
 ## Architecture
 
-Nuvio-Kai is structured using a clean, decoupled **Sidecar Hook Bridge (`KaiHooks`)**:
+Nuvio Kai is structured using a clean, decoupled **Sidecar Hook Bridge (`KaiHooks`)**:
 
 - `composeApp/src/commonMain/`: Shared Compose Multiplatform UI, ViewModels, and state management.
 - `composeApp/src/commonMain/kotlin/.../features/anilist/`: 100% self-contained native AniList, AniChart, and community features.
@@ -95,7 +95,7 @@ Nuvio-Kai is structured using a clean, decoupled **Sidecar Hook Bridge (`KaiHook
 
 ## Legal & Disclaimer
 
-Nuvio-Kai is a client-side interface for browsing metadata and organizing your media libraries. It does not host, distribute, or store any media streams or files. All metadata is retrieved via public APIs (AniList, MetaHub, and user-configured add-ons).
+Nuvio Kai is a client-side interface for browsing metadata and organizing your media libraries. It does not host, distribute, or store any media streams or files. All metadata is retrieved via public APIs (AniList, MetaHub, and user-configured add-ons).
 
 ---
 
