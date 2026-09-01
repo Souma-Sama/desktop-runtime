@@ -2066,6 +2066,7 @@ private fun LazyListScope.configuredMetaSectionItems(
                     onEpisodeLongPress = onEpisodeLongPress,
                     onSeasonLongPress = onSeasonLongPress,
                     onOpenMeta = onOpenMeta,
+                    onPosterLongClick = { item -> trackerSheetPreview = item },
                     onCastClick = onCastClick,
                     onCompanyClick = onCompanyClick,
                     sharedTransitionScope = sharedTransitionScope,
@@ -2221,6 +2222,7 @@ private fun ConfiguredMetaSections(
     onEpisodeLongPress: (MetaVideo) -> Unit,
     onSeasonLongPress: (Int) -> Unit,
     onOpenMeta: ((MetaPreview) -> Unit)?,
+    onPosterLongClick: ((MetaPreview) -> Unit)? = null,
     onCastClick: ((MetaPerson, String?) -> Unit)?,
     onCompanyClick: ((MetaCompany, String) -> Unit)?,
     sharedTransitionScope: SharedTransitionScope?,
@@ -2412,7 +2414,7 @@ private fun ConfiguredMetaSections(
                         showHeader = showHeader,
                         horizontalScrollPadding = horizontalScrollPadding,
                         onPosterClick = onOpenMeta,
-                        onPosterLongClick = { item -> trackerSheetPreview = item },
+                        onPosterLongClick = onPosterLongClick,
                     )
                 }
             }
@@ -2454,7 +2456,7 @@ private fun ConfiguredMetaSections(
                                 horizontalScrollPadding = horizontalScrollPadding,
                                 sourceLabel = sourceLabel,
                                 onPosterClick = onOpenMeta,
-                                onPosterLongClick = { item -> trackerSheetPreview = item },
+                                onPosterLongClick = onPosterLongClick,
                             )
                         }
                     }
