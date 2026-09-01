@@ -1,138 +1,101 @@
 <div align="center">
 
-  <img src="composeApp/src/commonMain/composeResources/drawable/app_logo_wordmark.png" alt="Nuvio" width="300" />
-  <br />
+  <h1>⚡ Nuvio-Kai</h1>
+  <p><strong>A Modern, Fast Anime & Media Client with Native AniList & AniChart Integration</strong></p>
+  <p>Built with Kotlin Multiplatform & Compose Multiplatform for macOS and Android.</p>
+
   <br />
 
-  [![Contributors][contributors-shield]][contributors-url]
-  [![Forks][forks-shield]][forks-url]
-  [![Stargazers][stars-shield]][stars-url]
-  [![Issues][issues-shield]][issues-url]
-  [![License][license-shield]][license-url]
-
-  <p>
-    A desktop media app for Windows, macOS, and Linux.
-    <br />
-    Browse, organize, and play media from sources you add.
-  </p>
+  [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg?style=for-the-badge)](LICENSE)
+  [![Platform](https://img.shields.io/badge/Platform-macOS%20%7C%20Android-green.svg?style=for-the-badge)](https://github.com)
+  [![Kotlin](https://img.shields.io/badge/Kotlin-Multiplatform-7F52FF.svg?style=for-the-badge&logo=kotlin&logoColor=white)](https://kotlinlang.org)
 
 </div>
 
-## ⚠️ Alpha Software - Slow Development - Testers Only
+---
 
-Nuvio Desktop is currently in alpha and is intended only for testers. It is under development and is not suitable for daily use.
+## ✨ Features
 
-Expect breaking changes with every update. Features, settings, stored data, and compatibility may change or stop working without notice. Do not rely on this build as your primary media app, and report any issues you encounter during testing.
+### 🎌 Native AniList Ecosystem
+- **Zero-Friction Sync**: Instant, real-time two-way synchronization with your AniList account.
+- **Interactive Tracker Sheet**: Track episodes, status (*Watching, Completed, Planning, Paused, Dropped*), scores (100-Point & 10-Star ratings), repeat counts, and notes directly from poster quick-actions or details pages.
+- **Poster Score & Status Badges**: AniList and MyAnimeList (MAL) scores, library status pills, and title logos rendered seamlessly across all catalog shelves.
 
-## About
+### 📅 AniChart Seasonal & Airing Schedule
+- **Seasonal Grids**: Explore anime by season (*Winter, Spring, Summer, Fall*) with format chips (*TV, Movie, OVA/ONA, Shorts*), genre filters, and popularity sorting.
+- **Live Airing Calendar**: Weekly countdown schedule with exact episode release times and air dates.
+- **Smart Offline Cache**: In-memory response caching and automatic rate-limit backoff ensure instant, uninterrupted tab navigation.
 
-Nuvio Desktop is a media client for browsing metadata, managing collections and watch progress, downloading media, and playing streams from user-installed extensions or user-provided sources.
+### 💬 Community & Rich Metadata
+- **Reviews & Ratings**: Read full community reviews with score breakdowns and upvotes.
+- **Forum Discussions**: Browse discussion threads, episode comments, and community feedback.
+- **Studio & Franchise Relations**: Explore studio credits, prequel/sequel timelines, and franchise relations.
 
-## Installation
+### 🎬 Advanced Media Playback & Stream Routing
+- **ARM Stream Routing**: Automatic anime-to-stream provider resolution via Anime-Relations-Map (ARM).
+- **Stremio Add-on Protocol**: Connect any standard Stremio add-on for high-speed streaming.
+- **Custom Player Integrations**: Native macOS video player bridge with hardware acceleration, subtitle customization, and intro/outro skip support.
 
-Download the latest desktop build from [GitHub Releases](https://github.com/NuvioMedia/NuvioDesktop/releases/latest).
+---
 
-Release packages are provided for supported desktop platforms:
+## 📥 Downloads & Installation
 
-- Windows: MSI installer
-- macOS: DMG installer
-- Linux: DEB package, when available
+Download the latest releases for macOS and Android from the **Releases** tab:
 
-## Development
+- **macOS**: `.dmg` installer (Optimized for Apple Silicon `arm64` and Intel `x86_64`)
+- **Android**: `.apk` (Optimized for Mobile and Android TV)
+
+---
+
+## 🛠️ Building From Source
+
+### Prerequisites
+- JDK 17 or higher
+- Android SDK (for Android builds)
+- macOS Xcode command line tools (for macOS DMG packaging)
+
+### Clone & Build
 
 ```bash
-git clone https://github.com/NuvioMedia/NuvioDesktop.git
-cd NuvioDesktop
+git clone https://github.com/SoumaditYa21/Nuvio-Kai.git
+cd Nuvio-Kai
 ```
 
-Run from source:
-
+#### Run Desktop Application (macOS):
 ```bash
 ./gradlew :composeApp:run
 ```
 
-On Windows PowerShell:
-
-```powershell
-.\gradlew.bat :composeApp:run
-```
-
-Build a release package for the current host:
-
+#### Package macOS Release DMG:
 ```bash
-./gradlew :composeApp:packageReleaseDistributionForCurrentOS
+./gradlew clean :composeApp:packageReleaseDmg -Pnuvio.macos.arch=arm64
 ```
 
-Platform-specific packaging:
-
+#### Assemble Android APK:
 ```bash
-# Windows
-./gradlew :composeApp:packageReleaseMsi --rerun-tasks
-
-# macOS
-./scripts/build-macos-release-dmgs.sh --package-only
-
-# Linux
-./gradlew :composeApp:packageReleaseDeb
+./gradlew :androidApp:assembleRelease
 ```
 
-## Project Structure
+---
 
-- `composeApp/` contains the app code.
-- `composeApp/src/commonMain/` contains shared UI, features, repositories, and platform-agnostic logic.
-- `composeApp/src/desktopMain/` contains desktop-specific integrations.
-- `composeApp/Configuration/DesktopVersion.properties` contains the desktop release version and build code.
+## 🏛️ Architecture
 
-## Versioning
+Nuvio-Kai is structured using a clean, decoupled **Sidecar Hook Bridge (`KaiHooks`)**:
 
-Desktop versions are set in `composeApp/Configuration/DesktopVersion.properties`.
+- `composeApp/src/commonMain/`: Shared Compose Multiplatform UI, ViewModels, and state management.
+- `composeApp/src/commonMain/kotlin/.../features/anilist/`: 100% self-contained native AniList, AniChart, and community features.
+- `composeApp/src/desktopMain/`: Desktop-specific windowing, macOS native video player bindings, and packaging.
+- `androidApp/`: Android application launcher, Leanback TV support, and hardware acceleration.
 
-```properties
-VERSION_NAME=0.1.1-alpha
-VERSION_CODE=1
-```
+---
 
-Use the version helper when changing desktop release versions:
+## ⚖️ Legal & Disclaimer
 
-```bash
-./scripts/set-version.sh --desktop 0.1.2-alpha --desktop-code 2
-./scripts/set-version.sh --show
-```
+Nuvio-Kai is a client-side interface for browsing metadata and organizing your media libraries. It does not host, distribute, or store any media streams or files. All metadata is retrieved via public APIs (AniList, MetaHub, and user-configured add-ons).
 
-## Legal & DMCA
+---
 
-Nuvio functions solely as a client-side interface for browsing metadata and playing media provided by user-installed extensions and/or user-provided sources. It is intended for content the user owns or is otherwise authorized to access.
+## 📜 License & Credits
 
-Nuvio is not affiliated with any third-party extensions, catalogs, sources, or content providers. It does not host, store, or distribute any media content.
-
-For comprehensive legal information, including our full disclaimer, third-party extension policy, and DMCA/Copyright information, please visit our [Legal & Disclaimer Page](https://nuvioapp.space/legal).
-
-## Built With
-
-- Kotlin Multiplatform
-- Compose Multiplatform
-- Kotlin
-- Compose Desktop packaging
-- Native desktop player integrations
-
-## Star History
-
-<a href="https://www.star-history.com/#NuvioMedia/NuvioDesktop&type=date&legend=top-left">
- <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=NuvioMedia/NuvioDesktop&type=date&theme=dark&legend=top-left" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=NuvioMedia/NuvioDesktop&type=date&legend=top-left" />
-   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=NuvioMedia/NuvioDesktop&type=date&legend=top-left" />
- </picture>
-</a>
-
-<!-- MARKDOWN LINKS & IMAGES -->
-[contributors-shield]: https://img.shields.io/github/contributors/NuvioMedia/NuvioDesktop.svg?style=for-the-badge
-[contributors-url]: https://github.com/NuvioMedia/NuvioDesktop/graphs/contributors
-[forks-shield]: https://img.shields.io/github/forks/NuvioMedia/NuvioDesktop.svg?style=for-the-badge
-[forks-url]: https://github.com/NuvioMedia/NuvioDesktop/network/members
-[stars-shield]: https://img.shields.io/github/stars/NuvioMedia/NuvioDesktop.svg?style=for-the-badge
-[stars-url]: https://github.com/NuvioMedia/NuvioDesktop/stargazers
-[issues-shield]: https://img.shields.io/github/issues/NuvioMedia/NuvioDesktop.svg?style=for-the-badge
-[issues-url]: https://github.com/NuvioMedia/NuvioDesktop/issues
-[license-shield]: https://img.shields.io/github/license/NuvioMedia/NuvioDesktop.svg?style=for-the-badge
-[license-url]: https://github.com/NuvioMedia/NuvioDesktop/blob/main/LICENSE
+This project is licensed under the **GNU General Public License v3.0** - see the [LICENSE](LICENSE) file for details.  
+Based on the open-source Nuvio project with specialized native anime integrations and extensions.
