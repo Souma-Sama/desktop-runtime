@@ -154,6 +154,7 @@ internal data class AppTabActions(
     val onCloudFilePlay: ((CloudLibraryItem, CloudLibraryFile) -> Unit)? = null,
     val onConnectCloudClick: (() -> Unit)? = null,
     val onAnilistPosterClick: ((AnilistLibraryItem) -> Unit)? = null,
+    val onAnilistPosterLongClick: ((AnilistLibraryItem) -> Unit)? = null,
     val onConnectAnilistClick: (() -> Unit)? = null,
     val onContinueWatchingClick: ((ContinueWatchingItem) -> Unit)? = null,
     val onContinueWatchingLongPress: ((ContinueWatchingItem) -> Unit)? = null,
@@ -262,6 +263,7 @@ internal fun AppTabHost(
                             if (anilistPrefs.enabled) {
                                 com.nuvio.app.features.anilist.anichart.AniChartScreen(
                                     onAnimeClick = { preview -> actions.onPosterClick?.invoke(preview) },
+                                    onAnimeLongClick = { preview -> actions.onPosterLongClick?.invoke(preview) },
                                     topChromePadding = state.topChromePadding ?: 0.dp,
                                 )
                             }
@@ -278,6 +280,7 @@ internal fun AppTabHost(
                                 onCloudFilePlay = actions.onCloudFilePlay,
                                 onConnectCloudClick = actions.onConnectCloudClick,
                                 onAnilistPosterClick = actions.onAnilistPosterClick,
+                                onAnilistPosterLongClick = actions.onAnilistPosterLongClick,
                                 onConnectAnilistClick = actions.onConnectAnilistClick,
                                 disintegrationRequest = state.libraryDisintegrationRequest,
                             )

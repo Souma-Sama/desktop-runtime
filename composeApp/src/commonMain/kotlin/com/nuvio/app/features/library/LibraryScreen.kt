@@ -119,6 +119,7 @@ fun LibraryScreen(
     onCloudFilePlay: ((CloudLibraryItem, CloudLibraryFile) -> Unit)? = null,
     onConnectCloudClick: (() -> Unit)? = null,
     onAnilistPosterClick: ((AnilistLibraryItem) -> Unit)? = null,
+    onAnilistPosterLongClick: ((AnilistLibraryItem) -> Unit)? = null,
     onConnectAnilistClick: (() -> Unit)? = null,
     disintegrationRequest: DisintegrationRequest<String>? = null,
 ) {
@@ -475,6 +476,7 @@ fun LibraryScreen(
                             ),
                         )
                     },
+                    onPosterLongClick = onAnilistPosterLongClick,
                     onConnectAnilistClick = { onConnectAnilistClick?.invoke() },
                     onRefresh = {
                         coroutineScope.launch {

@@ -1344,6 +1344,20 @@ internal fun MainAppContent(
                                         ),
                                     )
                                 },
+                                onAnilistPosterLongClick = { item ->
+                                    openPosterActions(
+                                        PosterActionTarget(
+                                            preview = com.nuvio.app.features.home.MetaPreview(
+                                                id = "ani_${item.id}",
+                                                type = if (item.format?.equals("MOVIE", ignoreCase = true) == true) "movie" else "series",
+                                                name = item.title,
+                                                poster = item.posterUrl,
+                                                banner = item.posterUrl,
+                                                anilistScore = item.score,
+                                            ),
+                                        ),
+                                    )
+                                },
                                 onLibrarySectionViewAllClick = onLibrarySectionViewAllClick,
                                 onCloudFilePlay = { item, file ->
                                     coroutineScope.launch {
@@ -1729,6 +1743,18 @@ internal fun MainAppContent(
             selectedPosterActionTarget?.let { posterActionTarget ->
                 key(posterActionTarget) {
                     val preview = posterActionTarget.preview
+                    val anilistPrefs by com.nuvio.app.features.anilist.AnilistPreferencesRepository.preferences.collectAsStateWithLifecycle()
+
+                    if (anilistPrefs.enabled) {
+                        com.nuvio.app.features.details.components.AnimeTrackerSheet(
+                            preview = preview,
+                            title = preview.name,
+                            onDismiss = {
+                                selectedPosterActionTarget = null
+                                selectedPosterAnchor = null
+                            },
+                        )
+                    } else {
                     val isSaved = LibraryRepository.isSaved(preview.id, preview.type)
                     val isWatched = WatchingState.isPosterWatched(
                         watchedKeys = watchedUiState.watchedKeys,
@@ -1886,6 +1912,7 @@ internal fun MainAppContent(
                             selectedPosterAnchor = null
                         },
                     )
+                    }
                 }
             }
 

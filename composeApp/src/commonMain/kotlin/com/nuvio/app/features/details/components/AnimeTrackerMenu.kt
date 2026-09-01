@@ -234,9 +234,31 @@ fun AnimeTrackerButton(
 @Composable
 fun AnimeTrackerSheet(
     meta: com.nuvio.app.features.details.MetaDetails? = null,
+    preview: com.nuvio.app.features.home.MetaPreview? = null,
     title: String? = null,
     onDismiss: () -> Unit,
 ) {
+    val effectiveTitle = title?.takeIf { it.isNotBlank() } ?: preview?.name ?: meta?.name.orEmpty()
+    val mediaId = preview?.id ?: meta?.id
+    val year = preview?.releaseInfo?.take(4)?.toIntOrNull() ?: meta?.releaseInfo?.take(4)?.toIntOrNull()
+    val genres = preview?.genres ?: meta?.genres.orEmpty()
+    val country = meta?.country
+    val language = meta?.language
+
+    LaunchedEffect(effectiveTitle, mediaId) {
+        if (effectiveTitle.isNotBlank()) {
+            AnilistTrackerCoordinator.loadForMedia(
+                title = effectiveTitle,
+                mediaId = mediaId,
+                year = year,
+                genres = genres,
+                country = country,
+                language = language,
+                forceRefresh = true,
+            )
+        }
+    }
+
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val coroutineScope = rememberCoroutineScope()
 
@@ -250,7 +272,8 @@ fun AnimeTrackerSheet(
     ) {
         AnimeTrackerSheetContent(
             meta = meta,
-            title = title,
+            preview = preview,
+            title = effectiveTitle,
             onClose = {
                 coroutineScope.launch {
                     dismissNuvioBottomSheet(sheetState = sheetState, onDismiss = onDismiss)
@@ -263,6 +286,7 @@ fun AnimeTrackerSheet(
 @Composable
 fun AnimeTrackerSheetContent(
     meta: com.nuvio.app.features.details.MetaDetails? = null,
+    preview: com.nuvio.app.features.home.MetaPreview? = null,
     title: String? = null,
     onClose: () -> Unit,
 ) {
@@ -512,16 +536,16 @@ fun AnimeTrackerSheetContent(
                     )
                     Spacer(modifier = Modifier.height(10.dp))
 
-                    val effectiveRetryTitle = title?.takeIf { it.isNotBlank() } ?: meta?.name.orEmpty()
-                    if (effectiveRetryTitle.isNotBlank() || meta != null) {
+                    val effectiveRetryTitle = title?.takeIf { it.isNotBlank() } ?: preview?.name ?: meta?.name.orEmpty()
+                    if (effectiveRetryTitle.isNotBlank() || preview != null || meta != null) {
                         Button(
                             onClick = {
-                                val metaYear = meta?.releaseInfo?.take(4)?.toIntOrNull()
+                                val metaYear = preview?.releaseInfo?.take(4)?.toIntOrNull() ?: meta?.releaseInfo?.take(4)?.toIntOrNull()
                                 AnilistTrackerCoordinator.loadForMedia(
                                     title = effectiveRetryTitle,
-                                    mediaId = meta?.id,
+                                    mediaId = preview?.id ?: meta?.id,
                                     year = metaYear,
-                                    genres = meta?.genres.orEmpty(),
+                                    genres = preview?.genres ?: meta?.genres.orEmpty(),
                                     country = meta?.country,
                                     language = meta?.language,
                                     forceRefresh = true,

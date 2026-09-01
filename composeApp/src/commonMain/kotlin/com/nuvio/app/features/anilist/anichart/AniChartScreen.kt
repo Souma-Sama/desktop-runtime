@@ -106,6 +106,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun AniChartScreen(
     onAnimeClick: (MetaPreview) -> Unit,
+    onAnimeLongClick: ((MetaPreview) -> Unit)? = null,
     modifier: Modifier = Modifier,
     topChromePadding: Dp = 0.dp,
 ) {
@@ -245,6 +246,7 @@ fun AniChartScreen(
                     AniChartSeasonalGrid(
                         items = filteredItems,
                         onAnimeClick = onAnimeClick,
+                        onAnimeLongClick = onAnimeLongClick,
                     )
                 } else {
                     val dayItems = remember(
@@ -268,6 +270,7 @@ fun AniChartScreen(
                     AniChartScheduleGrid(
                         items = dayItems,
                         onAnimeClick = onAnimeClick,
+                        onAnimeLongClick = onAnimeLongClick,
                     )
                 }
             }
@@ -520,6 +523,7 @@ private fun WeeklyScheduleDayTabs(
 private fun AniChartSeasonalGrid(
     items: List<AniChartMedia>,
     onAnimeClick: (MetaPreview) -> Unit,
+    onAnimeLongClick: ((MetaPreview) -> Unit)? = null,
 ) {
     if (items.isEmpty()) {
         Box(
@@ -581,6 +585,7 @@ private fun AniChartSeasonalGrid(
             HomePosterCard(
                 item = preview,
                 onClick = { onAnimeClick(preview) },
+                onLongClick = onAnimeLongClick?.let { { it(preview) } },
             )
         }
     }
@@ -590,6 +595,7 @@ private fun AniChartSeasonalGrid(
 private fun AniChartScheduleGrid(
     items: List<AniChartMedia>,
     onAnimeClick: (MetaPreview) -> Unit,
+    onAnimeLongClick: ((MetaPreview) -> Unit)? = null,
 ) {
     if (items.isEmpty()) {
         Box(
@@ -646,6 +652,7 @@ private fun AniChartScheduleGrid(
             HomePosterCard(
                 item = preview,
                 onClick = { onAnimeClick(preview) },
+                onLongClick = onAnimeLongClick?.let { { it(preview) } },
             )
         }
     }

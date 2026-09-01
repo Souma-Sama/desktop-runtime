@@ -26,6 +26,7 @@ fun LazyListScope.anilistLibraryContent(
     searchQuery: String = "",
     selectedFormat: String? = null,
     onPosterClick: (AnilistLibraryItem) -> Unit,
+    onPosterLongClick: ((AnilistLibraryItem) -> Unit)? = null,
     onConnectAnilistClick: () -> Unit,
     onRefresh: () -> Unit,
     isOffline: Boolean,
@@ -108,6 +109,7 @@ fun LazyListScope.anilistLibraryContent(
                                 item = entry.toMetaPreview(),
                                 isWatched = entry.status.equals("COMPLETED", ignoreCase = true),
                                 onClick = { onPosterClick(entry) },
+                                onLongClick = onPosterLongClick?.let { { it(entry) } },
                             )
                         }
                     }

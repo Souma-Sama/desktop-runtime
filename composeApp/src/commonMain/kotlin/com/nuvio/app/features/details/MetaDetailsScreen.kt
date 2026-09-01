@@ -249,6 +249,7 @@ fun MetaDetailsScreen(
     val trackingListsUpdateFailedMessage = stringResource(Res.string.tracking_lists_update_failed)
     var episodeImdbRatings by remember(type, id) { mutableStateOf<Map<Pair<Int, Int>, Double>>(emptyMap()) }
     var deferredMetaWorkAllowed by remember(type, id) { mutableStateOf(false) }
+    var trackerSheetPreview by remember(type, id) { mutableStateOf<MetaPreview?>(null) }
 
     LaunchedEffect(
         displayedMeta?.id,
@@ -1853,6 +1854,14 @@ fun MetaDetailsScreen(
                 },
             )
         }
+
+        trackerSheetPreview?.let { preview ->
+            com.nuvio.app.features.details.components.AnimeTrackerSheet(
+                preview = preview,
+                title = preview.name,
+                onDismiss = { trackerSheetPreview = null },
+            )
+        }
     }
 }
 
@@ -2403,6 +2412,7 @@ private fun ConfiguredMetaSections(
                         showHeader = showHeader,
                         horizontalScrollPadding = horizontalScrollPadding,
                         onPosterClick = onOpenMeta,
+                        onPosterLongClick = { item -> trackerSheetPreview = item },
                     )
                 }
             }
@@ -2444,6 +2454,7 @@ private fun ConfiguredMetaSections(
                                 horizontalScrollPadding = horizontalScrollPadding,
                                 sourceLabel = sourceLabel,
                                 onPosterClick = onOpenMeta,
+                                onPosterLongClick = { item -> trackerSheetPreview = item },
                             )
                         }
                     }
