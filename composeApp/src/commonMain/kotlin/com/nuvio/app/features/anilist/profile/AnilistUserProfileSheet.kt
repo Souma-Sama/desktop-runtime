@@ -1,5 +1,6 @@
 package com.nuvio.app.features.anilist.profile
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -10,6 +11,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -339,9 +341,8 @@ fun AnilistUserProfileSheet(
                             val showStatsTab = anilistPrefs.enabled && anilistPrefs.enableStatsDashboard
                             val showActivityTab = anilistPrefs.enabled && anilistPrefs.enableActivityFeed
 
-                            ScrollableTabRow(
+                            TabRow(
                                 selectedTabIndex = selectedTab,
-                                edgePadding = 16.dp,
                                 containerColor = Color.Transparent,
                                 contentColor = MaterialTheme.colorScheme.primary,
                                 indicator = { tabPositions ->

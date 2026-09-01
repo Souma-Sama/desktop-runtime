@@ -119,6 +119,8 @@ fun SearchScreen(
     var query by rememberSaveable { mutableStateOf("") }
     var lastRequestedQuery by rememberSaveable { mutableStateOf<String?>(null) }
     var observedOfflineState by remember { mutableStateOf(false) }
+    val advancedFilterState by SearchRepository.advancedFilterState.collectAsStateWithLifecycle()
+    var showAdvancedFilterSheet by remember { mutableStateOf(false) }
     val discoverInFocus by remember(query, listState) {
         derivedStateOf {
             query.isBlank() && listState.firstVisibleItemIndex > 0
@@ -302,44 +304,29 @@ fun SearchScreen(
                     )
                 }
             }
-                val advancedFilterState by SearchRepository.advancedFilterState.collectAsStateWithLifecycle()
-                var showAdvancedFilterSheet by remember { mutableStateOf(false) }
-
-                discoverContent(
-                    state = discoverUiState,
-                    columns = discoverColumns,
-                    networkCondition = networkStatusUiState.condition,
-                    onTypeSelected = SearchRepository::selectDiscoverType,
-                    onCatalogSelected = SearchRepository::selectDiscoverCatalog,
-                    onGenreSelected = SearchRepository::selectDiscoverGenre,
-                    onSortSelected = SearchRepository::selectDiscoverSort,
-                    onOpenAdvancedFilter = { showAdvancedFilterSheet = true },
-                    activeAdvancedFilterCount = advancedFilterState.activeFilterCount,
-                    onRetry = {
-                        NetworkStatusRepository.requestRefresh(force = true)
-                        SearchRepository.refreshDiscover(
-                            addons = addonsUiState.addons,
-                            forceRefresh = true,
-                        )
-                    },
-                    watchedKeys = watchedUiState.watchedKeys,
-                    fullyWatchedSeriesKeys = fullyWatchedSeriesKeys,
-                    onPosterClick = onPosterClick,
-                    onPosterLongClick = onPosterLongClick,
-                )
-
-                if (showAdvancedFilterSheet) {
-                    val isDesktopLayout = maxWidth > 680.dp
-                    com.nuvio.app.features.anilist.AnilistAdvancedFilterSheet(
-                        initialFilter = advancedFilterState,
-                        isDesktop = isDesktopLayout,
-                        onDismiss = { showAdvancedFilterSheet = false },
-                        onApply = { newFilter ->
-                            SearchRepository.updateAdvancedFilter(newFilter)
-                        },
+            discoverContent(
+                state = discoverUiState,
+                columns = discoverColumns,
+                networkCondition = networkStatusUiState.condition,
+                onTypeSelected = SearchRepository::selectDiscoverType,
+                onCatalogSelected = SearchRepository::selectDiscoverCatalog,
+                onGenreSelected = SearchRepository::selectDiscoverGenre,
+                onSortSelected = SearchRepository::selectDiscoverSort,
+                onOpenAdvancedFilter = { showAdvancedFilterSheet = true },
+                activeAdvancedFilterCount = advancedFilterState.activeFilterCount,
+                onRetry = {
+                    NetworkStatusRepository.requestRefresh(force = true)
+                    SearchRepository.refreshDiscover(
+                        addons = addonsUiState.addons,
+                        forceRefresh = true,
                     )
-                }
-            } else {
+                },
+                watchedKeys = watchedUiState.watchedKeys,
+                fullyWatchedSeriesKeys = fullyWatchedSeriesKeys,
+                onPosterClick = onPosterClick,
+                onPosterLongClick = onPosterLongClick,
+            )
+        } else {
                 val normalizedQuery = query.trim()
                 val isWaitingForSearch = normalizedQuery.isNotBlank() && lastRequestedQuery != normalizedQuery
                 when {
@@ -405,6 +392,18 @@ fun SearchScreen(
                     }
                 }
             }
+        }
+
+        if (showAdvancedFilterSheet) {
+            val isDesktopLayout = maxWidth > 680.dp
+            com.nuvio.app.features.anilist.AnilistAdvancedFilterSheet(
+                initialFilter = advancedFilterState,
+                isDesktop = isDesktopLayout,
+                onDismiss = { showAdvancedFilterSheet = false },
+                onApply = { newFilter ->
+                    SearchRepository.updateAdvancedFilter(newFilter)
+                },
+            )
         }
     }
 }

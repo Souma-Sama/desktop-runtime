@@ -502,7 +502,7 @@ private fun FilterContent(
             }
 
             NuvioDesktopVerticalScrollbar(
-                listState = listState,
+                state = listState,
                 modifier = Modifier.align(Alignment.CenterEnd),
             )
         }

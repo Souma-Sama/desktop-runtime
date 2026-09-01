@@ -79,7 +79,7 @@ object AnilistLibraryRepository {
 
     fun getMediaProgress(anilistId: Int): Pair<Int, Int?>? {
         val entry = getMediaEntry(anilistId) ?: return null
-        return entry.progress to entry.episodes
+        return entry.progress to entry.totalEpisodes
     }
 
     fun getMediaStatusById(itemId: String): AnilistMediaListStatus? {
