@@ -52,6 +52,15 @@ fun HomePosterCard(
     val effectiveAnilistScore = if (anilistPrefs.enabled && anilistPrefs.showPosterAnilistScore) item.anilistScore else null
     val effectiveMalScore = if (anilistPrefs.enabled && anilistPrefs.showPosterMalScore) lazyMalScore else null
 
+    val anilistLibraryState by com.nuvio.app.features.anilist.AnilistLibraryRepository.uiState.collectAsStateWithLifecycle()
+    val mediaStatus = if (anilistPrefs.enabled && anilistPrefs.showPosterStatusBadge) {
+        com.nuvio.app.features.anilist.AnilistLibraryRepository.getMediaStatusById(item.id)
+    } else null
+    val mediaProgress = if (anilistPrefs.enabled && anilistPrefs.showPosterStatusBadge) {
+        val anilistId = com.nuvio.app.features.anilist.AnilistLibraryRepository.extractAnilistId(item.id)
+        if (anilistId != null) com.nuvio.app.features.anilist.AnilistLibraryRepository.getMediaProgress(anilistId) else null
+    } else null
+
     HomePosterHoverPreview(
         item = item,
         isWatched = isWatched,
@@ -75,6 +84,8 @@ fun HomePosterCard(
             anilistScore = effectiveAnilistScore,
             malScore = effectiveMalScore,
             scoreFormat = anilistPrefs.posterScoreFormat,
+            anilistStatus = mediaStatus,
+            anilistProgress = mediaProgress,
             isWatched = isWatched,
             onClick = onClick,
             onLongClick = onLongClick,

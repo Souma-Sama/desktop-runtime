@@ -371,4 +371,56 @@ object AnilistCatalogRepository {
         pageCache[cacheKey] = CachedCatalogPage(timestamp = now, page = result)
         return result
     }
+
+    suspend fun fetchAdvancedFilterPage(
+        filter: com.nuvio.app.features.anilist.AnilistAdvancedFilterState,
+        searchQuery: String = "",
+        page: Int = 1,
+        perPage: Int = 25,
+    ): CatalogPage {
+        val mediaList = com.nuvio.app.features.anilist.AnilistApi.advancedSearchAnime(
+            filter = filter,
+            searchQuery = searchQuery,
+            page = page,
+            perPage = perPage,
+        )
+        val prefs = com.nuvio.app.features.anilist.AnilistPreferencesRepository.snapshot()
+        val previews = mediaList.map { media ->
+            val itemId = "ani_${media.id}"
+            val itemType = if (media.format == "MOVIE") "movie" else "series"
+
+            MetaPreview(
+                id = itemId,
+                type = itemType,
+                name = media.title?.getDisplayTitle(prefs.preferredTitleLanguage).orEmpty(),
+                poster = media.coverImage?.extraLarge
+                    ?: media.coverImage?.large
+                    ?: media.coverImage?.medium,
+                banner = MetaHubArtwork.getBackdropUrl(itemId),
+                logo = MetaHubArtwork.getLogoUrl(itemId),
+                posterShape = PosterShape.Poster,
+                description = media.description,
+                releaseInfo = listOfNotNull(
+                    com.nuvio.app.core.format.formatYearRange(media.startDateYear, media.endDateYear, media.status),
+                    if (media.episodes != null && media.episodes > 0 && media.format != "MOVIE") {
+                        "${media.episodes} eps"
+                    } else {
+                        media.duration?.let { "$it min" }
+                    },
+                ).joinToString(" • ").takeIf { it.isNotBlank() },
+                imdbRating = if (media.averageScore != null && media.averageScore > 0) {
+                    val score = (media.averageScore / 10.0)
+                    "${(score * 10).toInt() / 10.0}"
+                } else null,
+                anilistScore = if (media.averageScore != null && media.averageScore > 0) media.averageScore.toDouble() else null,
+                genres = media.genres,
+            )
+        }
+
+        return CatalogPage(
+            items = previews,
+            rawItemCount = previews.size,
+            nextSkip = if (mediaList.size >= perPage) (page * perPage) else null,
+        )
+    }
 }

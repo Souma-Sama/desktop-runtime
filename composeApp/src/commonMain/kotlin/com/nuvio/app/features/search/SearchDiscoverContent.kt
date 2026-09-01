@@ -43,6 +43,8 @@ internal fun LazyListScope.discoverContent(
     onCatalogSelected: (String) -> Unit,
     onGenreSelected: (String?) -> Unit,
     onSortSelected: (String?) -> Unit = {},
+    onOpenAdvancedFilter: () -> Unit = {},
+    activeAdvancedFilterCount: Int = 0,
     onRetry: (() -> Unit)? = null,
     watchedKeys: Set<String> = emptySet(),
     fullyWatchedSeriesKeys: Set<String> = emptySet(),
@@ -60,6 +62,8 @@ internal fun LazyListScope.discoverContent(
             onCatalogSelected = onCatalogSelected,
             onGenreSelected = onGenreSelected,
             onSortSelected = onSortSelected,
+            onOpenAdvancedFilter = onOpenAdvancedFilter,
+            activeAdvancedFilterCount = activeAdvancedFilterCount,
         )
     }
     if (state.genreOptions.isNotEmpty()) {
@@ -152,11 +156,18 @@ private fun DiscoverFilterRow(
     onCatalogSelected: (String) -> Unit,
     onGenreSelected: (String?) -> Unit,
     onSortSelected: (String?) -> Unit,
+    onOpenAdvancedFilter: () -> Unit,
+    activeAdvancedFilterCount: Int,
     modifier: Modifier = Modifier,
 ) {
+    val anilistPrefs = com.nuvio.app.features.anilist.AnilistPreferencesRepository.snapshot()
+    val isAnime = state.selectedType.equals("anime", ignoreCase = true) || state.selectedCatalogKey?.contains("anilist", ignoreCase = true) == true
+    val showAdvancedFilter = anilistPrefs.enabled && anilistPrefs.enableAdvancedFilters && isAnime
+
     Row(
         modifier = modifier.horizontalScroll(rememberScrollState()),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         NuvioDropdownChip(
             title = stringResource(Res.string.discover_select_type),
@@ -206,6 +217,39 @@ private fun DiscoverFilterRow(
                     onSortSelected(option.key)
                 },
             )
+        }
+
+        if (showAdvancedFilter) {
+            val hasActive = activeAdvancedFilterCount > 0
+            Surface(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .clickable { onOpenAdvancedFilter() },
+                shape = RoundedCornerShape(8.dp),
+                color = if (hasActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+                border = BorderStroke(1.dp, if (hasActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)),
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(5.dp),
+                ) {
+                    androidx.compose.material3.Icon(
+                        imageVector = androidx.compose.material.icons.Icons.Default.FilterList,
+                        contentDescription = "Advanced Filters",
+                        tint = if (hasActive) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(13.dp),
+                    )
+                    Text(
+                        text = if (hasActive) "Filters ($activeAdvancedFilterCount)" else "Filters",
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 11.sp,
+                        ),
+                        color = if (hasActive) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
         }
     }
 }

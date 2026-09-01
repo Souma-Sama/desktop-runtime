@@ -166,6 +166,8 @@ fun LibraryScreen(
     var selectedProviderId by rememberSaveable { mutableStateOf<String?>(null) }
     var selectedTypeName by rememberSaveable { mutableStateOf<String?>(null) }
     var cloudSearchQuery by rememberSaveable { mutableStateOf("") }
+    var anilistSearchQuery by rememberSaveable { mutableStateOf("") }
+    var anilistSelectedFormat by rememberSaveable { mutableStateOf<String?>(null) }
     val selectedType = remember(selectedTypeName) {
         selectedTypeName?.let { runCatching { CloudLibraryItemType.valueOf(it) }.getOrNull() }
     }
@@ -345,6 +347,72 @@ fun LibraryScreen(
                             modifier = Modifier.padding(horizontal = 16.dp),
                         )
                         Spacer(modifier = Modifier.height(6.dp))
+
+                        if (sourceMode == LibraryViewMode.AniList && anilistPrefs.enabled && anilistPrefs.enableInLibraryFilter) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp, vertical = 4.dp)
+                                    .horizontalScroll(rememberScrollState()),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                OutlinedTextField(
+                                    value = anilistSearchQuery,
+                                    onValueChange = { anilistSearchQuery = it },
+                                    placeholder = { Text("Filter titles...", fontSize = 12.sp) },
+                                    leadingIcon = {
+                                        Icon(
+                                            imageVector = Icons.Rounded.Search,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(16.dp),
+                                        )
+                                    },
+                                    trailingIcon = if (anilistSearchQuery.isNotBlank()) {
+                                        {
+                                            IconButton(onClick = { anilistSearchQuery = "" }) {
+                                                Icon(
+                                                    imageVector = Icons.Rounded.Close,
+                                                    contentDescription = "Clear",
+                                                    modifier = Modifier.size(14.dp),
+                                                )
+                                            }
+                                        }
+                                    } else null,
+                                    singleLine = true,
+                                    modifier = Modifier
+                                        .widthIn(min = 160.dp, max = 240.dp)
+                                        .height(44.dp),
+                                    textStyle = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
+                                    shape = RoundedCornerShape(8.dp),
+                                )
+
+                                NuvioDropdownChip(
+                                    title = "Format",
+                                    label = when (anilistSelectedFormat) {
+                                        "TV" -> "TV Series"
+                                        "MOVIE" -> "Movies"
+                                        "OVA" -> "OVAs"
+                                        "ONA" -> "ONAs"
+                                        "SPECIAL" -> "Specials"
+                                        else -> "All Formats"
+                                    },
+                                    selectedKey = anilistSelectedFormat ?: "",
+                                    options = listOf(
+                                        NuvioDropdownOption("", "All Formats"),
+                                        NuvioDropdownOption("TV", "TV Series"),
+                                        NuvioDropdownOption("MOVIE", "Movies"),
+                                        NuvioDropdownOption("OVA", "OVAs"),
+                                        NuvioDropdownOption("ONA", "ONAs"),
+                                        NuvioDropdownOption("SPECIAL", "Specials"),
+                                    ),
+                                    onSelected = { opt ->
+                                        anilistSelectedFormat = opt.key.ifBlank { null }
+                                    },
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(4.dp))
+                        }
                     }
                 }
             }
@@ -387,6 +455,8 @@ fun LibraryScreen(
                     sectionsConfig = anilistPrefs.librarySections,
                     sortBy = anilistMenuPrefs.sortBy,
                     sortAscending = anilistMenuPrefs.sortAscending,
+                    searchQuery = anilistSearchQuery,
+                    selectedFormat = anilistSelectedFormat,
                     onPosterClick = { item ->
                         onAnilistPosterClick?.invoke(item) ?: onPosterClick?.invoke(
                             LibraryItem(

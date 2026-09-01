@@ -48,4 +48,27 @@ object AnilistProfileRepository {
 
         Result.success(isFollowing)
     }
+
+    private val statsCache = mutableMapOf<Int, AnilistUserStatistics>()
+    private val activityCache = mutableMapOf<Int, List<AnilistUserActivityItem>>()
+
+    suspend fun fetchUserStatistics(userId: Int, forceRefresh: Boolean = false): Result<AnilistUserStatistics> = withContext(Dispatchers.Default) {
+        if (!forceRefresh) {
+            statsCache[userId]?.let { return@withContext Result.success(it) }
+        }
+        val stats = AnilistApi.fetchUserStatistics(userId) ?: return@withContext Result.failure(Exception("Statistics not available"))
+        statsCache[userId] = stats
+        Result.success(stats)
+    }
+
+    suspend fun fetchUserActivity(userId: Int, page: Int = 1, forceRefresh: Boolean = false): Result<List<AnilistUserActivityItem>> = withContext(Dispatchers.Default) {
+        if (!forceRefresh && page == 1) {
+            activityCache[userId]?.let { return@withContext Result.success(it) }
+        }
+        val activities = AnilistApi.fetchUserActivityFeed(userId, page = page)
+        if (page == 1) {
+            activityCache[userId] = activities
+        }
+        Result.success(activities)
+    }
 }

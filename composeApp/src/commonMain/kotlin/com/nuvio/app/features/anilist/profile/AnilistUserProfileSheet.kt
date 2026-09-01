@@ -334,16 +334,23 @@ fun AnilistUserProfileSheet(
 
                             Spacer(modifier = Modifier.height(16.dp))
 
-                            // 4. Tabs: About / Favorites
-                            TabRow(
+                            // 4. Tabs: About / Favorites / Statistics / Activity
+                            val anilistPrefs = com.nuvio.app.features.anilist.AnilistPreferencesRepository.snapshot()
+                            val showStatsTab = anilistPrefs.enabled && anilistPrefs.enableStatsDashboard
+                            val showActivityTab = anilistPrefs.enabled && anilistPrefs.enableActivityFeed
+
+                            ScrollableTabRow(
                                 selectedTabIndex = selectedTab,
+                                edgePadding = 16.dp,
                                 containerColor = Color.Transparent,
                                 contentColor = MaterialTheme.colorScheme.primary,
                                 indicator = { tabPositions ->
-                                    TabRowDefaults.SecondaryIndicator(
-                                        Modifier.tabIndicatorOffset(tabPositions[selectedTab]),
-                                        color = MaterialTheme.colorScheme.primary,
-                                    )
+                                    if (selectedTab < tabPositions.size) {
+                                        TabRowDefaults.SecondaryIndicator(
+                                            Modifier.tabIndicatorOffset(tabPositions[selectedTab]),
+                                            color = MaterialTheme.colorScheme.primary,
+                                        )
+                                    }
                                 },
                             ) {
                                 Tab(
@@ -356,99 +363,43 @@ fun AnilistUserProfileSheet(
                                     onClick = { selectedTab = 1 },
                                     text = { Text("Favorites (${user.favoriteAnime.size + user.favoriteCharacters.size})", fontWeight = FontWeight.SemiBold) },
                                 )
+                                if (showStatsTab) {
+                                    Tab(
+                                        selected = selectedTab == 2,
+                                        onClick = { selectedTab = 2 },
+                                        text = { Text("Statistics", fontWeight = FontWeight.SemiBold) },
+                                    )
+                                }
+                                if (showActivityTab) {
+                                    Tab(
+                                        selected = selectedTab == 3,
+                                        onClick = { selectedTab = 3 },
+                                        text = { Text("Activity", fontWeight = FontWeight.SemiBold) },
+                                    )
+                                }
                             }
                         }
                     }
 
                     // 5. Tab Content
-                    if (selectedTab == 0) {
-                        // About / Bio Content
-                        if (bioBlocks.isNotEmpty()) {
-                            items(
-                                count = bioBlocks.size,
-                                key = { index -> "bio-block-$index" },
-                            ) { index ->
-                                Box(modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp)) {
-                                    AnilistContentBlockItem(
-                                        block = bioBlocks[index],
-                                        primaryColor = primaryColor,
-                                        uriHandler = uriHandler,
-                                    )
-                                }
-                            }
-                        } else {
-                            item {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(32.dp),
-                                    contentAlignment = Alignment.Center,
-                                ) {
-                                    Text(
-                                        text = "No bio provided.",
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
-                                }
-                            }
-                        }
-                    } else {
-                        // Favorites Content
-                        item {
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 20.dp, vertical = 8.dp),
-                            ) {
-                                if (user.favoriteAnime.isNotEmpty()) {
-                                    Text(
-                                        text = "Favorite Anime",
-                                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                                        color = MaterialTheme.colorScheme.onSurface,
-                                    )
-                                    Spacer(modifier = Modifier.height(10.dp))
-                                    val favAnimeListState = rememberLazyListState()
-                                    LazyRow(
-                                        state = favAnimeListState,
-                                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                        contentPadding = PaddingValues(bottom = 12.dp),
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .nuvioDesktopDragScroll(favAnimeListState),
-                                    ) {
-                                        items(user.favoriteAnime, key = { it.id }) { anime ->
-                                            FavoriteAnimeCard(
-                                                anime = anime,
-                                                onClick = { onAnimeClick?.invoke(anime.id) },
-                                            )
-                                        }
+                    when (selectedTab) {
+                        0 -> {
+                            // About / Bio Content
+                            if (bioBlocks.isNotEmpty()) {
+                                items(
+                                    count = bioBlocks.size,
+                                    key = { index -> "bio-block-$index" },
+                                ) { index ->
+                                    Box(modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp)) {
+                                        AnilistContentBlockItem(
+                                            block = bioBlocks[index],
+                                            primaryColor = primaryColor,
+                                            uriHandler = uriHandler,
+                                        )
                                     }
                                 }
-
-                                if (user.favoriteCharacters.isNotEmpty()) {
-                                    Spacer(modifier = Modifier.height(12.dp))
-                                    Text(
-                                        text = "Favorite Characters",
-                                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                                        color = MaterialTheme.colorScheme.onSurface,
-                                    )
-                                    Spacer(modifier = Modifier.height(10.dp))
-                                    val favCharListState = rememberLazyListState()
-                                    LazyRow(
-                                        state = favCharListState,
-                                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                        contentPadding = PaddingValues(bottom = 12.dp),
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .nuvioDesktopDragScroll(favCharListState),
-                                    ) {
-                                        items(user.favoriteCharacters, key = { it.id }) { char ->
-                                            FavoriteCharacterCard(character = char)
-                                        }
-                                    }
-                                }
-
-                                if (user.favoriteAnime.isEmpty() && user.favoriteCharacters.isEmpty()) {
+                            } else {
+                                item {
                                     Box(
                                         modifier = Modifier
                                             .fillMaxWidth()
@@ -456,12 +407,100 @@ fun AnilistUserProfileSheet(
                                         contentAlignment = Alignment.Center,
                                     ) {
                                         Text(
-                                            text = "No favorites listed.",
+                                            text = "No bio provided.",
                                             style = MaterialTheme.typography.bodyMedium,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         )
                                     }
                                 }
+                            }
+                        }
+                        1 -> {
+                            // Favorites Content
+                            item {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 20.dp, vertical = 8.dp),
+                                ) {
+                                    if (user.favoriteAnime.isNotEmpty()) {
+                                        Text(
+                                            text = "Favorite Anime",
+                                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                            color = MaterialTheme.colorScheme.onSurface,
+                                        )
+                                        Spacer(modifier = Modifier.height(10.dp))
+                                        val favAnimeListState = rememberLazyListState()
+                                        LazyRow(
+                                            state = favAnimeListState,
+                                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                            contentPadding = PaddingValues(bottom = 12.dp),
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .nuvioDesktopDragScroll(favAnimeListState),
+                                        ) {
+                                            items(user.favoriteAnime, key = { it.id }) { anime ->
+                                                FavoriteAnimeCard(
+                                                    anime = anime,
+                                                    onClick = { onAnimeClick?.invoke(anime.id) },
+                                                )
+                                            }
+                                        }
+                                    }
+
+                                    if (user.favoriteCharacters.isNotEmpty()) {
+                                        Spacer(modifier = Modifier.height(12.dp))
+                                        Text(
+                                            text = "Favorite Characters",
+                                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                            color = MaterialTheme.colorScheme.onSurface,
+                                        )
+                                        Spacer(modifier = Modifier.height(10.dp))
+                                        val favCharListState = rememberLazyListState()
+                                        LazyRow(
+                                            state = favCharListState,
+                                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                            contentPadding = PaddingValues(bottom = 12.dp),
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .nuvioDesktopDragScroll(favCharListState),
+                                        ) {
+                                            items(user.favoriteCharacters, key = { it.id }) { char ->
+                                                FavoriteCharacterCard(character = char)
+                                            }
+                                        }
+                                    }
+
+                                    if (user.favoriteAnime.isEmpty() && user.favoriteCharacters.isEmpty()) {
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(32.dp),
+                                            contentAlignment = Alignment.Center,
+                                        ) {
+                                            Text(
+                                                text = "No favorites listed.",
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        2 -> {
+                            // Statistics Dashboard Content
+                            item {
+                                ProfileStatisticsTabContent(userId = user.id)
+                            }
+                        }
+                        3 -> {
+                            // Activity Stream Content
+                            item {
+                                ProfileActivityTabContent(
+                                    userId = user.id,
+                                    onAnimeClick = onAnimeClick,
+                                )
                             }
                         }
                     }
@@ -611,5 +650,384 @@ private fun FavoriteCharacterCard(
             overflow = TextOverflow.Ellipsis,
             textAlign = TextAlign.Center,
         )
+    }
+}
+
+@Composable
+private fun ProfileStatisticsTabContent(
+    userId: Int,
+    modifier: Modifier = Modifier,
+) {
+    var statsState by remember { mutableStateOf<AnilistUserStatistics?>(null) }
+    var isLoading by remember { mutableStateOf(true) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(userId) {
+        isLoading = true
+        errorMessage = null
+        val result = AnilistProfileRepository.fetchUserStatistics(userId)
+        result.fold(
+            onSuccess = { stats ->
+                statsState = stats
+                isLoading = false
+            },
+            onFailure = { err ->
+                errorMessage = err.message ?: "Failed to load statistics"
+                isLoading = false
+            },
+        )
+    }
+
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        if (isLoading) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(200.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                CircularProgressIndicator(modifier = Modifier.size(32.dp), strokeWidth = 2.dp)
+            }
+        } else if (errorMessage != null || statsState == null) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(32.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = errorMessage ?: "No statistics available.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        } else {
+            val stats = statsState!!
+
+            // 1. Score Distribution Bar Chart
+            if (stats.scores.isNotEmpty()) {
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.12f)),
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                text = "Score Distribution",
+                                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                                color = MaterialTheme.colorScheme.onSurface,
+                            )
+                            Text(
+                                text = "Mean: ${stats.meanScore.toInt()}% (±${stats.standardDeviation.toInt()}%)",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.primary,
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        val maxCount = stats.scores.maxOfOrNull { it.count }?.coerceAtLeast(1) ?: 1
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(120.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.Bottom,
+                        ) {
+                            stats.scores.forEach { item ->
+                                val barFraction = (item.count.toFloat() / maxCount.toFloat()).coerceIn(0.04f, 1f)
+                                Column(
+                                    modifier = Modifier.weight(1f),
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.Bottom,
+                                ) {
+                                    if (item.count > 0) {
+                                        Text(
+                                            text = "${item.count}",
+                                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                        Spacer(modifier = Modifier.height(2.dp))
+                                    }
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth(0.65f)
+                                            .fillMaxHeight(barFraction)
+                                            .clip(RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp))
+                                            .background(
+                                                if (item.score >= 80) MaterialTheme.colorScheme.primary
+                                                else if (item.score >= 60) MaterialTheme.colorScheme.primary.copy(alpha = 0.65f)
+                                                else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+                                            ),
+                                    )
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(
+                                        text = "${item.score}",
+                                        style = MaterialTheme.typography.labelSmall.copy(
+                                            fontSize = 9.sp,
+                                            fontWeight = FontWeight.Bold,
+                                        ),
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 2. Top 5 Genres
+            if (stats.genres.isNotEmpty()) {
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.12f)),
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text(
+                            text = "Top Genres",
+                            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        val maxGenreCount = stats.genres.maxOfOrNull { it.count }?.coerceAtLeast(1) ?: 1
+                        stats.genres.take(5).forEach { g ->
+                            val progress = (g.count.toFloat() / maxGenreCount.toFloat()).coerceIn(0.05f, 1f)
+                            Column(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Text(
+                                        text = g.genre,
+                                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                    )
+                                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                                        Text(
+                                            text = "${g.count} titles",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                        if (g.meanScore > 0) {
+                                            Surface(
+                                                shape = RoundedCornerShape(4.dp),
+                                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
+                                            ) {
+                                                Text(
+                                                    text = "${g.meanScore.toInt()}%",
+                                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, fontSize = 10.sp),
+                                                    color = MaterialTheme.colorScheme.primary,
+                                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(6.dp)
+                                        .clip(RoundedCornerShape(3.dp))
+                                        .background(MaterialTheme.colorScheme.surfaceVariant),
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth(progress)
+                                            .fillMaxHeight()
+                                            .clip(RoundedCornerShape(3.dp))
+                                            .background(MaterialTheme.colorScheme.primary),
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 3. Top Studios
+            if (stats.studios.isNotEmpty()) {
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.12f)),
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text(
+                            text = "Top Animation Studios",
+                            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        stats.studios.take(5).forEach { studio ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 5.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text(
+                                    text = studio.name,
+                                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.weight(1f),
+                                )
+                                Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    Text(
+                                        text = "${studio.count} shows",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                    if (studio.meanScore > 0) {
+                                        Surface(
+                                            shape = RoundedCornerShape(4.dp),
+                                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
+                                        ) {
+                                            Text(
+                                                text = "${studio.meanScore.toInt()}%",
+                                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, fontSize = 10.sp),
+                                                color = MaterialTheme.colorScheme.primary,
+                                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ProfileActivityTabContent(
+    userId: Int,
+    onAnimeClick: ((Int) -> Unit)? = null,
+    modifier: Modifier = Modifier,
+) {
+    var activities by remember { mutableStateOf<List<AnilistUserActivityItem>>(emptyList()) }
+    var isLoading by remember { mutableStateOf(true) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(userId) {
+        isLoading = true
+        errorMessage = null
+        val result = AnilistProfileRepository.fetchUserActivity(userId)
+        result.fold(
+            onSuccess = { acts ->
+                activities = acts
+                isLoading = false
+            },
+            onFailure = { err ->
+                errorMessage = err.message ?: "Failed to load activity"
+                isLoading = false
+            },
+        )
+    }
+
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        if (isLoading) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(200.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                CircularProgressIndicator(modifier = Modifier.size(32.dp), strokeWidth = 2.dp)
+            }
+        } else if (errorMessage != null || activities.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(32.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = errorMessage ?: "No recent activity found.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        } else {
+            activities.forEach { act ->
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(10.dp))
+                        .clickable { onAnimeClick?.invoke(act.mediaId) },
+                    shape = RoundedCornerShape(10.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.1f)),
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        if (!act.coverImage.isNullOrBlank()) {
+                            AsyncImage(
+                                model = act.coverImage,
+                                contentDescription = act.mediaTitle,
+                                modifier = Modifier
+                                    .size(width = 44.dp, height = 62.dp)
+                                    .clip(RoundedCornerShape(6.dp)),
+                                contentScale = ContentScale.Crop,
+                            )
+                        }
+
+                        Column(modifier = Modifier.weight(1f)) {
+                            val actionText = when {
+                                !act.progress.isNullOrBlank() -> "Watched ${act.progress} of"
+                                act.status.contains("completed", ignoreCase = true) -> "Completed"
+                                act.status.contains("paused", ignoreCase = true) || act.status.contains("hold", ignoreCase = true) -> "Paused"
+                                act.status.contains("dropped", ignoreCase = true) -> "Dropped"
+                                act.status.contains("planning", ignoreCase = true) -> "Plans to watch"
+                                else -> act.status
+                            }
+
+                            Text(
+                                text = actionText,
+                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Medium),
+                                color = MaterialTheme.colorScheme.primary,
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = act.mediaTitle,
+                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                                color = MaterialTheme.colorScheme.onSurface,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    }
+                }
+            }
+        }
     }
 }

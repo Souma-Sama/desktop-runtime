@@ -371,6 +371,25 @@ object SearchRepository {
         )
     }
 
+    private val _advancedFilterState = MutableStateFlow(com.nuvio.app.features.anilist.AnilistAdvancedFilterState())
+    val advancedFilterState: StateFlow<com.nuvio.app.features.anilist.AnilistAdvancedFilterState> = _advancedFilterState.asStateFlow()
+
+    fun updateAdvancedFilter(filter: com.nuvio.app.features.anilist.AnilistAdvancedFilterState) {
+        _advancedFilterState.value = filter
+        loadDiscoverFeed(
+            reset = true,
+            forceRefresh = true,
+        )
+    }
+
+    fun clearAdvancedFilter() {
+        _advancedFilterState.value = com.nuvio.app.features.anilist.AnilistAdvancedFilterState()
+        loadDiscoverFeed(
+            reset = true,
+            forceRefresh = true,
+        )
+    }
+
     fun loadMoreDiscover() {
         val current = _discoverUiState.value
         if (current.isLoading || current.nextSkip == null) return
@@ -553,6 +572,7 @@ object SearchRepository {
             errorMessage = null,
         )
 
+        val activeAdvancedFilter = _advancedFilterState.value
         activeDiscoverJob = scope.launch {
             runCatching {
                 fetchCatalogPage(
@@ -561,6 +581,7 @@ object SearchRepository {
                     catalogId = selectedCatalog.catalogId,
                     genre = current.selectedGenre,
                     sort = current.selectedSort,
+                    advancedFilter = if (activeAdvancedFilter.hasFilters) activeAdvancedFilter else null,
                     skip = requestedSkip.takeIf { it > 0 },
                     forceRefresh = forceRefresh,
                 ).withUnreleasedFilter()

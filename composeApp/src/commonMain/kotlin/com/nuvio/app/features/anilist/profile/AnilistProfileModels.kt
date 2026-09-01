@@ -38,3 +38,56 @@ data class AnilistProfileFavoriteCharacter(
     val name: String,
     val image: String? = null,
 )
+
+@Serializable
+data class AnilistScoreDistributionItem(
+    val score: Int,
+    val count: Int,
+    val meanScore: Double = 0.0,
+)
+
+@Serializable
+data class AnilistFormatStatItem(
+    val format: String,
+    val count: Int,
+)
+
+@Serializable
+data class AnilistGenreStatItem(
+    val genre: String,
+    val count: Int,
+    val meanScore: Double = 0.0,
+)
+
+@Serializable
+data class AnilistStudioStatItem(
+    val name: String,
+    val count: Int,
+    val meanScore: Double = 0.0,
+)
+
+@Serializable
+data class AnilistUserStatistics(
+    val animeCount: Int = 0,
+    val meanScore: Double = 0.0,
+    val standardDeviation: Double = 0.0,
+    val minutesWatched: Long = 0L,
+    val daysWatched: Double = 0.0,
+    val episodesWatched: Int = 0,
+    val scores: List<AnilistScoreDistributionItem> = emptyList(),
+    val formats: List<AnilistFormatStatItem> = emptyList(),
+    val genres: List<AnilistGenreStatItem> = emptyList(),
+    val studios: List<AnilistStudioStatItem> = emptyList(),
+)
+
+@Serializable
+data class AnilistUserActivityItem(
+    val id: Int,
+    val status: String,
+    val progress: String? = null,
+    val createdAt: Long = 0L,
+    val mediaId: Int,
+    val mediaTitle: String,
+    val coverImage: String? = null,
+    val format: String? = null,
+)

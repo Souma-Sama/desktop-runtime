@@ -23,6 +23,8 @@ fun LazyListScope.anilistLibraryContent(
     sectionsConfig: List<AnilistSectionSettings>,
     sortBy: AnilistSortBy,
     sortAscending: Boolean,
+    searchQuery: String = "",
+    selectedFormat: String? = null,
     onPosterClick: (AnilistLibraryItem) -> Unit,
     onConnectAnilistClick: () -> Unit,
     onRefresh: () -> Unit,
@@ -73,7 +75,12 @@ fun LazyListScope.anilistLibraryContent(
                     "rewatching", "repeating" -> uiState.rewatching
                     else -> emptyList()
                 }
-                val sorted = rawList.sortedWith(
+                val filtered = rawList.filter { item ->
+                    val matchesQuery = searchQuery.isBlank() || item.title.contains(searchQuery.trim(), ignoreCase = true)
+                    val matchesFormat = selectedFormat.isNullOrBlank() || item.format.equals(selectedFormat, ignoreCase = true)
+                    matchesQuery && matchesFormat
+                }
+                val sorted = filtered.sortedWith(
                     when (sortBy) {
                         AnilistSortBy.LAST_UPDATED -> compareBy { it.updatedAt }
                         AnilistSortBy.SCORE -> compareBy { it.score ?: 0.0 }

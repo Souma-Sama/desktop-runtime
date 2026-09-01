@@ -146,6 +146,13 @@ internal fun LazyListScope.anilistSettingsContent(
             AnilistDisplayPreferencesSection(isTablet = isTablet)
         }
     }
+
+    item {
+        val prefs by AnilistPreferencesRepository.preferences.collectAsStateWithLifecycle()
+        if (prefs.enabled) {
+            AnilistAdvancedFeaturesSection(isTablet = isTablet)
+        }
+    }
 }
 
 @Composable
@@ -216,6 +223,16 @@ private fun AnilistPosterDisplaySection(isTablet: Boolean) {
                 checked = prefs.showPosterMalScore,
                 isTablet = isTablet,
                 onCheckedChange = AnilistPreferencesRepository::setShowPosterMalScore,
+            )
+
+            SettingsGroupDivider(isTablet = isTablet)
+
+            SettingsSwitchRow(
+                title = "Show Library Status Badges",
+                description = "Display your current list status (Watching, Plan to Watch, Completed, On Hold, Dropped, Rewatching) on the bottom-left corner of anime posters across all pages.",
+                checked = prefs.showPosterStatusBadge,
+                isTablet = isTablet,
+                onCheckedChange = AnilistPreferencesRepository::setShowPosterStatusBadge,
             )
         }
     }
@@ -846,4 +863,64 @@ private fun AnilistTokenDialog(onDismiss: () -> Unit) {
             }
         },
     )
+}
+
+@Composable
+private fun AnilistAdvancedFeaturesSection(isTablet: Boolean) {
+    val prefs by AnilistPreferencesRepository.preferences.collectAsStateWithLifecycle()
+
+    SettingsSection(
+        title = "AniList Pro & Advanced Features",
+        isTablet = isTablet,
+    ) {
+        SettingsGroup(isTablet = isTablet) {
+            SettingsSwitchRow(
+                title = "Advanced Search Filters & Tags",
+                description = "Enable AniList multi-genre selection, 80+ official tags, format, status, score, and release year filters in Search & Discover.",
+                checked = prefs.enableAdvancedFilters,
+                isTablet = isTablet,
+                onCheckedChange = AnilistPreferencesRepository::setEnableAdvancedFilters,
+            )
+
+            SettingsGroupDivider(isTablet = isTablet)
+
+            SettingsSwitchRow(
+                title = "User Statistics & Charts Dashboard",
+                description = "Show detailed anime watch stats, animated score distribution bar chart, top genres, and top studios in profile.",
+                checked = prefs.enableStatsDashboard,
+                isTablet = isTablet,
+                onCheckedChange = AnilistPreferencesRepository::setEnableStatsDashboard,
+            )
+
+            SettingsGroupDivider(isTablet = isTablet)
+
+            SettingsSwitchRow(
+                title = "User Activity Stream",
+                description = "Display chronological watch updates, ratings, and scrobbles in user profiles.",
+                checked = prefs.enableActivityFeed,
+                isTablet = isTablet,
+                onCheckedChange = AnilistPreferencesRepository::setEnableActivityFeed,
+            )
+
+            SettingsGroupDivider(isTablet = isTablet)
+
+            SettingsSwitchRow(
+                title = "In-Library Filter & Sorter",
+                description = "Enable instant search and custom sorting (by score, progress %, updated date) in your personal library shelves.",
+                checked = prefs.enableInLibraryFilter,
+                isTablet = isTablet,
+                onCheckedChange = AnilistPreferencesRepository::setEnableInLibraryFilter,
+            )
+
+            SettingsGroupDivider(isTablet = isTablet)
+
+            SettingsSwitchRow(
+                title = "Episodic Discussion Threads",
+                description = "Show direct shortcuts to episode-specific AniList discussion threads in anime details and player.",
+                checked = prefs.enableEpisodicDiscussions,
+                isTablet = isTablet,
+                onCheckedChange = AnilistPreferencesRepository::setEnableEpisodicDiscussions,
+            )
+        }
+    }
 }

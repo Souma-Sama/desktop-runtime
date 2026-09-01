@@ -34,28 +34,109 @@ object AnilistGenres {
     }
 
     /**
-     * Popular thematic tags on AniList for advanced discovery.
+     * Official AniList tags categorized for structured multi-filtering.
      */
     val POPULAR_TAGS = listOf(
         "Isekai",
+        "Reincarnation",
+        "Time Travel",
+        "Cyberpunk",
+        "Post-Apocalyptic",
+        "Dystopian",
+        "Steampunk",
+        "Super Power",
+        "Martial Arts",
+        "Swordplay",
+        "Magic",
+        "Mythology",
+        "Demons",
+        "Vampire",
+        "Zombies",
+        "Survival",
+        "Battle Royale",
+        "Death Game",
+        "Space",
+        "Space Opera",
+        "Military",
+        "War",
+        "Politics",
+        "Conspiracy",
+        "Crime",
+        "Detective",
+        "Police",
+        "Mafia",
+        "Assassins",
+        "Spy",
+        "Idol",
+        "Band",
+        "Video Games",
+        "Virtual Reality",
+        "Otaku Culture",
+        "Gourmet",
+        "Cooking",
+        "Iyashikei",
+        "Cute Girls Doing Cute Things",
+        "School",
+        "Workplace",
+        "Historical",
+        "Feudal Japan",
+        "Medieval",
+        "Coming of Age",
+        "Tragedy",
+        "Revenge",
+        "Dark Fantasy",
+        "High Fantasy",
+        "Urban Fantasy",
+        "Cultivation",
+        "Wuxia",
         "Shounen",
         "Seinen",
         "Shoujo",
         "Josei",
-        "School",
-        "Cyberpunk",
-        "Post-Apocalyptic",
-        "Military",
-        "Super Power",
-        "Time Travel",
-        "Idol",
-        "Martial Arts",
-        "Vampire",
-        "Survival",
-        "Space",
-        "Mythology",
-        "Parody",
-        "Detective",
+        "Monster Girls",
+        "Kemonomimi",
+    )
+
+    val FORMAT_OPTIONS = listOf(
+        "TV" to "TV Series",
+        "TV_SHORT" to "TV Short",
+        "MOVIE" to "Movie",
+        "OVA" to "OVA",
+        "ONA" to "ONA",
+        "SPECIAL" to "Special",
+    )
+
+    val STATUS_OPTIONS = listOf(
+        "RELEASING" to "Currently Airing",
+        "FINISHED" to "Finished",
+        "NOT_YET_RELEASED" to "Upcoming",
+        "CANCELLED" to "Cancelled",
+        "HIATUS" to "On Hiatus",
+    )
+
+    val SEASON_OPTIONS = listOf(
+        "WINTER" to "Winter",
+        "SPRING" to "Spring",
+        "SUMMER" to "Summer",
+        "FALL" to "Fall",
+    )
+
+    val COUNTRY_OPTIONS = listOf(
+        "JP" to "Japan (Anime)",
+        "CN" to "China (Donghua)",
+        "KR" to "South Korea",
+        "TW" to "Taiwan",
+    )
+
+    val SOURCE_OPTIONS = listOf(
+        "ORIGINAL" to "Original",
+        "MANGA" to "Manga",
+        "LIGHT_NOVEL" to "Light Novel",
+        "VISUAL_NOVEL" to "Visual Novel",
+        "VIDEO_GAME" to "Video Game",
+        "WEB_NOVEL" to "Web Novel / Manhwa",
+        "NOVEL" to "Novel",
+        "OTHER" to "Other",
     )
 }
 

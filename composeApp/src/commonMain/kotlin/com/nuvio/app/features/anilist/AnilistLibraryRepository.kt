@@ -57,6 +57,46 @@ object AnilistLibraryRepository {
             .any { it.id == anilistId }
     }
 
+    fun getMediaEntry(anilistId: Int): AnilistLibraryItem? {
+        val state = _uiState.value
+        return (state.watching + state.completed + state.planning +
+                state.paused + state.dropped + state.rewatching)
+            .firstOrNull { it.id == anilistId }
+    }
+
+    fun getMediaStatus(anilistId: Int): AnilistMediaListStatus? {
+        val entry = getMediaEntry(anilistId) ?: return null
+        return when (entry.status.uppercase()) {
+            "CURRENT" -> AnilistMediaListStatus.CURRENT
+            "COMPLETED" -> AnilistMediaListStatus.COMPLETED
+            "PLANNING" -> AnilistMediaListStatus.PLANNING
+            "PAUSED" -> AnilistMediaListStatus.PAUSED
+            "DROPPED" -> AnilistMediaListStatus.DROPPED
+            "REPEATING" -> AnilistMediaListStatus.REPEATING
+            else -> null
+        }
+    }
+
+    fun getMediaProgress(anilistId: Int): Pair<Int, Int?>? {
+        val entry = getMediaEntry(anilistId) ?: return null
+        return entry.progress to entry.episodes
+    }
+
+    fun getMediaStatusById(itemId: String): AnilistMediaListStatus? {
+        val anilistId = extractAnilistId(itemId) ?: return null
+        return getMediaStatus(anilistId)
+    }
+
+    fun extractAnilistId(itemId: String): Int? {
+        return when {
+            itemId.startsWith("ani_") -> itemId.removePrefix("ani_").toIntOrNull()
+            itemId.startsWith("anilist:") -> itemId.removePrefix("anilist:").toIntOrNull()
+            itemId.startsWith("anilist_") -> itemId.removePrefix("anilist_").toIntOrNull()
+            itemId.toIntOrNull() != null -> itemId.toIntOrNull()
+            else -> null
+        }
+    }
+
     suspend fun refreshNow() {
         refresh(force = true)
     }

@@ -667,6 +667,147 @@ object AnilistApi {
         )
     }
 
+    suspend fun advancedSearchAnime(
+        filter: AnilistAdvancedFilterState,
+        searchQuery: String = "",
+        page: Int = 1,
+        perPage: Int = 25,
+        token: String? = null,
+    ): List<AnilistMedia> {
+        val cleanQuery = searchQuery.trim()
+        val hideAdult = AnilistPreferencesRepository.snapshot().hideAdultContent
+
+        val graphQLQuery = """
+            query AdvancedSearchAnime(
+              ${'$'}search: String,
+              ${'$'}genreIn: [String],
+              ${'$'}genreNotIn: [String],
+              ${'$'}tagIn: [String],
+              ${'$'}tagNotIn: [String],
+              ${'$'}formatIn: [MediaFormat],
+              ${'$'}statusIn: [MediaStatus],
+              ${'$'}season: MediaSeason,
+              ${'$'}seasonYear: Int,
+              ${'$'}countryOfOrigin: CountryCode,
+              ${'$'}sourceIn: [MediaSource],
+              ${'$'}averageScoreGreater: Int,
+              ${'$'}sort: [MediaSort],
+              ${'$'}isAdult: Boolean,
+              ${'$'}page: Int,
+              ${'$'}perPage: Int
+            ) {
+              Page(page: ${'$'}page, perPage: ${'$'}perPage) {
+                pageInfo {
+                  hasNextPage
+                }
+                media(
+                  search: ${'$'}search,
+                  genre_in: ${'$'}genreIn,
+                  genre_not_in: ${'$'}genreNotIn,
+                  tag_in: ${'$'}tagIn,
+                  tag_not_in: ${'$'}tagNotIn,
+                  format_in: ${'$'}formatIn,
+                  status_in: ${'$'}statusIn,
+                  season: ${'$'}season,
+                  seasonYear: ${'$'}seasonYear,
+                  countryOfOrigin: ${'$'}countryOfOrigin,
+                  source_in: ${'$'}sourceIn,
+                  averageScore_greater: ${'$'}averageScoreGreater,
+                  type: ANIME,
+                  sort: ${'$'}sort,
+                  isAdult: ${'$'}isAdult
+                ) {
+                  id
+                  idMal
+                  isAdult
+                  title {
+                    romaji
+                    english
+                    native
+                  }
+                  format
+                  status
+                  episodes
+                  duration
+                  coverImage {
+                    extraLarge
+                    large
+                    medium
+                  }
+                  bannerImage
+                  genres
+                  averageScore
+                  description(asHtml: false)
+                  startDate {
+                    year
+                  }
+                  endDate {
+                    year
+                  }
+                  mediaListEntry {
+                    id
+                    status
+                    score
+                    progress
+                    repeat
+                    updatedAt
+                  }
+                }
+              }
+            }
+        """.trimIndent()
+
+        val variables = buildJsonObject {
+            if (cleanQuery.isNotBlank()) put("search", cleanQuery)
+            if (filter.includedGenres.isNotEmpty()) {
+                put("genreIn", JsonArray(filter.includedGenres.map { JsonPrimitive(it) }))
+            }
+            if (filter.excludedGenres.isNotEmpty()) {
+                put("genreNotIn", JsonArray(filter.excludedGenres.map { JsonPrimitive(it) }))
+            }
+            if (filter.includedTags.isNotEmpty()) {
+                put("tagIn", JsonArray(filter.includedTags.map { JsonPrimitive(it) }))
+            }
+            if (filter.excludedTags.isNotEmpty()) {
+                put("tagNotIn", JsonArray(filter.excludedTags.map { JsonPrimitive(it) }))
+            }
+            if (filter.formats.isNotEmpty()) {
+                put("formatIn", JsonArray(filter.formats.map { JsonPrimitive(it) }))
+            }
+            if (filter.statuses.isNotEmpty()) {
+                put("statusIn", JsonArray(filter.statuses.map { JsonPrimitive(it) }))
+            }
+            if (!filter.season.isNullOrBlank()) {
+                put("season", filter.season)
+            }
+            if (filter.seasonYear != null && filter.seasonYear > 0) {
+                put("seasonYear", filter.seasonYear)
+            }
+            if (!filter.countryOfOrigin.isNullOrBlank()) {
+                put("countryOfOrigin", filter.countryOfOrigin)
+            }
+            if (filter.sources.isNotEmpty()) {
+                put("sourceIn", JsonArray(filter.sources.map { JsonPrimitive(it) }))
+            }
+            if (filter.minScore != null && filter.minScore > 0) {
+                put("averageScoreGreater", filter.minScore)
+            }
+            put("sort", JsonArray(listOf(JsonPrimitive(filter.sort.apiSortValue))))
+            if (hideAdult) put("isAdult", false)
+            put("page", page)
+            put("perPage", perPage)
+        }
+
+        val root = executeGraphQL(query = graphQLQuery, variables = variables, token = token)
+        val mediaList = root?.get("data")
+            .asJsonObjectOrNull()?.get("Page")
+            .asJsonObjectOrNull()?.get("media")
+            .asJsonArrayOrNull() ?: return emptyList()
+
+        return mediaList.mapNotNull { it.asJsonObjectOrNull()?.let { obj -> parseMedia(obj) } }
+            .filter { if (hideAdult) !it.isAdult else true }
+    }
+
     suspend fun fetchStaffDetail(
         staffId: Int? = null,
         searchName: String? = null,
@@ -2515,6 +2656,171 @@ object AnilistApi {
         val root = executeGraphQL(query = mutation, variables = variables, token = token)
         return root?.get("data").asJsonObjectOrNull()?.get("ToggleFollow").asJsonObjectOrNull()
             ?.get("isFollowing")?.jsonPrimitive?.contentOrNull?.toBoolean() ?: false
+    }
+
+    suspend fun fetchUserStatistics(userId: Int): com.nuvio.app.features.anilist.profile.AnilistUserStatistics? {
+        val query = """
+            query FetchUserStatistics(${'$'}userId: Int) {
+              User(id: ${'$'}userId) {
+                statistics {
+                  anime {
+                    count
+                    meanScore
+                    standardDeviation
+                    minutesWatched
+                    episodesWatched
+                    scores(limit: 100) {
+                      score
+                      count
+                      meanScore
+                      minutesWatched
+                    }
+                    formats(limit: 20) {
+                      format
+                      count
+                    }
+                    genres(limit: 10) {
+                      genre
+                      count
+                      meanScore
+                      minutesWatched
+                    }
+                    studios(limit: 10) {
+                      studio {
+                        id
+                        name
+                      }
+                      count
+                      meanScore
+                    }
+                  }
+                }
+              }
+            }
+        """.trimIndent()
+        val variables = buildJsonObject { put("userId", userId) }
+        val root = executeGraphQL(query = query, variables = variables) ?: return null
+        val userObj = root["data"].asJsonObjectOrNull()?.get("User").asJsonObjectOrNull() ?: return null
+        val animeStats = userObj["statistics"].asJsonObjectOrNull()?.get("anime").asJsonObjectOrNull() ?: return null
+
+        val count = animeStats["count"].asIntOrNull() ?: 0
+        val meanScore = animeStats["meanScore"].asDoubleOrNull() ?: 0.0
+        val standardDeviation = animeStats["standardDeviation"].asDoubleOrNull() ?: 0.0
+        val minutesWatched = animeStats["minutesWatched"].asLongOrNull() ?: 0L
+        val episodesWatched = animeStats["episodesWatched"].asIntOrNull() ?: 0
+        val daysWatched = (minutesWatched / (60.0 * 24.0) * 10.0).roundToInt() / 10.0
+
+        val scores = animeStats["scores"].asJsonArrayOrNull().orEmpty().mapNotNull { el ->
+            val obj = el.asJsonObjectOrNull() ?: return@mapNotNull null
+            val score = obj["score"].asIntOrNull() ?: return@mapNotNull null
+            val scCount = obj["count"].asIntOrNull() ?: 0
+            val scMean = obj["meanScore"].asDoubleOrNull() ?: 0.0
+            com.nuvio.app.features.anilist.profile.AnilistScoreDistributionItem(score = score, count = scCount, meanScore = scMean)
+        }.sortedBy { it.score }
+
+        val formats = animeStats["formats"].asJsonArrayOrNull().orEmpty().mapNotNull { el ->
+            val obj = el.asJsonObjectOrNull() ?: return@mapNotNull null
+            val format = obj["format"].asStringOrNull() ?: return@mapNotNull null
+            val fCount = obj["count"].asIntOrNull() ?: 0
+            com.nuvio.app.features.anilist.profile.AnilistFormatStatItem(format = format, count = fCount)
+        }
+
+        val genres = animeStats["genres"].asJsonArrayOrNull().orEmpty().mapNotNull { el ->
+            val obj = el.asJsonObjectOrNull() ?: return@mapNotNull null
+            val genre = obj["genre"].asStringOrNull() ?: return@mapNotNull null
+            val gCount = obj["count"].asIntOrNull() ?: 0
+            val gMean = obj["meanScore"].asDoubleOrNull() ?: 0.0
+            com.nuvio.app.features.anilist.profile.AnilistGenreStatItem(genre = genre, count = gCount, meanScore = gMean)
+        }
+
+        val studios = animeStats["studios"].asJsonArrayOrNull().orEmpty().mapNotNull { el ->
+            val obj = el.asJsonObjectOrNull() ?: return@mapNotNull null
+            val studioObj = obj["studio"].asJsonObjectOrNull() ?: return@mapNotNull null
+            val name = studioObj["name"].asStringOrNull() ?: return@mapNotNull null
+            val sCount = obj["count"].asIntOrNull() ?: 0
+            val sMean = obj["meanScore"].asDoubleOrNull() ?: 0.0
+            com.nuvio.app.features.anilist.profile.AnilistStudioStatItem(name = name, count = sCount, meanScore = sMean)
+        }
+
+        return com.nuvio.app.features.anilist.profile.AnilistUserStatistics(
+            animeCount = count,
+            meanScore = meanScore,
+            standardDeviation = standardDeviation,
+            minutesWatched = minutesWatched,
+            daysWatched = daysWatched,
+            episodesWatched = episodesWatched,
+            scores = scores,
+            formats = formats,
+            genres = genres,
+            studios = studios,
+        )
+    }
+
+    suspend fun fetchUserActivityFeed(userId: Int, page: Int = 1, perPage: Int = 20): List<com.nuvio.app.features.anilist.profile.AnilistUserActivityItem> {
+        val query = """
+            query FetchUserActivity(${'$'}userId: Int, ${'$'}page: Int, ${'$'}perPage: Int) {
+              Page(page: ${'$'}page, perPage: ${'$'}perPage) {
+                activities(userId: ${'$'}userId, type: MEDIA_LIST, sort: [ID_DESC]) {
+                  ... on ListActivity {
+                    id
+                    status
+                    progress
+                    createdAt
+                    media {
+                      id
+                      title {
+                        romaji
+                        english
+                        native
+                      }
+                      coverImage {
+                        medium
+                        large
+                      }
+                      format
+                    }
+                  }
+                }
+              }
+            }
+        """.trimIndent()
+        val variables = buildJsonObject {
+            put("userId", userId)
+            put("page", page)
+            put("perPage", perPage)
+        }
+        val root = executeGraphQL(query = query, variables = variables) ?: return emptyList()
+        val activities = root["data"].asJsonObjectOrNull()?.get("Page").asJsonObjectOrNull()?.get("activities").asJsonArrayOrNull() ?: return emptyList()
+        val lang = AnilistPreferencesRepository.snapshot().preferredTitleLanguage
+
+        return activities.mapNotNull { el ->
+            val obj = el.asJsonObjectOrNull() ?: return@mapNotNull null
+            val id = obj["id"].asIntOrNull() ?: return@mapNotNull null
+            val status = obj["status"].asStringOrNull() ?: return@mapNotNull null
+            val progress = obj["progress"].asStringOrNull()
+            val createdAt = obj["createdAt"].asLongOrNull() ?: 0L
+            val mediaObj = obj["media"].asJsonObjectOrNull() ?: return@mapNotNull null
+            val mediaId = mediaObj["id"].asIntOrNull() ?: return@mapNotNull null
+            val titleObj = mediaObj["title"].asJsonObjectOrNull()
+            val title = titleObj?.get(lang.name.lowercase()).asStringOrNull()
+                ?: titleObj?.get("romaji").asStringOrNull()
+                ?: titleObj?.get("english").asStringOrNull()
+                ?: "Anime #$mediaId"
+            val coverImage = mediaObj["coverImage"].asJsonObjectOrNull()?.get("medium").asStringOrNull()
+                ?: mediaObj["coverImage"].asJsonObjectOrNull()?.get("large").asStringOrNull()
+            val format = mediaObj["format"].asStringOrNull()
+
+            com.nuvio.app.features.anilist.profile.AnilistUserActivityItem(
+                id = id,
+                status = status,
+                progress = progress,
+                createdAt = createdAt,
+                mediaId = mediaId,
+                mediaTitle = title,
+                coverImage = coverImage,
+                format = format,
+            )
+        }
     }
 
     suspend fun getMediaThreads(

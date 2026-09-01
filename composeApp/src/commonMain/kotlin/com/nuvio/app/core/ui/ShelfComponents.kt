@@ -252,6 +252,8 @@ fun NuvioPosterCard(
     anilistScore: Double? = null,
     malScore: Double? = null,
     scoreFormat: AnilistPosterScoreFormat = AnilistPosterScoreFormat.PERCENTAGE,
+    anilistStatus: com.nuvio.app.features.anilist.AnilistMediaListStatus? = null,
+    anilistProgress: Pair<Int, Int?>? = null,
     isWatched: Boolean = false,
     onClick: (() -> Unit)? = null,
     onLongClick: (() -> Unit)? = null,
@@ -361,6 +363,16 @@ fun NuvioPosterCard(
                 scoreFormat = scoreFormat,
                 modifier = Modifier.align(Alignment.TopEnd),
             )
+
+            if (anilistStatus != null) {
+                AnilistPosterStatusBadge(
+                    status = anilistStatus,
+                    progress = anilistProgress,
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .padding(start = 6.dp, bottom = if (!bottomLeftLogoUrl.isNullOrBlank() || !bottomLeftText.isNullOrBlank()) 28.dp else 6.dp),
+                )
+            }
 
             NuvioPosterWatchedOverlay(isWatched = isWatched)
         }
@@ -753,6 +765,79 @@ private fun PosterScoreBadge(
                     letterSpacing = (-0.2).sp,
                 ),
                 color = Color.White,
+                maxLines = 1,
+            )
+        }
+    }
+}
+
+@Composable
+fun AnilistPosterStatusBadge(
+    status: com.nuvio.app.features.anilist.AnilistMediaListStatus,
+    progress: Pair<Int, Int?>? = null,
+    modifier: Modifier = Modifier,
+) {
+    val (label, bgTint, textTint) = when (status) {
+        com.nuvio.app.features.anilist.AnilistMediaListStatus.CURRENT -> Triple(
+            if (progress != null && progress.first > 0) {
+                if (progress.second != null && progress.second!! > 0) "Watching ${progress.first}/${progress.second}"
+                else "Watching Ep ${progress.first}"
+            } else "Watching",
+            Color(0xFF1B5E20), // Emerald Green
+            Color(0xFFE8F5E9),
+        )
+        com.nuvio.app.features.anilist.AnilistMediaListStatus.PLANNING -> Triple(
+            "Planning",
+            Color(0xFFE65100), // Vibrant Amber / Orange
+            Color(0xFFFFF3E0),
+        )
+        com.nuvio.app.features.anilist.AnilistMediaListStatus.COMPLETED -> Triple(
+            "Completed",
+            Color(0xFF01579B), // Sky / Ocean Blue
+            Color(0xFFE1F5FE),
+        )
+        com.nuvio.app.features.anilist.AnilistMediaListStatus.PAUSED -> Triple(
+            "On Hold",
+            Color(0xFFF57F17), // Warm Yellow / Gold
+            Color(0xFFFFFDE7),
+        )
+        com.nuvio.app.features.anilist.AnilistMediaListStatus.DROPPED -> Triple(
+            "Dropped",
+            Color(0xFFB71C1C), // Crimson / Coral Red
+            Color(0xFFFFEBEE),
+        )
+        com.nuvio.app.features.anilist.AnilistMediaListStatus.REPEATING -> Triple(
+            if (progress != null && progress.first > 0) "Rewatching ${progress.first}" else "Rewatching",
+            Color(0xFF4A148C), // Purple / Violet
+            Color(0xFFF3E5F5),
+        )
+    }
+
+    Surface(
+        shape = RoundedCornerShape(4.dp),
+        color = bgTint.copy(alpha = 0.88f),
+        border = BorderStroke(0.5.dp, textTint.copy(alpha = 0.35f)),
+        modifier = modifier,
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(3.dp),
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(4.dp)
+                    .clip(CircleShape)
+                    .background(textTint),
+            )
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall.copy(
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    letterSpacing = (-0.1).sp,
+                ),
+                color = textTint,
                 maxLines = 1,
             )
         }

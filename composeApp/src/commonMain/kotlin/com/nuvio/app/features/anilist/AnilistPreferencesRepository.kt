@@ -157,6 +157,30 @@ object AnilistPreferencesRepository {
         updateAndPersist { it.copy(posterScoreFormat = format) }
     }
 
+    fun setShowPosterStatusBadge(enabled: Boolean) {
+        updateAndPersist { it.copy(showPosterStatusBadge = enabled) }
+    }
+
+    fun setEnableAdvancedFilters(enabled: Boolean) {
+        updateAndPersist { it.copy(enableAdvancedFilters = enabled) }
+    }
+
+    fun setEnableStatsDashboard(enabled: Boolean) {
+        updateAndPersist { it.copy(enableStatsDashboard = enabled) }
+    }
+
+    fun setEnableActivityFeed(enabled: Boolean) {
+        updateAndPersist { it.copy(enableActivityFeed = enabled) }
+    }
+
+    fun setEnableInLibraryFilter(enabled: Boolean) {
+        updateAndPersist { it.copy(enableInLibraryFilter = enabled) }
+    }
+
+    fun setEnableEpisodicDiscussions(enabled: Boolean) {
+        updateAndPersist { it.copy(enableEpisodicDiscussions = enabled) }
+    }
+
     fun setHideAdultContent(enabled: Boolean) {
         updateAndPersist { it.copy(hideAdultContent = enabled) }
         com.nuvio.app.features.anilist.anichart.AniChartRepository.clearCache()
