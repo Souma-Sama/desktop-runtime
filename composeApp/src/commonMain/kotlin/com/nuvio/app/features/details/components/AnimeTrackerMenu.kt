@@ -131,11 +131,19 @@ fun AnimeTrackerButton(
 ) {
     var showSheet by remember { mutableStateOf(false) }
     val trackerState by AnilistTrackerCoordinator.trackerState.collectAsState()
-    val isTrackingActive = trackerState.entry?.status != null
-    val currentStatus = trackerState.entry?.status
+    val libraryUiState by com.nuvio.app.features.anilist.AnilistLibraryRepository.uiState.collectAsState()
     val effectiveTitle = title?.takeIf { it.isNotBlank() } ?: meta?.name.orEmpty()
     val hapticFeedback = LocalHapticFeedback.current
 
+    val anilistId = remember(meta?.id) { AnilistTrackerCoordinator.extractAnilistId(meta?.id) }
+    val currentStatus = trackerState.entry?.takeIf {
+        trackerState.media != null && (
+            (anilistId != null && trackerState.media?.id == anilistId) ||
+            trackerState.lastLookupTitle.equals(effectiveTitle, ignoreCase = true)
+        )
+    }?.status ?: com.nuvio.app.features.anilist.AnilistLibraryRepository.getMediaStatusById(meta?.id.orEmpty(), effectiveTitle)
+
+    val isTrackingActive = currentStatus != null
     val statusColor = getStatusColor(currentStatus)
 
     val containerColor by animateColorAsState(
@@ -178,18 +186,16 @@ fun AnimeTrackerButton(
                     .clickable(role = Role.Button) {
                         hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                         showSheet = true
-                        if (trackerState.media == null) {
-                            val metaYear = meta?.releaseInfo?.take(4)?.toIntOrNull()
-                            AnilistTrackerCoordinator.loadForMedia(
-                                title = effectiveTitle,
-                                mediaId = meta?.id,
-                                year = metaYear,
-                                genres = meta?.genres.orEmpty(),
-                                country = meta?.country,
-                                language = meta?.language,
-                                forceRefresh = true,
-                            )
-                        }
+                        val metaYear = meta?.releaseInfo?.take(4)?.toIntOrNull()
+                        AnilistTrackerCoordinator.loadForMedia(
+                            title = effectiveTitle,
+                            mediaId = meta?.id,
+                            year = metaYear,
+                            genres = meta?.genres.orEmpty(),
+                            country = meta?.country,
+                            language = meta?.language,
+                            forceRefresh = true,
+                        )
                     },
                 contentAlignment = Alignment.Center,
             ) {

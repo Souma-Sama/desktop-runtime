@@ -1512,13 +1512,25 @@ object AnilistApi {
 
     fun getCachedMedia(mediaId: Int): AnilistMedia? = mediaCache[mediaId]
 
+    fun updateCachedMediaEntry(mediaId: Int, entry: AnilistMediaListEntry?) {
+        val current = mediaCache[mediaId] ?: return
+        mediaCache[mediaId] = current.copy(mediaListEntry = entry)
+    }
+
+    fun clearMediaCache() {
+        mediaCache.clear()
+    }
+
     suspend fun fetchMediaById(
         mediaId: Int,
         token: String? = null,
+        forceRefresh: Boolean = false,
     ): AnilistMedia? {
-        val cached = mediaCache[mediaId]
-        if (cached != null && cached.isFullDetails && (!token.isNullOrBlank() == (cached.mediaListEntry != null) || token.isNullOrBlank())) {
-            return cached
+        if (!forceRefresh) {
+            val cached = mediaCache[mediaId]
+            if (cached != null && cached.isFullDetails && (!token.isNullOrBlank() == (cached.mediaListEntry != null) || token.isNullOrBlank())) {
+                return cached
+            }
         }
         val hasAuth = !token.isNullOrBlank()
         val mediaListEntryBlock = if (hasAuth) {
@@ -1831,7 +1843,9 @@ object AnilistApi {
 
         val root = executeGraphQL(query = mutation, variables = variables, token = token)
         val entryObj = root?.get("data").asJsonObjectOrNull()?.get("SaveMediaListEntry").asJsonObjectOrNull() ?: return null
-        return parseMediaListEntry(entryObj, defaultMediaId = mediaId)
+        val updatedEntry = parseMediaListEntry(entryObj, defaultMediaId = mediaId)
+        updateCachedMediaEntry(mediaId, updatedEntry)
+        return updatedEntry
     }
 
     suspend fun saveMediaListEntry(
@@ -1876,7 +1890,14 @@ object AnilistApi {
 
         val variables = buildJsonObject { put("id", entryId) }
         val root = executeGraphQL(query = mutation, variables = variables, token = token)
-        return root?.get("data").asJsonObjectOrNull()?.get("DeleteMediaListEntry").asJsonObjectOrNull()?.get("deleted").asStringOrNull() == "true"
+        val deleted = root?.get("data").asJsonObjectOrNull()?.get("DeleteMediaListEntry").asJsonObjectOrNull()?.get("deleted").asStringOrNull() == "true"
+        if (deleted) {
+            val matching = mediaCache.values.firstOrNull { it.mediaListEntry?.id == entryId }
+            if (matching != null) {
+                updateCachedMediaEntry(matching.id, null)
+            }
+        }
+        return deleted
     }
 
     private fun parseMedia(obj: JsonObject, isFullDetails: Boolean = false): AnilistMedia? = runCatching {

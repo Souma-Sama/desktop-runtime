@@ -82,14 +82,18 @@ object AnilistTrackerCoordinator {
                 val token = AnilistAuthRepository.token.value
                 val cachedMedia = mediaCache[cacheKey]
 
-                val media = if (cachedMedia != null) {
+                val media = if (cachedMedia != null && !forceRefresh) {
                     strategyUsed = "Cache Hit (${cachedMedia.title?.displayTitle})"
                     debug.appendLine("[Cache] $strategyUsed")
                     if (!token.isNullOrBlank()) {
-                        AnilistApi.fetchMediaById(cachedMedia.id, token = token) ?: cachedMedia
+                        AnilistApi.fetchMediaById(cachedMedia.id, token = token, forceRefresh = false) ?: cachedMedia
                     } else {
                         cachedMedia
                     }
+                } else if (cachedMedia != null && forceRefresh && !token.isNullOrBlank()) {
+                    strategyUsed = "Cache Refresh (${cachedMedia.title?.displayTitle})"
+                    debug.appendLine("[Cache Refresh] $strategyUsed")
+                    AnilistApi.fetchMediaById(cachedMedia.id, token = token, forceRefresh = true) ?: cachedMedia
                 } else {
                     var fetched: AnilistMedia? = null
 
@@ -241,6 +245,10 @@ object AnilistTrackerCoordinator {
         mediaCache["${currentMedia.id}"] = updatedMedia
         mediaCache["ani_${currentMedia.id}"] = updatedMedia
         mediaCache["anilist:${currentMedia.id}"] = updatedMedia
+        currentMedia.title?.displayTitle?.let { title ->
+            mediaCache[title.lowercase()] = updatedMedia
+        }
+        AnilistApi.updateCachedMediaEntry(currentMedia.id, entry)
     }
 
     fun updateStatus(status: AnilistMediaListStatus) {
