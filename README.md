@@ -1,7 +1,7 @@
 <div align="center">
 
-  <h1>⚡ Nuvio-Kai</h1>
-  <p><strong>A Modern, Fast Anime & Media Client with Native AniList & AniChart Integration</strong></p>
+  <h1>Nuvio-Kai</h1>
+  <p><strong>A High-Performance Anime & Media Client with Native AniList & AniChart Integration</strong></p>
   <p>Built with Kotlin Multiplatform & Compose Multiplatform for macOS and Android.</p>
 
   <br />
@@ -14,31 +14,31 @@
 
 ---
 
-## ✨ Features
+## Features
 
-### 🎌 Native AniList Ecosystem
+### Native AniList Ecosystem
 - **Zero-Friction Sync**: Instant, real-time two-way synchronization with your AniList account.
 - **Interactive Tracker Sheet**: Track episodes, status (*Watching, Completed, Planning, Paused, Dropped*), scores (100-Point & 10-Star ratings), repeat counts, and notes directly from poster quick-actions or details pages.
 - **Poster Score & Status Badges**: AniList and MyAnimeList (MAL) scores, library status pills, and title logos rendered seamlessly across all catalog shelves.
 
-### 📅 AniChart Seasonal & Airing Schedule
+### AniChart Seasonal & Airing Schedule
 - **Seasonal Grids**: Explore anime by season (*Winter, Spring, Summer, Fall*) with format chips (*TV, Movie, OVA/ONA, Shorts*), genre filters, and popularity sorting.
 - **Live Airing Calendar**: Weekly countdown schedule with exact episode release times and air dates.
 - **Smart Offline Cache**: In-memory response caching and automatic rate-limit backoff ensure instant, uninterrupted tab navigation.
 
-### 💬 Community & Rich Metadata
+### Community & Rich Metadata
 - **Reviews & Ratings**: Read full community reviews with score breakdowns and upvotes.
 - **Forum Discussions**: Browse discussion threads, episode comments, and community feedback.
 - **Studio & Franchise Relations**: Explore studio credits, prequel/sequel timelines, and franchise relations.
 
-### 🎬 Advanced Media Playback & Stream Routing
+### Advanced Media Playback & Stream Routing
 - **ARM Stream Routing**: Automatic anime-to-stream provider resolution via Anime-Relations-Map (ARM).
 - **Stremio Add-on Protocol**: Connect any standard Stremio add-on for high-speed streaming.
 - **Custom Player Integrations**: Native macOS video player bridge with hardware acceleration, subtitle customization, and intro/outro skip support.
 
 ---
 
-## 📥 Downloads & Installation
+## Downloads & Installation
 
 Download the latest releases for macOS and Android from the **Releases** tab:
 
@@ -47,7 +47,7 @@ Download the latest releases for macOS and Android from the **Releases** tab:
 
 ---
 
-## 🛠️ Building From Source
+## Building From Source
 
 ### Prerequisites
 - JDK 17 or higher
@@ -78,7 +78,7 @@ cd Nuvio-Kai
 
 ---
 
-## 🏛️ Architecture
+## Architecture
 
 Nuvio-Kai is structured using a clean, decoupled **Sidecar Hook Bridge (`KaiHooks`)**:
 
@@ -89,13 +89,13 @@ Nuvio-Kai is structured using a clean, decoupled **Sidecar Hook Bridge (`KaiHook
 
 ---
 
-## ⚖️ Legal & Disclaimer
+## Legal & Disclaimer
 
 Nuvio-Kai is a client-side interface for browsing metadata and organizing your media libraries. It does not host, distribute, or store any media streams or files. All metadata is retrieved via public APIs (AniList, MetaHub, and user-configured add-ons).
 
 ---
 
-## 📜 License & Credits
+## License & Credits
 
 This project is licensed under the **GNU General Public License v3.0** - see the [LICENSE](LICENSE) file for details.  
 Based on the open-source Nuvio project with specialized native anime integrations and extensions.
