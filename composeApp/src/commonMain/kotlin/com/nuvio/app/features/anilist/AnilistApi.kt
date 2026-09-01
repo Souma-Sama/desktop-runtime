@@ -2334,6 +2334,7 @@ object AnilistApi {
                       medium
                     }
                     bannerImage
+                    donatorTier
                     donatorBadge
                   }
                 }
@@ -2400,6 +2401,7 @@ object AnilistApi {
                     medium
                   }
                   bannerImage
+                  donatorTier
                   donatorBadge
                 }
               }
@@ -2499,7 +2501,8 @@ object AnilistApi {
             val avLarge = avObj?.get("large").asStringOrNull()
             val avMedium = avObj?.get("medium").asStringOrNull()
             val banner = u["bannerImage"].asStringOrNull()
-            val badge = u["donatorBadge"].asStringOrNull()
+            val donatorTier = u["donatorTier"]?.asIntOrNull() ?: 0
+            val badge = if (donatorTier > 0) u["donatorBadge"].asStringOrNull()?.takeIf { it.isNotBlank() } ?: "Donator" else null
             com.nuvio.app.features.anilist.community.AnilistUserSummary(
                 id = uId,
                 name = uName,
@@ -2606,7 +2609,7 @@ object AnilistApi {
         val avMedium = avObj?.get("medium").asStringOrNull()
         val banner = userObj["bannerImage"].asStringOrNull()
         val donatorTier = userObj["donatorTier"].asIntOrNull() ?: 0
-        val donatorBadge = userObj["donatorBadge"].asStringOrNull()
+        val donatorBadge = if (donatorTier > 0) userObj["donatorBadge"].asStringOrNull()?.takeIf { it.isNotBlank() } ?: "Donator" else null
         val isFollowing = userObj["isFollowing"]?.jsonPrimitive?.contentOrNull?.toBoolean() ?: false
         val isFollower = userObj["isFollower"]?.jsonPrimitive?.contentOrNull?.toBoolean() ?: false
 
@@ -2890,6 +2893,7 @@ object AnilistApi {
                       large
                     }
                     bannerImage
+                    donatorTier
                     donatorBadge
                   }
                 }
@@ -2928,7 +2932,8 @@ object AnilistApi {
                 val avMed = av?.get("medium").asStringOrNull()
                 val avLg = av?.get("large").asStringOrNull()
                 val banner = u["bannerImage"].asStringOrNull()
-                val badge = u["donatorBadge"].asStringOrNull()
+                val donatorTier = u["donatorTier"]?.asIntOrNull() ?: 0
+                val badge = if (donatorTier > 0) u["donatorBadge"]?.asStringOrNull()?.takeIf { it.isNotBlank() } ?: "Donator" else null
                 com.nuvio.app.features.anilist.community.AnilistUserSummary(
                     id = uId,
                     name = uName,
@@ -2983,6 +2988,7 @@ object AnilistApi {
                       medium
                       large
                     }
+                    donatorTier
                     donatorBadge
                   }
                 }
@@ -3016,7 +3022,8 @@ object AnilistApi {
                 val av = u["avatar"].asJsonObjectOrNull()
                 val avMed = av?.get("medium").asStringOrNull()
                 val avLg = av?.get("large").asStringOrNull()
-                val badge = u["donatorBadge"].asStringOrNull()
+                val donatorTier = u["donatorTier"]?.asIntOrNull() ?: 0
+                val badge = if (donatorTier > 0) u["donatorBadge"]?.asStringOrNull()?.takeIf { it.isNotBlank() } ?: "Donator" else null
                 com.nuvio.app.features.anilist.community.AnilistUserSummary(
                     id = uId,
                     name = uName,
@@ -3057,6 +3064,7 @@ object AnilistApi {
                   avatar {
                     medium
                   }
+                  donatorTier
                   donatorBadge
                 }
               }
@@ -3082,7 +3090,8 @@ object AnilistApi {
             val uName = u["name"].asStringOrNull().orEmpty()
             val av = u["avatar"].asJsonObjectOrNull()
             val avMed = av?.get("medium").asStringOrNull()
-            val badge = u["donatorBadge"].asStringOrNull()
+            val donatorTier = u["donatorTier"]?.asIntOrNull() ?: 0
+            val badge = if (donatorTier > 0) u["donatorBadge"]?.asStringOrNull()?.takeIf { it.isNotBlank() } ?: "Donator" else null
             com.nuvio.app.features.anilist.community.AnilistUserSummary(
                 id = uId,
                 name = uName,
@@ -3172,6 +3181,7 @@ object AnilistApi {
                       avatar {
                         medium
                       }
+                      donatorTier
                       donatorBadge
                     }
                   }
@@ -3219,7 +3229,8 @@ object AnilistApi {
                 val uName = u["name"].asStringOrNull().orEmpty()
                 val av = u["avatar"].asJsonObjectOrNull()
                 val avMed = av?.get("medium").asStringOrNull()
-                val badge = u["donatorBadge"].asStringOrNull()
+                val donatorTier = u["donatorTier"]?.asIntOrNull() ?: 0
+                val badge = if (donatorTier > 0) u["donatorBadge"]?.asStringOrNull()?.takeIf { it.isNotBlank() } ?: "Donator" else null
                 com.nuvio.app.features.anilist.community.AnilistUserSummary(
                     id = uId,
                     name = uName,

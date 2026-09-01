@@ -403,7 +403,8 @@ object SearchRepository {
         addons: List<ManagedAddon>,
         query: String,
     ): List<SearchCatalogRequest> {
-        val isAnilistEnabled = addons.any { it.manifestUrl == "native://anilist" && it.enabled }
+        val anilistPrefs = com.nuvio.app.features.anilist.AnilistPreferencesRepository.snapshot()
+        val isAnilistEnabled = anilistPrefs.enabled && addons.any { (it.manifestUrl == "native://anilist" || it.manifestUrl == "builtin://anilist" || it.manifest?.id.equals("anilist", ignoreCase = true)) && it.enabled }
         val anilistRequest = if (isAnilistEnabled) {
             listOf(
                 SearchCatalogRequest(
@@ -418,7 +419,9 @@ object SearchRepository {
             )
         } else emptyList()
 
-        val addonRequests = addons.mapNotNull { addon ->
+        val effectiveAddons = if (anilistPrefs.enabled) addons else addons.filterNot { it.manifestUrl == "native://anilist" || it.manifestUrl == "builtin://anilist" || it.manifest?.id.equals("anilist", ignoreCase = true) }
+
+        val addonRequests = effectiveAddons.mapNotNull { addon ->
             val manifest = addon.manifest ?: return@mapNotNull null
             addon to manifest
         }.flatMap { (addon, manifest) ->
@@ -440,8 +443,10 @@ object SearchRepository {
         return anilistRequest + addonRequests
     }
 
-    private fun buildDiscoverSources(addons: List<ManagedAddon>): List<DiscoverCatalogOption> =
-        addons.mapNotNull { addon ->
+    private fun buildDiscoverSources(addons: List<ManagedAddon>): List<DiscoverCatalogOption> {
+        val anilistPrefs = com.nuvio.app.features.anilist.AnilistPreferencesRepository.snapshot()
+        val effectiveAddons = if (anilistPrefs.enabled) addons else addons.filterNot { it.manifestUrl == "native://anilist" || it.manifestUrl == "builtin://anilist" || it.manifest?.id.equals("anilist", ignoreCase = true) }
+        return effectiveAddons.mapNotNull { addon ->
             val manifest = addon.manifest ?: return@mapNotNull null
             addon to manifest
         }.flatMap { (addon, manifest) ->
@@ -464,6 +469,7 @@ object SearchRepository {
                     )
                 }
         }
+    }
 
     private suspend fun SearchCatalogRequest.toSection(forceRefresh: Boolean): HomeCatalogSection {
         if (isNativeAnilist) {

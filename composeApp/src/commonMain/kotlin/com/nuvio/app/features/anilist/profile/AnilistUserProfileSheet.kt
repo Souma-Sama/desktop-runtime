@@ -306,7 +306,7 @@ fun AnilistUserProfileSheet(
                                     color = MaterialTheme.colorScheme.onSurface,
                                 )
 
-                                if (!user.donatorBadge.isNullOrBlank()) {
+                                if (user.donatorTier > 0 && !user.donatorBadge.isNullOrBlank()) {
                                     Surface(
                                         color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.8f),
                                         shape = RoundedCornerShape(6.dp),
