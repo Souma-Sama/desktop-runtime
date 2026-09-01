@@ -58,6 +58,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import kotlin.math.roundToInt
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -385,9 +386,7 @@ fun NuvioPosterCard(
             if (anilistUserScore != null && anilistUserScore > 0.0) {
                 AnilistPosterUserRatingBadge(
                     userScore = anilistUserScore,
-                    modifier = Modifier
-                        .align(Alignment.BottomStart)
-                        .padding(bottom = if (!bottomLeftLogoUrl.isNullOrBlank() || !bottomLeftText.isNullOrBlank()) 26.dp else 0.dp),
+                    modifier = Modifier.align(Alignment.BottomStart),
                 )
             }
 
@@ -954,21 +953,22 @@ fun AnilistPosterUserRatingBadge(
 ) {
     if (userScore == null || userScore <= 0.0) return
 
-    // Normalize to 10-point scale for color calculation
-    val normalized10 = if (userScore > 10.0) userScore / 10.0 else userScore
+    // Normalize to 1-10 scale (AniList scores can be 0-100 or 0-10)
+    val score10 = if (userScore > 10.0) userScore / 10.0 else userScore
 
     // AniHyou dynamic color tiers based on score
     val (bgTint, textTint) = when {
-        normalized10 >= 7.5 -> Color(0xFF4DD0E1) to Color(0xFF003840) // Cyan / Teal for high scores (7.5 - 10)
-        normalized10 >= 6.0 -> Color(0xFFAED581) to Color(0xFF1B3A00) // Soft Green for good scores (6.0 - 7.4)
-        normalized10 >= 4.0 -> Color(0xFFFFB74D) to Color(0xFF3E2000) // Warm Amber for average (4.0 - 5.9)
-        else -> Color(0xFFEF5350) to Color(0xFFFFFFFF)                // Coral Red for low scores (< 4.0)
+        score10 >= 7.5 -> Color(0xFF4DD0E1) to Color(0xFF003840) // Cyan / Teal for high scores (7.5 - 10)
+        score10 >= 6.0 -> Color(0xFFAED581) to Color(0xFF1B3A00) // Soft Green for good scores (6.0 - 7.4)
+        score10 >= 4.0 -> Color(0xFFFFB74D) to Color(0xFF3E2000) // Warm Amber for average (4.0 - 5.9)
+        else -> Color(0xFFEF5350) to Color(0xFFFFFFFF)           // Coral Red for low scores (< 4.0)
     }
 
-    val formattedScore = if (userScore % 1.0 == 0.0) {
-        userScore.toInt().toString()
+    val roundedScore = ((score10 * 10.0).roundToInt() / 10.0)
+    val formattedScore = if (roundedScore % 1.0 == 0.0) {
+        roundedScore.toInt().toString()
     } else {
-        userScore.toString()
+        roundedScore.toString()
     }
 
     Surface(
@@ -977,15 +977,15 @@ fun AnilistPosterUserRatingBadge(
         modifier = modifier,
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
+            modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.5.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(3.dp),
+            horizontalArrangement = Arrangement.spacedBy(2.5.dp),
         ) {
             Icon(
                 imageVector = Icons.Default.Star,
                 contentDescription = "User Rating",
                 tint = textTint,
-                modifier = Modifier.size(11.dp),
+                modifier = Modifier.size(10.dp),
             )
             Text(
                 text = formattedScore,

@@ -43,6 +43,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Sort
 import androidx.compose.material.icons.rounded.CalendarMonth
@@ -56,6 +57,10 @@ import androidx.compose.foundation.Image
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import com.nuvio.app.core.ui.NuvioDropdownChip
+import com.nuvio.app.core.ui.NuvioDropdownOption
+import com.nuvio.app.features.anilist.AnilistAdvancedFilterSheet
+import com.nuvio.app.features.anilist.AnilistAdvancedFilterState
 import com.nuvio.app.features.anilist.AnilistGenres
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -107,6 +112,8 @@ fun AniChartScreen(
     val state by AniChartRepository.uiState.collectAsState()
     val scope = rememberCoroutineScope()
     val posterCardStyle = rememberPosterCardStyleUiState()
+    var showAdvancedFilterSheet by remember { mutableStateOf(false) }
+    var advancedFilterState by remember { mutableStateOf(AnilistAdvancedFilterState()) }
 
     LaunchedEffect(state.mode, state.selectedSeason, state.selectedYear) {
         if (state.mode == AniChartMode.SEASONAL) {
@@ -158,6 +165,8 @@ fun AniChartScreen(
             selectedSort = state.selectedSort,
             onGenreSelected = { AniChartRepository.setGenreFilter(it) },
             onSortSelected = { AniChartRepository.setSortOption(it) },
+            onOpenFilter = { showAdvancedFilterSheet = true },
+            activeFilterCount = advancedFilterState.activeFilterCount(),
         )
 
         Spacer(modifier = Modifier.height(10.dp))
@@ -263,6 +272,19 @@ fun AniChartScreen(
                 }
             }
         }
+    }
+
+    if (showAdvancedFilterSheet) {
+        AnilistAdvancedFilterSheet(
+            initialFilter = advancedFilterState,
+            isDesktop = true,
+            onDismiss = { showAdvancedFilterSheet = false },
+            onApply = { newFilter ->
+                advancedFilterState = newFilter
+                AniChartRepository.setGenreFilter(newFilter.selectedGenre)
+                showAdvancedFilterSheet = false
+            },
+        )
     }
 }
 
@@ -635,141 +657,82 @@ private fun AniChartGenreAndSortBar(
     selectedSort: AniChartSort,
     onGenreSelected: (String?) -> Unit,
     onSortSelected: (AniChartSort) -> Unit,
+    onOpenFilter: () -> Unit,
+    activeFilterCount: Int = 0,
 ) {
     val prefs by AnilistPreferencesRepository.preferences.collectAsStateWithLifecycle()
     val genres = remember(prefs.hideAdultContent) {
         AnilistGenres.getAvailableGenres(prefs.hideAdultContent)
     }
-    var showSortMenu by remember { mutableStateOf(false) }
-    val genreScrollState = rememberScrollState()
+
+    val genreOptions = remember(genres) {
+        buildList {
+            add(NuvioDropdownOption(key = "", label = "All Genres"))
+            addAll(genres.map { NuvioDropdownOption(key = it, label = it) })
+        }
+    }
+
+    val sortOptions = remember {
+        AniChartSort.entries.map { NuvioDropdownOption(key = it.name, label = it.label) }
+    }
 
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 20.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        // Sort Selector Button
-        Box {
-            Surface(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(10.dp))
-                    .clickable { showSortMenu = true },
-                shape = RoundedCornerShape(10.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)),
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(5.dp),
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Sort,
-                        contentDescription = "Sort",
-                        modifier = Modifier.size(15.dp),
-                        tint = MaterialTheme.colorScheme.primary,
-                    )
-                    Text(
-                        text = selectedSort.label,
-                        style = MaterialTheme.typography.labelSmall.copy(
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 11.sp,
-                        ),
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-                }
-            }
+        NuvioDropdownChip(
+            title = "Genre",
+            label = selectedGenre ?: "All Genres",
+            selectedKey = selectedGenre ?: "",
+            options = genreOptions,
+            enabled = true,
+            onSelected = { option ->
+                onGenreSelected(option.key.ifBlank { null })
+            },
+        )
 
-            DropdownMenu(
-                expanded = showSortMenu,
-                onDismissRequest = { showSortMenu = false },
-                modifier = Modifier.background(MaterialTheme.colorScheme.surface),
-            ) {
-                AniChartSort.entries.forEach { sortOption ->
-                    val isSelected = sortOption == selectedSort
-                    DropdownMenuItem(
-                        text = {
-                            Text(
-                                text = sortOption.label,
-                                style = MaterialTheme.typography.bodySmall.copy(
-                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                ),
-                                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-                            )
-                        },
-                        onClick = {
-                            onSortSelected(sortOption)
-                            showSortMenu = false
-                        },
-                    )
-                }
-            }
-        }
+        NuvioDropdownChip(
+            title = "Sort",
+            label = selectedSort.label,
+            selectedKey = selectedSort.name,
+            options = sortOptions,
+            enabled = true,
+            onSelected = { option ->
+                AniChartSort.entries.find { it.name == option.key }?.let { onSortSelected(it) }
+            },
+        )
 
-        // Horizontal Scrollable Genre Chips
-        Box(
+        val hasActive = activeFilterCount > 0
+        Surface(
             modifier = Modifier
-                .weight(1f)
-                .horizontalScroll(genreScrollState)
-                .nuvioDesktopDragScroll(genreScrollState),
+                .clip(RoundedCornerShape(8.dp))
+                .clickable { onOpenFilter() },
+            shape = RoundedCornerShape(8.dp),
+            color = if (hasActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+            border = BorderStroke(1.dp, if (hasActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)),
         ) {
             Row(
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
                 verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(5.dp),
             ) {
-                // "All Genres" Chip
-                val isAllSelected = selectedGenre == null
-                Surface(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(8.dp))
-                        .clickable { onGenreSelected(null) },
-                    shape = RoundedCornerShape(8.dp),
-                    color = if (isAllSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.22f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
-                    border = BorderStroke(
-                        1.dp,
-                        if (isAllSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = 0.12f),
+                Icon(
+                    imageVector = Icons.Default.FilterList,
+                    contentDescription = "Filters",
+                    tint = if (hasActive) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(13.dp),
+                )
+                Text(
+                    text = if (hasActive) "Filters ($activeFilterCount)" else "Filters",
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 11.sp,
                     ),
-                ) {
-                    Text(
-                        text = "All Genres",
-                        style = MaterialTheme.typography.labelSmall.copy(
-                            fontWeight = if (isAllSelected) FontWeight.Bold else FontWeight.Medium,
-                            fontSize = 11.sp,
-                        ),
-                        color = if (isAllSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp),
-                    )
-                }
-
-                // Individual Genres
-                genres.forEach { genre ->
-                    val isSelected = selectedGenre.equals(genre, ignoreCase = true)
-                    Surface(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(8.dp))
-                            .clickable {
-                                onGenreSelected(if (isSelected) null else genre)
-                            },
-                        shape = RoundedCornerShape(8.dp),
-                        color = if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.22f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
-                        border = BorderStroke(
-                            1.dp,
-                            if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = 0.12f),
-                        ),
-                    ) {
-                        Text(
-                            text = genre,
-                            style = MaterialTheme.typography.labelSmall.copy(
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                fontSize = 11.sp,
-                            ),
-                            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp),
-                        )
-                    }
-                }
+                    color = if (hasActive) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         }
     }

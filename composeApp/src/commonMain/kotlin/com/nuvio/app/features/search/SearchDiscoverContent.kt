@@ -69,16 +69,6 @@ internal fun LazyListScope.discoverContent(
             activeAdvancedFilterCount = activeAdvancedFilterCount,
         )
     }
-    if (state.genreOptions.isNotEmpty()) {
-        item {
-            DiscoverQuickGenreChipsRow(
-                genres = state.genreOptions,
-                selectedGenre = state.selectedGenre,
-                onGenreSelected = onGenreSelected,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
-            )
-        }
-    }
     state.selectedCatalog?.let { selectedCatalog ->
         item {
             Text(
@@ -252,73 +242,6 @@ private fun DiscoverFilterRow(
                         color = if (hasActive) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-            }
-        }
-    }
-}
-
-@Composable
-private fun DiscoverQuickGenreChipsRow(
-    genres: List<String>,
-    selectedGenre: String?,
-    onGenreSelected: (String?) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val scrollState = rememberScrollState()
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .horizontalScroll(scrollState),
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        val isAllSelected = selectedGenre == null
-        Surface(
-            modifier = Modifier
-                .clip(RoundedCornerShape(8.dp))
-                .clickable { onGenreSelected(null) },
-            shape = RoundedCornerShape(8.dp),
-            color = if (isAllSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.22f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
-            border = BorderStroke(
-                1.dp,
-                if (isAllSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = 0.12f),
-            ),
-        ) {
-            Text(
-                text = "All",
-                style = MaterialTheme.typography.labelSmall.copy(
-                    fontWeight = if (isAllSelected) FontWeight.Bold else FontWeight.Medium,
-                    fontSize = 11.sp,
-                ),
-                color = if (isAllSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
-            )
-        }
-
-        genres.forEach { genre ->
-            val isSelected = selectedGenre.equals(genre, ignoreCase = true)
-            Surface(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(8.dp))
-                    .clickable {
-                        onGenreSelected(if (isSelected) null else genre)
-                    },
-                shape = RoundedCornerShape(8.dp),
-                color = if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.22f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
-                border = BorderStroke(
-                    1.dp,
-                    if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = 0.12f),
-                ),
-            ) {
-                Text(
-                    text = genre,
-                    style = MaterialTheme.typography.labelSmall.copy(
-                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                        fontSize = 11.sp,
-                    ),
-                    color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
-                )
             }
         }
     }
