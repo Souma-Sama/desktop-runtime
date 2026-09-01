@@ -1232,6 +1232,7 @@ fun MetaDetailsScreen(
                                             country = null,
                                             language = null,
                                             mediaId = item.id,
+                                            type = item.type,
                                         )
                                         if (anilistPrefs.enabled && isAnime) {
                                             trackerSheetPreview = item
@@ -1363,6 +1364,7 @@ fun MetaDetailsScreen(
                                             country = null,
                                             language = null,
                                             mediaId = item.id,
+                                            type = item.type,
                                         )
                                         if (anilistPrefs.enabled && isAnime) {
                                             trackerSheetPreview = item

@@ -41,13 +41,14 @@ fun HomePosterCard(
         }
     }
 
-    val isAnime = remember(item.id, item.name, item.genres) {
+    val isAnime = remember(item.id, item.name, item.genres, item.type) {
         com.nuvio.app.features.anilist.AnilistTrackerCoordinator.isAnimeCandidate(
             title = item.name,
             genres = item.genres,
             country = null,
             language = null,
             mediaId = item.id,
+            type = item.type,
         )
     }
 

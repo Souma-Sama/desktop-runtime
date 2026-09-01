@@ -225,6 +225,7 @@ fun DetailActionButtons(
                 country = meta?.country,
                 language = meta?.language,
                 mediaId = meta?.id,
+                type = meta?.type,
             )
             val isMatchedAnime = trackerState.isAnime && trackerState.media != null && trackerState.lastLookupTitle.equals(effectiveAnimeTitle, ignoreCase = true)
 

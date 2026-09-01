@@ -1751,6 +1751,7 @@ internal fun MainAppContent(
                             country = null,
                             language = null,
                             mediaId = preview.id,
+                            type = preview.type,
                         )
                     }
 

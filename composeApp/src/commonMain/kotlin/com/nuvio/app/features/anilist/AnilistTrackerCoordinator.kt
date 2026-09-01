@@ -909,12 +909,14 @@ object AnilistTrackerCoordinator {
 
     fun isAnimeCandidate(
         title: String,
-        genres: List<String>,
-        country: String?,
-        language: String?,
+        genres: List<String> = emptyList(),
+        country: String? = null,
+        language: String? = null,
         mediaId: String? = null,
+        type: String? = null,
     ): Boolean {
         if (hasAnimeId(mediaId)) return true
+        if (type.equals("anime", ignoreCase = true)) return true
         val g = genres.map { it.lowercase() }
         if (g.any { it.contains("anime") }) return true
         if (g.any { it == "animation" || it.contains("anim") }) {
@@ -926,6 +928,7 @@ object AnilistTrackerCoordinator {
         if (title.any { it in '\u3040'..'\u30ff' || it in '\u4e00'..'\u9faf' }) return true
         val isJapan = country?.lowercase() in listOf("jp", "japan") || language?.lowercase() in listOf("ja", "japanese", "jpn")
         if (isJapan) return true
+        if (!mediaId.isNullOrBlank() && mediaCache.containsKey(mediaId.lowercase())) return true
         return false
     }
 }
