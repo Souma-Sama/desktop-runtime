@@ -184,12 +184,29 @@ object AnilistTrackerCoordinator {
                 val hasMatch = media != null
                 debug.appendLine(if (hasMatch) "🎯 Final Match: #${media.id} ${media.title?.displayTitle}" else "❌ No match found on AniList.")
 
+                val localLibraryItem = media?.let { m ->
+                    AnilistLibraryRepository.getMediaEntry(m.id)
+                        ?: m.title?.displayTitle?.let { AnilistLibraryRepository.getMediaEntryByTitle(it) }
+                }
+                val effectiveEntry = media?.mediaListEntry ?: localLibraryItem?.toMediaListEntry()
+                val finalMedia = if (media != null && media.mediaListEntry == null && effectiveEntry != null) {
+                    media.copy(mediaListEntry = effectiveEntry)
+                } else {
+                    media
+                }
+                if (finalMedia != null) {
+                    mediaCache[cacheKey] = finalMedia
+                    mediaCache["${finalMedia.id}"] = finalMedia
+                    mediaCache["ani_${finalMedia.id}"] = finalMedia
+                    mediaCache["anilist:${finalMedia.id}"] = finalMedia
+                }
+
                 _trackerState.update {
                     it.copy(
                         isLoading = false,
                         isAnime = hasMatch || isExplicitAnime,
-                        media = media,
-                        entry = media?.mediaListEntry,
+                        media = finalMedia,
+                        entry = effectiveEntry,
                         error = if (!hasMatch) "No matching anime found on AniList for \"$rawTitle\"" else null,
                         debugInfo = debug.toString(),
                         resolvedStrategy = strategyUsed,
@@ -208,6 +225,24 @@ object AnilistTrackerCoordinator {
         }
     }
 
+    private fun applyLocalEntryUpdate(entry: AnilistMediaListEntry?) {
+        val currentMedia = _trackerState.value.media ?: return
+        val updatedMedia = currentMedia.copy(mediaListEntry = entry)
+        _trackerState.update {
+            it.copy(
+                media = updatedMedia,
+                entry = entry,
+            )
+        }
+        val cacheKey = currentKey
+        if (cacheKey != null) {
+            mediaCache[cacheKey] = updatedMedia
+        }
+        mediaCache["${currentMedia.id}"] = updatedMedia
+        mediaCache["ani_${currentMedia.id}"] = updatedMedia
+        mediaCache["anilist:${currentMedia.id}"] = updatedMedia
+    }
+
     fun updateStatus(status: AnilistMediaListStatus) {
         val currentMedia = _trackerState.value.media ?: return
         val token = AnilistAuthRepository.token.value ?: return
@@ -220,20 +255,37 @@ object AnilistTrackerCoordinator {
             posterUrl = currentMedia.coverImage?.extraLarge ?: currentMedia.coverImage?.large,
         )
 
+        val existingEntry = _trackerState.value.entry
+        val optimisticEntry = existingEntry?.copy(status = status)
+            ?: AnilistMediaListEntry(
+                id = 0,
+                mediaId = currentMedia.id,
+                status = status,
+                score = 0.0,
+                progress = 0,
+                repeat = 0,
+                private = false,
+                hiddenFromStatusLists = false,
+                notes = null,
+                startedAt = null,
+                completedAt = null,
+                updatedAt = com.nuvio.app.features.watchprogress.WatchProgressClock.nowEpochMs() / 1000L,
+            )
+        applyLocalEntryUpdate(optimisticEntry)
+
         scope.launch {
             _trackerState.update { it.copy(isSyncing = true) }
-            val updatedEntry = AnilistApi.saveMediaListEntry(
+            val updatedEntry = AnilistApi.updateMediaListEntry(
                 mediaId = currentMedia.id,
+                entryId = existingEntry?.id?.takeIf { it > 0 },
                 status = status,
                 token = token,
             )
             com.nuvio.app.features.anilist.catalog.AnilistCatalogRepository.clearCache()
-            _trackerState.update {
-                it.copy(
-                    isSyncing = false,
-                    entry = updatedEntry ?: it.entry?.copy(status = status),
-                )
+            if (updatedEntry != null) {
+                applyLocalEntryUpdate(updatedEntry)
             }
+            _trackerState.update { it.copy(isSyncing = false) }
         }
     }
 
@@ -261,21 +313,38 @@ object AnilistTrackerCoordinator {
             posterUrl = currentMedia.coverImage?.extraLarge ?: currentMedia.coverImage?.large,
         )
 
+        val existingEntry = _trackerState.value.entry
+        val optimisticEntry = existingEntry?.copy(progress = safeProgress, status = nextStatus)
+            ?: AnilistMediaListEntry(
+                id = 0,
+                mediaId = currentMedia.id,
+                status = nextStatus,
+                score = 0.0,
+                progress = safeProgress,
+                repeat = 0,
+                private = false,
+                hiddenFromStatusLists = false,
+                notes = null,
+                startedAt = null,
+                completedAt = null,
+                updatedAt = com.nuvio.app.features.watchprogress.WatchProgressClock.nowEpochMs() / 1000L,
+            )
+        applyLocalEntryUpdate(optimisticEntry)
+
         scope.launch {
             _trackerState.update { it.copy(isSyncing = true) }
-            val updatedEntry = AnilistApi.saveMediaListEntry(
+            val updatedEntry = AnilistApi.updateMediaListEntry(
                 mediaId = currentMedia.id,
+                entryId = existingEntry?.id?.takeIf { it > 0 },
                 status = nextStatus,
                 progress = safeProgress,
                 token = token,
             )
             com.nuvio.app.features.anilist.catalog.AnilistCatalogRepository.clearCache()
-            _trackerState.update {
-                it.copy(
-                    isSyncing = false,
-                    entry = updatedEntry ?: it.entry?.copy(progress = safeProgress, status = nextStatus),
-                )
+            if (updatedEntry != null) {
+                applyLocalEntryUpdate(updatedEntry)
             }
+            _trackerState.update { it.copy(isSyncing = false) }
         }
     }
 
@@ -336,8 +405,9 @@ object AnilistTrackerCoordinator {
                         currentEntry?.status ?: AnilistMediaListStatus.CURRENT
                     }
 
-                    val updatedEntry = AnilistApi.saveMediaListEntry(
+                    val updatedEntry = AnilistApi.updateMediaListEntry(
                         mediaId = media.id,
+                        entryId = currentEntry?.id?.takeIf { it > 0 },
                         status = nextStatus,
                         progress = safeProgress,
                         token = token,
@@ -353,9 +423,7 @@ object AnilistTrackerCoordinator {
                             posterUrl = media.coverImage?.extraLarge ?: media.coverImage?.large,
                         )
                         com.nuvio.app.features.anilist.catalog.AnilistCatalogRepository.clearCache()
-                        _trackerState.update {
-                            it.copy(entry = updatedEntry)
-                        }
+                        applyLocalEntryUpdate(updatedEntry)
                         onSuccess?.invoke(safeProgress)
                     }
                 }
@@ -376,29 +444,47 @@ object AnilistTrackerCoordinator {
         val currentMedia = _trackerState.value.media ?: return
         val token = AnilistAuthRepository.token.value ?: return
         val safeScore = score.coerceIn(0.0, 10.0)
+        val score100 = if (safeScore > 0.0) safeScore * 10.0 else 0.0
 
         AnilistLibraryRepository.updateItem(
             mediaId = currentMedia.id,
             title = currentMedia.title?.displayTitle,
-            score100 = safeScore * 10.0,
+            score100 = score100,
             totalEpisodes = currentMedia.episodes,
             posterUrl = currentMedia.coverImage?.extraLarge ?: currentMedia.coverImage?.large,
         )
 
+        val existingEntry = _trackerState.value.entry
+        val optimisticEntry = existingEntry?.copy(score = score100)
+            ?: AnilistMediaListEntry(
+                id = 0,
+                mediaId = currentMedia.id,
+                status = AnilistMediaListStatus.CURRENT,
+                score = score100,
+                progress = 0,
+                repeat = 0,
+                private = false,
+                hiddenFromStatusLists = false,
+                notes = null,
+                startedAt = null,
+                completedAt = null,
+                updatedAt = com.nuvio.app.features.watchprogress.WatchProgressClock.nowEpochMs() / 1000L,
+            )
+        applyLocalEntryUpdate(optimisticEntry)
+
         scope.launch {
             _trackerState.update { it.copy(isSyncing = true) }
-            val updatedEntry = AnilistApi.saveMediaListEntry(
+            val updatedEntry = AnilistApi.updateMediaListEntry(
                 mediaId = currentMedia.id,
+                entryId = existingEntry?.id?.takeIf { it > 0 },
                 score = safeScore,
                 token = token,
             )
             com.nuvio.app.features.anilist.catalog.AnilistCatalogRepository.clearCache()
-            _trackerState.update {
-                it.copy(
-                    isSyncing = false,
-                    entry = updatedEntry ?: it.entry?.copy(score = safeScore * 10.0),
-                )
+            if (updatedEntry != null) {
+                applyLocalEntryUpdate(updatedEntry)
             }
+            _trackerState.update { it.copy(isSyncing = false) }
         }
     }
 
@@ -406,126 +492,132 @@ object AnilistTrackerCoordinator {
         val currentMedia = _trackerState.value.media ?: return
         val token = AnilistAuthRepository.token.value ?: return
         val safeRepeat = repeat.coerceAtLeast(0)
+        val existingEntry = _trackerState.value.entry
+        applyLocalEntryUpdate(existingEntry?.copy(repeat = safeRepeat))
 
         scope.launch {
             _trackerState.update { it.copy(isSyncing = true) }
             val updatedEntry = AnilistApi.updateMediaListEntry(
                 mediaId = currentMedia.id,
+                entryId = existingEntry?.id?.takeIf { it > 0 },
                 repeat = safeRepeat,
                 token = token,
             )
             com.nuvio.app.features.anilist.catalog.AnilistCatalogRepository.clearCache()
-            _trackerState.update {
-                it.copy(
-                    isSyncing = false,
-                    entry = updatedEntry ?: it.entry?.copy(repeat = safeRepeat),
-                )
+            if (updatedEntry != null) {
+                applyLocalEntryUpdate(updatedEntry)
             }
+            _trackerState.update { it.copy(isSyncing = false) }
         }
     }
 
     fun updatePrivate(isPrivate: Boolean) {
         val currentMedia = _trackerState.value.media ?: return
         val token = AnilistAuthRepository.token.value ?: return
+        val existingEntry = _trackerState.value.entry
+        applyLocalEntryUpdate(existingEntry?.copy(private = isPrivate))
 
         scope.launch {
             _trackerState.update { it.copy(isSyncing = true) }
             val updatedEntry = AnilistApi.updateMediaListEntry(
                 mediaId = currentMedia.id,
+                entryId = existingEntry?.id?.takeIf { it > 0 },
                 private = isPrivate,
                 token = token,
             )
             com.nuvio.app.features.anilist.catalog.AnilistCatalogRepository.clearCache()
-            _trackerState.update {
-                it.copy(
-                    isSyncing = false,
-                    entry = updatedEntry ?: it.entry?.copy(private = isPrivate),
-                )
+            if (updatedEntry != null) {
+                applyLocalEntryUpdate(updatedEntry)
             }
+            _trackerState.update { it.copy(isSyncing = false) }
         }
     }
 
     fun updateHiddenFromStatusLists(hidden: Boolean) {
         val currentMedia = _trackerState.value.media ?: return
         val token = AnilistAuthRepository.token.value ?: return
+        val existingEntry = _trackerState.value.entry
+        applyLocalEntryUpdate(existingEntry?.copy(hiddenFromStatusLists = hidden))
 
         scope.launch {
             _trackerState.update { it.copy(isSyncing = true) }
             val updatedEntry = AnilistApi.updateMediaListEntry(
                 mediaId = currentMedia.id,
+                entryId = existingEntry?.id?.takeIf { it > 0 },
                 hiddenFromStatusLists = hidden,
                 token = token,
             )
             com.nuvio.app.features.anilist.catalog.AnilistCatalogRepository.clearCache()
-            _trackerState.update {
-                it.copy(
-                    isSyncing = false,
-                    entry = updatedEntry ?: it.entry?.copy(hiddenFromStatusLists = hidden),
-                )
+            if (updatedEntry != null) {
+                applyLocalEntryUpdate(updatedEntry)
             }
+            _trackerState.update { it.copy(isSyncing = false) }
         }
     }
 
     fun updateNotes(notes: String) {
         val currentMedia = _trackerState.value.media ?: return
         val token = AnilistAuthRepository.token.value ?: return
+        val existingEntry = _trackerState.value.entry
+        applyLocalEntryUpdate(existingEntry?.copy(notes = notes))
 
         scope.launch {
             _trackerState.update { it.copy(isSyncing = true) }
             val updatedEntry = AnilistApi.updateMediaListEntry(
                 mediaId = currentMedia.id,
+                entryId = existingEntry?.id?.takeIf { it > 0 },
                 notes = notes,
                 token = token,
             )
             com.nuvio.app.features.anilist.catalog.AnilistCatalogRepository.clearCache()
-            _trackerState.update {
-                it.copy(
-                    isSyncing = false,
-                    entry = updatedEntry ?: it.entry?.copy(notes = notes),
-                )
+            if (updatedEntry != null) {
+                applyLocalEntryUpdate(updatedEntry)
             }
+            _trackerState.update { it.copy(isSyncing = false) }
         }
     }
 
     fun updateStartedAt(date: AnilistFuzzyDate?) {
         val currentMedia = _trackerState.value.media ?: return
         val token = AnilistAuthRepository.token.value ?: return
+        val existingEntry = _trackerState.value.entry
+        applyLocalEntryUpdate(existingEntry?.copy(startedAt = date))
 
         scope.launch {
             _trackerState.update { it.copy(isSyncing = true) }
             val updatedEntry = AnilistApi.updateMediaListEntry(
                 mediaId = currentMedia.id,
+                entryId = existingEntry?.id?.takeIf { it > 0 },
                 startedAt = date,
                 token = token,
             )
             com.nuvio.app.features.anilist.catalog.AnilistCatalogRepository.clearCache()
-            _trackerState.update {
-                it.copy(
-                    isSyncing = false,
-                    entry = updatedEntry ?: it.entry?.copy(startedAt = date),
-                )
+            if (updatedEntry != null) {
+                applyLocalEntryUpdate(updatedEntry)
             }
+            _trackerState.update { it.copy(isSyncing = false) }
         }
     }
 
     fun updateCompletedAt(date: AnilistFuzzyDate?) {
         val currentMedia = _trackerState.value.media ?: return
         val token = AnilistAuthRepository.token.value ?: return
+        val existingEntry = _trackerState.value.entry
+        applyLocalEntryUpdate(existingEntry?.copy(completedAt = date))
 
         scope.launch {
             _trackerState.update { it.copy(isSyncing = true) }
             val updatedEntry = AnilistApi.updateMediaListEntry(
                 mediaId = currentMedia.id,
+                entryId = existingEntry?.id?.takeIf { it > 0 },
                 completedAt = date,
                 token = token,
             )
             com.nuvio.app.features.anilist.catalog.AnilistCatalogRepository.clearCache()
-            _trackerState.update {
-                it.copy(
-                    isSyncing = false,
-                    entry = updatedEntry ?: it.entry?.copy(completedAt = date),
-                )
+            if (updatedEntry != null) {
+                applyLocalEntryUpdate(updatedEntry)
             }
+            _trackerState.update { it.copy(isSyncing = false) }
         }
     }
 
@@ -553,10 +645,25 @@ object AnilistTrackerCoordinator {
             posterUrl = currentMedia.coverImage?.extraLarge ?: currentMedia.coverImage?.large,
         )
 
+        val existingEntry = _trackerState.value.entry
+        val optimisticEntry = existingEntry?.copy(
+            status = status ?: existingEntry.status,
+            progress = progress ?: existingEntry.progress,
+            score = score?.let { it * 10.0 } ?: existingEntry.score,
+            repeat = repeat ?: existingEntry.repeat,
+            private = private ?: existingEntry.private,
+            hiddenFromStatusLists = hiddenFromStatusLists ?: existingEntry.hiddenFromStatusLists,
+            notes = notes ?: existingEntry.notes,
+            startedAt = startedAt ?: existingEntry.startedAt,
+            completedAt = completedAt ?: existingEntry.completedAt,
+        )
+        applyLocalEntryUpdate(optimisticEntry)
+
         scope.launch {
             _trackerState.update { it.copy(isSyncing = true) }
             val updatedEntry = AnilistApi.updateMediaListEntry(
                 mediaId = currentMedia.id,
+                entryId = existingEntry?.id?.takeIf { it > 0 },
                 status = status,
                 progress = progress,
                 score = score,
@@ -569,47 +676,49 @@ object AnilistTrackerCoordinator {
                 token = token,
             )
             com.nuvio.app.features.anilist.catalog.AnilistCatalogRepository.clearCache()
-            _trackerState.update {
-                it.copy(
-                    isSyncing = false,
-                    entry = updatedEntry ?: it.entry?.copy(
-                        status = status ?: it.entry?.status,
-                        progress = progress ?: it.entry?.progress ?: 0,
-                        score = score ?: it.entry?.score ?: 0.0,
-                        repeat = repeat ?: it.entry?.repeat ?: 0,
-                        private = private ?: it.entry?.private ?: false,
-                        hiddenFromStatusLists = hiddenFromStatusLists ?: it.entry?.hiddenFromStatusLists ?: false,
-                        notes = notes ?: it.entry?.notes,
-                        startedAt = startedAt ?: it.entry?.startedAt,
-                        completedAt = completedAt ?: it.entry?.completedAt,
-                    ),
-                )
+            if (updatedEntry != null) {
+                applyLocalEntryUpdate(updatedEntry)
             }
+            _trackerState.update { it.copy(isSyncing = false) }
         }
     }
 
     fun deleteEntry() {
         val entryId = _trackerState.value.entry?.id ?: return
-        val currentMediaId = _trackerState.value.media?.id
+        val currentMedia = _trackerState.value.media
         val token = AnilistAuthRepository.token.value ?: return
 
-        if (currentMediaId != null) {
-            AnilistLibraryRepository.removeItem(currentMediaId)
+        if (currentMedia != null) {
+            AnilistLibraryRepository.removeItem(currentMedia.id)
         }
+        applyLocalEntryUpdate(null)
 
         scope.launch {
             _trackerState.update { it.copy(isSyncing = true) }
             val success = AnilistApi.deleteMediaListEntry(entryId = entryId, token = token)
             if (success) {
                 com.nuvio.app.features.anilist.catalog.AnilistCatalogRepository.clearCache()
-                _trackerState.update {
-                    it.copy(isSyncing = false, entry = null)
-                }
-            } else {
-                _trackerState.update { it.copy(isSyncing = false) }
+                applyLocalEntryUpdate(null)
             }
+            _trackerState.update { it.copy(isSyncing = false) }
         }
     }
+
+    private fun AnilistLibraryItem.toMediaListEntry(): AnilistMediaListEntry =
+        AnilistMediaListEntry(
+            id = 0,
+            mediaId = id,
+            status = AnilistMediaListStatus.fromString(status),
+            score = score ?: 0.0,
+            progress = progress,
+            repeat = repeat ?: 0,
+            private = private ?: false,
+            hiddenFromStatusLists = false,
+            notes = notes,
+            startedAt = startedAt,
+            completedAt = completedAt,
+            updatedAt = updatedAt,
+        )
 
     fun syncNow() {
         val media = _trackerState.value.media ?: return

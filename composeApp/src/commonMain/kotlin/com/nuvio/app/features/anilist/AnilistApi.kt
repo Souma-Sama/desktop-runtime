@@ -1718,6 +1718,7 @@ object AnilistApi {
 
     suspend fun updateMediaListEntry(
         mediaId: Int,
+        entryId: Int? = null,
         status: AnilistMediaListStatus? = null,
         progress: Int? = null,
         score: Double? = null,
@@ -1729,31 +1730,81 @@ object AnilistApi {
         completedAt: AnilistFuzzyDate? = null,
         token: String,
     ): AnilistMediaListEntry? {
+        val varDefs = mutableListOf<String>()
+        val argCalls = mutableListOf<String>()
+        val variables = buildJsonObject {
+            if (entryId != null && entryId > 0) {
+                varDefs.add("\$id: Int")
+                argCalls.add("id: \$id")
+                put("id", entryId)
+            }
+            varDefs.add("\$mediaId: Int")
+            argCalls.add("mediaId: \$mediaId")
+            put("mediaId", mediaId)
+
+            if (status != null) {
+                varDefs.add("\$status: MediaListStatus")
+                argCalls.add("status: \$status")
+                put("status", status.name)
+            }
+            if (progress != null) {
+                varDefs.add("\$progress: Int")
+                argCalls.add("progress: \$progress")
+                put("progress", progress)
+            }
+            if (score != null) {
+                varDefs.add("\$scoreRaw: Int")
+                argCalls.add("scoreRaw: \$scoreRaw")
+                val scoreRaw = if (score in 0.01..10.0) {
+                    ((score * 10.0).roundToInt()).coerceIn(0, 100)
+                } else {
+                    (score.roundToInt()).coerceIn(0, 100)
+                }
+                put("scoreRaw", scoreRaw)
+            }
+            if (repeat != null) {
+                varDefs.add("\$repeat: Int")
+                argCalls.add("repeat: \$repeat")
+                put("repeat", repeat)
+            }
+            if (private != null) {
+                varDefs.add("\$private: Boolean")
+                argCalls.add("private: \$private")
+                put("private", private)
+            }
+            if (hiddenFromStatusLists != null) {
+                varDefs.add("\$hiddenFromStatusLists: Boolean")
+                argCalls.add("hiddenFromStatusLists: \$hiddenFromStatusLists")
+                put("hiddenFromStatusLists", hiddenFromStatusLists)
+            }
+            if (notes != null) {
+                varDefs.add("\$notes: String")
+                argCalls.add("notes: \$notes")
+                put("notes", notes)
+            }
+            if (startedAt != null) {
+                varDefs.add("\$startedAt: FuzzyDateInput")
+                argCalls.add("startedAt: \$startedAt")
+                put("startedAt", buildJsonObject {
+                    if (startedAt.year != null) put("year", startedAt.year)
+                    if (startedAt.month != null) put("month", startedAt.month)
+                    if (startedAt.day != null) put("day", startedAt.day)
+                })
+            }
+            if (completedAt != null) {
+                varDefs.add("\$completedAt: FuzzyDateInput")
+                argCalls.add("completedAt: \$completedAt")
+                put("completedAt", buildJsonObject {
+                    if (completedAt.year != null) put("year", completedAt.year)
+                    if (completedAt.month != null) put("month", completedAt.month)
+                    if (completedAt.day != null) put("day", completedAt.day)
+                })
+            }
+        }
+
         val mutation = """
-            mutation SaveMediaListEntry(
-              ${'$'}mediaId: Int,
-              ${'$'}status: MediaListStatus,
-              ${'$'}progress: Int,
-              ${'$'}scoreRaw: Int,
-              ${'$'}repeat: Int,
-              ${'$'}private: Boolean,
-              ${'$'}hiddenFromStatusLists: Boolean,
-              ${'$'}notes: String,
-              ${'$'}startedAt: FuzzyDateInput,
-              ${'$'}completedAt: FuzzyDateInput
-            ) {
-              SaveMediaListEntry(
-                mediaId: ${'$'}mediaId,
-                status: ${'$'}status,
-                progress: ${'$'}progress,
-                scoreRaw: ${'$'}scoreRaw,
-                repeat: ${'$'}repeat,
-                private: ${'$'}private,
-                hiddenFromStatusLists: ${'$'}hiddenFromStatusLists,
-                notes: ${'$'}notes,
-                startedAt: ${'$'}startedAt,
-                completedAt: ${'$'}completedAt
-              ) {
+            mutation SaveMediaListEntry(${varDefs.joinToString(", ")}) {
+              SaveMediaListEntry(${argCalls.joinToString(", ")}) {
                 id
                 mediaId
                 status
@@ -1778,50 +1829,6 @@ object AnilistApi {
             }
         """.trimIndent()
 
-        val variables = buildJsonObject {
-            put("mediaId", mediaId)
-            if (status != null) {
-                put("status", status.name)
-            }
-            if (progress != null) {
-                put("progress", progress)
-            }
-            if (score != null) {
-                val scoreRaw = if (score in 0.01..10.0) {
-                    ((score * 10.0).roundToInt()).coerceIn(0, 100)
-                } else {
-                    (score.roundToInt()).coerceIn(0, 100)
-                }
-                put("scoreRaw", scoreRaw)
-            }
-            if (repeat != null) {
-                put("repeat", repeat)
-            }
-            if (private != null) {
-                put("private", private)
-            }
-            if (hiddenFromStatusLists != null) {
-                put("hiddenFromStatusLists", hiddenFromStatusLists)
-            }
-            if (notes != null) {
-                put("notes", notes)
-            }
-            if (startedAt != null) {
-                put("startedAt", buildJsonObject {
-                    if (startedAt.year != null) put("year", startedAt.year)
-                    if (startedAt.month != null) put("month", startedAt.month)
-                    if (startedAt.day != null) put("day", startedAt.day)
-                })
-            }
-            if (completedAt != null) {
-                put("completedAt", buildJsonObject {
-                    if (completedAt.year != null) put("year", completedAt.year)
-                    if (completedAt.month != null) put("month", completedAt.month)
-                    if (completedAt.day != null) put("day", completedAt.day)
-                })
-            }
-        }
-
         val root = executeGraphQL(query = mutation, variables = variables, token = token)
         val entryObj = root?.get("data").asJsonObjectOrNull()?.get("SaveMediaListEntry").asJsonObjectOrNull() ?: return null
         return parseMediaListEntry(entryObj, defaultMediaId = mediaId)
@@ -1829,6 +1836,7 @@ object AnilistApi {
 
     suspend fun saveMediaListEntry(
         mediaId: Int,
+        entryId: Int? = null,
         status: AnilistMediaListStatus? = null,
         progress: Int? = null,
         score: Double? = null,
@@ -1841,6 +1849,7 @@ object AnilistApi {
         token: String,
     ): AnilistMediaListEntry? = updateMediaListEntry(
         mediaId = mediaId,
+        entryId = entryId,
         status = status,
         progress = progress,
         score = score,
