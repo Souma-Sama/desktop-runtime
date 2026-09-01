@@ -130,7 +130,10 @@ fun AnimeTrackerButton(
     size: Dp = 52.dp,
 ) {
     val anilistPrefs by com.nuvio.app.features.anilist.AnilistPreferencesRepository.preferences.collectAsState()
-    if (!anilistPrefs.enabled) return
+    val isKaiItem = remember(meta?.id) {
+        AnilistTrackerCoordinator.isKaiMedia(meta?.id)
+    }
+    if (!anilistPrefs.enabled || !isKaiItem) return
 
     var showSheet by remember { mutableStateOf(false) }
     val trackerState by AnilistTrackerCoordinator.trackerState.collectAsState()

@@ -216,20 +216,12 @@ fun DetailActionButtons(
                 }
             }
 
-            val trackerState by com.nuvio.app.features.anilist.AnilistTrackerCoordinator.trackerState.collectAsState()
             val anilistPrefs by com.nuvio.app.features.anilist.AnilistPreferencesRepository.preferences.collectAsState()
-            val effectiveAnimeTitle = title?.takeIf { it.isNotBlank() } ?: meta?.name.orEmpty()
-            val isAnimeCandidate = com.nuvio.app.features.anilist.AnilistTrackerCoordinator.isAnimeCandidate(
-                title = effectiveAnimeTitle,
-                genres = meta?.genres.orEmpty(),
-                country = meta?.country,
-                language = meta?.language,
-                mediaId = meta?.id,
-                type = meta?.type,
-            )
-            val isMatchedAnime = trackerState.isAnime && trackerState.media != null && trackerState.lastLookupTitle.equals(effectiveAnimeTitle, ignoreCase = true)
+            val isKaiItem = remember(meta?.id) {
+                com.nuvio.app.features.anilist.AnilistTrackerCoordinator.isKaiMedia(meta?.id)
+            }
 
-            if (anilistPrefs.enabled && (isAnimeCandidate || isMatchedAnime)) {
+            if (anilistPrefs.enabled && isKaiItem) {
                 Spacer(modifier = Modifier.width(12.dp))
                 AnimeStreamIdButton(meta = meta, size = iconButtonSize)
                 Spacer(modifier = Modifier.width(12.dp))

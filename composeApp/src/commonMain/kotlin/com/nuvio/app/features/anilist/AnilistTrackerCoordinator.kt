@@ -45,10 +45,9 @@ object AnilistTrackerCoordinator {
         val rawTitle = title.replace(Regex("""\r|\n"""), " ").replace(Regex("""\s+"""), " ").trim()
         if (rawTitle.isBlank() && mediaId.isNullOrBlank()) return
 
-        val hasAnimeId = extractAnilistId(mediaId) != null || extractMalId(mediaId) != null || extractKitsuId(mediaId) != null
-        val isExplicitAnime = hasAnimeId || isAnimeCandidate(rawTitle, genres, country, language, mediaId)
+        val isKaiItem = isKaiMedia(mediaId)
 
-        if (!isExplicitAnime) {
+        if (!isKaiItem) {
             activeJob?.cancel()
             _trackerState.update {
                 it.copy(
@@ -61,7 +60,7 @@ object AnilistTrackerCoordinator {
                     user = AnilistAuthRepository.currentUser.value,
                     lastLookupTitle = rawTitle,
                     lastLookupMediaId = mediaId,
-                    resolvedStrategy = "Ignored Non-Anime",
+                    resolvedStrategy = "Ignored Non-Kai Item",
                 )
             }
             return

@@ -315,7 +315,9 @@ fun MetaDetailsScreen(
 
     LaunchedEffect(displayedMeta?.id, effectiveTitle, id) {
         deferredMetaWorkAllowed = false
-        if (effectiveTitle.isNotBlank() || displayedMeta != null || id.isNotBlank()) {
+        val isKaiItem = com.nuvio.app.features.anilist.AnilistTrackerCoordinator.isKaiMedia(id) ||
+                        com.nuvio.app.features.anilist.AnilistTrackerCoordinator.isKaiMedia(displayedMeta?.id)
+        if (isKaiItem && (effectiveTitle.isNotBlank() || displayedMeta != null || id.isNotBlank())) {
             val videoIds = displayedMeta?.videos.orEmpty().map { it.id }
             val effectiveMediaId = when {
                 com.nuvio.app.features.anilist.AnilistTrackerCoordinator.hasAnimeId(id) -> id
