@@ -1228,15 +1228,8 @@ fun MetaDetailsScreen(
                                     onOpenMeta = onOpenMeta,
                                     onPosterLongClick = { item ->
                                         val anilistPrefs = com.nuvio.app.features.anilist.AnilistPreferencesRepository.snapshot()
-                                        val isAnime = com.nuvio.app.features.anilist.AnilistTrackerCoordinator.isAnimeCandidate(
-                                            title = item.name,
-                                            genres = item.genres,
-                                            country = null,
-                                            language = null,
-                                            mediaId = item.id,
-                                            type = item.type,
-                                        )
-                                        if (anilistPrefs.enabled && isAnime) {
+                                        val isKai = com.nuvio.app.features.anilist.KaiHooks.isKaiMedia(item.id)
+                                        if (anilistPrefs.enabled && isKai) {
                                             trackerSheetPreview = item
                                         }
                                     },
@@ -1360,15 +1353,8 @@ fun MetaDetailsScreen(
                                     onOpenMeta = onOpenMeta,
                                     onPosterLongClick = { item ->
                                         val anilistPrefs = com.nuvio.app.features.anilist.AnilistPreferencesRepository.snapshot()
-                                        val isAnime = com.nuvio.app.features.anilist.AnilistTrackerCoordinator.isAnimeCandidate(
-                                            title = item.name,
-                                            genres = item.genres,
-                                            country = null,
-                                            language = null,
-                                            mediaId = item.id,
-                                            type = item.type,
-                                        )
-                                        if (anilistPrefs.enabled && isAnime) {
+                                        val isKai = com.nuvio.app.features.anilist.KaiHooks.isKaiMedia(item.id)
+                                        if (anilistPrefs.enabled && isKai) {
                                             trackerSheetPreview = item
                                         }
                                     },
