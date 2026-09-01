@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -896,7 +897,7 @@ fun AnilistPosterStatusBadge(
 ) {
     val (iconVector, bgTint, iconTint) = when (status) {
         com.nuvio.app.features.anilist.AnilistMediaListStatus.CURRENT -> Triple(
-            androidx.compose.material.icons.filled.PlayArrow,
+            Icons.Default.PlayArrow,
             Color(0xFF4CAF50), // Vibrant Green (AniHyou style)
             Color.White,
         )
@@ -906,7 +907,7 @@ fun AnilistPosterStatusBadge(
             Color.White,
         )
         com.nuvio.app.features.anilist.AnilistMediaListStatus.COMPLETED -> Triple(
-            androidx.compose.material.icons.filled.Check,
+            Icons.Default.Check,
             Color(0xFF90CAF9), // Soft Sky Blue (AniHyou style)
             Color(0xFF0D47A1), // Deep Navy
         )
@@ -916,7 +917,7 @@ fun AnilistPosterStatusBadge(
             Color(0xFF1E1E1E), // Dark Charcoal
         )
         com.nuvio.app.features.anilist.AnilistMediaListStatus.DROPPED -> Triple(
-            androidx.compose.material.icons.filled.Close,
+            Icons.Default.Close,
             Color(0xFFE53935), // Red
             Color.White,
         )
@@ -981,7 +982,7 @@ fun AnilistPosterUserRatingBadge(
             horizontalArrangement = Arrangement.spacedBy(3.dp),
         ) {
             Icon(
-                imageVector = androidx.compose.material.icons.filled.Star,
+                imageVector = Icons.Default.Star,
                 contentDescription = "User Rating",
                 tint = textTint,
                 modifier = Modifier.size(11.dp),
