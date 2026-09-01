@@ -19,6 +19,7 @@ import com.nuvio.app.features.home.HomeCatalogSection
 import com.nuvio.app.features.home.MetaPreview
 import com.nuvio.app.features.home.PosterShape
 import com.nuvio.app.features.catalog.CatalogTarget
+import com.nuvio.app.features.search.DiscoverCatalogOption
 
 /**
  * KaiHooks: Central Sidecar Extension Bridge for Nuvio Kai.
@@ -79,6 +80,64 @@ object KaiHooks {
     fun isKaiSearchEnabled(addons: List<ManagedAddon>): Boolean {
         val prefs = AnilistPreferencesRepository.snapshot()
         return prefs.enabled && (addons.isEmpty() || addons.any { isKaiAddon(it) && it.enabled })
+    }
+
+    /**
+     * Builds native AniList discover catalog options for Discover feed.
+     */
+    fun buildNativeDiscoverSources(): List<DiscoverCatalogOption> {
+        val genres = AnilistGenres.ALL_GENRES
+        val sorts = AnilistSortOption.entries.map { it.label }
+        return listOf(
+            DiscoverCatalogOption(
+                key = "native://anilist:anime:anilist:trending",
+                addonName = "AniList",
+                manifestUrl = MANIFEST_URL,
+                type = "anime",
+                catalogId = "anilist:trending",
+                catalogName = "Trending Anime",
+                genreOptions = genres,
+                sortOptions = sorts,
+                genreRequired = false,
+                supportsPagination = true,
+            ),
+            DiscoverCatalogOption(
+                key = "native://anilist:anime:anilist:popular",
+                addonName = "AniList",
+                manifestUrl = MANIFEST_URL,
+                type = "anime",
+                catalogId = "anilist:popular",
+                catalogName = "Popular This Season",
+                genreOptions = genres,
+                sortOptions = sorts,
+                genreRequired = false,
+                supportsPagination = true,
+            ),
+            DiscoverCatalogOption(
+                key = "native://anilist:anime:anilist:top-rated",
+                addonName = "AniList",
+                manifestUrl = MANIFEST_URL,
+                type = "anime",
+                catalogId = "anilist:top-rated",
+                catalogName = "Top Rated Anime",
+                genreOptions = genres,
+                sortOptions = sorts,
+                genreRequired = false,
+                supportsPagination = true,
+            ),
+            DiscoverCatalogOption(
+                key = "native://anilist:anime:anilist:airing",
+                addonName = "AniList",
+                manifestUrl = MANIFEST_URL,
+                type = "anime",
+                catalogId = "anilist:airing",
+                catalogName = "Currently Airing",
+                genreOptions = genres,
+                sortOptions = sorts,
+                genreRequired = false,
+                supportsPagination = true,
+            ),
+        )
     }
 
     /**

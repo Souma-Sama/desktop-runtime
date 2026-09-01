@@ -198,18 +198,19 @@ object SearchRepository {
         forceRefresh: Boolean = false,
     ) {
         val activeAddons = addons.enabledAddons().filter { it.manifest != null }
-        if (activeAddons.isEmpty()) {
+        val isKaiEnabled = com.nuvio.app.features.anilist.KaiHooks.isKaiSearchEnabled(addons)
+        if (activeAddons.isEmpty() && !isKaiEnabled) {
             activeDiscoverJob?.cancel()
             discoverSources = emptyList()
             lastDiscoverRequestKey = null
-            log.d { "Discover refresh aborted: no active addons" }
+            log.d { "Discover refresh aborted: no active addons and AniList disabled" }
             _discoverUiState.value = DiscoverUiState(
                 emptyStateReason = DiscoverEmptyStateReason.NoActiveAddons,
             )
             return
         }
 
-        val sources = buildDiscoverSources(activeAddons)
+        val sources = buildDiscoverSources(addons)
         val current = _discoverUiState.value
         val hideUnreleasedContent = HomeCatalogSettingsRepository.snapshot().hideUnreleasedContent
         val requestKey = DiscoverRequestKey(
@@ -442,8 +443,12 @@ object SearchRepository {
     }
 
     private fun buildDiscoverSources(addons: List<ManagedAddon>): List<DiscoverCatalogOption> {
+        val nativeSources = if (com.nuvio.app.features.anilist.KaiHooks.isKaiSearchEnabled(addons)) {
+            com.nuvio.app.features.anilist.KaiHooks.buildNativeDiscoverSources()
+        } else emptyList()
+
         val effectiveAddons = com.nuvio.app.features.anilist.KaiHooks.filterExternalAddons(addons)
-        return effectiveAddons.mapNotNull { addon ->
+        val addonSources = effectiveAddons.mapNotNull { addon ->
             val manifest = addon.manifest ?: return@mapNotNull null
             addon to manifest
         }.flatMap { (addon, manifest) ->
@@ -466,6 +471,7 @@ object SearchRepository {
                     )
                 }
         }
+        return nativeSources + addonSources
     }
 
     private suspend fun SearchCatalogRequest.toSection(forceRefresh: Boolean): HomeCatalogSection {

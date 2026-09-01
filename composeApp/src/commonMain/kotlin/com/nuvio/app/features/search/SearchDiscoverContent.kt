@@ -155,7 +155,7 @@ private fun DiscoverFilterRow(
 ) {
     val anilistPrefs = com.nuvio.app.features.anilist.AnilistPreferencesRepository.snapshot()
     val isAnime = state.selectedType.equals("anime", ignoreCase = true) || state.selectedCatalogKey?.contains("anilist", ignoreCase = true) == true
-    val showAdvancedFilter = anilistPrefs.enabled && anilistPrefs.enableAdvancedFilters && isAnime
+    val showAdvancedFilter = anilistPrefs.enabled && anilistPrefs.enableAdvancedFilters && isAnime && state.catalogOptions.isNotEmpty()
 
     Row(
         modifier = modifier.horizontalScroll(rememberScrollState()),
