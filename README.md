@@ -1,5 +1,9 @@
 <div align="center">
 
+  <img src="composeApp/src/commonMain/composeResources/drawable/app_logo_wordmark.png" alt="Nuvio" width="300" />
+  <br />
+  <br />
+
   <h1>Nuvio-Kai</h1>
   <p><strong>A High-Performance Anime & Media Client with Native AniList & AniChart Integration</strong></p>
   <p>Built with Kotlin Multiplatform & Compose Multiplatform for macOS and Android.</p>
