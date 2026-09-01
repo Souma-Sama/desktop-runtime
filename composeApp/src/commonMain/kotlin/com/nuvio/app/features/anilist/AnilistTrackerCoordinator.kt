@@ -46,7 +46,27 @@ object AnilistTrackerCoordinator {
         if (rawTitle.isBlank() && mediaId.isNullOrBlank()) return
 
         val hasAnimeId = extractAnilistId(mediaId) != null || extractMalId(mediaId) != null || extractKitsuId(mediaId) != null
-        val isExplicitAnime = hasAnimeId || isAnimeCandidate(rawTitle, genres, country, language)
+        val isExplicitAnime = hasAnimeId || isAnimeCandidate(rawTitle, genres, country, language, mediaId)
+
+        if (!isExplicitAnime) {
+            activeJob?.cancel()
+            _trackerState.update {
+                it.copy(
+                    isLoading = false,
+                    isAnime = false,
+                    media = null,
+                    entry = null,
+                    error = null,
+                    isAuthenticated = AnilistAuthRepository.isAuthenticated.value,
+                    user = AnilistAuthRepository.currentUser.value,
+                    lastLookupTitle = rawTitle,
+                    lastLookupMediaId = mediaId,
+                    resolvedStrategy = "Ignored Non-Anime",
+                )
+            }
+            return
+        }
+
         val cacheKey = if (!mediaId.isNullOrBlank()) mediaId.lowercase() else rawTitle.lowercase()
 
         val isNewMedia = currentKey != cacheKey
@@ -61,7 +81,7 @@ object AnilistTrackerCoordinator {
         _trackerState.update {
             it.copy(
                 isLoading = true,
-                isAnime = isExplicitAnime || (if (isNewMedia) false else it.media != null),
+                isAnime = true,
                 media = if (isNewMedia) null else it.media,
                 entry = if (isNewMedia) null else it.entry,
                 error = null,

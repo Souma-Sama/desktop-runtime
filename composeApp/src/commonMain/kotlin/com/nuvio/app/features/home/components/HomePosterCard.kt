@@ -41,25 +41,35 @@ fun HomePosterCard(
         }
     }
 
-    // Lazy load MAL score for visible items only
-    LaunchedEffect(item.id, anilistPrefs.showPosterMalScore) {
-        if (anilistPrefs.showPosterMalScore && lazyMalScore == null) {
+    val isAnime = remember(item.id, item.name, item.genres) {
+        com.nuvio.app.features.anilist.AnilistTrackerCoordinator.isAnimeCandidate(
+            title = item.name,
+            genres = item.genres,
+            country = null,
+            language = null,
+            mediaId = item.id,
+        )
+    }
+
+    // Lazy load MAL score for visible anime items only
+    LaunchedEffect(item.id, anilistPrefs.showPosterMalScore, isAnime) {
+        if (anilistPrefs.enabled && anilistPrefs.showPosterMalScore && isAnime && lazyMalScore == null) {
             lazyMalScore = MetaHubArtwork.resolveMalScore(item.id)
         }
     }
 
-    val effectiveLogoUrl = if (anilistPrefs.enabled && anilistPrefs.showPosterTitleLogos) lazyLogoUrl else null
-    val effectiveAnilistScore = if (anilistPrefs.enabled && anilistPrefs.showPosterAnilistScore) item.anilistScore else null
-    val effectiveMalScore = if (anilistPrefs.enabled && anilistPrefs.showPosterMalScore) lazyMalScore else null
+    val effectiveLogoUrl = if (anilistPrefs.enabled && anilistPrefs.showPosterTitleLogos && isAnime) lazyLogoUrl else null
+    val effectiveAnilistScore = if (anilistPrefs.enabled && anilistPrefs.showPosterAnilistScore && isAnime) item.anilistScore else null
+    val effectiveMalScore = if (anilistPrefs.enabled && anilistPrefs.showPosterMalScore && isAnime) lazyMalScore else null
 
     val anilistLibraryState by com.nuvio.app.features.anilist.AnilistLibraryRepository.uiState.collectAsStateWithLifecycle()
-    val mediaStatus = if (anilistPrefs.enabled && anilistPrefs.showPosterStatusBadge) {
+    val mediaStatus = if (anilistPrefs.enabled && anilistPrefs.showPosterStatusBadge && isAnime) {
         com.nuvio.app.features.anilist.AnilistLibraryRepository.getMediaStatusById(item.id, item.name)
     } else null
-    val mediaProgress = if (anilistPrefs.enabled && anilistPrefs.showPosterStatusBadge) {
+    val mediaProgress = if (anilistPrefs.enabled && anilistPrefs.showPosterStatusBadge && isAnime) {
         com.nuvio.app.features.anilist.AnilistLibraryRepository.getMediaProgressById(item.id, item.name)
     } else null
-    val mediaUserScore = if (anilistPrefs.enabled && anilistPrefs.showPosterStatusBadge) {
+    val mediaUserScore = if (anilistPrefs.enabled && anilistPrefs.showPosterStatusBadge && isAnime) {
         com.nuvio.app.features.anilist.AnilistLibraryRepository.getUserScoreById(item.id, item.name)
     } else null
 
