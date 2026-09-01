@@ -1,6 +1,7 @@
 package com.nuvio.app.features.settings
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -390,7 +391,7 @@ private fun AnilistAccountSection(isTablet: Boolean) {
     if (showProfileSheet && user != null) {
         com.nuvio.app.features.anilist.profile.AnilistUserProfileSheet(
             userId = user?.id,
-            userName = user?.name,
+            username = user?.name,
             onDismiss = { showProfileSheet = false },
         )
     }

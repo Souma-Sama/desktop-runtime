@@ -71,6 +71,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -1455,7 +1456,7 @@ fun AnimeTrackerSheetContent(
     if (showUserProfileSheet && trackerState.user != null) {
         com.nuvio.app.features.anilist.profile.AnilistUserProfileSheet(
             userId = trackerState.user?.id,
-            userName = trackerState.user?.name,
+            username = trackerState.user?.name,
             onDismiss = { showUserProfileSheet = false },
         )
     }
