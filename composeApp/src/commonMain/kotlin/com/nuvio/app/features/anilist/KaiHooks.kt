@@ -10,16 +10,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.nuvio.app.features.addons.ManagedAddon
-import com.nuvio.app.features.anilist.components.AnimeTrackerButton
-import com.nuvio.app.features.anilist.streams.AnimeStreamIdButton
 import com.nuvio.app.features.artwork.MetaHubArtwork
 import com.nuvio.app.features.details.MetaDetails
+import com.nuvio.app.features.details.components.AnimeStreamIdButton
+import com.nuvio.app.features.details.components.AnimeTrackerButton
 import com.nuvio.app.features.details.components.AnimeTrackerSheet
 import com.nuvio.app.features.home.HomeCatalogSection
 import com.nuvio.app.features.home.MetaPreview
 import com.nuvio.app.features.home.PosterShape
 import com.nuvio.app.features.catalog.CatalogTarget
-import com.nuvio.app.features.search.SearchCatalogRequest
 
 /**
  * KaiHooks: Central Sidecar Extension Bridge for Nuvio-Kai.
@@ -75,24 +74,11 @@ object KaiHooks {
     }
 
     /**
-     * Injects the native AniList search request if enabled.
+     * Checks if native AniList search should be included.
      */
-    fun buildSearchRequests(query: String, addons: List<ManagedAddon>): List<SearchCatalogRequest> {
+    fun isKaiSearchEnabled(addons: List<ManagedAddon>): Boolean {
         val prefs = AnilistPreferencesRepository.snapshot()
-        val isEnabled = prefs.enabled && (addons.isEmpty() || addons.any { isKaiAddon(it) && it.enabled })
-        if (!isEnabled) return emptyList()
-
-        return listOf(
-            SearchCatalogRequest(
-                addon = null,
-                catalogId = "anilist:search",
-                catalogName = "Anime",
-                type = "anime",
-                query = query,
-                supportsPagination = false,
-                isNativeAnilist = true,
-            )
-        )
+        return prefs.enabled && (addons.isEmpty() || addons.any { isKaiAddon(it) && it.enabled })
     }
 
     /**

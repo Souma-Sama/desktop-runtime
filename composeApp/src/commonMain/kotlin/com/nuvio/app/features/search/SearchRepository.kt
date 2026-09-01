@@ -403,7 +403,20 @@ object SearchRepository {
         addons: List<ManagedAddon>,
         query: String,
     ): List<SearchCatalogRequest> {
-        val anilistRequests = com.nuvio.app.features.anilist.KaiHooks.buildSearchRequests(query, addons)
+        val anilistRequest = if (com.nuvio.app.features.anilist.KaiHooks.isKaiSearchEnabled(addons)) {
+            listOf(
+                SearchCatalogRequest(
+                    addon = null,
+                    catalogId = "anilist:search",
+                    catalogName = "Anime",
+                    type = "anime",
+                    query = query,
+                    supportsPagination = false,
+                    isNativeAnilist = true,
+                )
+            )
+        } else emptyList()
+
         val effectiveAddons = com.nuvio.app.features.anilist.KaiHooks.filterExternalAddons(addons)
 
         val addonRequests = effectiveAddons.mapNotNull { addon ->
@@ -425,18 +438,31 @@ object SearchRepository {
                 }
         }
 
-        return anilistRequests + addonRequests
+        return anilistRequest + addonRequests
     }
 
     private fun buildDiscoverSources(addons: List<ManagedAddon>): List<DiscoverCatalogOption> {
-        return addons.flatMap { addon ->
-            val manifest = addon.manifest ?: return@flatMap emptyList()
+        val effectiveAddons = com.nuvio.app.features.anilist.KaiHooks.filterExternalAddons(addons)
+        return effectiveAddons.mapNotNull { addon ->
+            val manifest = addon.manifest ?: return@mapNotNull null
+            addon to manifest
+        }.flatMap { (addon, manifest) ->
             manifest.catalogs
                 .filter { catalog -> catalog.supportsDiscover() }
                 .map { catalog ->
+                    val genreExtra = catalog.genreExtra()
+                    val sortExtra = catalog.extra.firstOrNull { it.name.equals("sort", ignoreCase = true) }
                     DiscoverCatalogOption(
-                        addon = addon,
-                        catalog = catalog,
+                        key = "${manifest.id}:${catalog.type}:${catalog.id}",
+                        addonName = addon.displayTitle,
+                        manifestUrl = addon.manifestUrl,
+                        type = catalog.type,
+                        catalogId = catalog.id,
+                        catalogName = catalog.name,
+                        genreOptions = genreExtra?.options.orEmpty(),
+                        sortOptions = sortExtra?.options.orEmpty(),
+                        genreRequired = genreExtra?.isRequired == true,
+                        supportsPagination = catalog.supportsPagination(),
                     )
                 }
         }
