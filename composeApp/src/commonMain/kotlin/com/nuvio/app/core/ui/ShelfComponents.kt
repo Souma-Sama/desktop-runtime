@@ -953,6 +953,17 @@ fun AnilistPosterUserRatingBadge(
 ) {
     if (userScore == null || userScore <= 0.0) return
 
+    // Normalize to 10-point scale for color calculation
+    val normalized10 = if (userScore > 10.0) userScore / 10.0 else userScore
+
+    // AniHyou dynamic color tiers based on score
+    val (bgTint, textTint) = when {
+        normalized10 >= 7.5 -> Color(0xFF4DD0E1) to Color(0xFF003840) // Cyan / Teal for high scores (7.5 - 10)
+        normalized10 >= 6.0 -> Color(0xFFAED581) to Color(0xFF1B3A00) // Soft Green for good scores (6.0 - 7.4)
+        normalized10 >= 4.0 -> Color(0xFFFFB74D) to Color(0xFF3E2000) // Warm Amber for average (4.0 - 5.9)
+        else -> Color(0xFFEF5350) to Color(0xFFFFFFFF)                // Coral Red for low scores (< 4.0)
+    }
+
     val formattedScore = if (userScore % 1.0 == 0.0) {
         userScore.toInt().toString()
     } else {
@@ -961,7 +972,7 @@ fun AnilistPosterUserRatingBadge(
 
     Surface(
         shape = RoundedCornerShape(topEnd = 8.dp),
-        color = Color(0xFF4DD0E1), // Cyan / Teal from AniHyou
+        color = bgTint,
         modifier = modifier,
     ) {
         Row(
@@ -972,7 +983,7 @@ fun AnilistPosterUserRatingBadge(
             Icon(
                 imageVector = androidx.compose.material.icons.filled.Star,
                 contentDescription = "User Rating",
-                tint = Color(0xFF003840),
+                tint = textTint,
                 modifier = Modifier.size(11.dp),
             )
             Text(
@@ -982,7 +993,7 @@ fun AnilistPosterUserRatingBadge(
                     fontWeight = FontWeight.ExtraBold,
                     letterSpacing = (-0.2).sp,
                 ),
-                color = Color(0xFF003840),
+                color = textTint,
                 maxLines = 1,
             )
         }
