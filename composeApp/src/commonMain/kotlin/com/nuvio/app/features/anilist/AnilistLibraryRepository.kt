@@ -142,7 +142,8 @@ object AnilistLibraryRepository {
 
     fun getUserScore(anilistId: Int): Double? {
         val entry = getMediaEntry(anilistId) ?: return null
-        return entry.score?.takeIf { it > 0.0 }
+        val raw = entry.score?.takeIf { it > 0.0 } ?: return null
+        return if (raw >= 10.0) raw / 10.0 else raw
     }
 
     fun getUserScoreById(itemId: String, title: String? = null): Double? {
@@ -153,9 +154,89 @@ object AnilistLibraryRepository {
         }
         if (!title.isNullOrBlank()) {
             val entry = getMediaEntryByTitle(title)
-            if (entry != null) return entry.score?.takeIf { it > 0.0 }
+            if (entry != null) {
+                val raw = entry.score?.takeIf { it > 0.0 }
+                if (raw != null) return if (raw >= 10.0) raw / 10.0 else raw
+            }
         }
         return null
+    }
+
+    fun updateItem(
+        mediaId: Int,
+        title: String? = null,
+        status: AnilistMediaListStatus? = null,
+        progress: Int? = null,
+        score100: Double? = null,
+        totalEpisodes: Int? = null,
+        posterUrl: String? = null,
+    ) {
+        ensureLoaded()
+        val all = allItems().toMutableList()
+        val existingIndex = all.indexOfFirst { it.id == mediaId || (title != null && normalize(it.title) == normalize(title)) }
+        val now = WatchProgressClock.nowEpochMs()
+
+        val updatedItem = if (existingIndex >= 0) {
+            val old = all[existingIndex]
+            old.copy(
+                status = status?.name ?: old.status,
+                progress = progress ?: old.progress,
+                score = score100 ?: old.score,
+                totalEpisodes = totalEpisodes ?: old.totalEpisodes,
+                posterUrl = posterUrl ?: old.posterUrl,
+                updatedAt = now / 1000L,
+            )
+        } else if (status != null) {
+            AnilistLibraryItem(
+                id = mediaId,
+                title = title ?: "Anime $mediaId",
+                posterUrl = posterUrl,
+                progress = progress ?: 0,
+                totalEpisodes = totalEpisodes,
+                score = score100,
+                status = status.name,
+                updatedAt = now / 1000L,
+            )
+        } else {
+            null
+        }
+
+        if (updatedItem != null) {
+            if (existingIndex >= 0) {
+                all[existingIndex] = updatedItem
+            } else {
+                all.add(0, updatedItem)
+            }
+            applyUpdatedItems(all)
+        }
+    }
+
+    fun removeItem(mediaId: Int) {
+        ensureLoaded()
+        val all = allItems().filterNot { it.id == mediaId }
+        applyUpdatedItems(all)
+    }
+
+    private fun applyUpdatedItems(items: List<AnilistLibraryItem>) {
+        val watching = items.filter { it.status.equals("CURRENT", ignoreCase = true) }
+        val completed = items.filter { it.status.equals("COMPLETED", ignoreCase = true) }
+        val planning = items.filter { it.status.equals("PLANNING", ignoreCase = true) }
+        val paused = items.filter { it.status.equals("PAUSED", ignoreCase = true) }
+        val dropped = items.filter { it.status.equals("DROPPED", ignoreCase = true) }
+        val rewatching = items.filter { it.status.equals("REPEATING", ignoreCase = true) }
+
+        _uiState.value = AnilistLibraryUiState(
+            watching = watching,
+            completed = completed,
+            planning = planning,
+            paused = paused,
+            dropped = dropped,
+            rewatching = rewatching,
+            isLoading = false,
+            isLoaded = true,
+            errorMessage = null,
+        )
+        persistSnapshot(items)
     }
 
     fun extractAnilistId(itemId: String): Int? {

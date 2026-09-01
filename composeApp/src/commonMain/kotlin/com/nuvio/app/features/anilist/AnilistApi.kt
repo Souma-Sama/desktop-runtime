@@ -148,7 +148,7 @@ object AnilistApi {
                 mediaList(userName: ${'$'}userName, type: ANIME, status: ${'$'}status, sort: [UPDATED_TIME_DESC]) {
                   id
                   status
-                  score
+                  score(format: POINT_100)
                   progress
                   repeat
                   updatedAt
@@ -617,7 +617,7 @@ object AnilistApi {
                   mediaListEntry {
                     id
                     status
-                    score
+                    score(format: POINT_100)
                     progress
                     repeat
                     updatedAt
@@ -747,7 +747,7 @@ object AnilistApi {
                   mediaListEntry {
                     id
                     status
-                    score
+                    score(format: POINT_100)
                     progress
                     repeat
                     updatedAt
@@ -1429,7 +1429,7 @@ object AnilistApi {
                 mediaListEntry {
                   id
                   status
-                  score
+                  score(format: POINT_100)
                   progress
                   repeat
                   updatedAt
@@ -1526,7 +1526,7 @@ object AnilistApi {
             mediaListEntry {
               id
               status
-              score
+              score(format: POINT_100)
               progress
               repeat
               private
@@ -1734,7 +1734,7 @@ object AnilistApi {
               ${'$'}mediaId: Int,
               ${'$'}status: MediaListStatus,
               ${'$'}progress: Int,
-              ${'$'}score: Float,
+              ${'$'}scoreRaw: Int,
               ${'$'}repeat: Int,
               ${'$'}private: Boolean,
               ${'$'}hiddenFromStatusLists: Boolean,
@@ -1746,7 +1746,7 @@ object AnilistApi {
                 mediaId: ${'$'}mediaId,
                 status: ${'$'}status,
                 progress: ${'$'}progress,
-                score: ${'$'}score,
+                scoreRaw: ${'$'}scoreRaw,
                 repeat: ${'$'}repeat,
                 private: ${'$'}private,
                 hiddenFromStatusLists: ${'$'}hiddenFromStatusLists,
@@ -1757,7 +1757,7 @@ object AnilistApi {
                 id
                 mediaId
                 status
-                score
+                score(format: POINT_100)
                 progress
                 repeat
                 private
@@ -1787,7 +1787,12 @@ object AnilistApi {
                 put("progress", progress)
             }
             if (score != null) {
-                put("score", score)
+                val scoreRaw = if (score in 0.01..10.0) {
+                    ((score * 10.0).roundToInt()).coerceIn(0, 100)
+                } else {
+                    (score.roundToInt()).coerceIn(0, 100)
+                }
+                put("scoreRaw", scoreRaw)
             }
             if (repeat != null) {
                 put("repeat", repeat)

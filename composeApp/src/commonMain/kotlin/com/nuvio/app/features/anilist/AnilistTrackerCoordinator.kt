@@ -212,6 +212,14 @@ object AnilistTrackerCoordinator {
         val currentMedia = _trackerState.value.media ?: return
         val token = AnilistAuthRepository.token.value ?: return
 
+        AnilistLibraryRepository.updateItem(
+            mediaId = currentMedia.id,
+            title = currentMedia.title?.displayTitle,
+            status = status,
+            totalEpisodes = currentMedia.episodes,
+            posterUrl = currentMedia.coverImage?.extraLarge ?: currentMedia.coverImage?.large,
+        )
+
         scope.launch {
             _trackerState.update { it.copy(isSyncing = true) }
             val updatedEntry = AnilistApi.saveMediaListEntry(
@@ -243,6 +251,15 @@ object AnilistTrackerCoordinator {
         } else {
             _trackerState.value.entry?.status
         }
+
+        AnilistLibraryRepository.updateItem(
+            mediaId = currentMedia.id,
+            title = currentMedia.title?.displayTitle,
+            status = nextStatus,
+            progress = safeProgress,
+            totalEpisodes = currentMedia.episodes,
+            posterUrl = currentMedia.coverImage?.extraLarge ?: currentMedia.coverImage?.large,
+        )
 
         scope.launch {
             _trackerState.update { it.copy(isSyncing = true) }
@@ -327,6 +344,14 @@ object AnilistTrackerCoordinator {
                     )
 
                     if (updatedEntry != null) {
+                        AnilistLibraryRepository.updateItem(
+                            mediaId = media.id,
+                            title = media.title?.displayTitle,
+                            status = nextStatus,
+                            progress = safeProgress,
+                            totalEpisodes = media.episodes,
+                            posterUrl = media.coverImage?.extraLarge ?: media.coverImage?.large,
+                        )
                         com.nuvio.app.features.anilist.catalog.AnilistCatalogRepository.clearCache()
                         _trackerState.update {
                             it.copy(entry = updatedEntry)
@@ -352,6 +377,14 @@ object AnilistTrackerCoordinator {
         val token = AnilistAuthRepository.token.value ?: return
         val safeScore = score.coerceIn(0.0, 10.0)
 
+        AnilistLibraryRepository.updateItem(
+            mediaId = currentMedia.id,
+            title = currentMedia.title?.displayTitle,
+            score100 = safeScore * 10.0,
+            totalEpisodes = currentMedia.episodes,
+            posterUrl = currentMedia.coverImage?.extraLarge ?: currentMedia.coverImage?.large,
+        )
+
         scope.launch {
             _trackerState.update { it.copy(isSyncing = true) }
             val updatedEntry = AnilistApi.saveMediaListEntry(
@@ -363,7 +396,7 @@ object AnilistTrackerCoordinator {
             _trackerState.update {
                 it.copy(
                     isSyncing = false,
-                    entry = updatedEntry ?: it.entry?.copy(score = safeScore),
+                    entry = updatedEntry ?: it.entry?.copy(score = safeScore * 10.0),
                 )
             }
         }
@@ -510,6 +543,16 @@ object AnilistTrackerCoordinator {
         val currentMedia = _trackerState.value.media ?: return
         val token = AnilistAuthRepository.token.value ?: return
 
+        AnilistLibraryRepository.updateItem(
+            mediaId = currentMedia.id,
+            title = currentMedia.title?.displayTitle,
+            status = status,
+            progress = progress,
+            score100 = score?.let { it * 10.0 },
+            totalEpisodes = currentMedia.episodes,
+            posterUrl = currentMedia.coverImage?.extraLarge ?: currentMedia.coverImage?.large,
+        )
+
         scope.launch {
             _trackerState.update { it.copy(isSyncing = true) }
             val updatedEntry = AnilistApi.updateMediaListEntry(
@@ -547,7 +590,12 @@ object AnilistTrackerCoordinator {
 
     fun deleteEntry() {
         val entryId = _trackerState.value.entry?.id ?: return
+        val currentMediaId = _trackerState.value.media?.id
         val token = AnilistAuthRepository.token.value ?: return
+
+        if (currentMediaId != null) {
+            AnilistLibraryRepository.removeItem(currentMediaId)
+        }
 
         scope.launch {
             _trackerState.update { it.copy(isSyncing = true) }

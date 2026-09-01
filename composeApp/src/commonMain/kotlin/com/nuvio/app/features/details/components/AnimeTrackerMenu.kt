@@ -73,6 +73,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import kotlin.math.roundToInt
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -858,8 +859,9 @@ fun AnimeTrackerSheetContent(
         Spacer(modifier = Modifier.height(16.dp))
 
         // --- 8. SCORE RATING SECTION (1-10 STARS) ---
-        val currentScore = entry?.score ?: 0.0
-        val scoreInt = currentScore.toInt()
+        val rawScore = entry?.score ?: 0.0
+        val currentScore = if (rawScore >= 10.0) rawScore / 10.0 else rawScore
+        val scoreInt = ((currentScore * 10.0).roundToInt() / 10.0).roundToInt()
 
         Surface(
             modifier = Modifier.fillMaxWidth(),
