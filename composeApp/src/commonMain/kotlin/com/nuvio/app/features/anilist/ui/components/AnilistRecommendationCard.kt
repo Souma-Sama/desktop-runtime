@@ -72,6 +72,13 @@ fun AnilistRecommendationCard(
         recommendation.episodes?.takeIf { it > 0 }?.let { "$it eps" },
     ).joinToString(" • ").ifBlank { null }
 
+    val anilistStatus = if (anilistPrefs.enabled && anilistPrefs.showPosterStatusBadge) {
+        com.nuvio.app.features.anilist.AnilistLibraryRepository.getMediaStatusById("ani_${recommendation.mediaId}", recommendation.title)
+    } else null
+    val anilistProgress = if (anilistPrefs.enabled && anilistPrefs.showPosterStatusBadge) {
+        com.nuvio.app.features.anilist.AnilistLibraryRepository.getMediaProgressById("ani_${recommendation.mediaId}", recommendation.title)
+    } else null
+
     Box(modifier = modifier) {
         NuvioPosterCard(
             title = recommendation.title,
@@ -84,6 +91,8 @@ fun AnilistRecommendationCard(
             anilistScore = if (anilistPrefs.showPosterAnilistScore) recommendation.averageScore?.toDouble() else null,
             malScore = if (anilistPrefs.showPosterMalScore) lazyMalScore else null,
             scoreFormat = anilistPrefs.posterScoreFormat,
+            anilistStatus = anilistStatus,
+            anilistProgress = anilistProgress,
             onClick = if (isMangaOrNovel) null else onClick,
         )
 

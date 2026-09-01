@@ -120,6 +120,13 @@ private fun RelationPosterCard(
         relation.episodes?.takeIf { it > 0 }?.let { "$it eps" },
     ).joinToString(" • ").ifBlank { null }
 
+    val anilistStatus = if (anilistPrefs.enabled && anilistPrefs.showPosterStatusBadge) {
+        com.nuvio.app.features.anilist.AnilistLibraryRepository.getMediaStatusById("ani_${relation.id}", relation.title)
+    } else null
+    val anilistProgress = if (anilistPrefs.enabled && anilistPrefs.showPosterStatusBadge) {
+        com.nuvio.app.features.anilist.AnilistLibraryRepository.getMediaProgressById("ani_${relation.id}", relation.title)
+    } else null
+
     Box(modifier = modifier) {
         NuvioPosterCard(
             title = relation.title,
@@ -132,6 +139,8 @@ private fun RelationPosterCard(
             anilistScore = if (anilistPrefs.showPosterAnilistScore) relation.averageScore?.toDouble() else null,
             malScore = if (anilistPrefs.showPosterMalScore) lazyMalScore else null,
             scoreFormat = anilistPrefs.posterScoreFormat,
+            anilistStatus = anilistStatus,
+            anilistProgress = anilistProgress,
             onClick = onClick,
         )
 
