@@ -1743,28 +1743,13 @@ internal fun MainAppContent(
             selectedPosterActionTarget?.let { posterActionTarget ->
                 key(posterActionTarget) {
                     val preview = posterActionTarget.preview
-                    val anilistPrefs by com.nuvio.app.features.anilist.AnilistPreferencesRepository.preferences.collectAsStateWithLifecycle()
-                    val isAnimeCandidate = remember(preview) {
-                        com.nuvio.app.features.anilist.AnilistTrackerCoordinator.isAnimeCandidate(
-                            title = preview.name,
-                            genres = preview.genres,
-                            country = null,
-                            language = null,
-                            mediaId = preview.id,
-                            type = preview.type,
-                        )
-                    }
-
-                    if (anilistPrefs.enabled && isAnimeCandidate) {
-                        com.nuvio.app.features.details.components.AnimeTrackerSheet(
-                            preview = preview,
-                            title = preview.name,
-                            onDismiss = {
-                                selectedPosterActionTarget = null
-                                selectedPosterAnchor = null
-                            },
-                        )
-                    } else {
+                    com.nuvio.app.features.anilist.KaiHooks.PosterAction(
+                        targetPreview = preview,
+                        onDismiss = {
+                            selectedPosterActionTarget = null
+                            selectedPosterAnchor = null
+                        },
+                    ) {
                     val isSaved = LibraryRepository.isSaved(preview.id, preview.type)
                     val isWatched = WatchingState.isPosterWatched(
                         watchedKeys = watchedUiState.watchedKeys,

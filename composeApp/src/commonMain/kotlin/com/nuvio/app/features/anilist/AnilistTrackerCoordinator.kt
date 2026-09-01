@@ -817,19 +817,9 @@ object AnilistTrackerCoordinator {
         return null
     }
 
-    fun isKaiMedia(mediaId: String?): Boolean {
-        if (mediaId.isNullOrBlank()) return false
-        val id = mediaId.trim().lowercase()
-        return id.startsWith("ani_") ||
-               id.startsWith("ani:") ||
-               id.startsWith("anilist:") ||
-               id.startsWith("anilist_") ||
-               id.startsWith("al:") ||
-               id.startsWith("al_") ||
-               id.startsWith("anichart:")
-    }
+    fun isKaiMedia(mediaId: String?): Boolean = KaiHooks.isKaiMedia(mediaId)
 
-    fun hasAnimeId(mediaId: String?): Boolean = isKaiMedia(mediaId)
+    fun hasAnimeId(mediaId: String?): Boolean = KaiHooks.isKaiMedia(mediaId)
 
     private fun generateSearchCandidates(rawTitle: String): List<String> {
         val list = mutableListOf<String>()

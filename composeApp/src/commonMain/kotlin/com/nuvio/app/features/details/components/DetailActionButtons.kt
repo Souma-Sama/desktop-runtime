@@ -216,17 +216,11 @@ fun DetailActionButtons(
                 }
             }
 
-            val anilistPrefs by com.nuvio.app.features.anilist.AnilistPreferencesRepository.preferences.collectAsState()
-            val isKaiItem = remember(meta?.id) {
-                com.nuvio.app.features.anilist.AnilistTrackerCoordinator.isKaiMedia(meta?.id)
-            }
-
-            if (anilistPrefs.enabled && isKaiItem) {
-                Spacer(modifier = Modifier.width(12.dp))
-                AnimeStreamIdButton(meta = meta, size = iconButtonSize)
-                Spacer(modifier = Modifier.width(12.dp))
-                AnimeTrackerButton(meta = meta, title = title, size = iconButtonSize)
-            }
+            com.nuvio.app.features.anilist.KaiHooks.DetailsActionButtons(
+                meta = meta,
+                title = title,
+                iconButtonSize = iconButtonSize,
+            )
         }
     }
 }

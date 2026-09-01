@@ -403,27 +403,8 @@ object SearchRepository {
         addons: List<ManagedAddon>,
         query: String,
     ): List<SearchCatalogRequest> {
-        val anilistPrefs = com.nuvio.app.features.anilist.AnilistPreferencesRepository.snapshot()
-        val isAnilistEnabled = anilistPrefs.enabled && (addons.isEmpty() || addons.any { (it.manifestUrl.startsWith("native://anilist") || it.manifestUrl.startsWith("builtin://anilist") || it.manifest?.id?.contains("anilist", ignoreCase = true) == true) && it.enabled })
-        val anilistRequest = if (isAnilistEnabled) {
-            listOf(
-                SearchCatalogRequest(
-                    addon = null,
-                    catalogId = "anilist:search",
-                    catalogName = "Anime",
-                    type = "anime",
-                    query = query,
-                    supportsPagination = false,
-                    isNativeAnilist = true,
-                )
-            )
-        } else emptyList()
-
-        val effectiveAddons = if (anilistPrefs.enabled) {
-            addons.filterNot { it.manifestUrl.startsWith("native://anilist") || it.manifestUrl.startsWith("builtin://anilist") || it.manifest?.id?.contains("anilist", ignoreCase = true) == true }
-        } else {
-            addons.filterNot { it.manifestUrl.startsWith("native://anilist") || it.manifestUrl.startsWith("builtin://anilist") || it.manifest?.id?.contains("anilist", ignoreCase = true) == true }
-        }
+        val anilistRequests = com.nuvio.app.features.anilist.KaiHooks.buildSearchRequests(query, addons)
+        val effectiveAddons = com.nuvio.app.features.anilist.KaiHooks.filterExternalAddons(addons)
 
         val addonRequests = effectiveAddons.mapNotNull { addon ->
             val manifest = addon.manifest ?: return@mapNotNull null
@@ -444,32 +425,18 @@ object SearchRepository {
                 }
         }
 
-        return anilistRequest + addonRequests
+        return anilistRequests + addonRequests
     }
 
     private fun buildDiscoverSources(addons: List<ManagedAddon>): List<DiscoverCatalogOption> {
-        val anilistPrefs = com.nuvio.app.features.anilist.AnilistPreferencesRepository.snapshot()
-        val effectiveAddons = if (anilistPrefs.enabled) addons else addons.filterNot { it.manifestUrl.startsWith("native://anilist") || it.manifestUrl.startsWith("builtin://anilist") || it.manifest?.id?.contains("anilist", ignoreCase = true) == true }
-        return effectiveAddons.mapNotNull { addon ->
-            val manifest = addon.manifest ?: return@mapNotNull null
-            addon to manifest
-        }.flatMap { (addon, manifest) ->
+        return addons.flatMap { addon ->
+            val manifest = addon.manifest ?: return@flatMap emptyList()
             manifest.catalogs
                 .filter { catalog -> catalog.supportsDiscover() }
                 .map { catalog ->
-                    val genreExtra = catalog.genreExtra()
-                    val sortExtra = catalog.extra.firstOrNull { it.name.equals("sort", ignoreCase = true) }
                     DiscoverCatalogOption(
-                        key = "${manifest.id}:${catalog.type}:${catalog.id}",
-                        addonName = addon.displayTitle,
-                        manifestUrl = addon.manifestUrl,
-                        type = catalog.type,
-                        catalogId = catalog.id,
-                        catalogName = catalog.name,
-                        genreOptions = genreExtra?.options.orEmpty(),
-                        sortOptions = sortExtra?.options.orEmpty(),
-                        genreRequired = genreExtra?.isRequired == true,
-                        supportsPagination = catalog.supportsPagination(),
+                        addon = addon,
+                        catalog = catalog,
                     )
                 }
         }
@@ -477,47 +444,7 @@ object SearchRepository {
 
     private suspend fun SearchCatalogRequest.toSection(forceRefresh: Boolean): HomeCatalogSection {
         if (isNativeAnilist) {
-            val mediaList = com.nuvio.app.features.anilist.AnilistApi.searchAnime(query)
-            val previews = mediaList.map { media ->
-                val score = if (media.averageScore != null && media.averageScore > 0) {
-                    media.averageScore / 10.0
-                } else null
-                MetaPreview(
-                    id = "ani_${media.id}",
-                    type = if (media.format == "MOVIE") "movie" else "series",
-                    name = media.title?.displayTitle.orEmpty(),
-                    poster = media.coverImage?.extraLarge ?: media.coverImage?.large ?: media.coverImage?.medium,
-                    banner = media.bannerImage,
-                    logo = com.nuvio.app.features.artwork.MetaHubArtwork.getLogoUrl("ani_${media.id}"),
-                    posterShape = com.nuvio.app.features.home.PosterShape.Poster,
-                    description = media.description,
-                    releaseInfo = listOfNotNull(
-                        com.nuvio.app.core.format.formatYearRange(media.startDateYear, media.endDateYear, media.status),
-                        if (media.episodes != null && media.episodes > 0 && media.format != "MOVIE") {
-                            "${media.episodes} eps"
-                        } else {
-                            media.duration?.let { "$it min" }
-                        },
-                    ).joinToString(" • ").takeIf { it.isNotBlank() },
-                    imdbRating = score?.let { "${((it * 10).toInt()) / 10.0}" },
-                    anilistScore = if (media.averageScore != null && media.averageScore > 0) media.averageScore.toDouble() else null,
-                    genres = media.genres,
-                )
-            }
-            return HomeCatalogSection(
-                key = "anilist:search:anime:${query.lowercase()}",
-                title = "AniList Anime",
-                subtitle = "AniList",
-                addonName = "AniList",
-                target = CatalogTarget.Anilist(
-                    catalogId = "anilist:search",
-                    contentType = "anime",
-                    supportsPagination = false,
-                ),
-                items = previews,
-                availableItemCount = previews.size,
-                hasMore = false,
-            )
+            return com.nuvio.app.features.anilist.KaiHooks.executeSearch(query)
         }
 
         val manifest = requireNotNull(addon?.manifest)

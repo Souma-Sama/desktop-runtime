@@ -31,48 +31,24 @@ fun HomePosterCard(
     val anilistPrefs by AnilistPreferencesRepository.preferences.collectAsStateWithLifecycle()
     val isLandscapeMode = useLandscapeBackdropMode || posterCardStyle.catalogLandscapeModeEnabled
 
+    val deco = com.nuvio.app.features.anilist.KaiHooks.rememberPosterDecorations(item)
     var lazyLogoUrl by remember(item.id) { mutableStateOf(item.logo ?: MetaHubArtwork.getLogoUrl(item.id)) }
     var lazyMalScore by remember(item.id) { mutableStateOf(item.malScore ?: MetaHubArtwork.getMalScore(item.id)) }
 
-    // Lazy load logo for visible items only
-    LaunchedEffect(item.id, anilistPrefs.showPosterTitleLogos) {
-        if (anilistPrefs.showPosterTitleLogos && lazyLogoUrl == null) {
+    LaunchedEffect(item.id, deco.showTitleLogos) {
+        if (deco.showTitleLogos && lazyLogoUrl == null) {
             lazyLogoUrl = MetaHubArtwork.resolveLogoUrl(item.id)
         }
     }
 
-    val isAnime = remember(item.id, item.name, item.genres, item.type) {
-        com.nuvio.app.features.anilist.AnilistTrackerCoordinator.isAnimeCandidate(
-            title = item.name,
-            genres = item.genres,
-            country = null,
-            language = null,
-            mediaId = item.id,
-            type = item.type,
-        )
-    }
-
-    // Lazy load MAL score for visible anime items only
-    LaunchedEffect(item.id, anilistPrefs.showPosterMalScore, isAnime) {
-        if (anilistPrefs.enabled && anilistPrefs.showPosterMalScore && isAnime && lazyMalScore == null) {
+    LaunchedEffect(item.id, deco.showMalScore) {
+        if (deco.showMalScore && lazyMalScore == null) {
             lazyMalScore = MetaHubArtwork.resolveMalScore(item.id)
         }
     }
 
-    val effectiveLogoUrl = if (anilistPrefs.enabled && anilistPrefs.showPosterTitleLogos && isAnime) lazyLogoUrl else null
-    val effectiveAnilistScore = if (anilistPrefs.enabled && anilistPrefs.showPosterAnilistScore && isAnime) item.anilistScore else null
-    val effectiveMalScore = if (anilistPrefs.enabled && anilistPrefs.showPosterMalScore && isAnime) lazyMalScore else null
-
-    val anilistLibraryState by com.nuvio.app.features.anilist.AnilistLibraryRepository.uiState.collectAsStateWithLifecycle()
-    val mediaStatus = if (anilistPrefs.enabled && anilistPrefs.showPosterStatusBadge && isAnime) {
-        com.nuvio.app.features.anilist.AnilistLibraryRepository.getMediaStatusById(item.id, item.name)
-    } else null
-    val mediaProgress = if (anilistPrefs.enabled && anilistPrefs.showPosterStatusBadge && isAnime) {
-        com.nuvio.app.features.anilist.AnilistLibraryRepository.getMediaProgressById(item.id, item.name)
-    } else null
-    val mediaUserScore = if (anilistPrefs.enabled && anilistPrefs.showPosterStatusBadge && isAnime) {
-        com.nuvio.app.features.anilist.AnilistLibraryRepository.getUserScoreById(item.id, item.name)
-    } else null
+    val effectiveLogoUrl = if (deco.showTitleLogos) lazyLogoUrl else null
+    val effectiveMalScore = if (deco.showMalScore) lazyMalScore else null
 
     HomePosterHoverPreview(
         item = item,
@@ -94,12 +70,12 @@ fun HomePosterCard(
             showTitleBelow = !posterCardStyle.hideLabelsEnabled,
             bottomLeftLogoUrl = effectiveLogoUrl,
             bottomLeftText = if (isLandscapeMode && effectiveLogoUrl.isNullOrBlank() && !posterCardStyle.hideLabelsEnabled) item.name else null,
-            anilistScore = effectiveAnilistScore,
+            anilistScore = deco.anilistScore,
             malScore = effectiveMalScore,
             scoreFormat = anilistPrefs.posterScoreFormat,
-            anilistStatus = mediaStatus,
-            anilistProgress = mediaProgress,
-            anilistUserScore = mediaUserScore,
+            anilistStatus = deco.libraryStatus,
+            anilistProgress = deco.libraryProgress,
+            anilistUserScore = deco.userScore,
             isWatched = isWatched,
             onClick = onClick,
             onLongClick = onLongClick,
