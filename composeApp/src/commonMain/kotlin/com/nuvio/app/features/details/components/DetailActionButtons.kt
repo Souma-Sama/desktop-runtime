@@ -217,6 +217,7 @@ fun DetailActionButtons(
             }
 
             val trackerState by com.nuvio.app.features.anilist.AnilistTrackerCoordinator.trackerState.collectAsState()
+            val anilistPrefs by com.nuvio.app.features.anilist.AnilistPreferencesRepository.preferences.collectAsState()
             val effectiveAnimeTitle = title?.takeIf { it.isNotBlank() } ?: meta?.name.orEmpty()
             val isAnimeCandidate = com.nuvio.app.features.anilist.AnilistTrackerCoordinator.isAnimeCandidate(
                 title = effectiveAnimeTitle,
@@ -225,8 +226,9 @@ fun DetailActionButtons(
                 language = meta?.language,
                 mediaId = meta?.id,
             )
+            val isMatchedAnime = trackerState.isAnime && trackerState.media != null && trackerState.lastLookupTitle.equals(effectiveAnimeTitle, ignoreCase = true)
 
-            if (trackerState.isAnime || isAnimeCandidate) {
+            if (anilistPrefs.enabled && (isAnimeCandidate || isMatchedAnime)) {
                 Spacer(modifier = Modifier.width(12.dp))
                 AnimeStreamIdButton(meta = meta, size = iconButtonSize)
                 Spacer(modifier = Modifier.width(12.dp))

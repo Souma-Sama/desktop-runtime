@@ -1224,7 +1224,19 @@ fun MetaDetailsScreen(
                                     },
                                     onSeasonLongPress = { season -> selectedSeasonForActions = season },
                                     onOpenMeta = onOpenMeta,
-                                    onPosterLongClick = { item -> trackerSheetPreview = item },
+                                    onPosterLongClick = { item ->
+                                        val anilistPrefs = com.nuvio.app.features.anilist.AnilistPreferencesRepository.snapshot()
+                                        val isAnime = com.nuvio.app.features.anilist.AnilistTrackerCoordinator.isAnimeCandidate(
+                                            title = item.name,
+                                            genres = item.genres,
+                                            country = null,
+                                            language = null,
+                                            mediaId = item.id,
+                                        )
+                                        if (anilistPrefs.enabled && isAnime) {
+                                            trackerSheetPreview = item
+                                        }
+                                    },
                                     onCastClick = onCastClick,
                                     onCompanyClick = onCompanyClick,
                                     sharedTransitionScope = sharedTransitionScope,
@@ -1343,7 +1355,19 @@ fun MetaDetailsScreen(
                                     onEpisodeLongPress = { video -> selectedEpisodeForActions = video },
                                     onSeasonLongPress = { season -> selectedSeasonForActions = season },
                                     onOpenMeta = onOpenMeta,
-                                    onPosterLongClick = { item -> trackerSheetPreview = item },
+                                    onPosterLongClick = { item ->
+                                        val anilistPrefs = com.nuvio.app.features.anilist.AnilistPreferencesRepository.snapshot()
+                                        val isAnime = com.nuvio.app.features.anilist.AnilistTrackerCoordinator.isAnimeCandidate(
+                                            title = item.name,
+                                            genres = item.genres,
+                                            country = null,
+                                            language = null,
+                                            mediaId = item.id,
+                                        )
+                                        if (anilistPrefs.enabled && isAnime) {
+                                            trackerSheetPreview = item
+                                        }
+                                    },
                                     onCastClick = onCastClick,
                                     onCompanyClick = onCompanyClick,
                                     sharedTransitionScope = sharedTransitionScope,

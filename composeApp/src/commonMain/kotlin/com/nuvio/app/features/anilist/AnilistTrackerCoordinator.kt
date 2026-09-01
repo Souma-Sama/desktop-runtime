@@ -140,14 +140,15 @@ object AnilistTrackerCoordinator {
                     }
 
                     // 4. Multi-Strategy Title Search (Public, 100% Reliable)
-                    if (fetched == null && rawTitle.isNotBlank()) {
+                    if (fetched == null && rawTitle.isNotBlank() && isExplicitAnime) {
                         val candidates = generateSearchCandidates(rawTitle)
                         debug.appendLine("[Search] Candidates: $candidates")
                         for (query in candidates) {
                             val results = AnilistApi.searchAnime(query = query)
                             debug.appendLine("   - Search \"$query\" returned ${results.size} items: ${results.take(3).map { "${it.title?.displayTitle} (#${it.id})" }}")
-                            if (results.isNotEmpty()) {
-                                fetched = results.first()
+                            val matched = results.firstOrNull { isTitleMatch(query, rawTitle, it) }
+                            if (matched != null) {
+                                fetched = matched
                                 strategyUsed = "Title Search \"$query\" -> #${fetched.id} ${fetched.title?.displayTitle}"
                                 break
                             }
@@ -155,14 +156,15 @@ object AnilistTrackerCoordinator {
                     }
 
                     // 5. REST Kitsu -> ARM -> AniList Resolver Fallback
-                    if (fetched == null && rawTitle.isNotBlank()) {
+                    if (fetched == null && rawTitle.isNotBlank() && isExplicitAnime) {
                         val candidates = generateSearchCandidates(rawTitle)
                         for (query in candidates) {
                             val resolvedAnilistId = AnilistApi.searchViaKitsu(query)
                             debug.appendLine("[Kitsu] Search \"$query\" -> AniList ID: $resolvedAnilistId")
                             if (resolvedAnilistId != null) {
-                                fetched = AnilistApi.fetchMediaById(resolvedAnilistId, token = null)
-                                if (fetched != null) {
+                                val resolvedMedia = AnilistApi.fetchMediaById(resolvedAnilistId, token = null)
+                                if (resolvedMedia != null && isTitleMatch(query, rawTitle, resolvedMedia)) {
+                                    fetched = resolvedMedia
                                     strategyUsed = "Kitsu Fallback -> #${fetched.id} ${fetched.title?.displayTitle}"
                                     break
                                 }
@@ -808,7 +810,6 @@ object AnilistTrackerCoordinator {
         val id = mediaId.trim().lowercase()
         if (id.startsWith("ani_") || id.startsWith("ani:") || id.startsWith("anilist") || id.startsWith("al:") || id.startsWith("al_") || id.startsWith("kitsu") || id.startsWith("mal") || id.startsWith("anime:")) return true
         if (id.all { it.isDigit() } && id.length in 1..8) return true
-        if (id.startsWith("tt") && id.contains(":")) return true
         return false
     }
 
@@ -895,7 +896,12 @@ object AnilistTrackerCoordinator {
     ): Boolean {
         if (hasAnimeId(mediaId)) return true
         val g = genres.map { it.lowercase() }
-        if (g.any { it.contains("anime") || it.contains("anim") }) return true
+        if (g.any { it.contains("anime") }) return true
+        if (g.any { it == "animation" || it.contains("anim") }) {
+            val isJapan = country?.lowercase() in listOf("jp", "japan") || language?.lowercase() in listOf("ja", "japanese", "jpn")
+            if (isJapan) return true
+            if (title.any { it in '\u3040'..'\u30ff' || it in '\u4e00'..'\u9faf' }) return true
+        }
         // Check for Japanese Kanji, Hiragana, or Katakana in the title
         if (title.any { it in '\u3040'..'\u30ff' || it in '\u4e00'..'\u9faf' }) return true
         val isJapan = country?.lowercase() in listOf("jp", "japan") || language?.lowercase() in listOf("ja", "japanese", "jpn")

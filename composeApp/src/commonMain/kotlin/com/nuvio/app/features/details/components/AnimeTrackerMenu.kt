@@ -129,6 +129,9 @@ fun AnimeTrackerButton(
     title: String? = null,
     size: Dp = 52.dp,
 ) {
+    val anilistPrefs by com.nuvio.app.features.anilist.AnilistPreferencesRepository.preferences.collectAsState()
+    if (!anilistPrefs.enabled) return
+
     var showSheet by remember { mutableStateOf(false) }
     val trackerState by AnilistTrackerCoordinator.trackerState.collectAsState()
     val libraryUiState by com.nuvio.app.features.anilist.AnilistLibraryRepository.uiState.collectAsState()

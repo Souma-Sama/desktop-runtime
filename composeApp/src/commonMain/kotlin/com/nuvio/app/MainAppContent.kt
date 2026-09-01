@@ -1744,8 +1744,17 @@ internal fun MainAppContent(
                 key(posterActionTarget) {
                     val preview = posterActionTarget.preview
                     val anilistPrefs by com.nuvio.app.features.anilist.AnilistPreferencesRepository.preferences.collectAsStateWithLifecycle()
+                    val isAnimeCandidate = remember(preview) {
+                        com.nuvio.app.features.anilist.AnilistTrackerCoordinator.isAnimeCandidate(
+                            title = preview.name,
+                            genres = preview.genres,
+                            country = null,
+                            language = null,
+                            mediaId = preview.id,
+                        )
+                    }
 
-                    if (anilistPrefs.enabled) {
+                    if (anilistPrefs.enabled && isAnimeCandidate) {
                         com.nuvio.app.features.details.components.AnimeTrackerSheet(
                             preview = preview,
                             title = preview.name,
