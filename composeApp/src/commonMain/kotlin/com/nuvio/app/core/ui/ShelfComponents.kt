@@ -37,12 +37,20 @@ import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.graphics.PathFillType
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.vector.path
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -255,6 +263,7 @@ fun NuvioPosterCard(
     scoreFormat: AnilistPosterScoreFormat = AnilistPosterScoreFormat.PERCENTAGE,
     anilistStatus: com.nuvio.app.features.anilist.AnilistMediaListStatus? = null,
     anilistProgress: Pair<Int, Int?>? = null,
+    anilistUserScore: Double? = null,
     isWatched: Boolean = false,
     onClick: (() -> Unit)? = null,
     onLongClick: (() -> Unit)? = null,
@@ -368,10 +377,16 @@ fun NuvioPosterCard(
             if (anilistStatus != null) {
                 AnilistPosterStatusBadge(
                     status = anilistStatus,
-                    progress = anilistProgress,
+                    modifier = Modifier.align(Alignment.TopStart),
+                )
+            }
+
+            if (anilistUserScore != null && anilistUserScore > 0.0) {
+                AnilistPosterUserRatingBadge(
+                    userScore = anilistUserScore,
                     modifier = Modifier
                         .align(Alignment.BottomStart)
-                        .padding(start = 6.dp, bottom = if (!bottomLeftLogoUrl.isNullOrBlank() || !bottomLeftText.isNullOrBlank()) 28.dp else 6.dp),
+                        .padding(bottom = if (!bottomLeftLogoUrl.isNullOrBlank() || !bottomLeftText.isNullOrBlank()) 26.dp else 0.dp),
                 )
             }
 
@@ -772,73 +787,202 @@ private fun PosterScoreBadge(
     }
 }
 
+private val AnilistClockIcon: ImageVector by lazy {
+    ImageVector.Builder(
+        name = "AnilistClock",
+        defaultWidth = 24.dp,
+        defaultHeight = 24.dp,
+        viewportWidth = 24f,
+        viewportHeight = 24f,
+    ).apply {
+        path(
+            fill = SolidColor(Color.White),
+            pathFillType = PathFillType.NonZero,
+        ) {
+            moveTo(11.99f, 2f)
+            curveTo(6.47f, 2f, 2f, 6.48f, 2f, 12f)
+            reflectiveCurveTo(6.47f, 22f, 11.99f, 22f)
+            curveTo(17.52f, 22f, 22f, 17.52f, 22f, 12f)
+            reflectiveCurveTo(17.52f, 2f, 11.99f, 2f)
+            close()
+            moveTo(12f, 20f)
+            curveTo(7.58f, 20f, 4f, 16.42f, 4f, 12f)
+            reflectiveCurveTo(7.58f, 4f, 12f, 4f)
+            reflectiveCurveTo(20f, 7.58f, 20f, 12f)
+            reflectiveCurveTo(16.42f, 20f, 12f, 20f)
+            close()
+            moveTo(12.5f, 7f)
+            horizontalLineTo(11f)
+            verticalLineTo(13f)
+            lineTo(16.25f, 16.15f)
+            lineTo(17f, 14.92f)
+            lineTo(12.5f, 12.25f)
+            verticalLineTo(7f)
+            close()
+        }
+    }.build()
+}
+
+private val AnilistPauseIcon: ImageVector by lazy {
+    ImageVector.Builder(
+        name = "AnilistPause",
+        defaultWidth = 24.dp,
+        defaultHeight = 24.dp,
+        viewportWidth = 24f,
+        viewportHeight = 24f,
+    ).apply {
+        path(
+            fill = SolidColor(Color.White),
+            pathFillType = PathFillType.NonZero,
+        ) {
+            moveTo(6f, 19f)
+            horizontalLineTo(10f)
+            verticalLineTo(5f)
+            horizontalLineTo(6f)
+            verticalLineTo(19f)
+            close()
+            moveTo(14f, 5f)
+            verticalLineTo(19f)
+            horizontalLineTo(18f)
+            verticalLineTo(5f)
+            horizontalLineTo(14f)
+            close()
+        }
+    }.build()
+}
+
+private val AnilistRepeatIcon: ImageVector by lazy {
+    ImageVector.Builder(
+        name = "AnilistRepeat",
+        defaultWidth = 24.dp,
+        defaultHeight = 24.dp,
+        viewportWidth = 24f,
+        viewportHeight = 24f,
+    ).apply {
+        path(
+            fill = SolidColor(Color.White),
+            pathFillType = PathFillType.NonZero,
+        ) {
+            moveTo(7f, 7f)
+            horizontalLineTo(17f)
+            verticalLineTo(10f)
+            lineTo(21f, 6f)
+            lineTo(17f, 2f)
+            verticalLineTo(5f)
+            horizontalLineTo(5f)
+            verticalLineTo(11f)
+            horizontalLineTo(7f)
+            verticalLineTo(7f)
+            close()
+            moveTo(17f, 17f)
+            horizontalLineTo(7f)
+            verticalLineTo(14f)
+            lineTo(3f, 18f)
+            lineTo(7f, 22f)
+            verticalLineTo(19f)
+            horizontalLineTo(19f)
+            verticalLineTo(13f)
+            horizontalLineTo(17f)
+            verticalLineTo(17f)
+            close()
+        }
+    }.build()
+}
+
 @Composable
 fun AnilistPosterStatusBadge(
     status: com.nuvio.app.features.anilist.AnilistMediaListStatus,
-    progress: Pair<Int, Int?>? = null,
     modifier: Modifier = Modifier,
 ) {
-    val (label, bgTint, textTint) = when (status) {
+    val (iconVector, bgTint, iconTint) = when (status) {
         com.nuvio.app.features.anilist.AnilistMediaListStatus.CURRENT -> Triple(
-            if (progress != null && progress.first > 0) {
-                if (progress.second != null && progress.second!! > 0) "Watching ${progress.first}/${progress.second}"
-                else "Watching Ep ${progress.first}"
-            } else "Watching",
-            Color(0xFF1B5E20), // Emerald Green
-            Color(0xFFE8F5E9),
+            androidx.compose.material.icons.filled.PlayArrow,
+            Color(0xFF4CAF50), // Vibrant Green (AniHyou style)
+            Color.White,
         )
         com.nuvio.app.features.anilist.AnilistMediaListStatus.PLANNING -> Triple(
-            "Planning",
-            Color(0xFFE65100), // Vibrant Amber / Orange
-            Color(0xFFFFF3E0),
+            AnilistClockIcon,
+            Color(0xCC2A2A2A), // Dark Translucent Charcoal (AniHyou style)
+            Color.White,
         )
         com.nuvio.app.features.anilist.AnilistMediaListStatus.COMPLETED -> Triple(
-            "Completed",
-            Color(0xFF01579B), // Sky / Ocean Blue
-            Color(0xFFE1F5FE),
+            androidx.compose.material.icons.filled.Check,
+            Color(0xFF90CAF9), // Soft Sky Blue (AniHyou style)
+            Color(0xFF0D47A1), // Deep Navy
         )
         com.nuvio.app.features.anilist.AnilistMediaListStatus.PAUSED -> Triple(
-            "On Hold",
-            Color(0xFFF57F17), // Warm Yellow / Gold
-            Color(0xFFFFFDE7),
+            AnilistPauseIcon,
+            Color(0xFFE2D84C), // Mustard / Yellow (AniHyou style)
+            Color(0xFF1E1E1E), // Dark Charcoal
         )
         com.nuvio.app.features.anilist.AnilistMediaListStatus.DROPPED -> Triple(
-            "Dropped",
-            Color(0xFFB71C1C), // Crimson / Coral Red
-            Color(0xFFFFEBEE),
+            androidx.compose.material.icons.filled.Close,
+            Color(0xFFE53935), // Red
+            Color.White,
         )
         com.nuvio.app.features.anilist.AnilistMediaListStatus.REPEATING -> Triple(
-            if (progress != null && progress.first > 0) "Rewatching ${progress.first}" else "Rewatching",
-            Color(0xFF4A148C), // Purple / Violet
-            Color(0xFFF3E5F5),
+            AnilistRepeatIcon,
+            Color(0xFFAB47BC), // Purple
+            Color.White,
         )
     }
 
     Surface(
-        shape = RoundedCornerShape(4.dp),
-        color = bgTint.copy(alpha = 0.88f),
-        border = BorderStroke(0.5.dp, textTint.copy(alpha = 0.35f)),
+        shape = RoundedCornerShape(bottomEnd = 8.dp),
+        color = bgTint,
+        modifier = modifier.size(24.dp),
+    ) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = iconVector,
+                contentDescription = status.name,
+                tint = iconTint,
+                modifier = Modifier.size(14.dp),
+            )
+        }
+    }
+}
+
+@Composable
+fun AnilistPosterUserRatingBadge(
+    userScore: Double?,
+    modifier: Modifier = Modifier,
+) {
+    if (userScore == null || userScore <= 0.0) return
+
+    val formattedScore = if (userScore % 1.0 == 0.0) {
+        userScore.toInt().toString()
+    } else {
+        userScore.toString()
+    }
+
+    Surface(
+        shape = RoundedCornerShape(topEnd = 8.dp),
+        color = Color(0xFF4DD0E1), // Cyan / Teal from AniHyou
         modifier = modifier,
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
+            modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(3.dp),
         ) {
-            Box(
-                modifier = Modifier
-                    .size(4.dp)
-                    .clip(CircleShape)
-                    .background(textTint),
+            Icon(
+                imageVector = androidx.compose.material.icons.filled.Star,
+                contentDescription = "User Rating",
+                tint = Color(0xFF003840),
+                modifier = Modifier.size(11.dp),
             )
             Text(
-                text = label,
+                text = formattedScore,
                 style = MaterialTheme.typography.labelSmall.copy(
-                    fontSize = 9.sp,
+                    fontSize = 11.sp,
                     fontWeight = FontWeight.ExtraBold,
-                    letterSpacing = (-0.1).sp,
+                    letterSpacing = (-0.2).sp,
                 ),
-                color = textTint,
+                color = Color(0xFF003840),
                 maxLines = 1,
             )
         }

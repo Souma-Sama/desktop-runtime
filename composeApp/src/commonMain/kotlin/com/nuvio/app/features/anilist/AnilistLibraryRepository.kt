@@ -140,6 +140,24 @@ object AnilistLibraryRepository {
         return null
     }
 
+    fun getUserScore(anilistId: Int): Double? {
+        val entry = getMediaEntry(anilistId) ?: return null
+        return entry.score?.takeIf { it > 0.0 }
+    }
+
+    fun getUserScoreById(itemId: String, title: String? = null): Double? {
+        val anilistId = extractAnilistId(itemId)
+        if (anilistId != null) {
+            val sc = getUserScore(anilistId)
+            if (sc != null) return sc
+        }
+        if (!title.isNullOrBlank()) {
+            val entry = getMediaEntryByTitle(title)
+            if (entry != null) return entry.score?.takeIf { it > 0.0 }
+        }
+        return null
+    }
+
     fun extractAnilistId(itemId: String): Int? {
         return when {
             itemId.startsWith("ani_") -> itemId.removePrefix("ani_").toIntOrNull()

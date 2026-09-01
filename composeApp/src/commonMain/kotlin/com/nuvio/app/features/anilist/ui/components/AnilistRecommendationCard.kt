@@ -78,6 +78,9 @@ fun AnilistRecommendationCard(
     val anilistProgress = if (anilistPrefs.enabled && anilistPrefs.showPosterStatusBadge) {
         com.nuvio.app.features.anilist.AnilistLibraryRepository.getMediaProgressById("ani_${recommendation.mediaId}", recommendation.title)
     } else null
+    val anilistUserScore = if (anilistPrefs.enabled && anilistPrefs.showPosterStatusBadge) {
+        com.nuvio.app.features.anilist.AnilistLibraryRepository.getUserScoreById("ani_${recommendation.mediaId}", recommendation.title)
+    } else null
 
     Box(modifier = modifier) {
         NuvioPosterCard(
@@ -93,6 +96,7 @@ fun AnilistRecommendationCard(
             scoreFormat = anilistPrefs.posterScoreFormat,
             anilistStatus = anilistStatus,
             anilistProgress = anilistProgress,
+            anilistUserScore = anilistUserScore,
             onClick = if (isMangaOrNovel) null else onClick,
         )
 
