@@ -27,6 +27,16 @@ object AnilistApi {
     private const val GRAPHQL_ENDPOINT = "https://graphql.anilist.co"
     private val json = Json { ignoreUnknownKeys = true; isLenient = true }
 
+    private val requestSemaphore = kotlinx.coroutines.sync.Semaphore(4)
+    private val responseCacheMutex = kotlinx.coroutines.sync.Mutex()
+    private val responseCache = mutableMapOf<String, CachedGraphQLResponse>()
+    private const val GRAPHQL_CACHE_TTL_MS = 5 * 60 * 1000L // 5 minutes
+
+    private data class CachedGraphQLResponse(
+        val timestamp: Long,
+        val data: JsonObject,
+    )
+
     var lastDebugLog: String = "No requests made yet"
         private set
 
@@ -34,11 +44,25 @@ object AnilistApi {
         query: String,
         variables: JsonObject = buildJsonObject {},
         token: String? = null,
-    ): JsonObject? {
+        bypassCache: Boolean = false,
+    ): JsonObject? = requestSemaphore.withPermit {
         val payload = buildJsonObject {
             put("query", query)
             put("variables", variables)
         }.toString()
+
+        val isMutation = query.trimStart().startsWith("mutation", ignoreCase = true)
+        val cacheKey = "$payload:${token ?: "anon"}"
+        val now = com.nuvio.app.core.time.EpisodeReleaseDatePlatform.nowEpochMs()
+
+        if (!isMutation && !bypassCache) {
+            responseCacheMutex.withLock {
+                val cached = responseCache[cacheKey]
+                if (cached != null && (now - cached.timestamp < GRAPHQL_CACHE_TTL_MS)) {
+                    return@withPermit cached.data
+                }
+            }
+        }
 
         val headers = mutableMapOf(
             "User-Agent" to "Nuvio-Kai/1.0",
@@ -48,38 +72,79 @@ object AnilistApi {
             headers["Authorization"] = "Bearer $sanitized"
         }
 
-        var responseText: String? = null
-        try {
-            responseText = httpPostJsonWithHeaders(
-                url = GRAPHQL_ENDPOINT,
-                body = payload,
-                headers = headers,
-            )
-            lastDebugLog = "HTTP POST $GRAPHQL_ENDPOINT\nPayload: $payload\nResponse: ${responseText?.take(400)}"
-        } catch (e: Exception) {
-            lastDebugLog = "HTTP POST $GRAPHQL_ENDPOINT failed: ${e.message}\nPayload: $payload"
-            log.w(e) { "executeGraphQL request failed: ${e.message}" }
-            return null
-        }
+        var attempt = 0
+        val maxAttempts = 3
 
-        if (responseText.isNullOrBlank()) {
-            lastDebugLog = "GraphQL response empty for payload: $payload"
-            return null
-        }
-
-        return try {
-            val root = json.parseToJsonElement(responseText).jsonObject
-            val errors = root["errors"]?.jsonArray
-            if (errors != null && errors.isNotEmpty()) {
-                val errMsg = errors.firstOrNull()?.jsonObject?.get("message")?.jsonPrimitive?.contentOrNull
-                lastDebugLog = "GraphQL Error: $errMsg\nRaw: $responseText"
+        while (attempt < maxAttempts) {
+            attempt++
+            var responseText: String? = null
+            try {
+                responseText = httpPostJsonWithHeaders(
+                    url = GRAPHQL_ENDPOINT,
+                    body = payload,
+                    headers = headers,
+                )
+                lastDebugLog = "HTTP POST $GRAPHQL_ENDPOINT\nPayload: $payload\nResponse: ${responseText?.take(400)}"
+            } catch (e: Exception) {
+                lastDebugLog = "HTTP POST $GRAPHQL_ENDPOINT failed (attempt $attempt): ${e.message}\nPayload: $payload"
+                log.w(e) { "executeGraphQL attempt $attempt failed: ${e.message}" }
+                if (attempt < maxAttempts) {
+                    kotlinx.coroutines.delay(1000L * attempt)
+                    continue
+                }
+                return@withPermit null
             }
-            root
-        } catch (e: Exception) {
-            lastDebugLog = "Failed to parse GraphQL response: ${e.message}\nRaw: $responseText"
-            log.w(e) { "Failed to parse GraphQL response JSON: $responseText" }
-            null
+
+            if (responseText.isNullOrBlank()) {
+                lastDebugLog = "GraphQL response empty for payload: $payload"
+                if (attempt < maxAttempts) {
+                    kotlinx.coroutines.delay(800L * attempt)
+                    continue
+                }
+                return@withPermit null
+            }
+
+            try {
+                val root = json.parseToJsonElement(responseText).jsonObject
+                val errors = root["errors"]?.jsonArray
+                if (errors != null && errors.isNotEmpty()) {
+                    val errMsg = errors.firstOrNull()?.jsonObject?.get("message")?.jsonPrimitive?.contentOrNull
+                    val status = errors.firstOrNull()?.jsonObject?.get("status")?.jsonPrimitive?.intOrNull
+                    lastDebugLog = "GraphQL Error: $errMsg (status: $status)\nRaw: $responseText"
+
+                    // Check for rate limiting
+                    val isRateLimited = status == 429 ||
+                                        errMsg?.contains("Too Many Requests", ignoreCase = true) == true ||
+                                        errMsg?.contains("rate limit", ignoreCase = true) == true
+                    if (isRateLimited && attempt < maxAttempts) {
+                        log.w { "AniList rate limited, backing off for ${1500L * attempt}ms before retry..." }
+                        kotlinx.coroutines.delay(1500L * attempt)
+                        continue
+                    }
+                }
+
+                if (root.containsKey("data") && root["data"] !is JsonNull) {
+                    if (!isMutation) {
+                        responseCacheMutex.withLock {
+                            responseCache[cacheKey] = CachedGraphQLResponse(timestamp = now, data = root)
+                        }
+                    }
+                    return@withPermit root
+                } else if (errors == null || errors.isEmpty()) {
+                    return@withPermit root
+                }
+            } catch (e: Exception) {
+                lastDebugLog = "Failed to parse GraphQL response: ${e.message}\nRaw: $responseText"
+                log.w(e) { "Failed to parse GraphQL response JSON: $responseText" }
+                if (attempt < maxAttempts) {
+                    kotlinx.coroutines.delay(800L * attempt)
+                    continue
+                }
+                return@withPermit null
+            }
         }
+
+        return@withPermit null
     }
 
     private fun JsonElement?.asJsonObjectOrNull(): JsonObject? =

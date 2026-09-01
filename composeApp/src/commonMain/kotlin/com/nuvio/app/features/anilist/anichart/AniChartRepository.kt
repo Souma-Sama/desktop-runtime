@@ -40,19 +40,25 @@ object AniChartRepository {
     private val _uiState = MutableStateFlow(AniChartUiState())
     val uiState: StateFlow<AniChartUiState> = _uiState.asStateFlow()
 
+    private var activeSeasonalJob: kotlinx.coroutines.Job? = null
+    private var activeScheduleJob: kotlinx.coroutines.Job? = null
+
     fun setMode(mode: AniChartMode) {
         _uiState.value = _uiState.value.copy(mode = mode)
         if (mode == AniChartMode.SEASONAL && _uiState.value.seasonalItems.isEmpty()) {
-            scope.launch { loadSeasonal(_uiState.value.selectedSeason, _uiState.value.selectedYear) }
+            activeSeasonalJob?.cancel()
+            activeSeasonalJob = scope.launch { loadSeasonal(_uiState.value.selectedSeason, _uiState.value.selectedYear) }
         } else if (mode == AniChartMode.SCHEDULE && _uiState.value.scheduleItems.isEmpty()) {
-            scope.launch { loadWeeklySchedule() }
+            activeScheduleJob?.cancel()
+            activeScheduleJob = scope.launch { loadWeeklySchedule() }
         }
     }
 
     fun setSeason(season: AniChartSeason, year: Int) {
         val current = _uiState.value
         if (current.selectedSeason == season && current.selectedYear == year && current.seasonalItems.isNotEmpty()) return
-        scope.launch {
+        activeSeasonalJob?.cancel()
+        activeSeasonalJob = scope.launch {
             loadSeasonal(season, year)
         }
     }
@@ -92,7 +98,7 @@ object AniChartRepository {
         val cacheKey = "${season.apiName}_$year"
         if (!force) {
             val cached = mutex.withLock { seasonalCache[cacheKey] }
-            if (cached != null) {
+            if (cached != null && cached.isNotEmpty()) {
                 _uiState.value = _uiState.value.copy(
                     seasonalItems = cached,
                     selectedSeason = season,
@@ -105,7 +111,6 @@ object AniChartRepository {
         }
 
         _uiState.value = _uiState.value.copy(
-            seasonalItems = emptyList(),
             selectedSeason = season,
             selectedYear = year,
             isLoading = true,
@@ -117,10 +122,12 @@ object AniChartRepository {
             mutex.withLock { seasonalCache[cacheKey] = items }
         }
 
+        val finalItems = if (items.isNotEmpty()) items else mutex.withLock { seasonalCache[cacheKey] }.orEmpty()
+
         _uiState.value = _uiState.value.copy(
-            seasonalItems = items,
+            seasonalItems = finalItems,
             isLoading = false,
-            errorMessage = if (items.isEmpty()) "No anime found for ${season.label} $year" else null,
+            errorMessage = if (finalItems.isEmpty()) "No anime found for ${season.label} $year" else null,
         )
     }
 
@@ -138,13 +145,17 @@ object AniChartRepository {
         _uiState.value = _uiState.value.copy(isLoading = true, errorMessage = null)
 
         val scheduleMap = fetchWeeklyScheduleFromApi()
-        weeklyScheduleCache = scheduleMap
-        weeklyScheduleCachedAtMs = now
+        if (scheduleMap.isNotEmpty()) {
+            weeklyScheduleCache = scheduleMap
+            weeklyScheduleCachedAtMs = now
+        }
+
+        val finalSchedule = if (scheduleMap.isNotEmpty()) scheduleMap else weeklyScheduleCache.orEmpty()
 
         _uiState.value = _uiState.value.copy(
-            scheduleItems = scheduleMap,
+            scheduleItems = finalSchedule,
             isLoading = false,
-            errorMessage = if (scheduleMap.isEmpty()) "Failed to load schedule" else null,
+            errorMessage = if (finalSchedule.isEmpty()) "Failed to load schedule" else null,
         )
     }
 

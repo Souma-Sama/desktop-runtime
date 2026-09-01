@@ -530,7 +530,7 @@ fun HomeScreen(
 
     LaunchedEffect(catalogRefreshKey) {
         HomeCatalogSettingsRepository.syncCatalogs(enabledAddons)
-        HomeRepository.refresh(enabledAddons, force = true)
+        HomeRepository.refresh(enabledAddons, force = false)
     }
 
     LaunchedEffect(collections, enabledAddons) {
