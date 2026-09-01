@@ -31,6 +31,17 @@ object AnilistLibraryRepository {
     private var lastRefreshAtMs = 0L
     private const val CACHE_TTL_MS = 60_000L * 5 // 5 minutes cache TTL
 
+    init {
+        ensureLoaded()
+        scope.launch {
+            AnilistAuthRepository.currentUser.collect { user ->
+                if (user != null) {
+                    ensureFresh()
+                }
+            }
+        }
+    }
+
     fun ensureLoaded() {
         if (hasLoaded) return
         loadSnapshotFromDisk()
@@ -50,30 +61,51 @@ object AnilistLibraryRepository {
         runCatching { AnilistLibraryStorage.saveLibraryPayload("") }
     }
 
-    fun isInLibrary(anilistId: Int): Boolean {
+    private fun normalize(str: String): String =
+        str.lowercase().filter { it.isLetterOrDigit() }
+
+    fun allItems(): List<AnilistLibraryItem> {
+        ensureLoaded()
         val state = _uiState.value
         return (state.watching + state.completed + state.planning +
                 state.paused + state.dropped + state.rewatching)
-            .any { it.id == anilistId }
+    }
+
+    fun isInLibrary(anilistId: Int): Boolean {
+        return allItems().any { it.id == anilistId }
     }
 
     fun getMediaEntry(anilistId: Int): AnilistLibraryItem? {
-        val state = _uiState.value
-        return (state.watching + state.completed + state.planning +
-                state.paused + state.dropped + state.rewatching)
-            .firstOrNull { it.id == anilistId }
+        return allItems().firstOrNull { it.id == anilistId }
+    }
+
+    fun getMediaEntryByTitle(title: String): AnilistLibraryItem? {
+        val clean = normalize(title)
+        if (clean.isBlank()) return null
+        return allItems().firstOrNull { normalize(it.title) == clean }
     }
 
     fun getMediaStatus(anilistId: Int): AnilistMediaListStatus? {
         val entry = getMediaEntry(anilistId) ?: return null
         return when (entry.status.uppercase()) {
-            "CURRENT" -> AnilistMediaListStatus.CURRENT
+            "CURRENT", "WATCHING" -> AnilistMediaListStatus.CURRENT
             "COMPLETED" -> AnilistMediaListStatus.COMPLETED
-            "PLANNING" -> AnilistMediaListStatus.PLANNING
-            "PAUSED" -> AnilistMediaListStatus.PAUSED
+            "PLANNING", "PLAN_TO_WATCH" -> AnilistMediaListStatus.PLANNING
+            "PAUSED", "ON_HOLD" -> AnilistMediaListStatus.PAUSED
             "DROPPED" -> AnilistMediaListStatus.DROPPED
-            "REPEATING" -> AnilistMediaListStatus.REPEATING
-            else -> null
+            "REPEATING", "REWATCHING" -> AnilistMediaListStatus.REPEATING
+            else -> {
+                val state = _uiState.value
+                when {
+                    state.watching.any { it.id == anilistId } -> AnilistMediaListStatus.CURRENT
+                    state.completed.any { it.id == anilistId } -> AnilistMediaListStatus.COMPLETED
+                    state.planning.any { it.id == anilistId } -> AnilistMediaListStatus.PLANNING
+                    state.paused.any { it.id == anilistId } -> AnilistMediaListStatus.PAUSED
+                    state.dropped.any { it.id == anilistId } -> AnilistMediaListStatus.DROPPED
+                    state.rewatching.any { it.id == anilistId } -> AnilistMediaListStatus.REPEATING
+                    else -> null
+                }
+            }
         }
     }
 
@@ -82,9 +114,30 @@ object AnilistLibraryRepository {
         return entry.progress to entry.totalEpisodes
     }
 
-    fun getMediaStatusById(itemId: String): AnilistMediaListStatus? {
-        val anilistId = extractAnilistId(itemId) ?: return null
-        return getMediaStatus(anilistId)
+    fun getMediaStatusById(itemId: String, title: String? = null): AnilistMediaListStatus? {
+        val anilistId = extractAnilistId(itemId)
+        if (anilistId != null) {
+            val st = getMediaStatus(anilistId)
+            if (st != null) return st
+        }
+        if (!title.isNullOrBlank()) {
+            val entry = getMediaEntryByTitle(title)
+            if (entry != null) return getMediaStatus(entry.id)
+        }
+        return null
+    }
+
+    fun getMediaProgressById(itemId: String, title: String? = null): Pair<Int, Int?>? {
+        val anilistId = extractAnilistId(itemId)
+        if (anilistId != null) {
+            val pr = getMediaProgress(anilistId)
+            if (pr != null) return pr
+        }
+        if (!title.isNullOrBlank()) {
+            val entry = getMediaEntryByTitle(title)
+            if (entry != null) return getMediaProgress(entry.id)
+        }
+        return null
     }
 
     fun extractAnilistId(itemId: String): Int? {

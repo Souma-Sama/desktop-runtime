@@ -54,11 +54,10 @@ fun HomePosterCard(
 
     val anilistLibraryState by com.nuvio.app.features.anilist.AnilistLibraryRepository.uiState.collectAsStateWithLifecycle()
     val mediaStatus = if (anilistPrefs.enabled && anilistPrefs.showPosterStatusBadge) {
-        com.nuvio.app.features.anilist.AnilistLibraryRepository.getMediaStatusById(item.id)
+        com.nuvio.app.features.anilist.AnilistLibraryRepository.getMediaStatusById(item.id, item.name)
     } else null
     val mediaProgress = if (anilistPrefs.enabled && anilistPrefs.showPosterStatusBadge) {
-        val anilistId = com.nuvio.app.features.anilist.AnilistLibraryRepository.extractAnilistId(item.id)
-        if (anilistId != null) com.nuvio.app.features.anilist.AnilistLibraryRepository.getMediaProgress(anilistId) else null
+        com.nuvio.app.features.anilist.AnilistLibraryRepository.getMediaProgressById(item.id, item.name)
     } else null
 
     HomePosterHoverPreview(

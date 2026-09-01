@@ -271,6 +271,7 @@ fun AnimeTrackerSheetContent(
     var showTokenInput by remember { mutableStateOf(false) }
     var manualSearchText by remember { mutableStateOf("") }
     val uriHandler = LocalUriHandler.current
+    var showUserProfileSheet by rememberSaveable { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
@@ -319,6 +320,7 @@ fun AnimeTrackerSheetContent(
                 if (trackerState.isAuthenticated) {
                     val user = trackerState.user
                     Surface(
+                        onClick = { showUserProfileSheet = true },
                         color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f),
                         shape = RoundedCornerShape(12.dp),
                     ) {
@@ -1448,5 +1450,13 @@ fun AnimeTrackerSheetContent(
         }
 
         Spacer(modifier = Modifier.height(36.dp))
+    }
+
+    if (showUserProfileSheet && trackerState.user != null) {
+        com.nuvio.app.features.anilist.profile.AnilistUserProfileSheet(
+            userId = trackerState.user?.id,
+            userName = trackerState.user?.name,
+            onDismiss = { showUserProfileSheet = false },
+        )
     }
 }

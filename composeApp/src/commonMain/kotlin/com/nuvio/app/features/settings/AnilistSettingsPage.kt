@@ -273,6 +273,7 @@ private fun AnilistAccountSection(isTablet: Boolean) {
     val isAuthenticating by AnilistAuthRepository.isAuthenticating.collectAsStateWithLifecycle()
     val uriHandler = LocalUriHandler.current
     var showTokenDialog by rememberSaveable { mutableStateOf(false) }
+    var showProfileSheet by rememberSaveable { mutableStateOf(false) }
 
     SettingsSection(
         title = stringResource(Res.string.settings_anilist_section_account),
@@ -287,7 +288,16 @@ private fun AnilistAccountSection(isTablet: Boolean) {
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Row(
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier
+                        .weight(1f)
+                        .then(
+                            if (isAuth && user != null) {
+                                Modifier
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .clickable { showProfileSheet = true }
+                                    .padding(vertical = 2.dp, horizontal = 4.dp)
+                            } else Modifier
+                        ),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(14.dp),
                 ) {
@@ -326,12 +336,12 @@ private fun AnilistAccountSection(isTablet: Boolean) {
                         )
                         Text(
                             text = if (isAuth) {
-                                "Connected as ${user?.name ?: "User"} • Sync active"
+                                "Connected as ${user?.name ?: "User"} • Tap to view profile & stats"
                             } else {
                                 "Connect your AniList account to track anime and sync lists"
                             },
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            color = if (isAuth) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 2,
                             overflow = TextOverflow.Ellipsis,
                         )
@@ -375,6 +385,14 @@ private fun AnilistAccountSection(isTablet: Boolean) {
 
     if (showTokenDialog) {
         AnilistTokenDialog(onDismiss = { showTokenDialog = false })
+    }
+
+    if (showProfileSheet && user != null) {
+        com.nuvio.app.features.anilist.profile.AnilistUserProfileSheet(
+            userId = user?.id,
+            userName = user?.name,
+            onDismiss = { showProfileSheet = false },
+        )
     }
 }
 

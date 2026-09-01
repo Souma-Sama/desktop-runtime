@@ -2235,6 +2235,7 @@ object AnilistApi {
                         ?: coverObj?.get("medium").asStringOrNull()
 
                     val entryId = entryObj["id"].asIntOrNull() ?: 0
+                    val entryStatus = entryObj["status"].asStringOrNull()?.takeIf { it.isNotBlank() } ?: groupStatus
                     val progress = entryObj["progress"].asIntOrNull() ?: 0
                     val score = entryObj["score"].asDoubleOrNull()
                     val updatedAt = entryObj["updatedAt"].asLongOrNull() ?: 0L
@@ -2250,7 +2251,7 @@ object AnilistApi {
                         totalEpisodes = totalEpisodes,
                         score = score,
                         airingStatus = airingStatus,
-                        status = groupStatus,
+                        status = entryStatus,
                         updatedAt = updatedAt,
                         entryId = entryId,
                         format = format,
