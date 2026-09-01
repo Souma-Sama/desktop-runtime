@@ -94,7 +94,7 @@ object AnilistTrackerCoordinator {
         activeJob = scope.launch {
             val debug = StringBuilder()
             debug.appendLine("[Input] Title=\"$rawTitle\", MediaId=\"$mediaId\"")
-            debug.appendLine("[Candidate] Anime Candidate: $isExplicitAnime (genres: $genres, country: $country)")
+            debug.appendLine("[Candidate] Kai Media: $isKaiItem (genres: $genres, country: $country)")
             var strategyUsed = "None"
 
             try {
@@ -159,7 +159,7 @@ object AnilistTrackerCoordinator {
                     }
 
                     // 4. Multi-Strategy Title Search (Public, 100% Reliable)
-                    if (fetched == null && rawTitle.isNotBlank() && isExplicitAnime) {
+                    if (fetched == null && rawTitle.isNotBlank()) {
                         val candidates = generateSearchCandidates(rawTitle)
                         debug.appendLine("[Search] Candidates: $candidates")
                         for (query in candidates) {
@@ -175,7 +175,7 @@ object AnilistTrackerCoordinator {
                     }
 
                     // 5. REST Kitsu -> ARM -> AniList Resolver Fallback
-                    if (fetched == null && rawTitle.isNotBlank() && isExplicitAnime) {
+                    if (fetched == null && rawTitle.isNotBlank()) {
                         val candidates = generateSearchCandidates(rawTitle)
                         for (query in candidates) {
                             val resolvedAnilistId = AnilistApi.searchViaKitsu(query)
@@ -229,7 +229,7 @@ object AnilistTrackerCoordinator {
                 _trackerState.update {
                     it.copy(
                         isLoading = false,
-                        isAnime = hasMatch || isExplicitAnime,
+                        isAnime = hasMatch,
                         media = finalMedia,
                         entry = effectiveEntry,
                         error = if (!hasMatch) "No matching anime found on AniList for \"$rawTitle\"" else null,
