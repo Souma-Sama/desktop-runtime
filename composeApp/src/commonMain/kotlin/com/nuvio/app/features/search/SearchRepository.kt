@@ -404,7 +404,7 @@ object SearchRepository {
         query: String,
     ): List<SearchCatalogRequest> {
         val anilistPrefs = com.nuvio.app.features.anilist.AnilistPreferencesRepository.snapshot()
-        val isAnilistEnabled = anilistPrefs.enabled && addons.any { (it.manifestUrl == "native://anilist" || it.manifestUrl == "builtin://anilist" || it.manifest?.id.equals("anilist", ignoreCase = true)) && it.enabled }
+        val isAnilistEnabled = anilistPrefs.enabled && (addons.isEmpty() || addons.any { (it.manifestUrl.startsWith("native://anilist") || it.manifestUrl.startsWith("builtin://anilist") || it.manifest?.id?.contains("anilist", ignoreCase = true) == true) && it.enabled })
         val anilistRequest = if (isAnilistEnabled) {
             listOf(
                 SearchCatalogRequest(
@@ -419,7 +419,11 @@ object SearchRepository {
             )
         } else emptyList()
 
-        val effectiveAddons = if (anilistPrefs.enabled) addons else addons.filterNot { it.manifestUrl == "native://anilist" || it.manifestUrl == "builtin://anilist" || it.manifest?.id.equals("anilist", ignoreCase = true) }
+        val effectiveAddons = if (anilistPrefs.enabled) {
+            addons.filterNot { it.manifestUrl.startsWith("native://anilist") || it.manifestUrl.startsWith("builtin://anilist") || it.manifest?.id?.contains("anilist", ignoreCase = true) == true }
+        } else {
+            addons.filterNot { it.manifestUrl.startsWith("native://anilist") || it.manifestUrl.startsWith("builtin://anilist") || it.manifest?.id?.contains("anilist", ignoreCase = true) == true }
+        }
 
         val addonRequests = effectiveAddons.mapNotNull { addon ->
             val manifest = addon.manifest ?: return@mapNotNull null
@@ -445,7 +449,7 @@ object SearchRepository {
 
     private fun buildDiscoverSources(addons: List<ManagedAddon>): List<DiscoverCatalogOption> {
         val anilistPrefs = com.nuvio.app.features.anilist.AnilistPreferencesRepository.snapshot()
-        val effectiveAddons = if (anilistPrefs.enabled) addons else addons.filterNot { it.manifestUrl == "native://anilist" || it.manifestUrl == "builtin://anilist" || it.manifest?.id.equals("anilist", ignoreCase = true) }
+        val effectiveAddons = if (anilistPrefs.enabled) addons else addons.filterNot { it.manifestUrl.startsWith("native://anilist") || it.manifestUrl.startsWith("builtin://anilist") || it.manifest?.id?.contains("anilist", ignoreCase = true) == true }
         return effectiveAddons.mapNotNull { addon ->
             val manifest = addon.manifest ?: return@mapNotNull null
             addon to manifest
