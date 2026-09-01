@@ -166,7 +166,7 @@ fun AniChartScreen(
             onGenreSelected = { AniChartRepository.setGenreFilter(it) },
             onSortSelected = { AniChartRepository.setSortOption(it) },
             onOpenFilter = { showAdvancedFilterSheet = true },
-            activeFilterCount = advancedFilterState.activeFilterCount(),
+            activeFilterCount = advancedFilterState.activeFilterCount,
         )
 
         Spacer(modifier = Modifier.height(10.dp))
@@ -281,7 +281,7 @@ fun AniChartScreen(
             onDismiss = { showAdvancedFilterSheet = false },
             onApply = { newFilter ->
                 advancedFilterState = newFilter
-                AniChartRepository.setGenreFilter(newFilter.selectedGenre)
+                AniChartRepository.setGenreFilter(newFilter.includedGenres.firstOrNull())
                 showAdvancedFilterSheet = false
             },
         )
