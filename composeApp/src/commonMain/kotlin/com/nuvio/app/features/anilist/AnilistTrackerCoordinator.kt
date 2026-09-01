@@ -786,14 +786,7 @@ object AnilistTrackerCoordinator {
         if (id.startsWith("al_", ignoreCase = true)) return id.substringAfter("_").substringBefore("_").substringBefore(":").toIntOrNull()
         if (id.startsWith("anime:", ignoreCase = true)) return id.substringAfter(":").substringBefore("_").substringBefore(":").toIntOrNull()
 
-        // 3. IMDb compound: "tt15477980:140960" (IMDb:AnilistId)
-        if (id.startsWith("tt", ignoreCase = true) && id.contains(":")) {
-            val secondPart = id.substringAfter(":")
-            val parsed = secondPart.toIntOrNull()
-            if (parsed != null && parsed > 0) return parsed
-        }
-
-        // 4. Plain numeric ID that is NOT an IMDb ID (tt...) — treat as AniList ID
+        // 3. Plain numeric ID that is NOT an IMDb ID (tt...) — treat as AniList ID
         if (id.all { it.isDigit() } && id.length in 1..8) return id.toIntOrNull()
 
         return null
@@ -825,13 +818,19 @@ object AnilistTrackerCoordinator {
         return null
     }
 
-    fun hasAnimeId(mediaId: String?): Boolean {
+    fun isKaiMedia(mediaId: String?): Boolean {
         if (mediaId.isNullOrBlank()) return false
         val id = mediaId.trim().lowercase()
-        if (id.startsWith("ani_") || id.startsWith("ani:") || id.startsWith("anilist") || id.startsWith("al:") || id.startsWith("al_") || id.startsWith("kitsu") || id.startsWith("mal") || id.startsWith("anime:")) return true
-        if (id.all { it.isDigit() } && id.length in 1..8) return true
-        return false
+        return id.startsWith("ani_") ||
+               id.startsWith("ani:") ||
+               id.startsWith("anilist:") ||
+               id.startsWith("anilist_") ||
+               id.startsWith("al:") ||
+               id.startsWith("al_") ||
+               id.startsWith("anichart:")
     }
+
+    fun hasAnimeId(mediaId: String?): Boolean = isKaiMedia(mediaId)
 
     private fun generateSearchCandidates(rawTitle: String): List<String> {
         val list = mutableListOf<String>()
@@ -915,20 +914,6 @@ object AnilistTrackerCoordinator {
         mediaId: String? = null,
         type: String? = null,
     ): Boolean {
-        if (hasAnimeId(mediaId)) return true
-        if (type.equals("anime", ignoreCase = true)) return true
-        val g = genres.map { it.lowercase() }
-        if (g.any { it.contains("anime") }) return true
-        if (g.any { it == "animation" || it.contains("anim") }) {
-            val isJapan = country?.lowercase() in listOf("jp", "japan") || language?.lowercase() in listOf("ja", "japanese", "jpn")
-            if (isJapan) return true
-            if (title.any { it in '\u3040'..'\u30ff' || it in '\u4e00'..'\u9faf' }) return true
-        }
-        // Check for Japanese Kanji, Hiragana, or Katakana in the title
-        if (title.any { it in '\u3040'..'\u30ff' || it in '\u4e00'..'\u9faf' }) return true
-        val isJapan = country?.lowercase() in listOf("jp", "japan") || language?.lowercase() in listOf("ja", "japanese", "jpn")
-        if (isJapan) return true
-        if (!mediaId.isNullOrBlank() && mediaCache.containsKey(mediaId.lowercase())) return true
-        return false
+        return isKaiMedia(mediaId)
     }
 }
