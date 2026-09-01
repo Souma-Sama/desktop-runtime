@@ -184,13 +184,23 @@ object HomeRepository {
                 )
             }
 
+        val anilistPrefs = com.nuvio.app.features.anilist.AnilistPreferencesRepository.snapshot()
         val catalogHeroItems = if (snapshot.heroEnabled) {
             val heroRandom = Random((requestKey?.hashCode() ?: 0).absoluteValue + 1)
             currentDefinitions
-                .filter { definition -> preferences[definition.key]?.heroSourceEnabled != false }
+                .filter { definition ->
+                    val isNativeAnilist = definition.manifestUrl == "native://anilist" || definition.manifestUrl == "builtin://anilist" || definition.key.contains("anilist", ignoreCase = true)
+                    if (isNativeAnilist && !anilistPrefs.enabled) false
+                    else preferences[definition.key]?.heroSourceEnabled != false
+                }
                 .mapNotNull { definition -> cachedSections[definition.cacheKey] }
                 .map { section -> section.withReleaseFilter() }
                 .flatMap { section -> section.items }
+                .filter { item ->
+                    if (!anilistPrefs.enabled) {
+                        !item.id.startsWith("ani_") && !item.id.startsWith("anilist:")
+                    } else true
+                }
                 .distinctBy { item -> "${item.type}:${item.id}" }
                 .shuffled(heroRandom)
                 .take(HOME_HERO_ITEM_LIMIT)

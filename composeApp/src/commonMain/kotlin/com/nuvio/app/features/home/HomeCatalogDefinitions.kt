@@ -35,7 +35,7 @@ fun buildHomeCatalogRefreshSignature(addons: List<ManagedAddon>): List<String> {
     val anilistSignatures = if (isAnilistEnabled) {
         com.nuvio.app.features.anilist.catalog.AnilistCatalogRepository.getCatalogDefinitions()
             .map { it.descriptorSignature }
-    } else emptyList()
+    } else listOf("anilist:disabled")
     val addonSignatures = addons.enabledAddons()
         .filter { it.manifestUrl != "native://anilist" && it.manifestUrl != "builtin://anilist" && !it.manifest?.id.equals("anilist", ignoreCase = true) }
         .mapNotNull { addon ->

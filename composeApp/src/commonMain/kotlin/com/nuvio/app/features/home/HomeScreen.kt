@@ -523,13 +523,14 @@ fun HomeScreen(
 
     val anilistAuthenticated by com.nuvio.app.features.anilist.AnilistAuthRepository.isAuthenticated.collectAsStateWithLifecycle()
     val anilistUser by com.nuvio.app.features.anilist.AnilistAuthRepository.currentUser.collectAsStateWithLifecycle()
-    val catalogRefreshKey = remember(enabledAddons, anilistAuthenticated, anilistUser?.name) {
+    val anilistPrefs by com.nuvio.app.features.anilist.AnilistPreferencesRepository.preferences.collectAsStateWithLifecycle()
+    val catalogRefreshKey = remember(enabledAddons, anilistAuthenticated, anilistUser?.name, anilistPrefs.enabled) {
         buildHomeCatalogRefreshSignature(enabledAddons)
     }
 
     LaunchedEffect(catalogRefreshKey) {
         HomeCatalogSettingsRepository.syncCatalogs(enabledAddons)
-        HomeRepository.refresh(enabledAddons)
+        HomeRepository.refresh(enabledAddons, force = true)
     }
 
     LaunchedEffect(collections, enabledAddons) {
@@ -879,16 +880,29 @@ fun HomeScreen(
                             sectionPadding = if (isDesktop) homeSectionPadding else null,
                         )
 
-                        homeUiState.heroItems.isNotEmpty() -> HomeHeroSection(
-                            items = homeUiState.heroItems,
-                            modifier = Modifier,
-                            viewportHeight = maxHeight,
-                            mobileBelowSectionHeightHint = mobileHeroBelowSectionHeightHint,
-                            sectionPadding = if (isDesktop) homeSectionPadding else null,
-                            listState = homeListState,
-                            stretchPx = { heroStretchState.stretchPx },
-                            onItemClick = onPosterClick,
-                        )
+                        homeUiState.heroItems.isNotEmpty() -> {
+                            val filteredHeroItems = if (!anilistPrefs.enabled) {
+                                homeUiState.heroItems.filterNot { it.id.startsWith("ani_") || it.id.startsWith("anilist:") }
+                            } else homeUiState.heroItems
+                            if (filteredHeroItems.isNotEmpty()) {
+                                HomeHeroSection(
+                                    items = filteredHeroItems,
+                                    modifier = Modifier,
+                                    viewportHeight = maxHeight,
+                                    mobileBelowSectionHeightHint = mobileHeroBelowSectionHeightHint,
+                                    sectionPadding = if (isDesktop) homeSectionPadding else null,
+                                    listState = homeListState,
+                                    stretchPx = { heroStretchState.stretchPx },
+                                    onItemClick = onPosterClick,
+                                )
+                            } else {
+                                HomeHeroReservedSpace(
+                                    modifier = Modifier,
+                                    viewportHeight = maxHeight,
+                                    mobileBelowSectionHeightHint = mobileHeroBelowSectionHeightHint,
+                                )
+                            }
+                        }
 
                         else -> HomeHeroReservedSpace(
                             modifier = Modifier,
