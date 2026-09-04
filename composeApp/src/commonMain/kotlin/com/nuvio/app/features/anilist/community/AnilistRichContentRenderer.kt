@@ -8,13 +8,16 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -52,11 +55,24 @@ import com.nuvio.app.core.ui.NuvioDesktopVerticalScrollbar
 /**
  * Visual AST block elements for AniList rich markdown & HTML.
  */
+data class RichImageItem(
+    val url: String,
+    val width: Int? = null,
+    val height: Int? = null,
+)
+
+sealed interface InlineRowElement {
+    data class Text(val text: AnnotatedString) : InlineRowElement
+    data class Image(val url: String, val width: Int = 50, val height: Int = 50) : InlineRowElement
+}
+
 sealed interface AnilistContentBlock {
     data class Header(val text: AnnotatedString, val level: Int, val isCentered: Boolean) : AnilistContentBlock
-    data class Image(val url: String, val widthConstraint: Int? = null) : AnilistContentBlock
-    data class YouTube(val videoId: String, val url: String) : AnilistContentBlock
-    data class Video(val url: String) : AnilistContentBlock
+    data class Image(val url: String, val width: Int? = null, val height: Int? = null, val isCentered: Boolean = true) : AnilistContentBlock
+    data class ImageRow(val images: List<RichImageItem>, val isCentered: Boolean = true) : AnilistContentBlock
+    data class InlineMediaRow(val elements: List<InlineRowElement>, val isCentered: Boolean = true) : AnilistContentBlock
+    data class YouTube(val videoId: String, val url: String, val isCentered: Boolean = true) : AnilistContentBlock
+    data class Video(val url: String, val isCentered: Boolean = true) : AnilistContentBlock
     data class Quote(val text: AnnotatedString, val isCentered: Boolean) : AnilistContentBlock
     data class Paragraph(val text: AnnotatedString, val isCentered: Boolean) : AnilistContentBlock
     data class Spoiler(val content: String, val isCentered: Boolean) : AnilistContentBlock
@@ -114,9 +130,9 @@ internal fun AnilistContentBlockItem(
     when (block) {
         is AnilistContentBlock.Header -> {
             val fontSize = when (block.level) {
-                1 -> 20.sp
-                2 -> 18.sp
-                3 -> 16.sp
+                1 -> 22.sp
+                2 -> 19.sp
+                3 -> 17.sp
                 else -> 15.sp
             }
             val alignment = if (block.isCentered) TextAlign.Center else TextAlign.Start
@@ -131,7 +147,7 @@ internal fun AnilistContentBlockItem(
                 ),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 8.dp),
+                    .padding(top = 8.dp, bottom = 2.dp),
                 color = MaterialTheme.colorScheme.onSurface,
             )
         }
@@ -140,20 +156,110 @@ internal fun AnilistContentBlockItem(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(vertical = 4.dp),
-                contentAlignment = Alignment.Center,
+                    .padding(vertical = 6.dp),
+                contentAlignment = if (block.isCentered) Alignment.Center else Alignment.Start,
             ) {
-                val shape = RoundedCornerShape(12.dp)
+                val shape = RoundedCornerShape(10.dp)
+                val maxWidthDp = minOf(block.width ?: 560, 560).dp
+
+                val imageModifier = if (block.width != null && block.height != null && block.height > 0) {
+                    val ratio = block.width.toFloat() / block.height.toFloat()
+                    Modifier
+                        .widthIn(max = maxWidthDp)
+                        .aspectRatio(ratio)
+                        .clip(shape)
+                        .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.15f), shape)
+                } else {
+                    Modifier
+                        .widthIn(max = maxWidthDp)
+                        .heightIn(min = 120.dp, max = (block.height ?: 400).dp)
+                        .clip(shape)
+                        .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.15f), shape)
+                }
+
                 ReviewMediaImage(
                     url = block.url,
                     contentDescription = "Review media",
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(min = 120.dp, max = 420.dp)
-                        .clip(shape)
-                        .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.15f), shape),
+                    modifier = imageModifier,
                     contentScale = ContentScale.Fit,
                 )
+            }
+        }
+
+        is AnilistContentBlock.ImageRow -> {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 6.dp),
+                horizontalArrangement = if (block.isCentered) {
+                    Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally)
+                } else {
+                    Arrangement.spacedBy(8.dp, Alignment.Start)
+                },
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                val shape = RoundedCornerShape(10.dp)
+                block.images.forEach { img ->
+                    val targetW = img.width ?: 200
+                    val targetH = img.height ?: 150
+                    val ratio = targetW.toFloat() / maxOf(1, targetH).toFloat()
+
+                    ReviewMediaImage(
+                        url = img.url,
+                        contentDescription = "Review media",
+                        modifier = Modifier
+                            .weight(1f, fill = false)
+                            .widthIn(max = targetW.dp)
+                            .aspectRatio(ratio)
+                            .clip(shape)
+                            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.15f), shape),
+                        contentScale = ContentScale.Crop,
+                    )
+                }
+            }
+        }
+
+        is AnilistContentBlock.InlineMediaRow -> {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 4.dp),
+                horizontalArrangement = if (block.isCentered) {
+                    Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally)
+                } else {
+                    Arrangement.spacedBy(8.dp, Alignment.Start)
+                },
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                block.elements.forEach { element ->
+                    when (element) {
+                        is InlineRowElement.Image -> {
+                            val w = (element.width.takeIf { it in 16..160 } ?: 50).dp
+                            val h = (element.height.takeIf { it in 16..160 } ?: 50).dp
+                            val shape = RoundedCornerShape(8.dp)
+                            ReviewMediaImage(
+                                url = element.url,
+                                contentDescription = "Sticker",
+                                modifier = Modifier
+                                    .size(w, h)
+                                    .clip(shape),
+                                contentScale = ContentScale.Fit,
+                            )
+                        }
+                        is InlineRowElement.Text -> {
+                            ClickableRichText(
+                                annotatedString = element.text,
+                                style = MaterialTheme.typography.bodyLarge.copy(
+                                    lineHeight = 22.sp,
+                                    textAlign = if (block.isCentered) TextAlign.Center else TextAlign.Start,
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.95f),
+                                ),
+                                modifier = Modifier,
+                                onUrlClick = { uriHandler.openUri(it) },
+                            )
+                        }
+                    }
+                }
             }
         }
 
@@ -303,6 +409,7 @@ internal fun AnilistContentBlockItem(
                     textAlign = alignment,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.92f),
                 ),
+                modifier = Modifier.fillMaxWidth(),
                 onUrlClick = { url ->
                     uriHandler.openUri(url)
                 },
@@ -340,7 +447,7 @@ private fun InteractiveSpoilerBlock(
                 textAlign = alignment,
                 color = MaterialTheme.colorScheme.onSurface,
             ),
-            modifier = if (!revealed) Modifier.blur(10.dp) else Modifier,
+            modifier = if (!revealed) Modifier.fillMaxWidth().blur(10.dp) else Modifier.fillMaxWidth(),
             onUrlClick = { url ->
                 if (revealed) uriHandler.openUri(url)
             },
@@ -373,7 +480,7 @@ private fun ClickableRichText(
     ClickableText(
         text = annotatedString,
         style = style,
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier,
         onClick = { offset ->
             annotatedString.getStringAnnotations(tag = "URL", start = offset, end = offset)
                 .firstOrNull()?.let { annotation ->
@@ -464,34 +571,55 @@ fun sanitizeAnilistRichText(raw: String): String {
         text = text.replace(cssPattern, "")
     }
 
-    // 6. Normalize all <img> tags (including multiline tags, internal newlines inside src or attributes)
+    // 6. Convert HTML headers <h1..6> (discard empty ones, convert non-empty ones to markdown headers)
+    val headerRegex = Regex("""(?is)(?:__|[*]{2,})?\s*<h([1-6])[^>]*>(.*?)</h\1>\s*(?:__|[*]{2,})?""")
+    text = headerRegex.replace(text) { match ->
+        val lvl = match.groupValues[1].toIntOrNull() ?: 1
+        val content = match.groupValues[2].trim()
+        if (content.isBlank()) "" else "\n\n" + "#".repeat(lvl) + " " + content + "\n\n"
+    }
+
+    // 7. Clean and normalize all <img> tags, preserving width & height attributes
     val imgRegex = Regex("""(?is)<img\b([^>]*)>""")
     text = imgRegex.replace(text) { match ->
         val tagContent = match.groupValues[1]
         val srcMatch = Regex("""(?is)src\s*=\s*["']?\s*(https?://[^\s"'>]+)""").find(tagContent)
         if (srcMatch != null) {
             val url = srcMatch.groupValues[1].trim()
-            "\n\n<img src=\"$url\">\n\n"
+            val widthMatch = Regex("""(?is)width\s*=\s*["']?\s*(\d+)%?""").find(tagContent)
+            val heightMatch = Regex("""(?is)height\s*=\s*["']?\s*(\d+)%?""").find(tagContent)
+            var attrs = "src=\"$url\""
+            if (widthMatch != null) {
+                attrs += " width=\"${widthMatch.groupValues[1]}\""
+            }
+            if (heightMatch != null) {
+                attrs += " height=\"${heightMatch.groupValues[1]}\""
+            }
+            "<img $attrs>"
         } else {
             ""
         }
     }
 
-    // 7. Normalize markdown images ![alt](url) -> standalone <img src="url">
+    // 8. Normalize markdown images ![alt](url) -> <img src="url">
     val mdImgRegex = Regex("""!\[(.*?)\]\(\s*(https?://[^\s)]+)\s*\)""")
     text = mdImgRegex.replace(text) { match ->
         val url = match.groupValues[2].trim()
-        "\n\n<img src=\"$url\">\n\n"
+        "<img src=\"$url\">"
     }
 
-    // 8. Normalize AniList img shortcodes: img(url), img500(url), img100%(url) -> standalone <img src="url">
-    val alImgRegex = Regex("""(?is)(?:^|\s)img(?:\d+%?)?\s*\(\s*(https?://[^\s)]+)\s*\)""")
-    text = alImgRegex.replace(text) { match ->
+    // 9. Normalize AniList img shortcodes: img(url), img500(url), img220(url)
+    text = Regex("""(?is)\bimg(\d+)(?:%?)?\s*\(\s*(https?://[^\s)]+)\s*\)""").replace(text) { match ->
+        val w = match.groupValues[1]
+        val url = match.groupValues[2].trim()
+        "<img src=\"$url\" width=\"$w\">"
+    }
+    text = Regex("""(?is)\bimg\s*\(\s*(https?://[^\s)]+)\s*\)""").replace(text) { match ->
         val url = match.groupValues[1].trim()
-        "\n\n<img src=\"$url\">\n\n"
+        "<img src=\"$url\">"
     }
 
-    // 9. Collapse internal newlines and excess whitespace in ANY remaining HTML tags (so they stay on a single line)
+    // 10. Collapse internal newlines and excess whitespace in ANY remaining HTML tags (so they stay on a single line)
     val htmlTagRegex = Regex("""<[^>]+>""")
     text = htmlTagRegex.replace(text) { match ->
         match.value.replace(Regex("""\s+"""), " ")
@@ -521,6 +649,7 @@ internal fun parseAnilistRichContent(rawText: String, primaryColor: Color): List
     val blocks = mutableListOf<AnilistContentBlock>()
 
     val currentParagraphLines = mutableListOf<String>()
+    var isCenteredActive = false
     var currentParagraphCentered = false
 
     fun flushParagraph() {
@@ -531,7 +660,7 @@ internal fun parseAnilistRichContent(rawText: String, primaryColor: Color): List
                 blocks.add(AnilistContentBlock.Paragraph(text = parsed, isCentered = currentParagraphCentered))
             }
             currentParagraphLines.clear()
-            currentParagraphCentered = false
+            currentParagraphCentered = isCenteredActive
         }
     }
 
@@ -540,14 +669,13 @@ internal fun parseAnilistRichContent(rawText: String, primaryColor: Color): List
         val rawLine = lines[i]
         val trimmed = rawLine.trim()
 
-        if (trimmed.isBlank()) {
+        if (trimmed.isBlank() || trimmed in setOf("__", "**", "___", "****")) {
             flushParagraph()
             i++
             continue
         }
 
         // 1. Divider line (e.g. ***, ---, ____, <hr>, <hr/>, <center><hr></center>)
-        // Note: ~~~ is reserved for centering toggle and is not a divider
         if (trimmed.matches(Regex("^(?:<center>)?\\s*(?:<hr\\s*/?>|[-*_]{3,})\\s*(?:</center>)?$", RegexOption.IGNORE_CASE))) {
             flushParagraph()
             blocks.add(AnilistContentBlock.Divider)
@@ -555,29 +683,77 @@ internal fun parseAnilistRichContent(rawText: String, primaryColor: Color): List
             continue
         }
 
-        // 2. Standalone Centering Toggle: ~~~ or <center> or </center>
-        if (trimmed == "~~~" || trimmed.equals("<center>", ignoreCase = true) || trimmed.equals("</center>", ignoreCase = true)) {
+        // 2. Centering Toggles
+        if (trimmed == "~~~") {
             flushParagraph()
-            currentParagraphCentered = !currentParagraphCentered
+            isCenteredActive = !isCenteredActive
+            currentParagraphCentered = isCenteredActive
+            i++
+            continue
+        }
+        if (trimmed.equals("<center>", ignoreCase = true)) {
+            flushParagraph()
+            isCenteredActive = true
+            currentParagraphCentered = true
+            i++
+            continue
+        }
+        if (trimmed.equals("</center>", ignoreCase = true)) {
+            flushParagraph()
+            isCenteredActive = false
+            currentParagraphCentered = false
             i++
             continue
         }
 
-        // 3. Standalone image line: <img src="..."> or img(url)
-        val htmlImgMatch = Regex("""^(?:<center>|~~~)?\s*<img[^>]*src=["']?(https?://[^\s"'>]+)["']?[^>]*>\s*(?:</center>|~~~)?$""", RegexOption.IGNORE_CASE).find(trimmed)
-        if (htmlImgMatch != null) {
+        // 3. Image line (contains <img tag)
+        if (trimmed.contains("<img", ignoreCase = true)) {
             flushParagraph()
-            val url = htmlImgMatch.groupValues[1].trim()
-            blocks.add(AnilistContentBlock.Image(url = url))
-            i++
-            continue
-        }
+            val imgPattern = Regex("""(?is)<img\s+([^>]+)>""")
+            val elements = mutableListOf<InlineRowElement>()
+            var lastIdx = 0
+            val matches = imgPattern.findAll(trimmed).toList()
+            for (m in matches) {
+                val textBefore = trimmed.substring(lastIdx, m.range.first).trim()
+                if (textBefore.isNotEmpty()) {
+                    elements.add(InlineRowElement.Text(parseInlineAnilistMarkdown(textBefore, primaryColor)))
+                }
+                val tagAttrs = m.groupValues[1]
+                val srcMatch = Regex("""(?is)src\s*=\s*["']?([^\s"'>]+)""").find(tagAttrs)
+                val widthMatch = Regex("""(?is)width\s*=\s*["']?(\d+)""").find(tagAttrs)
+                val heightMatch = Regex("""(?is)height\s*=\s*["']?(\d+)""").find(tagAttrs)
+                val src = srcMatch?.groupValues?.get(1).orEmpty()
+                val width = widthMatch?.groupValues?.get(1)?.toIntOrNull()
+                val height = heightMatch?.groupValues?.get(1)?.toIntOrNull()
+                if (src.isNotEmpty()) {
+                    elements.add(InlineRowElement.Image(src, width ?: 50, height ?: 50))
+                }
+                lastIdx = m.range.last + 1
+            }
+            val textAfter = trimmed.substring(lastIdx).trim()
+            if (textAfter.isNotEmpty()) {
+                elements.add(InlineRowElement.Text(parseInlineAnilistMarkdown(textAfter, primaryColor)))
+            }
 
-        val anilistImgMatch = Regex("^(?:<center>|~~~)?\\s*img(?:\\d+%?)?\\((https?://[^)]+)\\)\\s*(?:</center>|~~~)?$", RegexOption.IGNORE_CASE).find(trimmed)
-        if (anilistImgMatch != null) {
-            flushParagraph()
-            val url = anilistImgMatch.groupValues[1].trim()
-            blocks.add(AnilistContentBlock.Image(url = url))
+            if (elements.isNotEmpty()) {
+                val allImages = elements.all { it is InlineRowElement.Image }
+                if (allImages) {
+                    if (elements.size == 1) {
+                        val single = elements[0] as InlineRowElement.Image
+                        val rawAttr = matches.firstOrNull()?.groupValues?.get(1).orEmpty()
+                        val w = Regex("""(?is)width\s*=\s*["']?(\d+)""").find(rawAttr)?.groupValues?.get(1)?.toIntOrNull()
+                        val h = Regex("""(?is)height\s*=\s*["']?(\d+)""").find(rawAttr)?.groupValues?.get(1)?.toIntOrNull()
+                        blocks.add(AnilistContentBlock.Image(url = single.url, width = w, height = h, isCentered = isCenteredActive))
+                    } else {
+                        val imageItems = elements.mapNotNull { el ->
+                            if (el is InlineRowElement.Image) RichImageItem(el.url, el.width, el.height) else null
+                        }
+                        blocks.add(AnilistContentBlock.ImageRow(images = imageItems, isCentered = isCenteredActive))
+                    }
+                } else {
+                    blocks.add(AnilistContentBlock.InlineMediaRow(elements = elements, isCentered = isCenteredActive))
+                }
+            }
             i++
             continue
         }
@@ -590,7 +766,7 @@ internal fun parseAnilistRichContent(rawText: String, primaryColor: Color): List
             if (videoId != null) {
                 flushParagraph()
                 val fullUrl = if (rawTarget.startsWith("http")) rawTarget else "https://www.youtube.com/watch?v=$videoId"
-                blocks.add(AnilistContentBlock.YouTube(videoId = videoId, url = fullUrl))
+                blocks.add(AnilistContentBlock.YouTube(videoId = videoId, url = fullUrl, isCentered = isCenteredActive))
                 i++
                 continue
             }
@@ -601,7 +777,7 @@ internal fun parseAnilistRichContent(rawText: String, primaryColor: Color): List
         if (videoMatch != null) {
             flushParagraph()
             val videoUrl = videoMatch.groupValues[1].trim()
-            blocks.add(AnilistContentBlock.Video(url = videoUrl))
+            blocks.add(AnilistContentBlock.Video(url = videoUrl, isCentered = isCenteredActive))
             i++
             continue
         }
@@ -624,7 +800,8 @@ internal fun parseAnilistRichContent(rawText: String, primaryColor: Color): List
                 }
             }
             val spoilerBody = spoilerLines.joinToString("\n").trim()
-            val isCentered = (spoilerBody.startsWith("~~~") && spoilerBody.endsWith("~~~")) ||
+            val isCentered = isCenteredActive ||
+                (spoilerBody.startsWith("~~~") && spoilerBody.endsWith("~~~")) ||
                 (spoilerBody.startsWith("<center>", ignoreCase = true) && spoilerBody.endsWith("</center>", ignoreCase = true))
             val cleanSpoiler = spoilerBody
                 .replace(Regex("^<center>", RegexOption.IGNORE_CASE), "")
@@ -636,13 +813,14 @@ internal fun parseAnilistRichContent(rawText: String, primaryColor: Color): List
             continue
         }
 
-        // 7. Header line: # Heading, ## Heading, # <a>~~~Heading~~~</a>, #<center>Heading</center>
+        // 7. Header line: # Heading, ## Heading, ####Heading
         val headerMatch = Regex("^(#{1,6})\\s*(.*)$").find(trimmed)
         if (headerMatch != null) {
             flushParagraph()
             val level = headerMatch.groupValues[1].length
             val rawHeaderText = headerMatch.groupValues[2].trim()
-            val isCentered = rawHeaderText.contains("<center>", ignoreCase = true) ||
+            val isCentered = isCenteredActive ||
+                rawHeaderText.contains("<center>", ignoreCase = true) ||
                 rawHeaderText.contains("~~~")
 
             val cleanHeaderText = rawHeaderText
@@ -650,8 +828,10 @@ internal fun parseAnilistRichContent(rawText: String, primaryColor: Color): List
                 .replace(Regex("~+"), "")
                 .trim()
 
-            val parsed = parseInlineAnilistMarkdown(cleanHeaderText, primaryColor)
-            blocks.add(AnilistContentBlock.Header(text = parsed, level = level, isCentered = isCentered))
+            if (cleanHeaderText.isNotBlank()) {
+                val parsed = parseInlineAnilistMarkdown(cleanHeaderText, primaryColor)
+                blocks.add(AnilistContentBlock.Header(text = parsed, level = level, isCentered = isCentered))
+            }
             i++
             continue
         }
@@ -668,22 +848,26 @@ internal fun parseAnilistRichContent(rawText: String, primaryColor: Color): List
                 i++
             }
             val quoteText = quoteLines.joinToString(" ").trim()
-            val isCentered = quoteText.contains("<center>", ignoreCase = true) || quoteText.contains("~~~")
+            val isCentered = isCenteredActive || quoteText.contains("<center>", ignoreCase = true) || quoteText.contains("~~~")
             val cleanQuote = quoteText
                 .replace(Regex("</?[a-zA-Z0-9]+[^>]*>"), "")
                 .replace(Regex("~+"), "")
                 .trim()
-            val parsed = parseInlineAnilistMarkdown(cleanQuote, primaryColor)
-            blocks.add(AnilistContentBlock.Quote(text = parsed, isCentered = isCentered))
+            if (cleanQuote.isNotBlank()) {
+                val parsed = parseInlineAnilistMarkdown(cleanQuote, primaryColor)
+                blocks.add(AnilistContentBlock.Quote(text = parsed, isCentered = isCentered))
+            }
             continue
         }
 
-        // 9. Regular Paragraph Line (Check if centered with ~~~ or <center>)
-        val lineIsCentered = currentParagraphCentered ||
-            (trimmed.startsWith("~~~") && trimmed.endsWith("~~~")) ||
+        // 9. Regular Paragraph Line
+        val lineIsCentered = isCenteredActive ||
+            (trimmed.startsWith("~~~") && trimmed.endsWith("~~~") && trimmed.length > 3) ||
             (trimmed.startsWith("<center>", ignoreCase = true) && trimmed.endsWith("</center>", ignoreCase = true))
 
         var cleanLine = trimmed
+            .replace(Regex("^(__|\\*\\*)\\s+"), "")
+            .replace(Regex("\\s+(__|\\*\\*)$"), "")
             .replace(Regex("^<center>", RegexOption.IGNORE_CASE), "")
             .replace(Regex("</center>$", RegexOption.IGNORE_CASE), "")
             .replace(Regex("^~{3,}|~{3,}$"), "")
