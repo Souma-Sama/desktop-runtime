@@ -12,8 +12,10 @@ internal actual fun ReviewMediaImage(
     modifier: Modifier,
     contentScale: ContentScale,
 ) {
+    val cleanUrl = remember(url) { url.trim() }
+    if (cleanUrl.isBlank()) return
     AsyncImage(
-        model = url,
+        model = cleanUrl,
         contentDescription = contentDescription,
         modifier = modifier,
         contentScale = contentScale,

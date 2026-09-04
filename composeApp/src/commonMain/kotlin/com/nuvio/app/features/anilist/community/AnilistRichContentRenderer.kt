@@ -5,6 +5,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -21,9 +22,16 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.ClickableText
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.OpenInNew
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -31,7 +39,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import com.nuvio.app.features.details.components.HeroTrailerPlayerSurface
+import com.nuvio.app.features.trailer.TrailerPlaybackResolver
+import com.nuvio.app.features.trailer.TrailerPlaybackSource
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
@@ -48,6 +61,7 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.nuvio.app.core.ui.NuvioDesktopVerticalScrollbar
@@ -264,88 +278,18 @@ internal fun AnilistContentBlockItem(
         }
 
         is AnilistContentBlock.YouTube -> {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 4.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                val shape = RoundedCornerShape(12.dp)
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(min = 160.dp, max = 260.dp)
-                        .clip(shape)
-                        .background(Color.Black)
-                        .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f), shape)
-                        .clickable { uriHandler.openUri(block.url) },
-                    contentAlignment = Alignment.Center,
-                ) {
-                    ReviewMediaImage(
-                        url = "https://img.youtube.com/vi/${block.videoId}/hqdefault.jpg",
-                        contentDescription = "YouTube preview",
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop,
-                    )
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(Color.Black.copy(alpha = 0.35f)),
-                    )
-                    Surface(
-                        color = Color(0xFFCC0000),
-                        shape = RoundedCornerShape(10.dp),
-                        shadowElevation = 4.dp,
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        ) {
-                            Text(
-                                text = "▶",
-                                color = Color.White,
-                                fontSize = 13.sp,
-                            )
-                            Text(
-                                text = "Watch on YouTube",
-                                color = Color.White,
-                                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-                            )
-                        }
-                    }
-                }
-            }
+            AnilistInlineYouTubePlayer(
+                block = block,
+                uriHandler = uriHandler,
+            )
         }
 
         is AnilistContentBlock.Video -> {
-            val shape = RoundedCornerShape(10.dp)
-            Surface(
-                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                shape = shape,
-                border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 4.dp)
-                    .clickable { uriHandler.openUri(block.url) },
-            ) {
-                Row(
-                    modifier = Modifier.padding(14.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
-                    Text("🎬", fontSize = 18.sp)
-                    Text(
-                        text = "Open Video: ${block.url.substringAfterLast('/').ifBlank { block.url }}",
-                        style = MaterialTheme.typography.bodyMedium.copy(
-                            color = primaryColor,
-                            textDecoration = TextDecoration.Underline,
-                            fontWeight = FontWeight.Medium,
-                        ),
-                        modifier = Modifier.weight(1f),
-                    )
-                }
-            }
+            AnilistInlineVideoPlayer(
+                block = block,
+                primaryColor = primaryColor,
+                uriHandler = uriHandler,
+            )
         }
 
         is AnilistContentBlock.Quote -> {
@@ -414,6 +358,265 @@ internal fun AnilistContentBlockItem(
                     uriHandler.openUri(url)
                 },
             )
+        }
+    }
+}
+
+@Composable
+private fun AnilistInlineYouTubePlayer(
+    block: AnilistContentBlock.YouTube,
+    uriHandler: UriHandler,
+) {
+    val scope = rememberCoroutineScope()
+    var isPlaying by remember(block.videoId, block.url) { mutableStateOf(false) }
+    var isLoading by remember(block.videoId, block.url) { mutableStateOf(false) }
+    var playbackSource by remember(block.videoId, block.url) { mutableStateOf<TrailerPlaybackSource?>(null) }
+
+    val shape = RoundedCornerShape(12.dp)
+    val fallbackTargetUrl = block.url.ifBlank { "https://www.youtube.com/watch?v=${block.videoId}" }
+
+    val startPlayback = {
+        if (playbackSource != null) {
+            isPlaying = true
+        } else {
+            isLoading = true
+            scope.launch {
+                val resolved = runCatching {
+                    TrailerPlaybackResolver.resolveFromYouTubeUrl(fallbackTargetUrl)
+                }.getOrNull()
+                isLoading = false
+                if (resolved != null && resolved.videoUrl.isNotBlank()) {
+                    playbackSource = resolved
+                    isPlaying = true
+                } else {
+                    uriHandler.openUri(fallbackTargetUrl)
+                }
+            }
+        }
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 6.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(16f / 9f)
+                .clip(shape)
+                .background(Color.Black)
+                .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f), shape),
+            contentAlignment = Alignment.Center,
+        ) {
+            val currentSource = playbackSource
+            if (isPlaying && currentSource != null) {
+                HeroTrailerPlayerSurface(
+                    sourceUrl = currentSource.videoUrl,
+                    sourceAudioUrl = currentSource.audioUrl,
+                    playWhenReady = true,
+                    muted = false,
+                    modifier = Modifier.fillMaxSize(),
+                    onReady = {},
+                    onEnded = { isPlaying = false },
+                    onError = {
+                        isPlaying = false
+                        uriHandler.openUri(fallbackTargetUrl)
+                    },
+                )
+
+                IconButton(
+                    onClick = { isPlaying = false },
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(8.dp)
+                        .size(32.dp)
+                        .background(Color.Black.copy(alpha = 0.65f), CircleShape),
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Close,
+                        contentDescription = "Stop Video",
+                        tint = Color.White,
+                        modifier = Modifier.size(18.dp),
+                    )
+                }
+            } else {
+                ReviewMediaImage(
+                    url = "https://img.youtube.com/vi/${block.videoId}/hqdefault.jpg",
+                    contentDescription = "YouTube preview",
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clickable(enabled = !isLoading) { startPlayback() },
+                    contentScale = ContentScale.Crop,
+                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.Black.copy(alpha = 0.35f))
+                        .clickable(enabled = !isLoading) { startPlayback() },
+                )
+
+                if (isLoading) {
+                    CircularProgressIndicator(
+                        color = Color.White,
+                        strokeWidth = 2.5.dp,
+                        modifier = Modifier.size(36.dp),
+                    )
+                } else {
+                    Surface(
+                        color = Color(0xFFCC0000),
+                        shape = RoundedCornerShape(20.dp),
+                        shadowElevation = 6.dp,
+                        modifier = Modifier.clickable { startPlayback() },
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 9.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            Text(
+                                text = "▶",
+                                color = Color.White,
+                                fontSize = 13.sp,
+                            )
+                            Text(
+                                text = "Play Video",
+                                color = Color.White,
+                                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                            )
+                        }
+                    }
+                }
+
+                IconButton(
+                    onClick = { uriHandler.openUri(fallbackTargetUrl) },
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(8.dp)
+                        .size(32.dp)
+                        .background(Color.Black.copy(alpha = 0.65f), CircleShape),
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Rounded.OpenInNew,
+                        contentDescription = "Open on YouTube",
+                        tint = Color.White,
+                        modifier = Modifier.size(16.dp),
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AnilistInlineVideoPlayer(
+    block: AnilistContentBlock.Video,
+    primaryColor: Color,
+    uriHandler: UriHandler,
+) {
+    var isPlaying by remember(block.url) { mutableStateOf(false) }
+    val shape = RoundedCornerShape(12.dp)
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+    ) {
+        if (isPlaying) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(16f / 9f)
+                    .clip(shape)
+                    .background(Color.Black)
+                    .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f), shape),
+                contentAlignment = Alignment.Center,
+            ) {
+                HeroTrailerPlayerSurface(
+                    sourceUrl = block.url,
+                    sourceAudioUrl = null,
+                    playWhenReady = true,
+                    muted = false,
+                    modifier = Modifier.fillMaxSize(),
+                    onReady = {},
+                    onEnded = { isPlaying = false },
+                    onError = {
+                        isPlaying = false
+                        uriHandler.openUri(block.url)
+                    },
+                )
+
+                IconButton(
+                    onClick = { isPlaying = false },
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(8.dp)
+                        .size(32.dp)
+                        .background(Color.Black.copy(alpha = 0.65f), CircleShape),
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Close,
+                        contentDescription = "Stop Video",
+                        tint = Color.White,
+                        modifier = Modifier.size(18.dp),
+                    )
+                }
+            }
+        } else {
+            Surface(
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                shape = shape,
+                border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { isPlaying = true },
+            ) {
+                Row(
+                    modifier = Modifier.padding(14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Surface(
+                        color = primaryColor.copy(alpha = 0.15f),
+                        shape = CircleShape,
+                        modifier = Modifier.size(36.dp),
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Text(
+                                text = "▶",
+                                color = primaryColor,
+                                fontSize = 13.sp,
+                            )
+                        }
+                    }
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Play Video",
+                            style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                        Text(
+                            text = block.url.substringAfterLast('/').substringBefore('?').ifBlank { block.url },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                    IconButton(
+                        onClick = { uriHandler.openUri(block.url) },
+                        modifier = Modifier.size(32.dp),
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Rounded.OpenInNew,
+                            contentDescription = "Open in browser",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(18.dp),
+                        )
+                    }
+                }
+            }
         }
     }
 }

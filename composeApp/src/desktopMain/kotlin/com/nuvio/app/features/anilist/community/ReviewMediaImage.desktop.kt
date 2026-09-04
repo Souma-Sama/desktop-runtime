@@ -12,20 +12,32 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.layout.ContentScale
-import coil3.compose.AsyncImage
+import com.nuvio.app.core.ui.NuvioAsyncImage as AsyncImage
 import io.ktor.client.HttpClient
+import io.ktor.client.engine.cio.CIO
 import io.ktor.client.request.get
+import io.ktor.client.request.header
 import io.ktor.client.statement.readBytes
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import java.io.ByteArrayInputStream
 import javax.imageio.ImageIO
 import javax.imageio.metadata.IIOMetadataNode
 
 private val gifFrameCache = mutableMapOf<String, List<Pair<ImageBitmap, Long>>>()
-private val httpClient by lazy { HttpClient() }
+private val downloadSemaphore = Semaphore(4)
+private val desktopGifHttpClient by lazy {
+    HttpClient(CIO) {
+        followRedirects = true
+        engine {
+            requestTimeout = 25_000
+        }
+    }
+}
 
 @Composable
 internal actual fun ReviewMediaImage(
@@ -34,16 +46,19 @@ internal actual fun ReviewMediaImage(
     modifier: Modifier,
     contentScale: ContentScale,
 ) {
-    val isGif = remember(url) {
-        url.endsWith(".gif", ignoreCase = true) ||
-            url.contains(".gif?", ignoreCase = true) ||
-            url.contains("tenor.com", ignoreCase = true) ||
-            url.contains("giphy.com", ignoreCase = true)
+    val cleanUrl = remember(url) { url.trim() }
+    if (cleanUrl.isBlank()) return
+
+    val isGif = remember(cleanUrl) {
+        cleanUrl.endsWith(".gif", ignoreCase = true) ||
+            cleanUrl.contains(".gif?", ignoreCase = true) ||
+            cleanUrl.contains("tenor.com", ignoreCase = true) ||
+            cleanUrl.contains("giphy.com", ignoreCase = true)
     }
 
     if (!isGif) {
         AsyncImage(
-            model = url,
+            model = cleanUrl,
             contentDescription = contentDescription,
             modifier = modifier,
             contentScale = contentScale,
@@ -51,20 +66,32 @@ internal actual fun ReviewMediaImage(
         return
     }
 
-    var frames by remember(url) { mutableStateOf<List<Pair<ImageBitmap, Long>>?>(gifFrameCache[url]) }
-    var currentFrameIndex by remember(url) { mutableIntStateOf(0) }
+    var frames by remember(cleanUrl) { mutableStateOf<List<Pair<ImageBitmap, Long>>?>(gifFrameCache[cleanUrl]) }
+    var currentFrameIndex by remember(cleanUrl) { mutableIntStateOf(0) }
 
-    LaunchedEffect(url) {
+    LaunchedEffect(cleanUrl) {
         if (frames != null) return@LaunchedEffect
         withContext(Dispatchers.IO) {
-            try {
-                val bytes = httpClient.get(url).readBytes()
-                val decoded = decodeGifFrames(bytes)
-                if (decoded.isNotEmpty()) {
-                    gifFrameCache[url] = decoded
-                    frames = decoded
+            downloadSemaphore.withPermit {
+                for (attempt in 0..2) {
+                    try {
+                        val bytes = desktopGifHttpClient.get(cleanUrl) {
+                            header("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+                            header("Accept", "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8")
+                        }.readBytes()
+
+                        if (bytes.isNotEmpty()) {
+                            val decoded = decodeGifFrames(bytes)
+                            if (decoded.isNotEmpty()) {
+                                gifFrameCache[cleanUrl] = decoded
+                                frames = decoded
+                                break
+                            }
+                        }
+                    } catch (_: Exception) {
+                        if (attempt < 2) delay(350)
+                    }
                 }
-            } catch (_: Exception) {
             }
         }
     }
@@ -88,7 +115,7 @@ internal actual fun ReviewMediaImage(
         )
     } else {
         AsyncImage(
-            model = url,
+            model = cleanUrl,
             contentDescription = contentDescription,
             modifier = modifier,
             contentScale = contentScale,
