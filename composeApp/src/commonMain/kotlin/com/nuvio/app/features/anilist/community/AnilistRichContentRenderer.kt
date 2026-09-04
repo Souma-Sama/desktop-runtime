@@ -63,7 +63,7 @@ data class RichImageItem(
 
 sealed interface InlineRowElement {
     data class Text(val text: AnnotatedString) : InlineRowElement
-    data class Image(val url: String, val width: Int = 50, val height: Int = 50) : InlineRowElement
+    data class Image(val url: String, val width: Int? = null, val height: Int? = null) : InlineRowElement
 }
 
 sealed interface AnilistContentBlock {
@@ -160,19 +160,19 @@ internal fun AnilistContentBlockItem(
                 contentAlignment = if (block.isCentered) Alignment.Center else Alignment.CenterStart,
             ) {
                 val shape = RoundedCornerShape(10.dp)
-                val maxWidthDp = minOf(block.width ?: 560, 560).dp
+                val targetWidth = minOf(block.width ?: 560, 560).dp
 
                 val imageModifier = if (block.width != null && block.height != null && block.height > 0) {
                     val ratio = block.width.toFloat() / block.height.toFloat()
                     Modifier
-                        .widthIn(max = maxWidthDp)
+                        .widthIn(max = targetWidth)
                         .aspectRatio(ratio)
                         .clip(shape)
                         .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.15f), shape)
                 } else {
                     Modifier
-                        .widthIn(max = maxWidthDp)
-                        .heightIn(min = 120.dp, max = (block.height ?: 400).dp)
+                        .widthIn(max = targetWidth)
+                        .heightIn(max = (block.height ?: 560).dp)
                         .clip(shape)
                         .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.15f), shape)
                 }
@@ -234,8 +234,8 @@ internal fun AnilistContentBlockItem(
                 block.elements.forEach { element ->
                     when (element) {
                         is InlineRowElement.Image -> {
-                            val w = (element.width.takeIf { it in 16..160 } ?: 50).dp
-                            val h = (element.height.takeIf { it in 16..160 } ?: 50).dp
+                            val w = ((element.width ?: 50).takeIf { it in 16..160 } ?: 50).dp
+                            val h = ((element.height ?: 50).takeIf { it in 16..160 } ?: 50).dp
                             val shape = RoundedCornerShape(8.dp)
                             ReviewMediaImage(
                                 url = element.url,
@@ -605,18 +605,18 @@ fun sanitizeAnilistRichText(raw: String): String {
     val mdImgRegex = Regex("""!\[(.*?)\]\(\s*(https?://[^\s)]+)\s*\)""")
     text = mdImgRegex.replace(text) { match ->
         val url = match.groupValues[2].trim()
-        "<img src=\"$url\">"
+        "\n\n<img src=\"$url\">\n\n"
     }
 
     // 9. Normalize AniList img shortcodes: img(url), img500(url), img220(url)
     text = Regex("""(?is)\bimg(\d+)(?:%?)?\s*\(\s*(https?://[^\s)]+)\s*\)""").replace(text) { match ->
         val w = match.groupValues[1]
         val url = match.groupValues[2].trim()
-        "<img src=\"$url\" width=\"$w\">"
+        "\n\n<img src=\"$url\" width=\"$w\">\n\n"
     }
     text = Regex("""(?is)\bimg\s*\(\s*(https?://[^\s)]+)\s*\)""").replace(text) { match ->
         val url = match.groupValues[1].trim()
-        "<img src=\"$url\">"
+        "\n\n<img src=\"$url\">\n\n"
     }
 
     // 10. Collapse internal newlines and excess whitespace in ANY remaining HTML tags (so they stay on a single line)
@@ -713,10 +713,26 @@ internal fun parseAnilistRichContent(rawText: String, primaryColor: Color): List
             val elements = mutableListOf<InlineRowElement>()
             var lastIdx = 0
             val matches = imgPattern.findAll(trimmed).toList()
+
+            val lineHasOpenTilde = trimmed.startsWith("~~~")
+            val lineHasCloseTilde = trimmed.endsWith("~~~")
+            val lineHasOpenCenter = trimmed.contains("<center>", ignoreCase = true)
+            val lineHasCloseCenter = trimmed.contains("</center>", ignoreCase = true)
+
+            if ((lineHasOpenTilde && !lineHasCloseTilde) || (lineHasOpenCenter && !lineHasCloseCenter)) {
+                isCenteredActive = true
+            }
+
+            val imgIsCentered = isCenteredActive || lineHasOpenTilde || lineHasCloseTilde || lineHasOpenCenter || lineHasCloseCenter
+
             for (m in matches) {
                 val textBefore = trimmed.substring(lastIdx, m.range.first).trim()
-                if (textBefore.isNotEmpty()) {
-                    elements.add(InlineRowElement.Text(parseInlineAnilistMarkdown(textBefore, primaryColor)))
+                val cleanBefore = textBefore
+                    .replace(Regex("""(?i)</?center>"""), "")
+                    .replace(Regex("""^~{3,}|~{3,}$"""), "")
+                    .trim()
+                if (cleanBefore.isNotEmpty()) {
+                    elements.add(InlineRowElement.Text(parseInlineAnilistMarkdown(cleanBefore, primaryColor)))
                 }
                 val tagAttrs = m.groupValues[1]
                 val srcMatch = Regex("""(?is)src\s*=\s*["']?([^\s"'>]+)""").find(tagAttrs)
@@ -726,34 +742,53 @@ internal fun parseAnilistRichContent(rawText: String, primaryColor: Color): List
                 val width = widthMatch?.groupValues?.get(1)?.toIntOrNull()
                 val height = heightMatch?.groupValues?.get(1)?.toIntOrNull()
                 if (src.isNotEmpty()) {
-                    elements.add(InlineRowElement.Image(src, width ?: 50, height ?: 50))
+                    elements.add(InlineRowElement.Image(src, width, height))
                 }
                 lastIdx = m.range.last + 1
             }
             val textAfter = trimmed.substring(lastIdx).trim()
-            if (textAfter.isNotEmpty()) {
-                elements.add(InlineRowElement.Text(parseInlineAnilistMarkdown(textAfter, primaryColor)))
+            val cleanAfter = textAfter
+                .replace(Regex("""(?i)</?center>"""), "")
+                .replace(Regex("""^~{3,}|~{3,}$"""), "")
+                .trim()
+            if (cleanAfter.isNotEmpty()) {
+                elements.add(InlineRowElement.Text(parseInlineAnilistMarkdown(cleanAfter, primaryColor)))
             }
 
             if (elements.isNotEmpty()) {
                 val allImages = elements.all { it is InlineRowElement.Image }
+                val imagesInRow = elements.filterIsInstance<InlineRowElement.Image>()
+                val hasLargeImage = imagesInRow.any { img ->
+                    img.width == null || img.width > 120 || (img.height != null && img.height > 120)
+                }
+
                 if (allImages) {
                     if (elements.size == 1) {
                         val single = elements[0] as InlineRowElement.Image
-                        val rawAttr = matches.firstOrNull()?.groupValues?.get(1).orEmpty()
-                        val w = Regex("""(?is)width\s*=\s*["']?(\d+)""").find(rawAttr)?.groupValues?.get(1)?.toIntOrNull()
-                        val h = Regex("""(?is)height\s*=\s*["']?(\d+)""").find(rawAttr)?.groupValues?.get(1)?.toIntOrNull()
-                        blocks.add(AnilistContentBlock.Image(url = single.url, width = w, height = h, isCentered = isCenteredActive))
+                        blocks.add(AnilistContentBlock.Image(url = single.url, width = single.width, height = single.height, isCentered = imgIsCentered))
                     } else {
                         val imageItems = elements.mapNotNull { el ->
                             if (el is InlineRowElement.Image) RichImageItem(el.url, el.width, el.height) else null
                         }
-                        blocks.add(AnilistContentBlock.ImageRow(images = imageItems, isCentered = isCenteredActive))
+                        blocks.add(AnilistContentBlock.ImageRow(images = imageItems, isCentered = imgIsCentered))
                     }
+                } else if (!hasLargeImage) {
+                    blocks.add(AnilistContentBlock.InlineMediaRow(elements = elements, isCentered = imgIsCentered))
                 } else {
-                    blocks.add(AnilistContentBlock.InlineMediaRow(elements = elements, isCentered = isCenteredActive))
+                    for (el in elements) {
+                        when (el) {
+                            is InlineRowElement.Text -> blocks.add(AnilistContentBlock.Paragraph(text = el.text, isCentered = imgIsCentered))
+                            is InlineRowElement.Image -> blocks.add(AnilistContentBlock.Image(url = el.url, width = el.width, height = el.height, isCentered = imgIsCentered))
+                        }
+                    }
                 }
             }
+
+            if ((lineHasCloseTilde && !lineHasOpenTilde) || (lineHasCloseCenter && !lineHasOpenCenter)) {
+                isCenteredActive = false
+                currentParagraphCentered = false
+            }
+
             i++
             continue
         }
@@ -766,7 +801,8 @@ internal fun parseAnilistRichContent(rawText: String, primaryColor: Color): List
             if (videoId != null) {
                 flushParagraph()
                 val fullUrl = if (rawTarget.startsWith("http")) rawTarget else "https://www.youtube.com/watch?v=$videoId"
-                blocks.add(AnilistContentBlock.YouTube(videoId = videoId, url = fullUrl, isCentered = isCenteredActive))
+                val ytCentered = isCenteredActive || trimmed.contains("~~~") || trimmed.contains("<center>", ignoreCase = true)
+                blocks.add(AnilistContentBlock.YouTube(videoId = videoId, url = fullUrl, isCentered = ytCentered))
                 i++
                 continue
             }
@@ -777,7 +813,8 @@ internal fun parseAnilistRichContent(rawText: String, primaryColor: Color): List
         if (videoMatch != null) {
             flushParagraph()
             val videoUrl = videoMatch.groupValues[1].trim()
-            blocks.add(AnilistContentBlock.Video(url = videoUrl, isCentered = isCenteredActive))
+            val videoCentered = isCenteredActive || trimmed.contains("~~~") || trimmed.contains("<center>", ignoreCase = true)
+            blocks.add(AnilistContentBlock.Video(url = videoUrl, isCentered = videoCentered))
             i++
             continue
         }
@@ -861,15 +898,26 @@ internal fun parseAnilistRichContent(rawText: String, primaryColor: Color): List
         }
 
         // 9. Regular Paragraph Line
-        val lineIsCentered = isCenteredActive ||
-            (trimmed.startsWith("~~~") && trimmed.endsWith("~~~") && trimmed.length > 3) ||
-            (trimmed.startsWith("<center>", ignoreCase = true) && trimmed.endsWith("</center>", ignoreCase = true))
+        val lineHasOpenTilde = trimmed.startsWith("~~~")
+        val lineHasCloseTilde = trimmed.endsWith("~~~")
+        val lineHasOpenCenter = trimmed.contains("<center>", ignoreCase = true)
+        val lineHasCloseCenter = trimmed.contains("</center>", ignoreCase = true)
+        val lineHasSelfContainedCentering = (lineHasOpenTilde && lineHasCloseTilde) || (lineHasOpenCenter && lineHasCloseCenter)
+
+        if (lineHasSelfContainedCentering && !currentParagraphCentered && currentParagraphLines.isNotEmpty()) {
+            flushParagraph()
+        }
+
+        if ((lineHasOpenTilde && !lineHasCloseTilde) || (lineHasOpenCenter && !lineHasCloseCenter)) {
+            isCenteredActive = true
+        }
+
+        val lineIsCentered = isCenteredActive || lineHasSelfContainedCentering
 
         var cleanLine = trimmed
             .replace(Regex("^(__|\\*\\*)\\s+"), "")
             .replace(Regex("\\s+(__|\\*\\*)$"), "")
-            .replace(Regex("^<center>", RegexOption.IGNORE_CASE), "")
-            .replace(Regex("</center>$", RegexOption.IGNORE_CASE), "")
+            .replace(Regex("(?i)</?center>"), "")
             .replace(Regex("^~{3,}|~{3,}$"), "")
             .trim()
 
@@ -878,6 +926,15 @@ internal fun parseAnilistRichContent(rawText: String, primaryColor: Color): List
                 currentParagraphCentered = lineIsCentered
             }
             currentParagraphLines.add(cleanLine)
+            if (lineHasSelfContainedCentering && !isCenteredActive) {
+                flushParagraph()
+            }
+        }
+
+        if ((lineHasCloseTilde && !lineHasOpenTilde) || (lineHasCloseCenter && !lineHasOpenCenter)) {
+            flushParagraph()
+            isCenteredActive = false
+            currentParagraphCentered = false
         }
         i++
     }
