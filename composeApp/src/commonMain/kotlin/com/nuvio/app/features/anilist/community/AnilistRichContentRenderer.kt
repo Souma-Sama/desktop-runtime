@@ -157,7 +157,7 @@ internal fun AnilistContentBlockItem(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(vertical = 6.dp),
-                contentAlignment = if (block.isCentered) Alignment.Center else Alignment.Start,
+                contentAlignment = if (block.isCentered) Alignment.Center else Alignment.CenterStart,
             ) {
                 val shape = RoundedCornerShape(10.dp)
                 val maxWidthDp = minOf(block.width ?: 560, 560).dp
