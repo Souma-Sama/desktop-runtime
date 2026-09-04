@@ -78,6 +78,8 @@ import com.nuvio.app.core.ui.localizedContinueWatchingSubtitle
 import com.nuvio.app.core.ui.nuvio
 import com.nuvio.app.core.ui.platformExitApp
 import com.nuvio.app.features.addons.AddAddonResult
+import com.nuvio.app.features.anilist.AnilistLibraryMenuPrefs
+import com.nuvio.app.features.anilist.AnilistOpenByResolver
 import com.nuvio.app.features.addons.AddonRepository
 import com.nuvio.app.features.addons.enabledAddons
 import com.nuvio.app.features.addons.isWaitingForFirstEnabledManifest
@@ -177,9 +179,7 @@ import nuvio.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.getString
 import org.jetbrains.compose.resources.stringResource
 import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.ui.input.pointer.PointerButton
-import androidx.compose.ui.input.pointer.PointerEventType
-import androidx.compose.ui.input.pointer.pointerInput
+import com.nuvio.app.core.ui.mouseBackButton
 import com.nuvio.app.core.ui.AppPresenceState
 import com.nuvio.app.core.ui.PresenceSnapshot
 import androidx.compose.ui.ExperimentalComposeUiApi
@@ -377,6 +377,8 @@ internal fun MainAppContent(
                 searchFocusRequestCount++
                 searchScrollToTopRequests.tryEmit(Unit)
             }
+            AppScreenTab.Explore -> Unit
+            AppScreenTab.Calendar -> Unit
             AppScreenTab.Library -> libraryScrollToTopRequests.tryEmit(Unit)
             AppScreenTab.Settings -> settingsRootActionRequests.tryEmit(Unit)
         }
@@ -1247,21 +1249,7 @@ internal fun MainAppContent(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(MaterialTheme.nuvio.colors.background)
-                    .pointerInput(Unit) {
-                        awaitPointerEventScope {
-                            while (true) {
-                                val event = awaitPointerEvent()
-                                if (event.type == PointerEventType.Press) {
-                                    if (!event.changes.any { it.isConsumed }) {
-                                        if (event.button == PointerButton.Back) {
-                                            event.changes.forEach { it.consume() }
-                                            navController.popBackStack()
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    },
+                    .mouseBackButton { navController.popBackStack() },
             ) {
             Box(
                 modifier = Modifier
@@ -1329,16 +1317,51 @@ internal fun MainAppContent(
                             AppTabActions(
                                 onCatalogClick = onCatalogClick,
                                 onPosterClick = { meta ->
-                                    navController.navigate(
-                                        DetailRoute(type = meta.type, id = meta.id, title = meta.name),
-                                    )
+                                    if (com.nuvio.app.features.anilist.KaiHooks.isNonVideoMedia(meta.type)) {
+                                        // Stop access to details page for manga, novels, music, doujins
+                                        return@AppTabActions
+                                    }
+                                    if (meta.id.startsWith("ani_char_") || meta.id.startsWith("ani_staff_") || meta.type == "character" || meta.type == "person") {
+                                        val isChar = meta.id.startsWith("ani_char_") || meta.type == "character"
+                                        val rawId = meta.id.substringAfterLast("_").substringAfterLast(":").toIntOrNull() ?: 0
+                                        navController.navigate(
+                                            com.nuvio.app.navigation.PersonDetailRoute(
+                                                personId = rawId,
+                                                personName = meta.name,
+                                                personPhoto = meta.poster,
+                                                isAnilist = true,
+                                                isCharacter = isChar,
+                                            ),
+                                        )
+                                    } else {
+                                        navController.navigate(
+                                            DetailRoute(
+                                                type = meta.type,
+                                                id = meta.id,
+                                                title = meta.name,
+                                                poster = meta.poster,
+                                                banner = meta.banner,
+                                                logo = meta.logo,
+                                            ),
+                                        )
+                                    }
                                 },
                                 onPosterLongClick = { meta ->
                                     openPosterActions(PosterActionTarget(preview = meta))
                                 },
                                 onLibraryPosterClick = { item ->
+                                    if (com.nuvio.app.features.anilist.KaiHooks.isNonVideoMedia(item.type)) {
+                                        return@AppTabActions
+                                    }
                                     navController.navigate(
-                                        DetailRoute(type = item.type, id = item.id, title = item.name),
+                                        DetailRoute(
+                                            type = item.type,
+                                            id = item.id,
+                                            title = item.name,
+                                            poster = item.poster,
+                                            banner = item.banner,
+                                            logo = item.logo,
+                                        ),
                                     )
                                 },
                                 onLibraryPosterLongClick = { item, section ->
@@ -1347,6 +1370,20 @@ internal fun MainAppContent(
                                             preview = item.toMetaPreview(),
                                             libraryItem = item,
                                             libraryListKey = section.type,
+                                        ),
+                                    )
+                                },
+                                onAnilistPosterLongClick = { item ->
+                                    openPosterActions(
+                                        PosterActionTarget(
+                                            preview = com.nuvio.app.features.home.MetaPreview(
+                                                id = "ani_${item.id}",
+                                                type = if (item.format?.equals("MOVIE", ignoreCase = true) == true) "movie" else "series",
+                                                name = item.title,
+                                                poster = item.posterUrl,
+                                                banner = item.posterUrl,
+                                                anilistScore = item.score,
+                                            ),
                                         ),
                                     )
                                 },
@@ -1383,6 +1420,72 @@ internal fun MainAppContent(
                                         )
                                     } else {
                                         requestedSettingsPageName = "Debrid"
+                                        activateTab(AppScreenTab.Settings)
+                                    }
+                                },
+                                onAnilistPosterClick = { item ->
+                                    coroutineScope.launch {
+                                        val selectedUrl = AnilistLibraryMenuPrefs.state.value.openByCatalogUrl
+                                        val addon = selectedUrl?.let { url ->
+                                            AddonRepository.uiState.value.addons.firstOrNull { it.manifest?.transportUrl == url }
+                                        }
+                                        val mediaType = if (item.format?.equals("MOVIE", ignoreCase = true) == true) "movie" else "series"
+                                        if (addon != null) {
+                                            when (val result = AnilistOpenByResolver.resolve(item, addon)) {
+                                                is AnilistOpenByResolver.Result.OpenDirect -> {
+                                                    navController.navigate(
+                                                        DetailRoute(
+                                                            type = mediaType,
+                                                            id = result.id,
+                                                            title = item.title,
+                                                            poster = item.posterUrl,
+                                                        ),
+                                                    )
+                                                }
+                                                is AnilistOpenByResolver.Result.SearchByTitle -> {
+                                                    navController.navigate(
+                                                        DetailRoute(
+                                                            type = mediaType,
+                                                            id = "anilist:${item.id}",
+                                                            title = result.title,
+                                                            poster = item.posterUrl,
+                                                        ),
+                                                    )
+                                                }
+                                                is AnilistOpenByResolver.Result.NotSupported -> {
+                                                    navController.navigate(
+                                                        DetailRoute(
+                                                            type = mediaType,
+                                                            id = "anilist:${item.id}",
+                                                            title = item.title,
+                                                            poster = item.posterUrl,
+                                                        ),
+                                                    )
+                                                }
+                                            }
+                                        } else {
+                                            navController.navigate(
+                                                DetailRoute(
+                                                    type = mediaType,
+                                                    id = "anilist:${item.id}",
+                                                    title = item.title,
+                                                    poster = item.posterUrl,
+                                                ),
+                                            )
+                                        }
+                                    }
+                                },
+                                onConnectAnilistClick = {
+                                    if (useNativeNavigation && !isTabletLayout) {
+                                        activateTab(AppScreenTab.Settings)
+                                        navController.navigate(
+                                            SettingsPageRoute(
+                                                pageName = "AniList",
+                                                title = "AniList",
+                                            ),
+                                        )
+                                    } else {
+                                        requestedSettingsPageName = "AniList"
                                         activateTab(AppScreenTab.Settings)
                                     }
                                 },
@@ -1683,6 +1786,13 @@ internal fun MainAppContent(
             selectedPosterActionTarget?.let { posterActionTarget ->
                 key(posterActionTarget) {
                     val preview = posterActionTarget.preview
+                    com.nuvio.app.features.anilist.KaiHooks.PosterAction(
+                        targetPreview = preview,
+                        onDismiss = {
+                            selectedPosterActionTarget = null
+                            selectedPosterAnchor = null
+                        },
+                    ) {
                     val isSaved = LibraryRepository.isSaved(preview.id, preview.type)
                     val isWatched = WatchingState.isPosterWatched(
                         watchedKeys = watchedUiState.watchedKeys,
@@ -1840,6 +1950,7 @@ internal fun MainAppContent(
                             selectedPosterAnchor = null
                         },
                     )
+                    }
                 }
             }
 
@@ -1871,6 +1982,8 @@ internal fun MainAppContent(
                                                         type = item.parentMetaType,
                                                         id = item.parentMetaId,
                                                         title = item.title,
+                                                        poster = item.poster,
+                                                        banner = item.background,
                                                     ),
                                                 )
                                             },
@@ -1926,6 +2039,8 @@ internal fun MainAppContent(
                                 type = item.parentMetaType,
                                 id = item.parentMetaId,
                                 title = item.title,
+                                poster = item.poster,
+                                banner = item.background,
                             ),
                         )
                     }

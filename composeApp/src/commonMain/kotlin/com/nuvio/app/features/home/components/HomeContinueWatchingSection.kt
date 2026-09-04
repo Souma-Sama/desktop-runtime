@@ -51,6 +51,7 @@ import com.nuvio.app.core.ui.NuvioAsyncImage as AsyncImage
 import com.nuvio.app.core.ui.NuvioCardDepthSurface
 import com.nuvio.app.core.ui.NuvioProgressBar
 import com.nuvio.app.core.ui.nuvioCardDepth
+import com.nuvio.app.core.ui.LocalNuvioFloatingSidebarPadding
 import com.nuvio.app.core.ui.NuvioShelfSection
 import com.nuvio.app.core.ui.NuvioTokens
 import com.nuvio.app.core.ui.PosterLandscapeAspectRatio
@@ -315,12 +316,16 @@ private fun HomeContinueWatchingSectionContent(
         }
         val displayEntries = disintegration.sync(dataSourceKey, items, disintegrationRequest)
 
+        val floatingSidebarPadding = LocalNuvioFloatingSidebarPadding.current
+        val rowEndPadding = if (floatingSidebarPadding > 0.dp) 28.dp else sectionPadding
+
         NuvioShelfSection(
             title = title ?: stringResource(Res.string.compose_settings_page_continue_watching),
             entries = displayEntries,
             modifier = modifier,
             headerHorizontalPadding = sectionPadding,
-            rowContentPadding = PaddingValues(horizontal = sectionPadding),
+            headerEndPadding = rowEndPadding,
+            rowContentPadding = PaddingValues(start = sectionPadding, end = rowEndPadding),
             itemSpacing = layout.itemGap,
             key = { entry -> entry.key },
             animatePlacement = true,

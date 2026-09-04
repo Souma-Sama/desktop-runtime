@@ -35,3 +35,6 @@ PERFORMANCE_FINDINGS.md
 
 # Local MPVKit iOS build environment (sparse APFS image, see MPVKit docs)
 .mpvkit-build.sparseimage
+
+# Local private changelog
+CHANGELOG_LOCAL.md

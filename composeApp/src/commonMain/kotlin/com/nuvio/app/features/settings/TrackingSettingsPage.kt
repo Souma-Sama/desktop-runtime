@@ -106,6 +106,7 @@ internal fun LazyListScope.trackingSettingsContent(
     settingsUiState: TrackingSettingsUiState,
     commentsEnabled: Boolean,
     onCommentsEnabledChange: (Boolean) -> Unit,
+    onAnilistClick: (() -> Unit)? = null,
 ) {
     item {
         SettingsSection(
@@ -116,6 +117,7 @@ internal fun LazyListScope.trackingSettingsContent(
                 isTablet = isTablet,
                 traktUiState = traktUiState,
                 simklUiState = simklUiState,
+                onAnilistClick = onAnilistClick,
             )
         }
     }
@@ -365,7 +367,7 @@ private fun TrackingViewingAndDiscovery(
 }
 
 @Composable
-private fun TrackingPreferenceActionRow(
+internal fun TrackingPreferenceActionRow(
     title: String,
     description: String,
     value: String,

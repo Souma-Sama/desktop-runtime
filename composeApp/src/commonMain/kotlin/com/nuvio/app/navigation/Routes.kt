@@ -38,6 +38,9 @@ data class DetailRoute(
     val type: String,
     val id: String,
     override val title: String? = null,
+    val poster: String? = null,
+    val banner: String? = null,
+    val logo: String? = null,
 ) : AppRoute
 
 @Serializable
@@ -47,6 +50,8 @@ data class PersonDetailRoute(
     val personPhoto: String? = null,
     val castAvatarTransitionKey: String? = null,
     val preferCrew: Boolean = false,
+    val isAnilist: Boolean = false,
+    val isCharacter: Boolean = false,
 ) : AppRoute {
     override val title: String
         get() = personName
@@ -58,6 +63,7 @@ data class EntityBrowseRoute(
     val entityId: Int,
     val entityName: String,
     val sourceType: String = "tv",
+    val isAnilist: Boolean = false,
 ) : AppRoute {
     override val title: String
         get() = entityName

@@ -1,0 +1,74 @@
+name: Build Android APK
+
+on:
+  push:
+    branches:
+      - '**'
+  workflow_dispatch:
+    inputs:
+      build_type:
+        description: 'Build Type (debug or release)'
+        required: true
+        default: 'debug'
+        type: choice
+        options:
+          - debug
+          - release
+
+jobs:
+  build-android:
+    name: Android APK Build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Prepare build environment
+        run: |
+          touch local.properties
+
+      - name: Build Debug Android APK
+        if: "${{ github.event_name == 'push' || inputs.build_type == 'debug' }}"
+        run: |
+          ./gradlew clean :androidApp:assembleFullDebug \
+            --no-daemon \
+            --stacktrace
+
+      - name: Build Release Android APKs
+        if: "${{ github.event_name == 'workflow_dispatch' && inputs.build_type == 'release' }}"
+        run: |
+          ./gradlew clean :androidApp:assembleFullRelease \
+            --no-daemon \
+            --stacktrace
+
+      - name: Upload Android APKs Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Nuvio-Kai-Android-APKs
+          path: androidApp/build/outputs/apk/full/*/*.apk
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Publish Android APKs to Latest Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: Nuvio Kai Latest Release
+          body: "Direct download of the latest Nuvio Kai APKs and macOS DMG."
+          prerelease: true
+          overwrite: false
+          files: androidApp/build/outputs/apk/full/*/*.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

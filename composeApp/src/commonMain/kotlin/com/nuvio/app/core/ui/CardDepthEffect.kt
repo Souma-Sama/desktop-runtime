@@ -15,11 +15,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.drawscope.clipPath
 
 @Composable
-fun rememberCardDepthStyleUiState(): CardDepthStyleUiState {
-    CardDepthStyleRepository.ensureLoaded()
-    val uiState by CardDepthStyleRepository.uiState.collectAsState()
-    return uiState
-}
+fun rememberCardDepthStyleUiState(): CardDepthStyleUiState = LocalCardDepthStyle.current
 
 @Composable
 fun Modifier.nuvioCardDepth(

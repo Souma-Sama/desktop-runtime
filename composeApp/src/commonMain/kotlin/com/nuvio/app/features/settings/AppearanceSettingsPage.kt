@@ -240,6 +240,19 @@ internal fun LazyListScope.appearanceSettingsContent(
                         isTablet = isTablet,
                         onClick = { showNavBarStyleSheet = true },
                     )
+                    if (isSidebarActive) {
+                        val anilistPrefs by com.nuvio.app.features.anilist.AnilistPreferencesRepository.preferences.collectAsStateWithLifecycle()
+                        SettingsGroupDivider(isTablet = isTablet)
+                        SettingsSwitchRow(
+                            title = "Floating Glass Sidebar",
+                            description = "Auto-hiding frosted glass dock with edge reveal, clock, and fluid pill tabs",
+                            checked = anilistPrefs.useFloatingGlassDesktopSidebar,
+                            isTablet = isTablet,
+                            onCheckedChange = {
+                                com.nuvio.app.features.anilist.AnilistPreferencesRepository.setUseFloatingGlassDesktopSidebar(it)
+                            },
+                        )
+                    }
                 }
                 if (isDesktop) {
                     SettingsGroupDivider(isTablet = isTablet)

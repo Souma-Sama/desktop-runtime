@@ -20,6 +20,17 @@ private fun isEndedSeriesStatus(status: String?): Boolean {
  */
 fun formatMetaReleaseLineForDetails(meta: MetaDetails): String? {
     val raw = meta.releaseInfo?.trim()?.takeIf { it.isNotEmpty() } ?: return null
+    val isAnilist = meta.id.startsWith("ani_", ignoreCase = true) || meta.id.startsWith("anilist:", ignoreCase = true)
+    if (isAnilist) {
+        val startYear = extractReleaseYearForDisplay(raw) ?: return raw
+        val endYear = meta.lastAirDate?.let { extractReleaseYearForDisplay(it) }
+        val isAiring = meta.status?.trim()?.uppercase() in setOf("RELEASING", "ONGOING", "RETURNING SERIES", "AIRING")
+        return when {
+            isAiring -> "$startYear -"
+            endYear != null && endYear != startYear -> "$startYear - $endYear"
+            else -> startYear.toString()
+        }
+    }
     if (!isTvSeriesType(meta.type)) {
         return extractReleaseYearForDisplay(raw)?.toString()
     }

@@ -17,6 +17,15 @@ internal actual object EpisodeReleaseDatePlatform {
         )
     }
 
+    actual fun localTimeAtEpochMs(epochMs: Long): String? {
+        val formatter = NSDateFormatter().apply {
+            dateFormat = "HH:mm"
+        }
+        return formatter.stringFromDate(
+            NSDate.dateWithTimeIntervalSince1970(epochMs.toDouble() / 1_000.0),
+        )
+    }
+
     actual fun localDateTimeToEpochMs(normalizedIsoDateTime: String): Long? {
         val formatter = NSDateFormatter().apply {
             dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSS"

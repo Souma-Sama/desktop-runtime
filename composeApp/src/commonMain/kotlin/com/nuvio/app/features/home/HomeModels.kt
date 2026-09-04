@@ -17,6 +17,8 @@ data class MetaPreview(
     val popularity: Double? = null,
     val voteCount: Int? = null,
     val imdbRating: String? = null,
+    val anilistScore: Double? = null,
+    val malScore: Double? = null,
     val genres: List<String> = emptyList(),
 )
 
@@ -59,8 +61,8 @@ internal fun shouldShowHomeHeroSlot(
     heroEnabled: Boolean,
     hasHeroItems: Boolean,
     isResolvingHeroSources: Boolean,
-    hasRenderableHomeRows: Boolean,
-): Boolean = heroEnabled && (hasHeroItems || isResolvingHeroSources || hasRenderableHomeRows)
+    hasRenderableHomeRows: Boolean = false,
+): Boolean = heroEnabled && (hasHeroItems || isResolvingHeroSources)
 
 internal data class CatalogRequest(
     val addon: ManagedAddon,

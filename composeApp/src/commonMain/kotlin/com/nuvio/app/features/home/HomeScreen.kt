@@ -26,6 +26,7 @@ import com.nuvio.app.core.auth.AuthState
 import com.nuvio.app.core.network.NetworkCondition
 import com.nuvio.app.core.network.NetworkStatusRepository
 import com.nuvio.app.core.ui.LocalNuvioBottomNavigationOverlayPadding
+import com.nuvio.app.core.ui.LocalNuvioFloatingSidebarPadding
 import com.nuvio.app.core.ui.LocalNuvioNavBarScrollState
 import com.nuvio.app.core.ui.NuvioScreen
 import com.nuvio.app.core.ui.NuvioNetworkOfflineCard
@@ -537,6 +538,17 @@ fun HomeScreen(
         mutableStateOf(0)
     }
 
+    val anilistAuthenticated by com.nuvio.app.features.anilist.AnilistAuthRepository.isAuthenticated.collectAsStateWithLifecycle()
+    val anilistUser by com.nuvio.app.features.anilist.AnilistAuthRepository.currentUser.collectAsStateWithLifecycle()
+    val anilistPrefs by com.nuvio.app.features.anilist.AnilistPreferencesRepository.preferences.collectAsStateWithLifecycle()
+    val catalogRefreshKey = remember(enabledAddons, anilistAuthenticated, anilistUser?.name, anilistPrefs.enabled) {
+        buildHomeCatalogRefreshSignature(enabledAddons)
+    }
+
+    LaunchedEffect(catalogRefreshKey) {
+        HomeCatalogSettingsRepository.syncCatalogs(enabledAddons)
+        HomeRepository.refresh(enabledAddons, force = false)
+    }
     LaunchedEffect(collections, enabledAddons) {
         withContext(Dispatchers.Default) {
             HomeCatalogSettingsRepository.syncCollections(collections, enabledAddons)
@@ -842,7 +854,9 @@ fun HomeScreen(
     )
 
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
-        val homeSectionPadding = homeSectionHorizontalPaddingForWidth(maxWidth.value)
+        val floatingSidebarPadding = LocalNuvioFloatingSidebarPadding.current
+        val baseSectionPadding = homeSectionHorizontalPaddingForWidth(maxWidth.value)
+        val homeSectionPadding = if (floatingSidebarPadding > 0.dp) floatingSidebarPadding else baseSectionPadding
         val continueWatchingLayout = rememberContinueWatchingLayout(maxWidth.value)
         val posterCardStyle = rememberPosterCardStyleUiState()
         val homeCatalogPreviewLimit = if (isDesktop) {
@@ -914,16 +928,29 @@ fun HomeScreen(
                             sectionPadding = if (isDesktop) homeSectionPadding else null,
                         )
 
-                        homeUiState.heroItems.isNotEmpty() -> HomeHeroSection(
-                            items = homeUiState.heroItems,
-                            modifier = Modifier,
-                            viewportHeight = maxHeight,
-                            mobileBelowSectionHeightHint = mobileHeroBelowSectionHeightHint,
-                            sectionPadding = if (isDesktop) homeSectionPadding else null,
-                            listState = homeListState,
-                            stretchPx = { heroStretchState.stretchPx },
-                            onItemClick = onPosterClick,
-                        )
+                        homeUiState.heroItems.isNotEmpty() -> {
+                            val filteredHeroItems = if (!anilistPrefs.enabled) {
+                                homeUiState.heroItems.filterNot { it.id.startsWith("ani_") || it.id.startsWith("anilist:") }
+                            } else homeUiState.heroItems
+                            if (filteredHeroItems.isNotEmpty()) {
+                                HomeHeroSection(
+                                    items = filteredHeroItems,
+                                    modifier = Modifier,
+                                    viewportHeight = maxHeight,
+                                    mobileBelowSectionHeightHint = mobileHeroBelowSectionHeightHint,
+                                    sectionPadding = if (isDesktop) homeSectionPadding else null,
+                                    listState = homeListState,
+                                    stretchPx = { heroStretchState.stretchPx },
+                                    onItemClick = onPosterClick,
+                                )
+                            } else {
+                                HomeHeroReservedSpace(
+                                    modifier = Modifier,
+                                    viewportHeight = maxHeight,
+                                    mobileBelowSectionHeightHint = mobileHeroBelowSectionHeightHint,
+                                )
+                            }
+                        }
 
                         else -> HomeHeroReservedSpace(
                             modifier = Modifier,
@@ -1079,7 +1106,10 @@ fun HomeScreen(
                         if (settingsItem.isCollection) {
                             val collection = collectionsMap[settingsItem.key]
                             if (collection != null) {
-                                item(key = keyedSettingsItem.lazyKey) {
+                                item(
+                                    key = keyedSettingsItem.lazyKey,
+                                    contentType = "home_collection_row",
+                                ) {
                                     HomeCollectionRowSection(
                                         collection = collection,
                                         modifier = Modifier.padding(bottom = 12.dp),
@@ -1092,7 +1122,10 @@ fun HomeScreen(
                         } else {
                             val section = sectionsMap[settingsItem.key]
                             if (section != null && section.items.isNotEmpty()) {
-                                item(key = keyedSettingsItem.lazyKey) {
+                                item(
+                                    key = keyedSettingsItem.lazyKey,
+                                    contentType = "home_catalog_row",
+                                ) {
                                     HomeCatalogRowSection(
                                         section = section,
                                         entries = if (isDesktop) {
@@ -1140,7 +1173,10 @@ private fun LazyListScope.homeContinueWatchingSections(
     if (!preferences.isVisible) return
 
     if (continueWatchingItems.isNotEmpty()) {
-        item(key = HOME_CONTINUE_WATCHING_SECTION_KEY) {
+        item(
+            key = HOME_CONTINUE_WATCHING_SECTION_KEY,
+            contentType = "home_continue_watching",
+        ) {
             HomeContinueWatchingSection(
                 items = continueWatchingItems,
                 dataSourceKey = dataSourceKey,
@@ -1159,7 +1195,10 @@ private fun LazyListScope.homeContinueWatchingSections(
     }
 
     if (upcomingItems.isNotEmpty()) {
-        item(key = HOME_UPCOMING_SECTION_KEY) {
+        item(
+            key = HOME_UPCOMING_SECTION_KEY,
+            contentType = "home_continue_watching",
+        ) {
             HomeContinueWatchingSection(
                 items = upcomingItems,
                 dataSourceKey = dataSourceKey,

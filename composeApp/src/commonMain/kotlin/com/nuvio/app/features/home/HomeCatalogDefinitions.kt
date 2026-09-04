@@ -30,43 +30,77 @@ data class HomeCatalogDefinition(
 }
 
 fun buildAddonCatalogRefreshSignature(addons: List<ManagedAddon>): List<String> =
-    addons.enabledAddons().map { addon ->
-        val signature = CatalogDescriptorSignature()
-        signature.addAddon(addon)
-        addon.manifest?.let { manifest ->
-            signature.addManifest(manifest)
-            manifest.catalogs.forEach(signature::addCatalog)
-        }
-        signature.value()
-    }.sorted()
+    buildHomeCatalogRefreshSignature(addons)
 
-fun buildHomeCatalogDefinitions(addons: List<ManagedAddon>): List<HomeCatalogDefinition> =
-    addons.enabledAddons().mapNotNull { addon ->
-        val manifest = addon.manifest ?: return@mapNotNull null
-        addon to manifest
-    }.flatMap { (addon, manifest) ->
-        manifest.catalogs
-            .filter { catalog -> catalog.extra.none { it.isRequired } }
-            .map { catalog ->
-                HomeCatalogDefinition(
-                    key = "${manifest.id}:${catalog.type}:${catalog.id}",
-                    defaultTitle = runBlocking {
-                        getString(
-                            Res.string.home_catalog_default_title,
-                            catalog.name,
-                            localizedMediaTypeLabel(catalog.type),
-                        )
-                    },
-                    catalogName = catalog.name,
-                    addonName = addon.displayTitle,
-                    manifestUrl = addon.manifestUrl,
-                    type = catalog.type,
-                    catalogId = catalog.id,
-                    supportsPagination = catalog.supportsPagination(),
-                    descriptorSignature = buildHomeCatalogDescriptorSignature(addon, manifest, catalog),
-                )
+fun buildHomeCatalogRefreshSignature(addons: List<ManagedAddon>): List<String> {
+    val isAnilistEnabled = com.nuvio.app.features.anilist.KaiHooks.isKaiEnabled() &&
+        (addons.isEmpty() || addons.any { com.nuvio.app.features.anilist.KaiHooks.isKaiAddon(it) && it.enabled })
+    val anilistSignatures = if (isAnilistEnabled) {
+        com.nuvio.app.features.anilist.catalog.AnilistCatalogRepository.getCatalogDefinitions()
+            .map { it.descriptorSignature }
+    } else listOf("anilist:disabled")
+    val addonSignatures = com.nuvio.app.features.anilist.KaiHooks.filterExternalAddons(addons.enabledAddons())
+        .mapNotNull { addon ->
+            val manifest = addon.manifest ?: return@mapNotNull null
+            addon to manifest
+        }.flatMap { (addon, manifest) ->
+            manifest.catalogs.map { catalog ->
+                buildHomeCatalogDescriptorSignature(addon, manifest, catalog)
             }
-    }.distinctBy(HomeCatalogDefinition::key)
+        }
+    return (anilistSignatures + addonSignatures).sorted()
+}
+
+fun buildHomeCatalogDefinitions(addons: List<ManagedAddon>): List<HomeCatalogDefinition> {
+    val isAnilistEnabled = com.nuvio.app.features.anilist.KaiHooks.isKaiEnabled() &&
+        (addons.isEmpty() || addons.any { com.nuvio.app.features.anilist.KaiHooks.isKaiAddon(it) && it.enabled })
+    val anilistCatalogs = if (isAnilistEnabled) {
+        com.nuvio.app.features.anilist.catalog.AnilistCatalogRepository.getCatalogDefinitions()
+    } else emptyList()
+    val addonCatalogs = com.nuvio.app.features.anilist.KaiHooks.filterExternalAddons(addons.enabledAddons())
+        .mapNotNull { addon ->
+            val manifest = addon.manifest ?: return@mapNotNull null
+            addon to manifest
+        }.flatMap { (addon, manifest) ->
+            manifest.catalogs
+                .filter { catalog -> catalog.extra.none { it.isRequired } }
+                .map { catalog ->
+                    HomeCatalogDefinition(
+                        key = "${manifest.id}:${catalog.type}:${catalog.id}",
+                        defaultTitle = buildDefaultCatalogTitle(catalog.name, catalog.type),
+                        catalogName = catalog.name,
+                        addonName = addon.displayTitle,
+                        manifestUrl = addon.manifestUrl,
+                        type = catalog.type,
+                        catalogId = catalog.id,
+                        supportsPagination = catalog.supportsPagination(),
+                        descriptorSignature = buildHomeCatalogDescriptorSignature(addon, manifest, catalog),
+                    )
+                }
+        }
+    return (anilistCatalogs + addonCatalogs).distinctBy(HomeCatalogDefinition::key)
+}
+
+fun buildDefaultCatalogTitle(catalogName: String, type: String): String {
+    val cleanName = catalogName.trim()
+    return when (type.lowercase()) {
+        "movie" -> {
+            if (cleanName.endsWith("movie", ignoreCase = true) || cleanName.endsWith("movies", ignoreCase = true)) {
+                cleanName
+            } else {
+                "$cleanName Movies"
+            }
+        }
+        "series", "tv" -> {
+            if (cleanName.endsWith("series", ignoreCase = true) || cleanName.endsWith("shows", ignoreCase = true) || cleanName.endsWith("tv", ignoreCase = true)) {
+                cleanName
+            } else {
+                "$cleanName Series"
+            }
+        }
+        else -> cleanName
+    }
+}
 
 private fun buildHomeCatalogDescriptorSignature(
     addon: ManagedAddon,

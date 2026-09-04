@@ -43,6 +43,7 @@ fun handleAppUrl(url: String) {
     if (normalizedUrl.isBlank()) return
 
     ensureTrackingProvidersRegistered()
+    com.nuvio.app.features.anilist.AnilistAuthRepository.handleAuthCallback(normalizedUrl)
     TrackingProviderRegistry.handleAuthCallback(normalizedUrl)
     AppDeepLinkRepository.handleUrl(normalizedUrl)
 }

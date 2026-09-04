@@ -371,6 +371,13 @@ object HomeCatalogSettingsRepository {
                 order = stored?.order ?: nextOrder++,
             )
         }
+        if (enabledHeroSourceCount == 0 && com.nuvio.app.features.anilist.KaiHooks.isKaiEnabled()) {
+            val defaultKey = "anilist:anime:trending"
+            val existing = normalized[defaultKey]
+            if (existing != null && definitions.any { it.key == defaultKey }) {
+                normalized[defaultKey] = existing.copy(heroSourceEnabled = true)
+            }
+        }
         preferences = normalized.toMap()
     }
 

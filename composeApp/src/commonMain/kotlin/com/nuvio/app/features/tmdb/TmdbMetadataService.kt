@@ -4,6 +4,7 @@ import com.nuvio.app.isDesktop
 
 import co.touchlab.kermit.Logger
 import com.nuvio.app.features.addons.httpGetText
+import com.nuvio.app.features.addons.httpGetTextWithHeaders
 import com.nuvio.app.features.details.MetaCompany
 import com.nuvio.app.features.details.MetaDetails
 import com.nuvio.app.features.details.MetaPerson
@@ -22,6 +23,8 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import nuvio.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.getString
 
@@ -42,12 +45,81 @@ object TmdbMetadataService {
     suspend fun fetchPersonDetail(
         personId: Int,
         preferCrewCredits: Boolean? = null,
+        fallbackName: String? = null,
+        isAnilist: Boolean = false,
+        isCharacter: Boolean = false,
     ): PersonDetail? = withContext(Dispatchers.Default) {
         val settings = TmdbSettingsRepository.snapshot()
-        if (!settings.enabled || !settings.hasApiKey) return@withContext null
         val language = normalizeTmdbLanguage(settings.language)
-        val cacheKey = "$personId:${preferCrewCredits?.toString() ?: "auto"}:$language"
+        val cacheKey = "$personId:${fallbackName.orEmpty()}:${preferCrewCredits?.toString() ?: "auto"}:$language:$isAnilist:$isCharacter"
         personCache[cacheKey]?.let { return@withContext it }
+
+        if (isAnilist) {
+            val anilistPerson = runCatching {
+                if (isCharacter) {
+                    com.nuvio.app.features.anilist.AnilistApi.fetchCharacterDetail(
+                        characterId = personId.takeIf { it > 0 },
+                        searchName = fallbackName,
+                    )
+                } else {
+                    com.nuvio.app.features.anilist.AnilistApi.fetchStaffDetail(
+                        staffId = personId.takeIf { it > 0 },
+                        searchName = fallbackName,
+                    )
+                }
+            }.getOrNull()
+
+            val resolved = anilistPerson ?: if (!fallbackName.isNullOrBlank()) {
+                PersonDetail(
+                    tmdbId = personId,
+                    name = fallbackName,
+                    biography = null,
+                    birthday = null,
+                    deathday = null,
+                    placeOfBirth = "Japan",
+                    profilePhoto = null,
+                    knownFor = if (isCharacter) "Character" else "Voice Acting",
+                    movieCredits = emptyList(),
+                    tvCredits = emptyList(),
+                )
+            } else null
+
+            if (resolved != null) {
+                personCache[cacheKey] = resolved
+            }
+            return@withContext resolved
+        }
+
+        val anilistFallback = if (personId > 0 || !fallbackName.isNullOrBlank()) {
+            val staffDetail = runCatching {
+                com.nuvio.app.features.anilist.AnilistApi.fetchStaffDetail(
+                    staffId = personId.takeIf { it > 0 },
+                    searchName = fallbackName,
+                )
+            }.getOrNull()
+            staffDetail ?: if (!fallbackName.isNullOrBlank()) {
+                PersonDetail(
+                    tmdbId = personId,
+                    name = fallbackName,
+                    biography = null,
+                    birthday = null,
+                    deathday = null,
+                    placeOfBirth = "Japan",
+                    profilePhoto = null,
+                    knownFor = "Voice Acting",
+                    movieCredits = emptyList(),
+                    tvCredits = emptyList(),
+                )
+            } else null
+        } else null
+
+        if (!settings.enabled || !settings.hasApiKey || personId <= 0) {
+            if (anilistFallback != null) {
+                personCache[cacheKey] = anilistFallback
+                return@withContext anilistFallback
+            }
+            return@withContext null
+        }
 
         try {
             val (person, credits) = coroutineScope {
@@ -163,30 +235,54 @@ object TmdbMetadataService {
                 )
             }
 
+            val resolvedPersonName = resolvePersonName(
+                localizedName = person.name,
+                originalName = person.originalName,
+                fallbackEnglishName = englishPerson?.name,
+                preferredLanguage = language,
+            ) ?: runBlocking { getString(Res.string.generic_unknown) }
+
+            // Fetch distinct standalone anime seasons for voice actors from AniList!
+            val anilistStaffMedia = coroutineScope {
+                val searchName = englishPerson?.name ?: person.name ?: resolvedPersonName
+                if (searchName.isNotBlank()) {
+                    runCatching {
+                        com.nuvio.app.features.anilist.AnilistApi.fetchStaffMedia(searchName)
+                    }.getOrNull().orEmpty()
+                } else emptyList()
+            }
+
+            val baseMovieCredits = selectPreferredCredits(
+                preferCrew = preferCrew,
+                castCredits = castMovieCredits,
+                crewCredits = crewMovieCredits,
+            )
+            val baseTvCredits = selectPreferredCredits(
+                preferCrew = preferCrew,
+                castCredits = castTvCredits,
+                crewCredits = crewTvCredits,
+            )
+
+            val (finalMovieCredits, finalTvCredits) = if (anilistStaffMedia.isNotEmpty()) {
+                val anilistMovies = anilistStaffMedia.filter { it.type == "movie" }
+                val anilistTv = anilistStaffMedia.filter { it.type == "series" }
+                (anilistMovies + baseMovieCredits).distinctBy { it.name.lowercase().trim() } to
+                    (anilistTv + baseTvCredits).distinctBy { it.name.lowercase().trim() }
+            } else {
+                baseMovieCredits to baseTvCredits
+            }
+
             val detail = PersonDetail(
                 tmdbId = person.id ?: personId,
-                name = resolvePersonName(
-                    localizedName = person.name,
-                    originalName = person.originalName,
-                    fallbackEnglishName = englishPerson?.name,
-                    preferredLanguage = language,
-                ) ?: runBlocking { getString(Res.string.generic_unknown) },
+                name = resolvedPersonName,
                 biography = biography,
                 birthday = person.birthday?.takeIf { it.isNotBlank() },
                 deathday = person.deathday?.takeIf { it.isNotBlank() },
                 placeOfBirth = person.placeOfBirth?.takeIf { it.isNotBlank() },
                 profilePhoto = buildImageUrl(person.profilePath, "w500"),
                 knownFor = person.knownForDepartment?.takeIf { it.isNotBlank() },
-                movieCredits = selectPreferredCredits(
-                    preferCrew = preferCrew,
-                    castCredits = castMovieCredits,
-                    crewCredits = crewMovieCredits,
-                ),
-                tvCredits = selectPreferredCredits(
-                    preferCrew = preferCrew,
-                    castCredits = castTvCredits,
-                    crewCredits = crewTvCredits,
-                ),
+                movieCredits = finalMovieCredits,
+                tvCredits = finalTvCredits,
             )
             personCache[cacheKey] = detail
             detail
@@ -363,13 +459,106 @@ object TmdbMetadataService {
         entityId: Int,
         sourceType: String,
         fallbackName: String? = null,
+        isAnilist: Boolean = false,
     ): TmdbEntityBrowseData? = withContext(Dispatchers.Default) {
         val settings = TmdbSettingsRepository.snapshot()
-        if (!settings.enabled || !settings.hasApiKey) return@withContext null
         val language = normalizeTmdbLanguage(settings.language)
         val normalizedSourceType = normalizeEntitySourceType(sourceType)
-        val cacheKey = "${entityKind.routeValue}:$entityId:$normalizedSourceType:$language"
+        val cacheKey = "${entityKind.routeValue}:$entityId:${fallbackName.orEmpty()}:$normalizedSourceType:$language:$isAnilist"
         entityBrowseCache[cacheKey]?.let { return@withContext it }
+
+        val studioName = fallbackName.orEmpty()
+        if (isAnilist || !settings.enabled || !settings.hasApiKey || entityId <= 0) {
+            val cleanName = studioName.replace(" (TV)", "").replace(" Corporation", "").replace(" Co., Ltd.", "").trim()
+            var anilistStudioMedia = if (cleanName.isNotBlank()) {
+                runCatching {
+                    com.nuvio.app.features.anilist.AnilistApi.fetchStudioMedia(cleanName)
+                }.getOrNull().orEmpty()
+            } else emptyList()
+
+            if (anilistStudioMedia.isEmpty() && cleanName.isNotBlank()) {
+                // Secondary fallback: search AniList by keyword
+                val searchResults = runCatching {
+                    com.nuvio.app.features.anilist.AnilistApi.searchAnime(cleanName)
+                }.getOrNull().orEmpty()
+                anilistStudioMedia = searchResults.mapNotNull { media ->
+                    val poster = media.coverImage?.extraLarge ?: media.coverImage?.large ?: return@mapNotNull null
+                    com.nuvio.app.features.home.MetaPreview(
+                        id = "ani_${media.id}",
+                        type = if (media.format == "MOVIE" || media.episodes == 1) "movie" else "series",
+                        name = media.title?.displayTitle.orEmpty(),
+                        poster = poster,
+                        banner = media.bannerImage,
+                        logo = null,
+                        description = media.description,
+                        releaseInfo = media.startDateYear?.toString() ?: (if (media.episodes != null) "${media.episodes} Ep" else null),
+                    )
+                }
+            }
+
+            val seriesList = anilistStudioMedia.filter { it.type == "series" }
+            val moviesList = anilistStudioMedia.filter { it.type == "movie" }
+
+            val rails = buildList {
+                if (seriesList.isNotEmpty()) {
+                    add(
+                        TmdbEntityRail(
+                            mediaType = TmdbEntityMediaType.TV,
+                            railType = TmdbEntityRailType.POPULAR,
+                            items = seriesList,
+                            currentPage = 1,
+                            hasMore = false,
+                        )
+                    )
+                }
+                if (moviesList.isNotEmpty()) {
+                    add(
+                        TmdbEntityRail(
+                            mediaType = TmdbEntityMediaType.MOVIE,
+                            railType = TmdbEntityRailType.POPULAR,
+                            items = moviesList,
+                            currentPage = 1,
+                            hasMore = false,
+                        )
+                    )
+                }
+                if (isEmpty() && anilistStudioMedia.isNotEmpty()) {
+                    add(
+                        TmdbEntityRail(
+                            mediaType = TmdbEntityMediaType.TV,
+                            railType = TmdbEntityRailType.POPULAR,
+                            items = anilistStudioMedia,
+                            currentPage = 1,
+                            hasMore = false,
+                        )
+                    )
+                }
+            }
+
+            val studioLogo = com.nuvio.app.features.anilist.catalog.AnimeStudioLogos.findLogo(studioName)
+                ?: com.nuvio.app.features.anilist.catalog.AnimeStudioLogos.findLogo(cleanName)
+
+            val wikiSummary = runCatching {
+                kotlinx.coroutines.withTimeoutOrNull(2500L) {
+                    fetchWikipediaSummary(cleanName.ifBlank { studioName })
+                }
+            }.getOrNull()
+
+            val browseData = TmdbEntityBrowseData(
+                header = TmdbEntityHeader(
+                    id = entityId,
+                    kind = entityKind,
+                    name = studioName.ifBlank { cleanName },
+                    logo = studioLogo,
+                    originCountry = "Japan",
+                    secondaryLabel = if (entityKind == TmdbEntityKind.NETWORK) "Broadcaster / Network" else "Animation Studio",
+                    description = wikiSummary,
+                ),
+                rails = rails,
+            )
+            entityBrowseCache[cacheKey] = browseData
+            return@withContext browseData
+        }
 
         val (header, rails) = coroutineScope {
             val headerDeferred = async {
@@ -409,22 +598,80 @@ object TmdbMetadataService {
             headerDeferred.await() to railDeferreds.awaitAll().filterNotNull()
         }
 
-        if (header == null && rails.isEmpty()) return@withContext null
+        val resolvedHeader = header ?: TmdbEntityHeader(
+            id = entityId,
+            kind = entityKind,
+            name = fallbackName?.takeIf { it.isNotBlank() } ?: runBlocking { getString(Res.string.generic_unknown) },
+            logo = null,
+            originCountry = null,
+            secondaryLabel = null,
+            description = null,
+        )
+
+        val studioResolvedName = fallbackName ?: resolvedHeader.name
+        val resolvedStudioMedia = if (studioResolvedName.isNotBlank() && rails.isEmpty()) {
+            runCatching {
+                com.nuvio.app.features.anilist.AnilistApi.fetchStudioMedia(studioResolvedName)
+            }.getOrNull().orEmpty()
+        } else emptyList()
+
+        val finalRails = if (resolvedStudioMedia.isNotEmpty()) {
+            val anilistRail = TmdbEntityRail(
+                mediaType = TmdbEntityMediaType.TV,
+                railType = TmdbEntityRailType.POPULAR,
+                items = resolvedStudioMedia,
+                currentPage = 1,
+                hasMore = false,
+            )
+            listOf(anilistRail) + rails
+        } else {
+            rails
+        }
+
+        if (header == null && finalRails.isEmpty()) return@withContext null
 
         val data = TmdbEntityBrowseData(
-            header = header ?: TmdbEntityHeader(
-                id = entityId,
-                kind = entityKind,
-                name = fallbackName?.takeIf { it.isNotBlank() } ?: runBlocking { getString(Res.string.generic_unknown) },
-                logo = null,
-                originCountry = null,
-                secondaryLabel = null,
-                description = null,
-            ),
-            rails = rails,
+            header = resolvedHeader,
+            rails = finalRails,
         )
         entityBrowseCache[cacheKey] = data
         data
+    }
+
+    private suspend fun fetchWikipediaSummary(name: String): String? {
+        val cleanName = name.trim()
+        if (cleanName.isBlank()) return null
+
+        val candidates = listOf(
+            cleanName,
+            "$cleanName (company)",
+            "$cleanName (studio)",
+            "$cleanName (animation studio)",
+            cleanName.replace(" ", "_")
+        )
+
+        for (candidate in candidates) {
+            val url = "https://en.wikipedia.org/api/rest_v1/page/summary/${candidate.replace(" ", "_")}"
+            val text = runCatching {
+                httpGetTextWithHeaders(
+                    url = url,
+                    headers = mapOf(
+                        "User-Agent" to "NuvioApp/1.0 (https://nuvio.app; contact@nuvio.app)",
+                        "Accept" to "application/json",
+                    ),
+                )
+            }.getOrNull() ?: continue
+
+            val extract = runCatching {
+                val jsonElement = json.parseToJsonElement(text)
+                jsonElement.jsonObject["extract"]?.jsonPrimitive?.content
+            }.getOrNull()
+
+            if (!extract.isNullOrBlank() && !extract.contains("may refer to:", ignoreCase = true) && !extract.contains("disambiguation", ignoreCase = true)) {
+                return extract
+            }
+        }
+        return null
     }
 
     suspend fun fetchEntityRailPage(
@@ -825,6 +1072,8 @@ object TmdbMetadataService {
                         video.episode?.let { episode -> season to episode }
                     }
                     val enrichmentForEpisode = key?.let(episodeMap::get)
+                        ?: (video.episode?.let { ep -> 1 to ep }?.let(episodeMap::get))
+                        ?: (video.episode?.let { ep -> 0 to ep }?.let(episodeMap::get))
                     if (enrichmentForEpisode == null) {
                         video
                     } else {
@@ -866,10 +1115,13 @@ object TmdbMetadataService {
         }
 
         if (enrichment != null && settings.useMoreLikeThis) {
-            updated = updated.copy(
-                moreLikeThis = enrichment.moreLikeThis,
-                moreLikeThisSource = MoreLikeThisSource.TMDB.takeIf { enrichment.moreLikeThis.isNotEmpty() },
-            )
+            val isAnilist = meta.id.startsWith("ani_", ignoreCase = true) || meta.id.startsWith("anilist:", ignoreCase = true)
+            if (!isAnilist || meta.moreLikeThis.isEmpty()) {
+                updated = updated.copy(
+                    moreLikeThis = enrichment.moreLikeThis,
+                    moreLikeThisSource = MoreLikeThisSource.TMDB.takeIf { enrichment.moreLikeThis.isNotEmpty() },
+                )
+            }
         }
 
         if (enrichment != null && settings.useCollections) {
@@ -1446,7 +1698,7 @@ internal data class TmdbEpisodeEnrichment(
 
 private fun normalizeMetaType(type: String): String =
     when (type.trim().lowercase()) {
-        "series", "tv", "show", "tvshow" -> "tv"
+        "series", "tv", "show", "tvshow", "anime" -> "tv"
         else -> "movie"
     }
 

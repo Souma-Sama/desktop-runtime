@@ -47,6 +47,7 @@ import com.nuvio.app.core.ui.NuvioScreen
 import com.nuvio.app.core.ui.NuvioNetworkOfflineCard
 import com.nuvio.app.core.ui.NuvioScreenHeader
 import com.nuvio.app.core.ui.nuvioConsumePointerEvents
+import com.nuvio.app.core.ui.LocalNuvioFloatingSidebarPadding
 import com.nuvio.app.core.ui.rememberPosterCardStyleUiState
 import com.nuvio.app.core.ui.withDuplicateSafeLazyKeys
 import com.nuvio.app.features.addons.AddonRepository
@@ -125,6 +126,8 @@ fun SearchScreen(
     var query by rememberSaveable { mutableStateOf("") }
     var lastRequestedQuery by rememberSaveable { mutableStateOf<String?>(null) }
     var observedOfflineState by remember { mutableStateOf(false) }
+    val advancedFilterState by SearchRepository.advancedFilterState.collectAsStateWithLifecycle()
+    var showAdvancedFilterSheet by remember { mutableStateOf(false) }
     val discoverInFocus by remember(query, listState) {
         derivedStateOf {
             query.isBlank() && listState.firstVisibleItemIndex > 0
@@ -231,8 +234,9 @@ fun SearchScreen(
                 posterGridColumnCountForWidth(maxWidth)
             }
         }
-        val homeSectionPadding = remember(maxWidth) {
-            homeSectionHorizontalPaddingForWidth(maxWidth.value)
+        val floatingSidebarPadding = LocalNuvioFloatingSidebarPadding.current
+        val homeSectionPadding = remember(maxWidth, floatingSidebarPadding) {
+            if (floatingSidebarPadding > 0.dp) floatingSidebarPadding else homeSectionHorizontalPaddingForWidth(maxWidth.value)
         }
         val headerTitle = when {
             query.isNotBlank() -> stringResource(Res.string.compose_nav_search)
@@ -299,31 +303,34 @@ fun SearchScreen(
                     )
                 }
             }
-                discoverContent(
-                    state = discoverUiState,
-                    isSourceLoading = addonManifestsLoading,
-                    columns = discoverColumns,
-                    networkCondition = networkStatusUiState.condition,
-                    onTypeSelected = SearchRepository::selectDiscoverType,
-                    onCatalogSelected = SearchRepository::selectDiscoverCatalog,
-                    onGenreSelected = SearchRepository::selectDiscoverGenre,
-                    onRetry = {
-                        NetworkStatusRepository.requestRefresh(force = true)
-                        if (addonsUiState.addons.firstEnabledManifestError() != null) {
-                            AddonRepository.refreshAll()
-                        } else {
-                            SearchRepository.refreshDiscover(
-                                addons = addonsUiState.addons,
-                                forceRefresh = true,
-                            )
-                        }
-                    },
-                    watchedKeys = watchedUiState.watchedKeys,
-                    fullyWatchedSeriesKeys = fullyWatchedSeriesKeys,
-                    onPosterClick = onPosterClick,
-                    onPosterLongClick = onPosterLongClick,
-                )
-            } else {
+            discoverContent(
+                state = discoverUiState,
+                isSourceLoading = addonManifestsLoading,
+                columns = discoverColumns,
+                networkCondition = networkStatusUiState.condition,
+                onTypeSelected = SearchRepository::selectDiscoverType,
+                onCatalogSelected = SearchRepository::selectDiscoverCatalog,
+                onGenreSelected = SearchRepository::selectDiscoverGenre,
+                onSortSelected = SearchRepository::selectDiscoverSort,
+                onOpenAdvancedFilter = { showAdvancedFilterSheet = true },
+                activeAdvancedFilterCount = advancedFilterState.activeFilterCount,
+                onRetry = {
+                    NetworkStatusRepository.requestRefresh(force = true)
+                    if (addonsUiState.addons.firstEnabledManifestError() != null) {
+                        AddonRepository.refreshAll()
+                    } else {
+                        SearchRepository.refreshDiscover(
+                            addons = addonsUiState.addons,
+                            forceRefresh = true,
+                        )
+                    }
+                },
+                watchedKeys = watchedUiState.watchedKeys,
+                fullyWatchedSeriesKeys = fullyWatchedSeriesKeys,
+                onPosterClick = onPosterClick,
+                onPosterLongClick = onPosterLongClick,
+            )
+        } else {
                 val normalizedQuery = query.trim()
                 val isWaitingForSearch = normalizedQuery.isNotBlank() && lastRequestedQuery != normalizedQuery
                 when {
@@ -393,6 +400,22 @@ fun SearchScreen(
                     }
                 }
             }
+        }
+
+        if (showAdvancedFilterSheet) {
+            val isDesktopLayout = maxWidth > 680.dp
+            com.nuvio.app.features.anilist.search.AniHyouSearchFilterSheet(
+                initialFilter = advancedFilterState,
+                initialQuery = query,
+                isDesktop = isDesktopLayout,
+                onDismiss = { showAdvancedFilterSheet = false },
+                onApply = { newFilter, newQuery ->
+                    SearchRepository.updateAdvancedFilter(newFilter)
+                    if (newQuery != query) {
+                        query = newQuery
+                    }
+                },
+            )
         }
     }
 }

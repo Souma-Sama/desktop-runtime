@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.nuvio.app.core.ui.NuvioCardDepthSurface
+import com.nuvio.app.core.ui.LocalNuvioFloatingSidebarPadding
 import com.nuvio.app.core.ui.NuvioShelfSection
 import com.nuvio.app.core.ui.PosterLandscapeAspectRatio
 import com.nuvio.app.core.ui.desktopCatalogShelfPosterBaseWidthDp
@@ -74,12 +75,16 @@ private fun HomeCollectionRowSectionContent(
     animateGifs: Boolean,
     onFolderClick: ((collectionId: String, folderId: String) -> Unit)?,
 ) {
+    val floatingSidebarPadding = LocalNuvioFloatingSidebarPadding.current
+    val rowEndPadding = if (floatingSidebarPadding > 0.dp) 28.dp else sectionPadding
+
     NuvioShelfSection(
         title = collection.title,
         entries = collection.folders,
         modifier = modifier,
         headerHorizontalPadding = sectionPadding,
-        rowContentPadding = PaddingValues(horizontal = sectionPadding),
+        headerEndPadding = rowEndPadding,
+        rowContentPadding = PaddingValues(start = sectionPadding, end = rowEndPadding),
         key = { folder -> "collection_${collection.id}_folder_${folder.id}" },
     ) { folder ->
         CollectionFolderCard(

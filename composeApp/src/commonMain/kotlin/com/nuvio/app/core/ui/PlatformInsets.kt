@@ -18,6 +18,7 @@ internal expect fun nuvioBottomNavigationBarInsets(): WindowInsets
 internal expect fun platformPhysicalTopInset(): Dp
 
 internal val LocalNuvioBottomNavigationOverlayPadding = staticCompositionLocalOf { 0.dp }
+internal val LocalNuvioFloatingSidebarPadding = staticCompositionLocalOf { 0.dp }
 
 /** CompositionLocal providing the shared [NuvioNavBarScrollState] so child screens can attach the nestedScrollConnection. */
 val LocalNuvioNavBarScrollState = staticCompositionLocalOf<NuvioNavBarScrollState?> { null }

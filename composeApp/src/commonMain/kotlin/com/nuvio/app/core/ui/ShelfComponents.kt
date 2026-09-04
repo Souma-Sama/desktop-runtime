@@ -3,11 +3,14 @@ package com.nuvio.app.core.ui
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -16,12 +19,15 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import com.nuvio.app.features.anilist.AnilistPosterScoreFormat
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.lazy.LazyRow
@@ -32,18 +38,30 @@ import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.graphics.PathFillType
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.vector.path
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import kotlin.math.roundToInt
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
@@ -52,17 +70,23 @@ import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import com.nuvio.app.isDesktop
 import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.home_view_all
 import nuvio.composeapp.generated.resources.poster_logo_content_description
+import nuvio.composeapp.generated.resources.rating_anilist
+import nuvio.composeapp.generated.resources.rating_mal
+import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
 import kotlin.math.abs
+import kotlin.math.absoluteValue
 import kotlin.math.roundToInt
 
 enum class NuvioPosterShape {
@@ -83,6 +107,7 @@ fun <T> NuvioShelfSection(
     modifier: Modifier = Modifier,
     rowModifier: Modifier = Modifier,
     headerHorizontalPadding: Dp = 0.dp,
+    headerEndPadding: Dp? = null,
     rowContentPadding: PaddingValues = PaddingValues(0.dp),
     itemSpacing: Dp = 10.dp,
     onViewAllClick: (() -> Unit)? = null,
@@ -105,7 +130,10 @@ fun <T> NuvioShelfSection(
         if (title.isNotBlank()) {
             NuvioShelfSectionHeader(
                 title = title,
-                modifier = Modifier.padding(horizontal = headerHorizontalPadding),
+                modifier = Modifier.padding(
+                    start = headerHorizontalPadding,
+                    end = headerEndPadding ?: headerHorizontalPadding,
+                ),
                 onViewAllClick = onViewAllClick,
                 onTitleClick = onTitleClick,
                 viewAllPillSize = viewAllPillSize,
@@ -238,6 +266,15 @@ fun NuvioPosterCard(
     showTitleBelow: Boolean = true,
     bottomLeftLogoUrl: String? = null,
     bottomLeftText: String? = null,
+    anilistScore: Double? = null,
+    malScore: Double? = null,
+    scoreFormat: AnilistPosterScoreFormat = AnilistPosterScoreFormat.PERCENTAGE,
+    anilistStatus: com.nuvio.app.features.anilist.AnilistMediaListStatus? = null,
+    anilistProgress: Pair<Int, Int?>? = null,
+    anilistUserScore: Double? = null,
+    ratingBadgeScale: Float = 1f,
+    statusBadgeScale: Float = 1f,
+    titleLogoScale: Float = 1f,
     isWatched: Boolean = false,
     onClick: (() -> Unit)? = null,
     onLongClick: (() -> Unit)? = null,
@@ -247,10 +284,6 @@ fun NuvioPosterCard(
     val effectiveBasePosterWidthDp = basePosterWidthDp ?: posterCardStyle.widthDp
     val cardWidth = shape.cardWidth(basePosterWidthDp = effectiveBasePosterWidthDp)
     val cardShape = RoundedCornerShape(posterCardStyle.cornerRadiusDp.dp)
-    val catalogLogoOverlaySize = catalogLogoOverlaySize(
-        basePosterWidthDp = effectiveBasePosterWidthDp,
-        shape = shape,
-    )
     val shouldShowTitleBelow = showTitleBelow && !posterCardStyle.hideLabelsEnabled
 
     Column(
@@ -299,19 +332,37 @@ fun NuvioPosterCard(
             }
 
             if (!bottomLeftLogoUrl.isNullOrBlank() || !bottomLeftText.isNullOrBlank()) {
+                val maxLogoHeight = when (shape) {
+                    NuvioPosterShape.Landscape -> 44.dp * titleLogoScale
+                    NuvioPosterShape.Square -> 56.dp * titleLogoScale
+                    NuvioPosterShape.Poster -> ((cardWidth * 0.48f).coerceIn(48.dp, 68.dp)) * titleLogoScale
+                }
                 Box(
                     modifier = Modifier
-                        .align(Alignment.BottomStart)
-                        .padding(horizontal = NuvioTokens.Space.s10, vertical = NuvioTokens.Space.s10),
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .background(
+                            Brush.verticalGradient(
+                                colorStops = arrayOf(
+                                    0.00f to Color.Transparent,
+                                    0.25f to Color.Black.copy(alpha = 0.25f),
+                                    0.65f to Color.Black.copy(alpha = 0.65f),
+                                    1.00f to Color.Black.copy(alpha = 0.85f),
+                                ),
+                            )
+                        )
+                        .padding(horizontal = 6.dp, vertical = 6.dp),
+                    contentAlignment = Alignment.BottomCenter,
                 ) {
                     if (!bottomLeftLogoUrl.isNullOrBlank()) {
                         NuvioAsyncImage(
                             model = bottomLeftLogoUrl,
                             contentDescription = stringResource(Res.string.poster_logo_content_description, title),
                             modifier = Modifier
-                                .width(catalogLogoOverlaySize.width)
-                                .height(catalogLogoOverlaySize.height),
+                                .fillMaxWidth((0.90f * titleLogoScale).coerceIn(0.4f, 1f))
+                                .heightIn(min = 20.dp * titleLogoScale, max = maxLogoHeight),
                             contentScale = ContentScale.Fit,
+                            alignment = Alignment.BottomCenter,
                         )
                     } else {
                         Text(
@@ -320,10 +371,35 @@ fun NuvioPosterCard(
                             color = tokens.colors.textPrimary,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.widthIn(max = catalogLogoOverlaySize.textMaxWidth),
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth(0.90f),
                         )
                     }
                 }
+            }
+
+            PosterRatingBadgesOverlay(
+                anilistScore = anilistScore,
+                malScore = malScore,
+                scoreFormat = scoreFormat,
+                scale = ratingBadgeScale,
+                modifier = Modifier.align(Alignment.TopEnd),
+            )
+
+            if (anilistStatus != null) {
+                AnilistPosterStatusBadge(
+                    status = anilistStatus,
+                    scale = statusBadgeScale,
+                    modifier = Modifier.align(Alignment.TopStart),
+                )
+            }
+
+            if (anilistUserScore != null && anilistUserScore > 0.0) {
+                AnilistPosterUserRatingBadge(
+                    userScore = anilistUserScore,
+                    scale = statusBadgeScale,
+                    modifier = Modifier.align(Alignment.BottomStart),
+                )
             }
 
             NuvioPosterWatchedOverlay(isWatched = isWatched)
@@ -337,13 +413,37 @@ fun NuvioPosterCard(
                 overflow = TextOverflow.Ellipsis,
             )
             if (!detailLine.isNullOrBlank()) {
-                Text(
-                    text = detailLine,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = tokens.colors.textMuted,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
+                if (detailLine.contains(" • ")) {
+                    val parts = detailLine.split(" • ", limit = 2)
+                    androidx.compose.foundation.layout.Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceBetween,
+                        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = parts[0].trim(),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = tokens.colors.textMuted,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        Text(
+                            text = parts[1].trim(),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = tokens.colors.textMuted,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                } else {
+                    Text(
+                        text = detailLine,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = tokens.colors.textMuted,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
             } else {
                 Box(modifier = Modifier.height(NuvioTokens.Space.none))
             }
@@ -380,18 +480,12 @@ private fun NuvioShelfSectionHeader(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            val viewAllPlaceholderModifier = if (onViewAllClick == null) {
-                Modifier
-                    .alpha(0f)
-                    .clearAndSetSemantics { }
-            } else {
-                Modifier
+            if (onViewAllClick != null) {
+                NuvioViewAllPill(
+                    onClick = onViewAllClick,
+                    size = viewAllPillSize,
+                )
             }
-            NuvioViewAllPill(
-                onClick = onViewAllClick,
-                size = viewAllPillSize,
-                modifier = viewAllPlaceholderModifier,
-            )
         }
     }
 }
@@ -513,7 +607,7 @@ private fun catalogLogoOverlaySize(
         }
     }
 
-private fun NuvioPosterShape.cardWidth(basePosterWidthDp: Int): Dp =
+internal fun NuvioPosterShape.cardWidth(basePosterWidthDp: Int): Dp =
     when (this) {
         NuvioPosterShape.Poster -> basePosterWidthDp.dp
         NuvioPosterShape.Square -> basePosterWidthDp.dp
@@ -591,6 +685,7 @@ internal fun Modifier.posterCardClickable(
             interactionSource = interactionSource,
             indication = null,
             onClick = { onClick?.invoke() },
+            onDoubleClick = handleLongClick,
             onLongClick = handleLongClick,
         )
         .secondaryClick(handleLongClick)
@@ -604,4 +699,320 @@ private fun androidx.compose.ui.layout.LayoutCoordinates.unclippedBoundsInRoot()
         right = position.x + size.width,
         bottom = position.y + size.height,
     )
+}
+
+fun formatAnilistScore(
+    score: Double?,
+    format: AnilistPosterScoreFormat = AnilistPosterScoreFormat.PERCENTAGE,
+): String? {
+    if (score == null || score <= 0.0) return null
+    return when (format) {
+        AnilistPosterScoreFormat.PERCENTAGE -> {
+            val pct = if (score <= 10.0) (score * 10.0).roundToInt() else score.roundToInt()
+            "$pct%"
+        }
+        AnilistPosterScoreFormat.POINT_10 -> {
+            val score10 = if (score > 10.0) (score / 10.0) else score
+            val rounded = (score10 * 10.0).roundToInt()
+            val whole = rounded / 10
+            val decimal = (rounded % 10).absoluteValue
+            "$whole.$decimal"
+        }
+    }
+}
+
+@Composable
+private fun PosterRatingBadgesOverlay(
+    anilistScore: Double?,
+    malScore: Double?,
+    scoreFormat: AnilistPosterScoreFormat = AnilistPosterScoreFormat.PERCENTAGE,
+    scale: Float = 1f,
+    modifier: Modifier = Modifier,
+) {
+    val hasAnilist = anilistScore != null && anilistScore > 0
+    val hasMal = malScore != null && malScore > 0
+    if (!hasAnilist && !hasMal) return
+
+    Row(
+        modifier = modifier
+            .padding(top = 6.dp * scale, end = 6.dp * scale),
+        horizontalArrangement = Arrangement.spacedBy(4.dp * scale),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (hasAnilist) {
+            val formatted = formatAnilistScore(anilistScore, scoreFormat)
+            if (formatted != null) {
+                PosterScoreBadge(
+                    logo = Res.drawable.rating_anilist,
+                    contentDescription = "AniList",
+                    text = formatted,
+                    scale = scale,
+                )
+            }
+        }
+        if (hasMal) {
+            val roundedMal = (malScore!! * 100.0).roundToInt()
+            val whole = roundedMal / 100
+            val decimal = (roundedMal % 100).absoluteValue
+            val malFormatted = "$whole.${decimal.toString().padStart(2, '0')}"
+            PosterScoreBadge(
+                logo = Res.drawable.rating_mal,
+                contentDescription = "MyAnimeList",
+                text = malFormatted,
+                scale = scale,
+            )
+        }
+    }
+}
+
+@Composable
+private fun PosterScoreBadge(
+    logo: org.jetbrains.compose.resources.DrawableResource,
+    contentDescription: String,
+    text: String,
+    scale: Float = 1f,
+) {
+    Surface(
+        shape = RoundedCornerShape(4.dp * scale),
+        color = Color.Black.copy(alpha = 0.72f),
+        border = BorderStroke(0.5.dp * scale, Color.White.copy(alpha = 0.18f)),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 4.dp * scale, vertical = 2.dp * scale),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(3.dp * scale),
+        ) {
+            Image(
+                painter = painterResource(logo),
+                contentDescription = contentDescription,
+                modifier = Modifier.size(12.dp * scale),
+            )
+            Text(
+                text = text,
+                style = MaterialTheme.typography.labelSmall.copy(
+                    fontSize = (10 * scale).sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = (-0.2 * scale).sp,
+                ),
+                color = Color.White,
+                maxLines = 1,
+            )
+        }
+    }
+}
+
+private val AnilistClockIcon: ImageVector by lazy {
+    ImageVector.Builder(
+        name = "AnilistClock",
+        defaultWidth = 24.dp,
+        defaultHeight = 24.dp,
+        viewportWidth = 24f,
+        viewportHeight = 24f,
+    ).apply {
+        path(
+            fill = SolidColor(Color.White),
+            pathFillType = PathFillType.NonZero,
+        ) {
+            moveTo(11.99f, 2f)
+            curveTo(6.47f, 2f, 2f, 6.48f, 2f, 12f)
+            reflectiveCurveTo(6.47f, 22f, 11.99f, 22f)
+            curveTo(17.52f, 22f, 22f, 17.52f, 22f, 12f)
+            reflectiveCurveTo(17.52f, 2f, 11.99f, 2f)
+            close()
+            moveTo(12f, 20f)
+            curveTo(7.58f, 20f, 4f, 16.42f, 4f, 12f)
+            reflectiveCurveTo(7.58f, 4f, 12f, 4f)
+            reflectiveCurveTo(20f, 7.58f, 20f, 12f)
+            reflectiveCurveTo(16.42f, 20f, 12f, 20f)
+            close()
+            moveTo(12.5f, 7f)
+            horizontalLineTo(11f)
+            verticalLineTo(13f)
+            lineTo(16.25f, 16.15f)
+            lineTo(17f, 14.92f)
+            lineTo(12.5f, 12.25f)
+            verticalLineTo(7f)
+            close()
+        }
+    }.build()
+}
+
+private val AnilistPauseIcon: ImageVector by lazy {
+    ImageVector.Builder(
+        name = "AnilistPause",
+        defaultWidth = 24.dp,
+        defaultHeight = 24.dp,
+        viewportWidth = 24f,
+        viewportHeight = 24f,
+    ).apply {
+        path(
+            fill = SolidColor(Color.White),
+            pathFillType = PathFillType.NonZero,
+        ) {
+            moveTo(6f, 19f)
+            horizontalLineTo(10f)
+            verticalLineTo(5f)
+            horizontalLineTo(6f)
+            verticalLineTo(19f)
+            close()
+            moveTo(14f, 5f)
+            verticalLineTo(19f)
+            horizontalLineTo(18f)
+            verticalLineTo(5f)
+            horizontalLineTo(14f)
+            close()
+        }
+    }.build()
+}
+
+private val AnilistRepeatIcon: ImageVector by lazy {
+    ImageVector.Builder(
+        name = "AnilistRepeat",
+        defaultWidth = 24.dp,
+        defaultHeight = 24.dp,
+        viewportWidth = 24f,
+        viewportHeight = 24f,
+    ).apply {
+        path(
+            fill = SolidColor(Color.White),
+            pathFillType = PathFillType.NonZero,
+        ) {
+            moveTo(7f, 7f)
+            horizontalLineTo(17f)
+            verticalLineTo(10f)
+            lineTo(21f, 6f)
+            lineTo(17f, 2f)
+            verticalLineTo(5f)
+            horizontalLineTo(5f)
+            verticalLineTo(11f)
+            horizontalLineTo(7f)
+            verticalLineTo(7f)
+            close()
+            moveTo(17f, 17f)
+            horizontalLineTo(7f)
+            verticalLineTo(14f)
+            lineTo(3f, 18f)
+            lineTo(7f, 22f)
+            verticalLineTo(19f)
+            horizontalLineTo(19f)
+            verticalLineTo(13f)
+            horizontalLineTo(17f)
+            verticalLineTo(17f)
+            close()
+        }
+    }.build()
+}
+
+@Composable
+fun AnilistPosterStatusBadge(
+    status: com.nuvio.app.features.anilist.AnilistMediaListStatus,
+    scale: Float = 1f,
+    modifier: Modifier = Modifier,
+) {
+    val (iconVector, bgTint, iconTint) = when (status) {
+        com.nuvio.app.features.anilist.AnilistMediaListStatus.CURRENT -> Triple(
+            Icons.Default.PlayArrow,
+            Color(0xFF4CAF50), // Vibrant Green (AniHyou style)
+            Color.White,
+        )
+        com.nuvio.app.features.anilist.AnilistMediaListStatus.PLANNING -> Triple(
+            AnilistClockIcon,
+            Color(0xCC2A2A2A), // Dark Translucent Charcoal (AniHyou style)
+            Color.White,
+        )
+        com.nuvio.app.features.anilist.AnilistMediaListStatus.COMPLETED -> Triple(
+            Icons.Default.Check,
+            Color(0xFF90CAF9), // Soft Sky Blue (AniHyou style)
+            Color(0xFF0D47A1), // Deep Navy
+        )
+        com.nuvio.app.features.anilist.AnilistMediaListStatus.PAUSED -> Triple(
+            AnilistPauseIcon,
+            Color(0xFFE2D84C), // Mustard / Yellow (AniHyou style)
+            Color(0xFF1E1E1E), // Dark Charcoal
+        )
+        com.nuvio.app.features.anilist.AnilistMediaListStatus.DROPPED -> Triple(
+            Icons.Default.Close,
+            Color(0xFFE53935), // Red
+            Color.White,
+        )
+        com.nuvio.app.features.anilist.AnilistMediaListStatus.REPEATING -> Triple(
+            AnilistRepeatIcon,
+            Color(0xFFAB47BC), // Purple
+            Color.White,
+        )
+    }
+
+    Surface(
+        shape = RoundedCornerShape(bottomEnd = 8.dp * scale),
+        color = bgTint,
+        modifier = modifier.size(24.dp * scale),
+    ) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = iconVector,
+                contentDescription = status.name,
+                tint = iconTint,
+                modifier = Modifier.size(14.dp * scale),
+            )
+        }
+    }
+}
+
+@Composable
+fun AnilistPosterUserRatingBadge(
+    userScore: Double?,
+    scale: Float = 1f,
+    modifier: Modifier = Modifier,
+) {
+    if (userScore == null || userScore <= 0.0) return
+
+    // Normalize to 1-10 scale (AniList scores can be 0-100 or 0-10)
+    val score10 = if (userScore > 10.0) userScore / 10.0 else userScore
+
+    // AniHyou dynamic color tiers based on score
+    val (bgTint, textTint) = when {
+        score10 >= 7.5 -> Color(0xFF4DD0E1) to Color(0xFF003840) // Cyan / Teal for high scores (7.5 - 10)
+        score10 >= 6.0 -> Color(0xFFAED581) to Color(0xFF1B3A00) // Soft Green for good scores (6.0 - 7.4)
+        score10 >= 4.0 -> Color(0xFFFFB74D) to Color(0xFF3E2000) // Warm Amber for average (4.0 - 5.9)
+        else -> Color(0xFFEF5350) to Color(0xFFFFFFFF)           // Coral Red for low scores (< 4.0)
+    }
+
+    val roundedScore = ((score10 * 10.0).roundToInt() / 10.0)
+    val formattedScore = if (roundedScore % 1.0 == 0.0) {
+        roundedScore.toInt().toString()
+    } else {
+        roundedScore.toString()
+    }
+
+    Surface(
+        shape = RoundedCornerShape(topEnd = 8.dp * scale),
+        color = bgTint,
+        modifier = modifier,
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 5.dp * scale, vertical = 2.5.dp * scale),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(2.5.dp * scale),
+        ) {
+            Icon(
+                imageVector = Icons.Default.Star,
+                contentDescription = "User Rating",
+                tint = textTint,
+                modifier = Modifier.size(10.dp * scale),
+            )
+            Text(
+                text = formattedScore,
+                style = MaterialTheme.typography.labelSmall.copy(
+                    fontSize = (11 * scale).sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    letterSpacing = (-0.2 * scale).sp,
+                ),
+                color = textTint,
+                maxLines = 1,
+            )
+        }
+    }
 }

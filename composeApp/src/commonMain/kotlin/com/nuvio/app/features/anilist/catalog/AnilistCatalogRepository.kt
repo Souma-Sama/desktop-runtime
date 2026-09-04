@@ -1,0 +1,492 @@
+package com.nuvio.app.features.anilist.catalog
+
+import co.touchlab.kermit.Logger
+import com.nuvio.app.features.anilist.AnilistAuthRepository
+import com.nuvio.app.features.anilist.AnilistAuthStorage
+import com.nuvio.app.features.anilist.AnilistApi
+import com.nuvio.app.features.anilist.AnilistMedia
+import com.nuvio.app.features.anilist.AnilistMediaListStatus
+import com.nuvio.app.features.catalog.CatalogPage
+import com.nuvio.app.features.artwork.MetaHubArtwork
+import com.nuvio.app.features.home.HomeCatalogDefinition
+import com.nuvio.app.features.home.MetaPreview
+import com.nuvio.app.features.home.PosterShape
+import com.nuvio.app.features.library.LibraryClock
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+
+private data class CachedCatalogPage(
+    val timestamp: Long,
+    val page: CatalogPage,
+)
+
+object AnilistCatalogRepository {
+    private val log = Logger.withTag("AnilistCatalog")
+    private val pageCache = mutableMapOf<String, CachedCatalogPage>()
+    private const val CACHE_TTL_MS = 5 * 60 * 1000L // 5 minutes
+
+    const val CATALOG_WATCHING = "anilist:watching"
+    const val CATALOG_PLANNING = "anilist:planning"
+    const val CATALOG_COMPLETED = "anilist:completed"
+    const val CATALOG_REWATCHING = "anilist:rewatching"
+    const val CATALOG_PAUSED = "anilist:paused"
+    const val CATALOG_DROPPED = "anilist:dropped"
+    const val CATALOG_TRENDING = "anilist:trending"
+    const val CATALOG_POPULAR = "anilist:popular"
+    const val CATALOG_TOP_RATED = "anilist:top-rated"
+    const val CATALOG_AIRING = "anilist:airing"
+
+    fun clearCache() {
+        pageCache.clear()
+    }
+
+    fun getCatalogDefinitions(): List<HomeCatalogDefinition> {
+        AnilistAuthRepository.ensureInitialized()
+        val token = AnilistAuthRepository.token.value
+        val isAuthenticated = !token.isNullOrBlank() || AnilistAuthRepository.isAuthenticated.value
+
+        val availableDefinitions = mutableMapOf<String, HomeCatalogDefinition>()
+
+        if (isAuthenticated) {
+            availableDefinitions["Currently Watching"] = HomeCatalogDefinition(
+                key = "anilist:anime:watching",
+                defaultTitle = "Currently Watching",
+                catalogName = "Currently Watching",
+                addonName = "AniList",
+                manifestUrl = "native://anilist",
+                type = "anime",
+                catalogId = CATALOG_WATCHING,
+                supportsPagination = true,
+                descriptorSignature = "anilist:watching",
+            )
+            availableDefinitions["Plan to Watch"] = HomeCatalogDefinition(
+                key = "anilist:anime:planning",
+                defaultTitle = "Plan to Watch",
+                catalogName = "Plan to Watch",
+                addonName = "AniList",
+                manifestUrl = "native://anilist",
+                type = "anime",
+                catalogId = CATALOG_PLANNING,
+                supportsPagination = true,
+                descriptorSignature = "anilist:planning",
+            )
+            availableDefinitions["Completed"] = HomeCatalogDefinition(
+                key = "anilist:anime:completed",
+                defaultTitle = "Completed",
+                catalogName = "Completed",
+                addonName = "AniList",
+                manifestUrl = "native://anilist",
+                type = "anime",
+                catalogId = CATALOG_COMPLETED,
+                supportsPagination = true,
+                descriptorSignature = "anilist:completed",
+            )
+            availableDefinitions["Rewatching"] = HomeCatalogDefinition(
+                key = "anilist:anime:rewatching",
+                defaultTitle = "Rewatching",
+                catalogName = "Rewatching",
+                addonName = "AniList",
+                manifestUrl = "native://anilist",
+                type = "anime",
+                catalogId = CATALOG_REWATCHING,
+                supportsPagination = true,
+                descriptorSignature = "anilist:rewatching",
+            )
+            availableDefinitions["Paused"] = HomeCatalogDefinition(
+                key = "anilist:anime:paused",
+                defaultTitle = "Paused",
+                catalogName = "Paused",
+                addonName = "AniList",
+                manifestUrl = "native://anilist",
+                type = "anime",
+                catalogId = CATALOG_PAUSED,
+                supportsPagination = true,
+                descriptorSignature = "anilist:paused",
+            )
+            availableDefinitions["Dropped"] = HomeCatalogDefinition(
+                key = "anilist:anime:dropped",
+                defaultTitle = "Dropped",
+                catalogName = "Dropped",
+                addonName = "AniList",
+                manifestUrl = "native://anilist",
+                type = "anime",
+                catalogId = CATALOG_DROPPED,
+                supportsPagination = true,
+                descriptorSignature = "anilist:dropped",
+            )
+        }
+
+        availableDefinitions["Trending Anime"] = HomeCatalogDefinition(
+            key = "anilist:anime:trending",
+            defaultTitle = "Trending Anime",
+            catalogName = "Trending Anime",
+            addonName = "AniList",
+            manifestUrl = "native://anilist",
+            type = "anime",
+            catalogId = CATALOG_TRENDING,
+            supportsPagination = true,
+            descriptorSignature = "anilist:trending",
+        )
+        availableDefinitions["Currently Airing"] = HomeCatalogDefinition(
+            key = "anilist:anime:airing",
+            defaultTitle = "Currently Airing",
+            catalogName = "Currently Airing",
+            addonName = "AniList",
+            manifestUrl = "native://anilist",
+            type = "anime",
+            catalogId = CATALOG_AIRING,
+            supportsPagination = true,
+            descriptorSignature = "anilist:airing",
+        )
+        availableDefinitions["Popular This Season"] = HomeCatalogDefinition(
+            key = "anilist:anime:popular",
+            defaultTitle = "Popular This Season",
+            catalogName = "Popular This Season",
+            addonName = "AniList",
+            manifestUrl = "native://anilist",
+            type = "anime",
+            catalogId = CATALOG_POPULAR,
+            supportsPagination = true,
+            descriptorSignature = "anilist:popular",
+        )
+        availableDefinitions["Top Rated Anime"] = HomeCatalogDefinition(
+            key = "anilist:anime:top-rated",
+            defaultTitle = "Top Rated Anime",
+            catalogName = "Top Rated Anime",
+            addonName = "AniList",
+            manifestUrl = "native://anilist",
+            type = "anime",
+            catalogId = CATALOG_TOP_RATED,
+            supportsPagination = true,
+            descriptorSignature = "anilist:top-rated",
+        )
+
+        val configuredSections = com.nuvio.app.features.anilist.AnilistPreferencesRepository.getEffectiveSections(isAuthenticated)
+        val orderedList = mutableListOf<HomeCatalogDefinition>()
+
+        for (section in configuredSections) {
+            if (!section.enabled) continue
+            val def = availableDefinitions[section.type]
+                ?: availableDefinitions.entries.firstOrNull {
+                    it.key.equals(section.type, ignoreCase = true) || isCatalogAlias(it.key, section.type)
+                }?.value
+            if (def != null && orderedList.none { it.key == def.key }) {
+                orderedList.add(def)
+            }
+        }
+
+        for ((_, def) in availableDefinitions) {
+            val isExplicitlyConfigured = configuredSections.any {
+                it.type.equals(def.catalogName, ignoreCase = true) || isCatalogAlias(it.type, def.catalogName)
+            }
+            if (!isExplicitlyConfigured && orderedList.none { it.key == def.key }) {
+                orderedList.add(def)
+            }
+        }
+
+        return orderedList
+    }
+
+    private fun isCatalogAlias(a: String, b: String): Boolean {
+        val cleanA = a.lowercase().trim()
+        val cleanB = b.lowercase().trim()
+        if (cleanA == cleanB) return true
+        if ((cleanA == "watching" || cleanA == "currently watching") && (cleanB == "watching" || cleanB == "currently watching")) return true
+        if ((cleanA == "planning" || cleanA == "plan to watch") && (cleanB == "planning" || cleanB == "plan to watch")) return true
+        if ((cleanA == "trending" || cleanA == "trending anime") && (cleanB == "trending" || cleanB == "trending anime")) return true
+        if ((cleanA == "airing" || cleanA == "currently airing") && (cleanB == "airing" || cleanB == "currently airing")) return true
+        if ((cleanA == "popular" || cleanA == "popular this season") && (cleanB == "popular" || cleanB == "popular this season")) return true
+        if ((cleanA == "top rated" || cleanA == "top rated anime") && (cleanB == "top rated" || cleanB == "top rated anime")) return true
+        return false
+    }
+
+    suspend fun fetchCatalogPage(
+        catalogId: String,
+        page: Int = 1,
+        perPage: Int = 25,
+        genre: String? = null,
+        sort: com.nuvio.app.features.anilist.AnilistSortOption = com.nuvio.app.features.anilist.AnilistSortOption.POPULARITY,
+        force: Boolean = false,
+    ): CatalogPage {
+        AnilistAuthRepository.ensureInitialized()
+        val token = AnilistAuthRepository.token.value
+        val user = AnilistAuthRepository.currentUser.value ?: if (!token.isNullOrBlank()) {
+            runCatching { AnilistApi.fetchCurrentUser(token) }.getOrNull()?.also { fetched ->
+                AnilistAuthStorage.saveUser(fetched)
+            }
+        } else null
+
+        val prefs = com.nuvio.app.features.anilist.AnilistPreferencesRepository.snapshot()
+        val cacheKey = "$catalogId:$page:$perPage:${user?.name ?: "anon"}:${prefs.preferredTitleLanguage.name}:${genre.orEmpty()}:${sort.name}:${prefs.hideAdultContent}"
+        val now = LibraryClock.nowEpochMs()
+        if (!force) {
+            val cached = pageCache[cacheKey]
+            if (cached != null && (now - cached.timestamp) < CACHE_TTL_MS) {
+                return cached.page
+            }
+        }
+
+        log.d { "fetchCatalogPage: catalogId=$catalogId, page=$page, genre=$genre, sort=$sort, tokenPresent=${!token.isNullOrBlank()}, force=$force" }
+
+        val mediaList: List<AnilistMedia> = when (catalogId) {
+            CATALOG_WATCHING -> {
+                if (token.isNullOrBlank()) emptyList()
+                else AnilistApi.fetchUserAnimeList(
+                    token = token,
+                    userName = user?.name,
+                    status = AnilistMediaListStatus.CURRENT,
+                    page = page,
+                    perPage = perPage,
+                )
+            }
+            CATALOG_PLANNING -> {
+                if (token.isNullOrBlank()) emptyList()
+                else AnilistApi.fetchUserAnimeList(
+                    token = token,
+                    userName = user?.name,
+                    status = AnilistMediaListStatus.PLANNING,
+                    page = page,
+                    perPage = perPage,
+                )
+            }
+            CATALOG_COMPLETED -> {
+                if (token.isNullOrBlank()) emptyList()
+                else AnilistApi.fetchUserAnimeList(
+                    token = token,
+                    userName = user?.name,
+                    status = AnilistMediaListStatus.COMPLETED,
+                    page = page,
+                    perPage = perPage,
+                )
+            }
+            CATALOG_REWATCHING -> {
+                if (token.isNullOrBlank()) emptyList()
+                else AnilistApi.fetchUserAnimeList(
+                    token = token,
+                    userName = user?.name,
+                    status = AnilistMediaListStatus.REPEATING,
+                    page = page,
+                    perPage = perPage,
+                )
+            }
+            CATALOG_PAUSED -> {
+                if (token.isNullOrBlank()) emptyList()
+                else AnilistApi.fetchUserAnimeList(
+                    token = token,
+                    userName = user?.name,
+                    status = AnilistMediaListStatus.PAUSED,
+                    page = page,
+                    perPage = perPage,
+                )
+            }
+            CATALOG_DROPPED -> {
+                if (token.isNullOrBlank()) emptyList()
+                else AnilistApi.fetchUserAnimeList(
+                    token = token,
+                    userName = user?.name,
+                    status = AnilistMediaListStatus.DROPPED,
+                    page = page,
+                    perPage = perPage,
+                )
+            }
+            CATALOG_TRENDING -> {
+                if (!genre.isNullOrBlank() || sort != com.nuvio.app.features.anilist.AnilistSortOption.POPULARITY) {
+                    val effectiveSort = if (sort == com.nuvio.app.features.anilist.AnilistSortOption.POPULARITY) com.nuvio.app.features.anilist.AnilistSortOption.TRENDING else sort
+                    AnilistApi.browseAnime(genre = genre, sort = effectiveSort, page = page, perPage = perPage, token = token)
+                } else {
+                    AnilistApi.fetchTrendingAnime(page = page, perPage = perPage)
+                }
+            }
+            CATALOG_AIRING -> {
+                if (!genre.isNullOrBlank() || sort != com.nuvio.app.features.anilist.AnilistSortOption.POPULARITY) {
+                    AnilistApi.searchAnime(query = "", token = token, genre = genre, sort = listOf(sort.apiSortValue), page = page, perPage = perPage)
+                } else {
+                    AnilistApi.fetchAiringAnime(page = page, perPage = perPage)
+                }
+            }
+            CATALOG_POPULAR -> {
+                if (!genre.isNullOrBlank()) {
+                    AnilistApi.browseAnime(genre = genre, sort = sort, page = page, perPage = perPage, token = token)
+                } else {
+                    AnilistApi.fetchPopularSeasonAnime(page = page, perPage = perPage)
+                }
+            }
+            CATALOG_TOP_RATED -> {
+                if (!genre.isNullOrBlank() || sort != com.nuvio.app.features.anilist.AnilistSortOption.POPULARITY) {
+                    val effectiveSort = if (sort == com.nuvio.app.features.anilist.AnilistSortOption.POPULARITY) com.nuvio.app.features.anilist.AnilistSortOption.SCORE else sort
+                    AnilistApi.browseAnime(genre = genre, sort = effectiveSort, page = page, perPage = perPage, token = token)
+                } else {
+                    AnilistApi.fetchTopRatedAnime(page = page, perPage = perPage)
+                }
+            }
+            else -> emptyList()
+        }
+
+        var filteredMediaList = if (prefs.hideAdultContent) mediaList.filter { !it.isAdult } else mediaList
+        if (!genre.isNullOrBlank() && catalogId.startsWith("anilist:") && catalogId in listOf(CATALOG_WATCHING, CATALOG_PLANNING, CATALOG_COMPLETED, CATALOG_REWATCHING, CATALOG_PAUSED, CATALOG_DROPPED)) {
+            filteredMediaList = filteredMediaList.filter { it.genres.any { g -> g.equals(genre, ignoreCase = true) } }
+        }
+        val previews = filteredMediaList.map { media ->
+            val itemId = "ani_${media.id}"
+            val itemType = if (media.format == "MOVIE") "movie" else "series"
+
+            MetaPreview(
+                id = itemId,
+                type = itemType,
+                name = media.title?.getDisplayTitle(prefs.preferredTitleLanguage).orEmpty(),
+                poster = media.coverImage?.extraLarge
+                    ?: media.coverImage?.large
+                    ?: media.coverImage?.medium,
+                banner = MetaHubArtwork.getBackdropUrl(itemId),
+                logo = MetaHubArtwork.getLogoUrl(itemId),
+                posterShape = PosterShape.Poster,
+                description = media.description,
+                releaseInfo = listOfNotNull(
+                    com.nuvio.app.core.format.formatYearRange(media.startDateYear, media.endDateYear, media.status),
+                    if (media.episodes != null && media.episodes > 0 && media.format != "MOVIE") {
+                        "${media.episodes} eps"
+                    } else {
+                        media.duration?.let { "$it min" }
+                    },
+                ).joinToString(" • ").takeIf { it.isNotBlank() },
+                imdbRating = if (media.averageScore != null && media.averageScore > 0) {
+                    val score = (media.averageScore / 10.0)
+                    "${(score * 10).toInt() / 10.0}"
+                } else null,
+                anilistScore = if (media.averageScore != null && media.averageScore > 0) media.averageScore.toDouble() else null,
+                genres = media.genres,
+            )
+        }
+
+        val result = CatalogPage(
+            items = previews,
+            rawItemCount = previews.size,
+            nextSkip = if (mediaList.size >= perPage) (page * perPage) else null,
+        )
+        pageCache[cacheKey] = CachedCatalogPage(timestamp = now, page = result)
+        return result
+    }
+
+    suspend fun fetchAdvancedFilterPage(
+        filter: com.nuvio.app.features.anilist.AnilistAdvancedFilterState,
+        searchQuery: String = "",
+        page: Int = 1,
+        perPage: Int = 25,
+    ): CatalogPage {
+        if (filter.searchType.equals("CHARACTERS", ignoreCase = true)) {
+            val chars = com.nuvio.app.features.anilist.AnilistApi.searchCharacters(
+                searchQuery = searchQuery,
+                page = page,
+                perPage = perPage,
+            )
+            val previews = chars.map { char ->
+                MetaPreview(
+                    id = "ani_char_${char.id}",
+                    type = "character",
+                    name = char.name,
+                    poster = char.image,
+                    banner = char.image,
+                    posterShape = PosterShape.Poster,
+                    description = if (char.favourites > 0) "♥ ${char.favourites} favourites" else null,
+                    releaseInfo = if (char.favourites > 0) "♥ ${char.favourites}" else null,
+                    genres = emptyList(),
+                )
+            }
+            return CatalogPage(
+                items = previews,
+                rawItemCount = previews.size,
+                nextSkip = if (chars.size >= perPage) (page * perPage) else null,
+            )
+        }
+
+        if (filter.searchType.equals("STAFF", ignoreCase = true)) {
+            val staff = com.nuvio.app.features.anilist.AnilistApi.searchStaff(
+                searchQuery = searchQuery,
+                page = page,
+                perPage = perPage,
+            )
+            val previews = staff.map { st ->
+                MetaPreview(
+                    id = "ani_staff_${st.id}",
+                    type = "person",
+                    name = st.name,
+                    poster = st.image,
+                    banner = st.image,
+                    posterShape = PosterShape.Poster,
+                    description = st.occupations.joinToString(", "),
+                    releaseInfo = st.occupations.firstOrNull() ?: if (st.favourites > 0) "♥ ${st.favourites}" else null,
+                    genres = st.occupations,
+                )
+            }
+            return CatalogPage(
+                items = previews,
+                rawItemCount = previews.size,
+                nextSkip = if (staff.size >= perPage) (page * perPage) else null,
+            )
+        }
+
+        val mediaList = com.nuvio.app.features.anilist.AnilistApi.advancedSearchAnime(
+            filter = filter,
+            searchQuery = searchQuery,
+            page = page,
+            perPage = perPage,
+            token = AnilistAuthRepository.token.value,
+        )
+        val prefs = com.nuvio.app.features.anilist.AnilistPreferencesRepository.snapshot()
+        val previews = mediaList.map { media ->
+            val itemId = "ani_${media.id}"
+            val isNonVideo = com.nuvio.app.features.anilist.KaiHooks.isNonVideoMedia(media.format) ||
+                filter.searchType.equals("MANGA", ignoreCase = true)
+            val itemType = when {
+                isNonVideo -> media.format?.lowercase() ?: "manga"
+                media.format == "MOVIE" -> "movie"
+                else -> "series"
+            }
+
+            MetaPreview(
+                id = itemId,
+                type = itemType,
+                name = media.title?.getDisplayTitle(prefs.preferredTitleLanguage).orEmpty(),
+                poster = media.coverImage?.extraLarge
+                    ?: media.coverImage?.large
+                    ?: media.coverImage?.medium,
+                banner = MetaHubArtwork.getBackdropUrl(itemId),
+                logo = MetaHubArtwork.getLogoUrl(itemId),
+                posterShape = PosterShape.Poster,
+                description = media.description,
+                releaseInfo = if (isNonVideo) {
+                    listOfNotNull(
+                        media.format?.replace("_", " ")?.lowercase()?.replaceFirstChar { it.uppercase() } ?: "Manga",
+                        media.startDateYear?.toString(),
+                    ).joinToString(" • ")
+                } else {
+                    listOfNotNull(
+                        com.nuvio.app.core.format.formatYearRange(media.startDateYear, media.endDateYear, media.status),
+                        if (media.episodes != null && media.episodes > 0 && media.format != "MOVIE") {
+                            "${media.episodes} eps"
+                        } else {
+                            media.duration?.let { "$it min" }
+                        },
+                    ).joinToString(" • ").takeIf { it.isNotBlank() }
+                },
+                imdbRating = if (media.averageScore != null && media.averageScore > 0) {
+                    val score = (media.averageScore / 10.0)
+                    "${(score * 10).toInt() / 10.0}"
+                } else null,
+                anilistScore = if (media.averageScore != null && media.averageScore > 0) media.averageScore.toDouble() else null,
+                genres = media.genres,
+            )
+        }
+
+        return CatalogPage(
+            items = previews,
+            rawItemCount = previews.size,
+            nextSkip = if (mediaList.size >= perPage) (page * perPage) else null,
+        )
+    }
+}

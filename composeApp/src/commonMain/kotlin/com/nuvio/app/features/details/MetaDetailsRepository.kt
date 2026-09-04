@@ -3,6 +3,7 @@ package com.nuvio.app.features.details
 import co.touchlab.kermit.Logger
 import com.nuvio.app.features.addons.AddonManifest
 import com.nuvio.app.features.addons.AddonRepository
+import com.nuvio.app.features.addons.AddonResource
 import com.nuvio.app.features.addons.buildAddonResourceUrl
 import com.nuvio.app.features.addons.enabledAddons
 import com.nuvio.app.features.addons.fetchAddonResponseText
@@ -23,11 +24,15 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import nuvio.composeapp.generated.resources.*
@@ -77,22 +82,24 @@ object MetaDetailsRepository {
 
             activeRequestKey = requestKey
             _uiState.value = MetaDetailsUiState(
-                isLoading = true,
-                meta = cachedBaseMeta,
+                isLoading = false,
+                meta = cachedBaseMeta.withUnreleasedFilter(),
             )
 
             scope.launch {
+                val lookupId = resolveMetaLookupId(id, type)
+                val normalizedType = if (type == "movie") "movie" else "series"
                 val enrichedMeta = withContext(Dispatchers.Default) {
                     enrichForMetaScreen(
                         requestKey = requestKey,
                         meta = cachedBaseMeta,
-                        fallbackItemId = id,
-                        fallbackItemType = type,
+                        fallbackItemId = lookupId,
+                        fallbackItemType = normalizedType,
                         settings = mdbListSettings,
                         settingsFingerprint = metaScreenSettingsFingerprint,
                     )
                 }
-                _uiState.value = MetaDetailsUiState(meta = enrichedMeta.withUnreleasedFilter())
+                _uiState.value = MetaDetailsUiState(meta = enrichedMeta.withUnreleasedFilter(), isLoading = false)
                 activeRequestKey = requestKey
             }
             return
@@ -113,41 +120,47 @@ object MetaDetailsRepository {
         _uiState.value = MetaDetailsUiState(isLoading = true)
 
         scope.launch {
-            val metaLookupId = resolveMetaLookupId(itemId = id, itemType = type)
-            val manifests = findReadyMetaManifests(type = type, id = metaLookupId)
+            val anilistEnabled = com.nuvio.app.features.anilist.AnilistPreferencesRepository.snapshot().enabled
+            val isAnilistItem = anilistEnabled && com.nuvio.app.features.anilist.KaiHooks.isKaiMedia(id)
+            val effectiveType = if (type == "movie") "movie" else "series"
 
-            if (manifests.isEmpty()) {
-                val tmdbMeta = tryFetchTmdbFallbackMeta(type = type, id = id)
-                if (tmdbMeta != null) {
+            val anilistId = if (isAnilistItem) {
+                com.nuvio.app.features.anilist.AnilistTrackerCoordinator.extractAnilistId(id)
+            } else null
+
+            if (anilistId != null) {
+                val anilistMeta = runCatching {
+                    com.nuvio.app.features.anilist.catalog.AnilistMetaDetailsResolver.resolveMetaDetails(id)
+                }.getOrNull()
+                if (anilistMeta != null) {
                     publishLoadedMeta(
                         requestKey = requestKey,
-                        meta = tmdbMeta,
+                        meta = anilistMeta,
                         fallbackItemId = id,
-                        fallbackItemType = type,
+                        fallbackItemType = effectiveType,
                         mdbListSettings = mdbListSettings,
                         metaScreenSettingsFingerprint = metaScreenSettingsFingerprint,
                     )
                     return@launch
                 }
-
-                log.w { "No addon provides meta for type=$type id=$id" }
-                _uiState.value = MetaDetailsUiState(
-                    errorMessage = getString(Res.string.details_no_addon_meta),
-                )
-                activeRequestKey = null
-                return@launch
             }
+
+            val metaLookupId = resolveMetaLookupId(itemId = id, itemType = type)
+            val manifests = findReadyMetaManifests(type = effectiveType, id = metaLookupId)
 
             for (manifest in manifests) {
                 val result = withContext(Dispatchers.Default) {
-                    tryFetchMeta(manifest, type, metaLookupId, includeMdbList = false)
+                    tryFetchMeta(manifest, effectiveType, metaLookupId, includeMdbList = false, enrichWithTmdb = false)
                 }
                 if (result != null) {
+                    val finalMeta = if (isAnilistItem) {
+                        com.nuvio.app.features.anilist.catalog.AnilistMetaDetailsResolver.adaptCinemetaForAnilist(result, id)
+                    } else result
                     publishLoadedMeta(
                         requestKey = requestKey,
-                        meta = result,
-                        fallbackItemId = metaLookupId,
-                        fallbackItemType = type,
+                        meta = finalMeta,
+                        fallbackItemId = if (isAnilistItem) id else metaLookupId,
+                        fallbackItemType = effectiveType,
                         mdbListSettings = mdbListSettings,
                         metaScreenSettingsFingerprint = metaScreenSettingsFingerprint,
                     )
@@ -155,21 +168,25 @@ object MetaDetailsRepository {
                 }
             }
 
-            val tmdbMeta = tryFetchTmdbFallbackMeta(type = type, id = id)
+            val tmdbMeta = tryFetchTmdbFallbackMeta(type = effectiveType, id = metaLookupId)
             if (tmdbMeta != null) {
+                val finalMeta = if (isAnilistItem) {
+                    com.nuvio.app.features.anilist.catalog.AnilistMetaDetailsResolver.adaptCinemetaForAnilist(tmdbMeta, id)
+                } else tmdbMeta
                 publishLoadedMeta(
                     requestKey = requestKey,
-                    meta = tmdbMeta,
-                    fallbackItemId = id,
-                    fallbackItemType = type,
+                    meta = finalMeta,
+                    fallbackItemId = if (isAnilistItem) id else metaLookupId,
+                    fallbackItemType = effectiveType,
                     mdbListSettings = mdbListSettings,
                     metaScreenSettingsFingerprint = metaScreenSettingsFingerprint,
                 )
                 return@launch
             }
 
+            log.w { "No addon provides meta for type=$type id=$id (lookupId=$metaLookupId)" }
             _uiState.value = MetaDetailsUiState(
-                errorMessage = getString(Res.string.details_load_failed_all_addons),
+                errorMessage = getString(Res.string.details_no_addon_meta),
             )
             activeRequestKey = null
         }
@@ -177,14 +194,38 @@ object MetaDetailsRepository {
 
     fun peek(type: String, id: String): MetaDetails? {
         val requestKey = "$type:$id"
-        val currentMeta = _uiState.value.meta?.takeIf { it.type == type && it.id == id }
+        val currentMeta = _uiState.value.meta?.takeIf {
+            (it.id == id || (com.nuvio.app.features.anilist.KaiHooks.isKaiMedia(it.id) && com.nuvio.app.features.anilist.KaiHooks.isKaiMedia(id) && com.nuvio.app.features.anilist.AnilistTrackerCoordinator.extractAnilistId(it.id) == com.nuvio.app.features.anilist.AnilistTrackerCoordinator.extractAnilistId(id))) &&
+            (it.type.equals(type, ignoreCase = true) || (it.type in listOf("series", "movie") && type in listOf("series", "movie", "anime", "show", "tv")))
+        }
         if (currentMeta != null) return currentMeta
 
         val metaScreenSettingsFingerprint = buildMetaScreenSettingsFingerprint(MdbListSettingsRepository.snapshot())
-        val cachedEntry = cachedMetaByRequestKey[requestKey] ?: return null
-        return cachedEntry.metaScreenMeta
-            ?.takeIf { cachedEntry.metaScreenSettingsFingerprint == metaScreenSettingsFingerprint }
-            ?: cachedEntry.baseMeta
+        val cachedEntry = cachedMetaByRequestKey[requestKey]
+        if (cachedEntry != null) {
+            return cachedEntry.metaScreenMeta
+                ?.takeIf { cachedEntry.metaScreenSettingsFingerprint == metaScreenSettingsFingerprint }
+                ?: cachedEntry.baseMeta
+        }
+
+        if (com.nuvio.app.features.anilist.KaiHooks.isKaiMedia(id)) {
+            val anilistId = com.nuvio.app.features.anilist.AnilistTrackerCoordinator.extractAnilistId(id)
+            if (anilistId != null) {
+                val cachedMedia = com.nuvio.app.features.anilist.AnilistApi.getCachedMedia(anilistId)
+                    ?: com.nuvio.app.features.anilist.AnilistTrackerCoordinator.getCachedMedia(anilistId)
+                    ?: com.nuvio.app.features.anilist.AnilistTrackerCoordinator.getCachedMedia(id)
+                if (cachedMedia != null) {
+                    val isSpecial = com.nuvio.app.features.anilist.catalog.AnilistMetaDetailsResolver.isSpecialAnime(cachedMedia)
+                    return com.nuvio.app.features.anilist.catalog.AnilistMetaDetailsResolver.buildBaseMetaFromAnilistMedia(
+                        media = cachedMedia,
+                        season = if (isSpecial) 0 else 1,
+                        requestedId = id,
+                    )
+                }
+            }
+        }
+
+        return null
     }
 
     fun clear() {
@@ -197,26 +238,60 @@ object MetaDetailsRepository {
         val requestKey = "$type:$id"
         cachedMetaByRequestKey[requestKey]?.let { return it.baseMeta }
 
+        val isAnilistItem = id.startsWith("ani_", ignoreCase = true) || id.startsWith("anilist:", ignoreCase = true)
+        val effectiveType = if (type == "movie") "movie" else "series"
+
+        val anilistId = if (isAnilistItem) {
+            com.nuvio.app.features.anilist.AnilistTrackerCoordinator.extractAnilistId(id)
+        } else {
+            when {
+                id.startsWith("tt", ignoreCase = true) -> com.nuvio.app.features.anilist.AnilistApi.resolveArmAnilistId("imdb", id)
+                id.startsWith("tmdb:", ignoreCase = true) -> com.nuvio.app.features.anilist.AnilistApi.resolveArmAnilistId("themoviedb", id.removePrefix("tmdb:"))
+                id.all(Char::isDigit) -> com.nuvio.app.features.anilist.AnilistApi.resolveArmAnilistId("themoviedb", id)
+                else -> null
+            }
+        }
+
+        if (anilistId != null) {
+            val anilistMeta = com.nuvio.app.features.anilist.catalog.AnilistMetaDetailsResolver.resolveMetaDetails("ani_$anilistId")
+            if (anilistMeta != null) {
+                if (cacheResult) {
+                    cachedMetaByRequestKey[requestKey] = CachedMetaEntry(baseMeta = anilistMeta)
+                }
+                return anilistMeta
+            }
+        }
+
         val metaLookupId = resolveMetaLookupId(itemId = id, itemType = type)
-        val manifests = findReadyMetaManifests(type = type, id = metaLookupId)
+        val manifests = findReadyMetaManifests(type = effectiveType, id = metaLookupId)
 
         for (manifest in manifests) {
             val result = withTimeoutOrNull(FETCH_TIMEOUT_MS) {
-                tryFetchMeta(manifest, type, metaLookupId, includeMdbList = false)
+                tryFetchMeta(manifest, effectiveType, metaLookupId, includeMdbList = false)
             }
             if (result != null) {
+                val finalMeta = if (isAnilistItem) {
+                    com.nuvio.app.features.anilist.catalog.AnilistMetaDetailsResolver.adaptCinemetaForAnilist(result, id)
+                } else result
                 if (cacheResult) {
-                    cachedMetaByRequestKey[requestKey] = CachedMetaEntry(baseMeta = result)
+                    cachedMetaByRequestKey[requestKey] = CachedMetaEntry(baseMeta = finalMeta)
                 }
-                return result
+                return finalMeta
             }
         }
 
-        return tryFetchTmdbFallbackMeta(type = type, id = id)?.also { result ->
+        val tmdbMeta = tryFetchTmdbFallbackMeta(type = effectiveType, id = metaLookupId)
+        if (tmdbMeta != null) {
+            val finalMeta = if (isAnilistItem) {
+                com.nuvio.app.features.anilist.catalog.AnilistMetaDetailsResolver.adaptCinemetaForAnilist(tmdbMeta, id)
+            } else tmdbMeta
             if (cacheResult) {
-                cachedMetaByRequestKey[requestKey] = CachedMetaEntry(baseMeta = result)
+                cachedMetaByRequestKey[requestKey] = CachedMetaEntry(baseMeta = finalMeta)
             }
+            return finalMeta
         }
+
+        return null
     }
 
     private const val FETCH_TIMEOUT_MS = 5_000L
@@ -229,6 +304,7 @@ object MetaDetailsRepository {
         type: String,
         id: String,
         includeMdbList: Boolean,
+        enrichWithTmdb: Boolean = true,
     ): MetaDetails? {
         val url = buildAddonResourceUrl(
             manifestUrl = manifest.transportUrl,
@@ -243,6 +319,9 @@ object MetaDetailsRepository {
             val payload = fetchAddonResponseText(url)
             log.d { "Raw payload length=${payload.length}, first 500 chars: ${payload.take(500)}" }
             val result = MetaDetailsParser.parse(payload)
+            if (!enrichWithTmdb) {
+                return result
+            }
             val tmdbEnriched = withTimeoutOrNull(TMDB_ENRICH_TIMEOUT_MS) {
                 TmdbMetadataService.enrichMeta(
                     meta = result,
@@ -262,11 +341,6 @@ object MetaDetailsRepository {
             } else {
                 tmdbEnriched
             }
-            log.d { "Parsed meta: type=${enriched.type}, name=${enriched.name}, videos=${enriched.videos.size}" }
-            if (enriched.videos.isNotEmpty()) {
-                val first = enriched.videos.first()
-                log.d { "First video: id=${first.id} title=${first.title} s=${first.season} e=${first.episode} embeddedStreams=${first.streams.size}" }
-            }
             enriched
         } catch (e: Throwable) {
             if (e is CancellationException) throw e
@@ -275,10 +349,32 @@ object MetaDetailsRepository {
         }
     }
 
+    private val cinemetaDefaultManifest = AddonManifest(
+        id = "org.stremio.cinemeta",
+        name = "Cinemeta",
+        version = "3.0.0",
+        description = "Cinemeta Official Metadata",
+        resources = listOf(
+            AddonResource(
+                name = "meta",
+                types = listOf("movie", "series"),
+                idPrefixes = listOf("tt"),
+            )
+        ),
+        types = listOf("movie", "series"),
+        catalogs = emptyList(),
+        transportUrl = "https://v3-cinemeta.strem.io/manifest.json",
+    )
+
     private suspend fun findReadyMetaManifests(type: String, id: String): List<AddonManifest> {
         AddonRepository.initialize()
 
-        findMetaManifests(AddonRepository.uiState.value, type, id).takeIf { it.isNotEmpty() }?.let { return it }
+        val active = findMetaManifests(AddonRepository.uiState.value, type, id)
+        if (active.isNotEmpty()) return active
+
+        if (id.startsWith("tt", ignoreCase = true)) {
+            return listOf(cinemetaDefaultManifest)
+        }
 
         if (!AddonRepository.uiState.value.hasPendingEnabledAddonManifests()) {
             return emptyList()
@@ -291,7 +387,11 @@ object MetaDetailsRepository {
             }
         } ?: AddonRepository.uiState.value
 
-        return findMetaManifests(readyState, type, id)
+        val resolved = findMetaManifests(readyState, type, id)
+        if (resolved.isEmpty() && id.startsWith("tt", ignoreCase = true)) {
+            return listOf(cinemetaDefaultManifest)
+        }
+        return resolved
     }
 
     private fun findMetaManifests(state: com.nuvio.app.features.addons.AddonsUiState, type: String, id: String): List<AddonManifest> =
@@ -310,18 +410,37 @@ object MetaDetailsRepository {
         addons.enabledAddons().any { addon -> addon.manifest == null && addon.isRefreshing }
 
     private suspend fun resolveMetaLookupId(itemId: String, itemType: String): String {
+        // 1. AniList Kai Media: Self-contained & isolated ARM resolution (TMDb bypassed for anime)
+        if (com.nuvio.app.features.anilist.KaiHooks.isKaiMedia(itemId)) {
+            val anilistId = com.nuvio.app.features.anilist.AnilistTrackerCoordinator.extractAnilistId(itemId)
+            if (anilistId != null) {
+                val arm = com.nuvio.app.features.anilist.catalog.AnilistMetaDetailsResolver.resolveArmMapping(anilistId)
+                val resolved = arm.imdbId ?: arm.kitsuId ?: arm.tmdbId?.let { "tmdb:$it" }
+                if (!resolved.isNullOrBlank()) {
+                    return resolved
+                }
+            }
+            return itemId
+        }
+
+        // 2. Native Nuvio Core: Keep non-anime catalogs and core features fully working
         val tmdbId = itemId
             .takeIf { it.startsWith("tmdb:", ignoreCase = true) }
             ?.substringAfter(':')
             ?.substringBefore(':')
             ?.toIntOrNull()
-            ?: return itemId
 
-        return withTimeoutOrNull(FETCH_TIMEOUT_MS) {
-            TmdbService.tmdbToImdb(tmdbId = tmdbId, mediaType = itemType)
+        if (tmdbId != null) {
+            val imdbId = withTimeoutOrNull(5_000L) {
+                com.nuvio.app.features.tmdb.TmdbService.tmdbToImdb(tmdbId = tmdbId, mediaType = itemType)
+            }?.takeIf { it.isNotBlank() }
+            if (imdbId != null) return imdbId
         }
-            ?.takeIf { it.isNotBlank() }
-            ?: itemId
+
+        val match = Regex("tt\\d+").find(itemId)?.value
+        if (match != null) return match
+
+        return itemId
     }
 
     private suspend fun tryFetchTmdbFallbackMeta(type: String, id: String): MetaDetails? =
@@ -344,16 +463,18 @@ object MetaDetailsRepository {
         val cachedEntry = CachedMetaEntry(baseMeta = meta)
         cachedMetaByRequestKey[requestKey] = cachedEntry
 
+        // 1. Immediately render base meta on screen with 0ms perceived delay
+        _uiState.value = MetaDetailsUiState(
+            isLoading = false,
+            meta = meta.withUnreleasedFilter(),
+        )
+
         if (!shouldEnrichForMetaScreen(meta, fallbackItemId, mdbListSettings)) {
-            _uiState.value = MetaDetailsUiState(meta = meta.withUnreleasedFilter())
             activeRequestKey = requestKey
             return
         }
 
-        _uiState.value = MetaDetailsUiState(
-            isLoading = true,
-            meta = meta,
-        )
+        // 2. Asynchronously enrich in background with parallel coroutines
         val enrichedMeta = withContext(Dispatchers.Default) {
             enrichForMetaScreen(
                 requestKey = requestKey,
@@ -368,7 +489,7 @@ object MetaDetailsRepository {
             metaScreenMeta = enrichedMeta,
             metaScreenSettingsFingerprint = metaScreenSettingsFingerprint,
         )
-        _uiState.value = MetaDetailsUiState(meta = enrichedMeta.withUnreleasedFilter())
+        _uiState.value = MetaDetailsUiState(meta = enrichedMeta.withUnreleasedFilter(), isLoading = false)
         activeRequestKey = requestKey
     }
 
@@ -379,32 +500,125 @@ object MetaDetailsRepository {
         fallbackItemType: String,
         settings: com.nuvio.app.features.mdblist.MdbListSettings,
         settingsFingerprint: String,
-    ): MetaDetails {
-        val mdbListEnrichedMeta = withTimeoutOrNull(MDBLIST_ENRICH_TIMEOUT_MS) {
-            MdbListMetadataService.enrichMeta(
+    ): MetaDetails = coroutineScope {
+        val tmdbSettings = TmdbSettingsRepository.snapshot()
+        val isAnilist = meta.id.startsWith("ani_", ignoreCase = true) || meta.id.startsWith("anilist:", ignoreCase = true)
+
+        var currentMeta = meta
+        val mutex = Mutex()
+
+        suspend fun emitUpdate(transform: (MetaDetails) -> MetaDetails) {
+            val updated = mutex.withLock {
+                currentMeta = transform(currentMeta)
+                currentMeta
+            }
+            if (activeRequestKey == requestKey) {
+                _uiState.value = MetaDetailsUiState(meta = updated.withUnreleasedFilter(), isLoading = false)
+            }
+        }
+
+        val anilistEnabled = com.nuvio.app.features.anilist.AnilistPreferencesRepository.snapshot().enabled
+        if (isAnilist && anilistEnabled) {
+            com.nuvio.app.features.anilist.catalog.AnilistMetaDetailsResolver.enrichAnimeForMetaScreen(
                 meta = meta,
-                fallbackItemId = fallbackItemId,
-                settings = settings,
+                onUpdate = { transform -> emitUpdate(transform) },
             )
-        } ?: meta
-        val enrichedMeta = applyMoreLikeThisSource(
-            meta = mdbListEnrichedMeta,
-            fallbackItemId = fallbackItemId,
-            fallbackItemType = fallbackItemType,
-        )
+            return@coroutineScope mutex.withLock { currentMeta }
+        }
 
-        cachedMetaByRequestKey[requestKey] = cachedMetaByRequestKey[requestKey]
-            ?.copy(
-                metaScreenMeta = enrichedMeta,
-                metaScreenSettingsFingerprint = settingsFingerprint,
-            )
-            ?: CachedMetaEntry(
-                baseMeta = meta,
-                metaScreenMeta = enrichedMeta,
-                metaScreenSettingsFingerprint = settingsFingerprint,
-            )
+        // 1. TMDB job: Full credits, cast portraits, episodes, synopses (~1-2s) - Streams in independently!
+        // TMDb enrichment is completely shut down for the native AniList addon. It only runs for non-AniList addons (Cinemeta, Stremio, etc.).
+        val tmdbJob = launch {
+            if (!isAnilist && tmdbSettings.enabled && tmdbSettings.hasApiKey) {
+                val tmdbEnriched = runCatching {
+                    withTimeoutOrNull(TMDB_ENRICH_TIMEOUT_MS) {
+                        TmdbMetadataService.enrichMeta(
+                            meta = meta,
+                            fallbackItemId = fallbackItemId,
+                            settings = tmdbSettings,
+                        )
+                    }
+                }.getOrNull()
 
-        return enrichedMeta
+                if (tmdbEnriched != null) {
+                    emitUpdate { current ->
+                        tmdbEnriched.copy(
+                            id = current.id,
+                            type = current.type,
+                            name = tmdbEnriched.name,
+                            genres = if (current.genres.isNotEmpty()) current.genres else tmdbEnriched.genres,
+                            logo = current.logo ?: tmdbEnriched.logo ?: meta.logo,
+                            background = tmdbEnriched.background ?: current.background ?: meta.background,
+                            poster = current.poster ?: tmdbEnriched.poster ?: meta.poster,
+                            videos = tmdbEnriched.videos.mapIndexed { idx, enrichedVid ->
+                                val currentVid = current.videos.getOrNull(idx)
+                                if (!currentVid?.seasonPoster.isNullOrBlank()) {
+                                    enrichedVid.copy(seasonPoster = currentVid.seasonPoster)
+                                } else enrichedVid
+                            },
+                            cast = tmdbEnriched.cast,
+                            productionCompanies = tmdbEnriched.productionCompanies,
+                            networks = tmdbEnriched.networks,
+                            trailers = if (tmdbEnriched.trailers.isNotEmpty()) tmdbEnriched.trailers else current.trailers,
+                            moreLikeThis = tmdbEnriched.moreLikeThis,
+                            moreLikeThisSource = tmdbEnriched.moreLikeThisSource,
+                            description = tmdbEnriched.description,
+                            releaseInfo = meta.releaseInfo ?: tmdbEnriched.releaseInfo,
+                            status = tmdbEnriched.status,
+                            lastAirDate = tmdbEnriched.lastAirDate,
+                            externalRatings = current.externalRatings.ifEmpty { tmdbEnriched.externalRatings },
+                        )
+                    }
+                }
+            }
+        }
+
+        // 3. MDBList job: External ratings (IMDb, TMDb, Trakt, RT, AniList) - Streams in independently!
+        val mdbListJob = launch {
+            val mdbListRatings = runCatching {
+                withTimeoutOrNull(MDBLIST_ENRICH_TIMEOUT_MS) {
+                    MdbListMetadataService.enrichMeta(
+                        meta = meta,
+                        fallbackItemId = fallbackItemId,
+                        settings = settings,
+                    )
+                }?.externalRatings.orEmpty()
+            }.getOrNull().orEmpty()
+
+            if (mdbListRatings.isNotEmpty()) {
+                emitUpdate { current ->
+                    current.copy(externalRatings = mdbListRatings)
+                }
+            }
+        }
+
+        // 4. Trakt job: Related titles / recommendations (Only for standard non-anime movies/shows)
+        val traktJob = launch {
+            if (!isAnilist) {
+                val traktMeta = runCatching {
+                    applyMoreLikeThisSource(
+                        meta = meta,
+                        fallbackItemId = fallbackItemId,
+                        fallbackItemType = fallbackItemType,
+                    )
+                }.getOrNull()
+
+                if (traktMeta != null && traktMeta.moreLikeThis.isNotEmpty()) {
+                    emitUpdate { current ->
+                        current.copy(
+                            moreLikeThis = traktMeta.moreLikeThis,
+                            moreLikeThisSource = traktMeta.moreLikeThisSource,
+                        )
+                    }
+                }
+            }
+        }
+
+        tmdbJob.join()
+        mdbListJob.join()
+        traktJob.join()
+
+        mutex.withLock { currentMeta }
     }
 
     private suspend fun applyMoreLikeThisSource(
@@ -412,6 +626,11 @@ object MetaDetailsRepository {
         fallbackItemId: String,
         fallbackItemType: String,
     ): MetaDetails {
+        val isAnilist = meta.id.startsWith("ani_", ignoreCase = true) || meta.id.startsWith("anilist:", ignoreCase = true)
+        if (isAnilist) {
+            return meta
+        }
+
         TrackingSettingsRepository.ensureLoaded()
         TraktAuthRepository.ensureLoaded()
         TmdbSettingsRepository.ensureLoaded()
@@ -465,6 +684,9 @@ object MetaDetailsRepository {
         fallbackItemId: String,
         settings: com.nuvio.app.features.mdblist.MdbListSettings,
     ): Boolean {
+        if (meta.id.startsWith("ani_", ignoreCase = true) || meta.id.startsWith("anilist:", ignoreCase = true)) return true
+        val tmdbSettings = TmdbSettingsRepository.snapshot()
+        if (tmdbSettings.enabled && tmdbSettings.hasApiKey) return true
         if (shouldFetchMdbListOnMetaScreen(meta, fallbackItemId, settings)) return true
         return shouldApplyMoreLikeThisSource(meta)
     }

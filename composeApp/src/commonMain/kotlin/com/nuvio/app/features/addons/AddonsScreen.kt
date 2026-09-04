@@ -97,7 +97,11 @@ internal fun AddonsSettingsPageContent(
     val enterAddonUrlMessage = stringResource(Res.string.addons_error_enter_url)
     val usePersonalMediaCopy = AppFeaturePolicy.personalMediaAddonCopyEnabled
 
-    val overview = remember(uiState.addons) { uiState.addons.toOverview() }
+    val overview = remember(uiState.addons) {
+        uiState.addons.filter {
+            !it.manifestUrl.startsWith("native://anilist") && !it.manifestUrl.startsWith("builtin://anilist")
+        }.toOverview()
+    }
 
     Column(
         modifier = modifier,
@@ -144,8 +148,12 @@ internal fun AddonsSettingsPageContent(
         if (uiState.addons.isEmpty()) {
             EmptyStateCard(usePersonalMediaCopy = usePersonalMediaCopy)
         } else {
-            val lastIndex = uiState.addons.lastIndex
-            uiState.addons.forEachIndexed { index, addon ->
+            // Filter out the native AniList addon — it's managed from AniList Settings, not here
+            val displayedAddons = uiState.addons.filter {
+                !it.manifestUrl.startsWith("native://anilist") && !it.manifestUrl.startsWith("builtin://anilist")
+            }
+            val lastIndex = displayedAddons.lastIndex
+            displayedAddons.forEachIndexed { index, addon ->
                 val manifest = addon.manifest
                 val behaviorHints = manifest?.behaviorHints
                 val showConfigureAction = behaviorHints?.configurable == true || behaviorHints?.configurationRequired == true

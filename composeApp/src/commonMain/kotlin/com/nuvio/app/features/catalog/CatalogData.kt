@@ -72,11 +72,34 @@ suspend fun fetchCatalogPage(
     type: String,
     catalogId: String,
     genre: String? = null,
+    sort: String? = null,
+    advancedFilter: com.nuvio.app.features.anilist.AnilistAdvancedFilterState? = null,
     search: String? = null,
     skip: Int? = null,
     maxItems: Int? = null,
     forceRefresh: Boolean = false,
 ): CatalogPage {
+    if (manifestUrl.startsWith("native://anilist", ignoreCase = true) || manifestUrl.equals("native", ignoreCase = true) || manifestUrl.startsWith("anilist:", ignoreCase = true)) {
+        val pageNum = ((skip ?: 0) / 25) + 1
+        if (advancedFilter != null && advancedFilter.hasFilters) {
+            return com.nuvio.app.features.anilist.catalog.AnilistCatalogRepository.fetchAdvancedFilterPage(
+                filter = advancedFilter,
+                searchQuery = search.orEmpty(),
+                page = pageNum,
+                perPage = maxItems ?: 25,
+            )
+        }
+        val sortOption = com.nuvio.app.features.anilist.AnilistSortOption.fromLabelOrNull(sort) ?: com.nuvio.app.features.anilist.AnilistSortOption.POPULARITY
+        return com.nuvio.app.features.anilist.catalog.AnilistCatalogRepository.fetchCatalogPage(
+            catalogId = catalogId,
+            page = pageNum,
+            perPage = maxItems ?: 25,
+            genre = genre,
+            sort = sortOption,
+            force = forceRefresh,
+        )
+    }
+
     val url = buildCatalogUrl(
         manifestUrl = manifestUrl,
         type = type,

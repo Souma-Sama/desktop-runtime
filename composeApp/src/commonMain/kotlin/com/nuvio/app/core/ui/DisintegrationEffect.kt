@@ -15,9 +15,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
-import androidx.compose.ui.graphics.drawscope.clipPath
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.layer.drawLayer
 import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.graphics.toArgb
@@ -103,7 +102,6 @@ private class AshField(
     val halfHeights = FloatArray(count)
     val colors = IntArray(count)
     val renderer = AshSwarmRenderer(count)
-    val clipOutline = Path()
 }
 
 private const val ASH_COLS = 130
@@ -171,26 +169,15 @@ private fun DrawScope.drawAsh(field: AshField, p: Float) {
     val h = size.height
     if (w <= 0f || h <= 0f) return
 
-    val threshold = 1f - p / (1f - TILE_LIFESPAN)
-    if (threshold > -0.1f) {
-        val intact = field.clipOutline
-        intact.rewind()
-        val steps = 28
-        for (i in 0..steps) {
-            val ny = i / steps.toFloat()
-            val boundary = (threshold - 0.52f * (1f - ny) - frontWave(ny, field.wavePhase)) / 0.48f
-            val x = (boundary * w).coerceIn(0f, w)
-            val y = ny * h
-            if (i == 0) intact.moveTo(x, y) else intact.lineTo(x, y)
-        }
-        intact.lineTo(0f, h)
-        intact.lineTo(0f, 0f)
-        intact.close()
-        clipPath(intact) {
+    val wipeFraction = (1f - p / (1f - TILE_LIFESPAN)).coerceIn(0f, 1f)
+    if (wipeFraction > 0.01f) {
+        val remainingWidth = w * wipeFraction
+        clipRect(left = 0f, top = 0f, right = remainingWidth, bottom = h) {
             drawImage(
                 image = field.bitmap,
                 dstOffset = IntOffset.Zero,
                 dstSize = IntSize(w.toInt().coerceAtLeast(1), h.toInt().coerceAtLeast(1)),
+                alpha = wipeFraction,
             )
         }
     }

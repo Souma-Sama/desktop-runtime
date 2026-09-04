@@ -8,6 +8,8 @@ import androidx.compose.material3.Typography
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalDensity
@@ -26,6 +28,8 @@ import nuvio.composeapp.generated.resources.jetbrains_sans_semibold
 import org.jetbrains.compose.resources.Font
 
 val LocalAppTheme = staticCompositionLocalOf { AppTheme.WHITE }
+val LocalPosterCardStyle = staticCompositionLocalOf { PosterCardStyleUiState() }
+val LocalCardDepthStyle = staticCompositionLocalOf { CardDepthStyleUiState() }
 
 internal val LocalNuvioPlatformDensity = staticCompositionLocalOf<Density> {
     error("Platform density is unavailable outside NuvioTheme")
@@ -224,6 +228,9 @@ fun NuvioTheme(
     } else {
         NuvioDesktopMinUiScale
     }
+    val posterCardStyle by PosterCardStyleRepository.uiState.collectAsState()
+    val cardDepthStyle by CardDepthStyleRepository.uiState.collectAsState()
+
     CompositionLocalProvider(
         LocalNuvioPlatformDensity provides density,
         LocalDensity provides Density(
@@ -234,6 +241,8 @@ fun NuvioTheme(
         LocalNuvioTypeScale provides NuvioTypeTokens,
         LocalRippleConfiguration provides NuvioRippleConfiguration,
         LocalAppTheme provides appTheme,
+        LocalPosterCardStyle provides posterCardStyle,
+        LocalCardDepthStyle provides cardDepthStyle,
     ) {
         MaterialTheme(
             colorScheme = colorScheme,

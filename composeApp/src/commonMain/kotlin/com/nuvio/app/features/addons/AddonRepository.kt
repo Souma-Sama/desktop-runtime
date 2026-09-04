@@ -68,7 +68,9 @@ object AddonRepository {
         currentProfileId = effectiveProfileId
         log.d { "initialize() — loading local addons for profile $currentProfileId" }
 
-        val storedUrls = dedupeManifestUrls(AddonStorage.loadInstalledAddonUrls(currentProfileId))
+        val rawUrls = AddonStorage.loadInstalledAddonUrls(currentProfileId)
+        val defaultUrls = if (rawUrls.any { it == "native://anilist" }) rawUrls else listOf("native://anilist") + rawUrls
+        val storedUrls = dedupeManifestUrls(defaultUrls)
         val enabledByUrl = loadLocalEnabledStates()
         log.d { "initialize() — local addon count: ${storedUrls.size}" }
         if (storedUrls.isEmpty()) return
@@ -133,8 +135,10 @@ object AddonRepository {
             }
 
             val urls = rowsByUrl.keys.toList()
-            log.i { "pullFromServer() — server returned ${rows.size} addons" }
-            urls.forEachIndexed { i, u -> log.d { "  server[$i]: $u" } }
+            val effectiveUrls = if (urls.any { it.startsWith("native://anilist") }) urls else listOf("native://anilist") + urls
+            val enabledByUrl = loadLocalEnabledStates()
+            log.i { "pullFromServer() — server returned ${rows.size} addons (effective ${effectiveUrls.size})" }
+            effectiveUrls.forEachIndexed { i, u -> log.d { "  server[$i]: $u" } }
 
             if (urls.isEmpty() && !pulledFromServer) {
                 val localUrls = dedupeManifestUrls(AddonStorage.loadInstalledAddonUrls(currentProfileId))
@@ -143,19 +147,20 @@ object AddonRepository {
                     log.i { "pullFromServer() — migrating local addons to server for profile $currentProfileId" }
                     initialize()
                     pulledFromServer = true
-                    val enabledByUrl = loadLocalEnabledStates()
-                    val addons = localUrls.mapIndexed { index, addonUrl ->
-                        val manifestUrl = ensureManifestSuffix(addonUrl)
-                        AddonPushItem(
-                            url = manifestUrl,
-                            name = _uiState.value.addons
-                                .find { it.manifestUrl == manifestUrl }?.manifest?.name ?: "",
-                            enabled = enabledByUrl[manifestUrl]
-                                ?: _uiState.value.addons.find { it.manifestUrl == manifestUrl }?.enabled
-                                ?: true,
-                            sortOrder = index,
-                        )
-                    }
+                    val addons = localUrls
+                        .filterNot { it.startsWith("native://") || it.startsWith("builtin://") }
+                        .mapIndexed { index, addonUrl ->
+                            val manifestUrl = ensureManifestSuffix(addonUrl)
+                            AddonPushItem(
+                                url = manifestUrl,
+                                name = _uiState.value.addons
+                                    .find { it.manifestUrl == manifestUrl }?.manifest?.name ?: "",
+                                enabled = enabledByUrl[manifestUrl]
+                                    ?: _uiState.value.addons.find { it.manifestUrl == manifestUrl }?.enabled
+                                    ?: true,
+                                sortOrder = index,
+                            )
+                        }
                     val params = buildJsonObject {
                         put("p_profile_id", currentProfileId)
                         put("p_addons", json.encodeToJsonElement(addons))
@@ -171,7 +176,6 @@ object AddonRepository {
                 val localUrls = dedupeManifestUrls(AddonStorage.loadInstalledAddonUrls(currentProfileId))
                 if (localUrls.isNotEmpty()) {
                     log.w { "pullFromServer() — remote empty while local has ${localUrls.size} addons; preserving local addons" }
-                    val enabledByUrl = loadLocalEnabledStates()
                     val existingByUrl = _uiState.value.addons.associateBy(ManagedAddon::manifestUrl)
                     _uiState.value = AddonsUiState(
                         addons = localUrls.map { url ->
@@ -197,17 +201,17 @@ object AddonRepository {
 
             val existingByUrl = _uiState.value.addons.associateBy(ManagedAddon::manifestUrl)
             _uiState.value = AddonsUiState(
-                addons = urls.map { url ->
+                addons = effectiveUrls.map { url ->
                     val row = rowsByUrl[url]
                     existingByUrl[url].toPendingAddon(
                         manifestUrl = url,
                         userSetName = row?.name?.takeIf { it.isNotBlank() },
-                        enabled = row?.enabled,
+                        enabled = row?.enabled ?: enabledByUrl[url] ?: true,
                     )
                 },
             )
             persist()
-            urls.forEach { url ->
+            effectiveUrls.forEach { url ->
                 val existing = existingByUrl[url]
                 val addon = _uiState.value.addons.firstOrNull { it.manifestUrl == url }
                 if (addon?.enabled == true && (existing == null || (addon.manifest == null && !addon.isRefreshing))) {
@@ -216,7 +220,7 @@ object AddonRepository {
             }
             pulledFromServer = true
             initialized = true
-            log.i { "pullFromServer() — applied ${urls.size} addons to state" }
+            log.i { "pullFromServer() — applied ${effectiveUrls.size} addons to state" }
         }.onFailure { e ->
             log.e(e) { "pullFromServer() — FAILED" }
         }
@@ -357,14 +361,50 @@ object AddonRepository {
         refreshJob = scope.launch {
             try {
                 val result = runCatching {
-                    val payload = fetchAddonResponseText(
-                        url = manifestUrl,
-                        forceRefresh = forceRefresh,
-                    )
-                    AddonManifestParser.parse(
-                        manifestUrl = manifestUrl,
-                        payload = payload,
-                    )
+                    if (manifestUrl.startsWith("native://anilist") || manifestUrl.startsWith("builtin://anilist")) {
+                        val hideAdult = com.nuvio.app.features.anilist.AnilistPreferencesRepository.snapshot().hideAdultContent
+                        val genres = com.nuvio.app.features.anilist.AnilistGenres.getAvailableGenres(hideAdult)
+                        val sorts = com.nuvio.app.features.anilist.AnilistSortOption.entries.map { it.label }
+                        val animeExtras = listOf(
+                            AddonExtraProperty(name = "genre", isRequired = false, options = genres),
+                            AddonExtraProperty(name = "sort", isRequired = false, options = sorts),
+                        )
+                        AddonManifest(
+                            id = "org.nuvio.anilist",
+                            name = "AniList Anime Catalog",
+                            version = "1.0.0",
+                            description = "Official trending, seasonal, top-rated anime catalogs & list tracking powered by AniList.",
+                            types = listOf("anime", "series", "movie"),
+                            resources = listOf(
+                                AddonResource(name = "catalog", types = listOf("anime")),
+                                AddonResource(name = "meta", types = listOf("anime", "series", "movie"), idPrefixes = listOf("ani_", "anilist:")),
+                            ),
+                            catalogs = listOf(
+                                AddonCatalog(type = "anime", id = "anilist:watching", name = "Currently Watching", extra = animeExtras),
+                                AddonCatalog(type = "anime", id = "anilist:planning", name = "Plan to Watch", extra = animeExtras),
+                                AddonCatalog(type = "anime", id = "anilist:completed", name = "Completed", extra = animeExtras),
+                                AddonCatalog(type = "anime", id = "anilist:rewatching", name = "Rewatching", extra = animeExtras),
+                                AddonCatalog(type = "anime", id = "anilist:paused", name = "Paused", extra = animeExtras),
+                                AddonCatalog(type = "anime", id = "anilist:dropped", name = "Dropped", extra = animeExtras),
+                                AddonCatalog(type = "anime", id = "anilist:trending", name = "Trending Anime", extra = animeExtras),
+                                AddonCatalog(type = "anime", id = "anilist:airing", name = "Currently Airing", extra = animeExtras),
+                                AddonCatalog(type = "anime", id = "anilist:popular", name = "Popular This Season", extra = animeExtras),
+                                AddonCatalog(type = "anime", id = "anilist:top-rated", name = "Top Rated Anime", extra = animeExtras),
+                            ),
+                            idPrefixes = listOf("ani_", "anilist:"),
+                            logoUrl = "https://anilist.co/img/icons/icon.svg",
+                            transportUrl = "native://anilist",
+                        )
+                    } else {
+                        val payload = fetchAddonResponseText(
+                            url = manifestUrl,
+                            forceRefresh = forceRefresh,
+                        )
+                        AddonManifestParser.parse(
+                            manifestUrl = manifestUrl,
+                            payload = payload,
+                        )
+                    }
                 }
 
                 _uiState.update { current ->
@@ -405,6 +445,7 @@ object AddonRepository {
         if (isUsingPrimaryAddonsFromSecondaryProfile()) return
         val profileId = currentProfileId
         val addons = _uiState.value.addons
+            .filterNot { it.manifestUrl.startsWith("native://") || it.manifestUrl.startsWith("builtin://") }
             .distinctBy { it.manifestUrl }
             .mapIndexed { index, addon ->
                 AddonPushItem(
@@ -525,6 +566,9 @@ private fun dedupeManifestUrls(urls: List<String>): List<String> =
     urls.map(::ensureManifestSuffix).distinct()
 
 private fun ensureManifestSuffix(url: String): String {
+    if (url.startsWith("native://") || url.startsWith("builtin://")) {
+        return url
+    }
     val path = url.substringBefore("?").trimEnd('/')
     val query = url.substringAfter("?", "")
     val withSuffix = if (path.endsWith("/manifest.json")) path else "$path/manifest.json"

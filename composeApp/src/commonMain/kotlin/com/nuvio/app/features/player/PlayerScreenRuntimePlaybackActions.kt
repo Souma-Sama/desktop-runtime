@@ -71,6 +71,7 @@ internal fun PlayerScreenRuntime.resetIdentityStateIfNeeded() {
         scrobbleStartRequestGeneration = 0L
         pendingSeekScrobbleRestart = false
         hasSentCompletionScrobbleForCurrentItem = false
+        hasAutoMarkedAnilistForCurrentEpisode = false
         currentTrackingMedia = null
         resetTrackSelectionState()
     }
@@ -210,6 +211,7 @@ internal fun PlayerScreenRuntime.emitStopScrobbleForCurrentProgress() {
         hasSentCompletionScrobbleForCurrentItem = true
         emitTrackingScrobbleStop(progressPercent)
     }
+    checkAnilistAutoMarkProgress()
 }
 
 internal fun shouldSendStopScrobble(
@@ -330,4 +332,27 @@ internal fun PlayerScreenRuntime.persistPlaybackProgressTick() {
         snapshot = playbackSnapshot,
         syncRemote = false,
     )
+    checkAnilistAutoMarkProgress()
+}
+
+internal fun PlayerScreenRuntime.checkAnilistAutoMarkProgress() {
+    if (hasAutoMarkedAnilistForCurrentEpisode) return
+    val progressPercent = currentPlaybackProgressPercent()
+    val prefs = com.nuvio.app.features.anilist.AnilistPreferencesRepository.snapshot()
+    if (!prefs.autoMarkEpisodeWatched) return
+    if (progressPercent >= prefs.watchedPercentageThreshold.toFloat()) {
+        hasAutoMarkedAnilistForCurrentEpisode = true
+        com.nuvio.app.features.anilist.AnilistTrackerCoordinator.markEpisodeWatchedFromPlayback(
+            title = title,
+            mediaId = parentMetaId,
+            season = activeSeasonNumber,
+            episode = activeEpisodeNumber,
+            progressPercent = progressPercent,
+            onSuccess = { ep ->
+                if (prefs.showSyncNotification) {
+                    com.nuvio.app.core.ui.NuvioToastController.show("AniList: Episode $ep marked as watched")
+                }
+            },
+        )
+    }
 }

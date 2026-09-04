@@ -45,9 +45,9 @@ internal actual object AddonStorage {
 
 private val desktopHttpClient = OkHttpClient.Builder()
     .dns(DesktopIPv4FirstDns())
-    .connectTimeout(60, TimeUnit.SECONDS)
-    .readTimeout(60, TimeUnit.SECONDS)
-    .writeTimeout(60, TimeUnit.SECONDS)
+    .connectTimeout(12, TimeUnit.SECONDS)
+    .readTimeout(12, TimeUnit.SECONDS)
+    .writeTimeout(12, TimeUnit.SECONDS)
     .followRedirects(true)
     .followSslRedirects(true)
     .build()
@@ -157,16 +157,18 @@ private fun buildDesktopRequest(
 ): Request {
     val normalizedMethod = method.trim().uppercase().ifBlank { "GET" }
     val sanitizedHeaders = headers.withoutAcceptEncoding()
+    val contentType = sanitizedHeaders.getHeaderIgnoreCase("Content-Type")
+        ?: "application/json"
     val builder = Request.Builder().url(url.encodeUnsafeHttpUrlCharacters())
-    sanitizedHeaders.forEach { (key, value) ->
-        if (key.isNotBlank() && value.isNotBlank()) {
-            builder.header(key, value)
+    sanitizedHeaders
+        .filterNot { (key, _) -> key.equals("Content-Type", ignoreCase = true) }
+        .forEach { (key, value) ->
+            if (key.isNotBlank() && value.isNotBlank()) {
+                builder.header(key, value)
+            }
         }
-    }
 
     return if (requestAllowsBody(normalizedMethod)) {
-        val contentType = sanitizedHeaders.getHeaderIgnoreCase("Content-Type")
-            ?: if (normalizedMethod == "POST") "application/x-www-form-urlencoded" else "application/json"
         builder.method(
             normalizedMethod,
             body.toByteArray(Charsets.UTF_8).toRequestBody(contentType.toMediaType()),

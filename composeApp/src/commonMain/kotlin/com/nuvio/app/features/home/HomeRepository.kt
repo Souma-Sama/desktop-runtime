@@ -27,6 +27,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.joinAll
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlin.math.absoluteValue
 import kotlin.random.Random
 
@@ -45,8 +48,10 @@ object HomeRepository {
     private var collectionHeroRequestKey: String? = null
     private var lastPublishedCatalogHeroEmpty: Boolean = true
     private var lastErrorMessage: String? = null
+    private var isForceRefresh: Boolean = false
 
     fun refresh(addons: List<ManagedAddon>, force: Boolean = false) {
+        isForceRefresh = force
         val activeAddons = addons.enabledAddons()
         val requests = buildHomeCatalogDefinitions(activeAddons)
         currentDefinitions = requests
@@ -88,46 +93,37 @@ object HomeRepository {
                 putAll(cachedSections)
             }
             var firstErrorMessage: String? = null
-            var batchIndex = 0
+            val mutex = Mutex()
 
-            prioritizedRequests.chunked(HOME_CATALOG_FETCH_BATCH_SIZE).forEach { batch ->
-                if (activeRequestKey != requestKey) return@launch
-                val results = batch.map { request ->
-                    async {
-                        request to runCatching {
-                            request.toSection(forceRefresh = force)
+            val jobs = prioritizedRequests.map { request ->
+                launch {
+                    val result = runCatching {
+                        request.toSection(forceRefresh = force)
+                    }
+                    if (activeRequestKey != requestKey) return@launch
+                    val section = result.getOrNull()
+                    if (section != null) {
+                        mutex.withLock {
+                            loadedSections[request.cacheKey] = section
+                            cachedSections = loadedSections.toMap()
+                            publishCurrentState(
+                                isLoading = true,
+                                requestKey = requestKey,
+                            )
                         }
-                    }
-                }.awaitAll()
-
-                if (activeRequestKey != requestKey) return@launch
-
-                results.mapNotNull { (request, result) ->
-                    result.getOrNull()?.let { section -> request.cacheKey to section }
-                }.forEach { (cacheKey, section) ->
-                    loadedSections[cacheKey] = section
-                }
-                if (firstErrorMessage == null) {
-                    firstErrorMessage = results.firstNotNullOfOrNull { (_, result) ->
-                        result.exceptionOrNull()?.message
+                    } else if (firstErrorMessage == null) {
+                        firstErrorMessage = result.exceptionOrNull()?.message
                     }
                 }
-                cachedSections = loadedSections.toMap()
-                lastErrorMessage = firstErrorMessage
-                if (batchIndex == 0 || (batchIndex + 1) % HOME_CATALOG_PUBLISH_INTERVAL == 0) {
-                    publishCurrentState(
-                        isLoading = true,
-                        requestKey = requestKey,
-                    )
-                }
-                batchIndex++
             }
+            jobs.joinAll()
 
             if (activeRequestKey != requestKey) return@launch
 
             cachedSections = loadedSections.toMap()
             lastErrorMessage = firstErrorMessage
             activeRequestKey = null
+            isForceRefresh = false
             publishCurrentState(
                 isLoading = false,
                 requestKey = requestKey,
@@ -194,16 +190,48 @@ object HomeRepository {
                 )
             }
 
+        val anilistPrefs = com.nuvio.app.features.anilist.AnilistPreferencesRepository.snapshot()
         val catalogHeroItems = if (snapshot.heroEnabled) {
-            val heroRandom = Random((requestKey?.hashCode() ?: 0).absoluteValue + 1)
-            currentDefinitions
-                .filter { definition -> preferences[definition.key]?.heroSourceEnabled != false }
-                .mapNotNull { definition -> cachedSections[definition.cacheKey] }
-                .map { section -> section.withReleaseFilter() }
-                .flatMap { section -> section.items }
-                .distinctBy { item -> "${item.type}:${item.id}" }
-                .shuffled(heroRandom)
-                .take(HOME_HERO_ITEM_LIMIT)
+            val existingHero = _uiState.value.heroItems
+            if (existingHero.isNotEmpty() && !isForceRefresh && (isLoading || !lastPublishedCatalogHeroEmpty)) {
+                existingHero
+            } else {
+                val heroRandom = Random((requestKey?.hashCode() ?: 0).absoluteValue + 1)
+                val primaryItems = currentDefinitions
+                    .filter { definition ->
+                        val isNativeAnilist = definition.manifestUrl == "native://anilist" || definition.manifestUrl == "builtin://anilist" || definition.key.contains("anilist", ignoreCase = true)
+                        if (isNativeAnilist && !anilistPrefs.enabled) false
+                        else preferences[definition.key]?.heroSourceEnabled != false
+                    }
+                    .mapNotNull { definition -> cachedSections[definition.cacheKey] }
+                    .map { section -> section.withReleaseFilter() }
+                    .flatMap { section -> section.items }
+                    .filter { item ->
+                        if (!anilistPrefs.enabled) {
+                            !item.id.startsWith("ani_") && !item.id.startsWith("anilist:")
+                        } else true
+                    }
+                    .distinctBy { item -> "${item.type}:${item.id}" }
+
+                val fallbackItems = if (primaryItems.isEmpty()) {
+                    cachedSections.values
+                        .map { section -> section.withReleaseFilter() }
+                        .flatMap { section -> section.items }
+                        .filter { item ->
+                            if (!anilistPrefs.enabled) {
+                                !item.id.startsWith("ani_") && !item.id.startsWith("anilist:")
+                            } else true
+                        }
+                        .distinctBy { item -> "${item.type}:${item.id}" }
+                } else emptyList()
+
+                val chosen = (primaryItems.ifEmpty { fallbackItems })
+                if (chosen.isNotEmpty()) {
+                    chosen.shuffled(heroRandom).take(HOME_HERO_ITEM_LIMIT)
+                } else {
+                    existingHero
+                }
+            }
         } else {
             emptyList()
         }
@@ -224,7 +252,14 @@ object HomeRepository {
     }
 
     private suspend fun HomeCatalogDefinition.toSection(forceRefresh: Boolean): HomeCatalogSection {
-        val page = if (isDesktop) {
+        val page = if (manifestUrl == "native://anilist") {
+            com.nuvio.app.features.anilist.catalog.AnilistCatalogRepository.fetchCatalogPage(
+                catalogId = catalogId,
+                page = 1,
+                perPage = HOME_CATALOG_PREVIEW_FETCH_LIMIT,
+                force = forceRefresh,
+            )
+        } else if (isDesktop) {
             fetchDesktopHomePreview(forceRefresh)
         } else {
             fetchCatalogPage(
@@ -236,18 +271,28 @@ object HomeRepository {
             )
         }
         val items = page.items
+        val catalogTarget = if (manifestUrl == "native://anilist") {
+            CatalogTarget.Anilist(
+                catalogId = catalogId,
+                contentType = type,
+                supportsPagination = supportsPagination,
+            )
+        } else {
+            CatalogTarget.Addon(
+                manifestUrl = manifestUrl,
+                contentType = type,
+                catalogId = catalogId,
+                supportsPagination = supportsPagination,
+            )
+        }
+
         if (items.isEmpty()) {
             return HomeCatalogSection(
                 key = key,
                 title = defaultTitle,
                 subtitle = addonName,
                 addonName = addonName,
-                target = CatalogTarget.Addon(
-                    manifestUrl = manifestUrl,
-                    contentType = type,
-                    catalogId = catalogId,
-                    supportsPagination = supportsPagination,
-                ),
+                target = catalogTarget,
                 items = emptyList(),
                 availableItemCount = 0,
                 hasMore = false,
@@ -259,12 +304,7 @@ object HomeRepository {
             title = defaultTitle,
             subtitle = addonName,
             addonName = addonName,
-            target = CatalogTarget.Addon(
-                manifestUrl = manifestUrl,
-                contentType = type,
-                catalogId = catalogId,
-                supportsPagination = supportsPagination,
-            ),
+            target = catalogTarget,
             items = items,
             availableItemCount = page.rawItemCount,
             hasMore = supportsPagination && page.nextSkip != null,

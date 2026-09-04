@@ -8,9 +8,11 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
@@ -53,8 +55,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.pointer.PointerEventType
-import androidx.compose.ui.input.pointer.onPointerEvent
+import com.nuvio.app.core.ui.onScrollDismiss
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
@@ -325,7 +326,7 @@ internal fun HomePosterHoverPreview(
                         trailerPlaybackSource = trailerPlaybackSource,
                         modifier = Modifier
                             .hoverable(previewInteractionSource)
-                            .onPointerEvent(PointerEventType.Scroll) {
+                            .onScrollDismiss {
                                 previewDismissedByScroll = true
                                 previewVisible = false
                                 popupMounted = false
@@ -377,13 +378,14 @@ private fun HomePosterPreviewCard(
             .clip(shape)
             .background(previewBackground)
             .border(tokens.borders.hairline, tokens.colors.borderStrong, shape)
-            .clickable(
+            .combinedClickable(
                 interactionSource = clickInteractionSource,
                 indication = null,
-                enabled = onClick != null,
-            ) {
-                onClick?.invoke()
-            }
+                enabled = onClick != null || onLongClick != null,
+                onClick = { onClick?.invoke() },
+                onDoubleClick = onLongClick,
+                onLongClick = onLongClick,
+            )
             .secondaryClick(onLongClick),
     ) {
         Box(
@@ -490,7 +492,7 @@ private fun HomePosterPreviewCard(
                     )
                 }
 
-            item.description?.takeIf { it.isNotBlank() }?.let { description ->
+            com.nuvio.app.core.format.cleanHtmlDescription(item.description)?.let { description ->
                 Text(
                     text = description,
                     style = MaterialTheme.typography.bodyMedium,

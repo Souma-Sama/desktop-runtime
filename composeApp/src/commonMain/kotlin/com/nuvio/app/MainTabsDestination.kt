@@ -1,19 +1,27 @@
 package com.nuvio.app
 
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.width
+import kotlinx.coroutines.delay
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -33,9 +41,14 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.max
+import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.nuvio.app.core.ui.LocalNuvioBottomNavigationOverlayPadding
+import com.nuvio.app.core.ui.LocalNuvioFloatingSidebarPadding
 import com.nuvio.app.core.ui.LocalNuvioNavBarScrollState
+import com.nuvio.app.core.ui.FloatingGlassDesktopSidebar
+import com.nuvio.app.core.ui.FloatingGlassSidebarCollapsedWidth
+import com.nuvio.app.core.ui.FloatingGlassSidebarExpandedWidth
 import com.nuvio.app.core.ui.NuvioClassicNavigationBar
 import com.nuvio.app.core.ui.NuvioNavigationBar
 import com.nuvio.app.core.ui.PlatformBackHandler
@@ -115,15 +128,49 @@ internal fun MainTabsDestination(
             else -> isSidebarHovered || isProfileStackVisible // ADAPTIVE
         }
 
+        val anilistPrefs by com.nuvio.app.features.anilist.AnilistPreferencesRepository.preferences.collectAsStateWithLifecycle()
+        val useFloatingGlassSidebar = useDesktopSidebar && anilistPrefs.useFloatingGlassDesktopSidebar
+        val targetCollapsedWidth = if (useFloatingGlassSidebar) FloatingGlassSidebarCollapsedWidth else DesktopSidebarCollapsedWidth
+        val targetExpandedWidth = if (useFloatingGlassSidebar) FloatingGlassSidebarExpandedWidth else DesktopSidebarExpandedWidth
+
         val animatedSidebarWidth by animateDpAsState(
-            targetValue = if (isSidebarExpanded) DesktopSidebarExpandedWidth else DesktopSidebarCollapsedWidth,
+            targetValue = if (isSidebarExpanded) targetExpandedWidth else targetCollapsedWidth,
             animationSpec = tween(durationMillis = 200, easing = FastOutSlowInEasing),
             label = "desktop_sidebar_width",
         )
 
+        val edgeHoverSource = remember { MutableInteractionSource() }
+        val isEdgeHovered by edgeHoverSource.collectIsHoveredAsState()
+
+        var isDockRevealed by remember { mutableStateOf(!useFloatingGlassSidebar) }
+
+        LaunchedEffect(isEdgeHovered, isSidebarHovered, isProfileStackVisible, useFloatingGlassSidebar) {
+            if (!useFloatingGlassSidebar) {
+                isDockRevealed = true
+            } else if (isEdgeHovered || isSidebarHovered || isProfileStackVisible) {
+                isDockRevealed = true
+            } else {
+                delay(300L)
+                isDockRevealed = false
+            }
+        }
+
+        val animatedDockSlideX by animateDpAsState(
+            targetValue = if (isDockRevealed) 0.dp else -(animatedSidebarWidth + 24.dp),
+            animationSpec = spring(
+                dampingRatio = 0.82f,
+                stiffness = Spring.StiffnessMediumLow,
+            ),
+            label = "sidebar_dock_slide_x",
+        )
+
         val isSidebarAlwaysExpanded = useDesktopSidebar && navBarStyleSetting == NavBarStyle.EXPANDED
         val contentStartPadding = if (useDesktopSidebar) {
-            if (isSidebarAlwaysExpanded) DesktopSidebarExpandedWidth else DesktopSidebarCollapsedWidth
+            if (useFloatingGlassSidebar) {
+                0.dp // Floating glass sidebar hovers over full-bleed content without dead area
+            } else {
+                if (isSidebarAlwaysExpanded) DesktopSidebarExpandedWidth else DesktopSidebarCollapsedWidth
+            }
         } else {
             0.dp
         }
@@ -149,6 +196,14 @@ internal fun MainTabsDestination(
                             icon = Res.drawable.sidebar_search,
                             contentDescription = stringResource(Res.string.compose_nav_search),
                         )
+                        if (anilistPrefs.enabled) {
+                            NavItem(
+                                selected = selectedTab == AppScreenTab.Explore,
+                                onClick = { onTabSelected(AppScreenTab.Explore) },
+                                icon = com.nuvio.app.features.anilist.ExploreIconVector,
+                                contentDescription = "Explore",
+                            )
+                        }
                         NavItem(
                             selected = selectedTab == AppScreenTab.Library,
                             onClick = { onTabSelected(AppScreenTab.Library) },
@@ -172,7 +227,7 @@ internal fun MainTabsDestination(
         ) { innerPadding ->
             Box(modifier = Modifier.fillMaxSize()) {
                 val requiresNavBarHaze = if (isTabletLayout) {
-                    useFloatingTopBar
+                    useFloatingTopBar || useFloatingGlassSidebar
                 } else {
                     !useNativeBottomTabs && navBarStyleSetting != NavBarStyle.CLASSIC
                 }
@@ -183,6 +238,7 @@ internal fun MainTabsDestination(
                 }
                 CompositionLocalProvider(
                     LocalNuvioBottomNavigationOverlayPadding provides if (useNativeBottomTabs) 49.dp else if (!isTabletLayout && navBarStyleSetting != NavBarStyle.CLASSIC) 72.dp else 0.dp,
+                    LocalNuvioFloatingSidebarPadding provides 0.dp,
                     LocalNuvioNavBarScrollState provides navBarScrollState,
                 ) {
                     AppTabHost(
@@ -202,19 +258,49 @@ internal fun MainTabsDestination(
                     )
                 }
 
-                if (useDesktopSidebar) {
-                    DesktopHoverSidebar(
-                        selectedTab = selectedTab,
-                        onTabSelected = onTabSelected,
-                        onProfileSelected = onProfileSelected,
-                        onAddProfileRequested = onAddProfileRequested,
-                        sidebarExpanded = isSidebarExpanded,
-                        sidebarWidth = animatedSidebarWidth,
-                        hoverSource = sidebarHoverSource,
-                        profileStackVisible = isProfileStackVisible,
-                        onProfileStackVisibleChange = { isProfileStackVisible = it },
-                        modifier = Modifier.align(Alignment.CenterStart),
+                if (useDesktopSidebar && useFloatingGlassSidebar) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.CenterStart)
+                            .fillMaxHeight()
+                            .width(18.dp)
+                            .hoverable(edgeHoverSource)
+                            .zIndex(9f),
                     )
+                }
+
+                if (useDesktopSidebar) {
+                    if (useFloatingGlassSidebar) {
+                        FloatingGlassDesktopSidebar(
+                            selectedTab = selectedTab,
+                            onTabSelected = onTabSelected,
+                            onProfileSelected = onProfileSelected,
+                            onAddProfileRequested = onAddProfileRequested,
+                            sidebarExpanded = isSidebarExpanded,
+                            sidebarWidth = animatedSidebarWidth,
+                            hoverSource = sidebarHoverSource,
+                            profileStackVisible = isProfileStackVisible,
+                            onProfileStackVisibleChange = { isProfileStackVisible = it },
+                            hazeState = navBarHazeState,
+                            modifier = Modifier
+                                .align(Alignment.CenterStart)
+                                .offset(x = animatedDockSlideX)
+                                .zIndex(10f),
+                        )
+                    } else {
+                        DesktopHoverSidebar(
+                            selectedTab = selectedTab,
+                            onTabSelected = onTabSelected,
+                            onProfileSelected = onProfileSelected,
+                            onAddProfileRequested = onAddProfileRequested,
+                            sidebarExpanded = isSidebarExpanded,
+                            sidebarWidth = animatedSidebarWidth,
+                            hoverSource = sidebarHoverSource,
+                            profileStackVisible = isProfileStackVisible,
+                            onProfileStackVisibleChange = { isProfileStackVisible = it },
+                            modifier = Modifier.align(Alignment.CenterStart),
+                        )
+                    }
                 }
 
                 if (useFloatingTopBar) {
@@ -252,6 +338,15 @@ internal fun MainTabsDestination(
                             contentDescription = stringResource(Res.string.compose_nav_search),
                             label = stringResource(Res.string.compose_nav_search),
                         )
+                        if (anilistPrefs.enabled) {
+                            NavItem(
+                                selected = selectedTab == AppScreenTab.Explore,
+                                onClick = { onTabSelected(AppScreenTab.Explore) },
+                                icon = com.nuvio.app.features.anilist.ExploreIconVector,
+                                contentDescription = "Explore",
+                                label = "Explore",
+                            )
+                        }
                         NavItem(
                             selected = selectedTab == AppScreenTab.Library,
                             onClick = { onTabSelected(AppScreenTab.Library) },

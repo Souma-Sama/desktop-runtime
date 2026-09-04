@@ -14,6 +14,15 @@ internal actual object EpisodeReleaseDatePlatform {
             .toString()
     }.getOrNull()
 
+    actual fun localTimeAtEpochMs(epochMs: Long): String? = runCatching {
+        val time = Instant.ofEpochMilli(epochMs)
+            .atZone(ZoneId.systemDefault())
+            .toLocalTime()
+        val h = time.hour.toString().padStart(2, '0')
+        val m = time.minute.toString().padStart(2, '0')
+        "$h:$m"
+    }.getOrNull()
+
     actual fun localDateTimeToEpochMs(normalizedIsoDateTime: String): Long? = runCatching {
         LocalDateTime.parse(normalizedIsoDateTime)
             .atZone(ZoneId.systemDefault())

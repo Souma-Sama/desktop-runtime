@@ -30,6 +30,12 @@ sealed interface CatalogTarget {
         override val contentType: String,
         override val supportsPagination: Boolean = false,
     ) : CatalogTarget
+
+    data class Anilist(
+        val catalogId: String,
+        override val contentType: String = "anime",
+        override val supportsPagination: Boolean = true,
+    ) : CatalogTarget
 }
 
 @Serializable
@@ -37,4 +43,5 @@ enum class CatalogTargetKind {
     ADDON,
     LIBRARY,
     COLLECTION_SOURCE,
+    ANILIST,
 }

@@ -28,9 +28,29 @@ object TmdbService {
 
         if (normalized.isBlank()) return null
         if (normalized.all(Char::isDigit)) return normalized
+        if (normalized.startsWith("ani_", ignoreCase = true) || normalized.startsWith("anilist:", ignoreCase = true)) {
+            val anilistId = com.nuvio.app.features.anilist.AnilistTrackerCoordinator.extractAnilistId(normalized)
+            if (anilistId != null) {
+                val armMapping = com.nuvio.app.features.anilist.catalog.AnilistMetaDetailsResolver.resolveArmMapping(anilistId)
+                if (armMapping.tmdbId != null && armMapping.tmdbId > 0) {
+                    return armMapping.tmdbId.toString()
+                }
+                if (!armMapping.imdbId.isNullOrBlank()) {
+                    return imdbToTmdb(imdbId = armMapping.imdbId, mediaType = mediaType, apiKey = apiKey)
+                }
+            }
+        }
         if (!normalized.startsWith("tt", ignoreCase = true)) return null
 
         return imdbToTmdb(imdbId = normalized, mediaType = mediaType, apiKey = apiKey)
+    }
+
+    suspend fun imdbToTvdbId(imdbId: String): String? {
+        val apiKey = currentApiKey() ?: return null
+        val tmdbIdStr = imdbToTmdb(imdbId, "tv", apiKey) ?: return null
+        val tmdbId = tmdbIdStr.toIntOrNull() ?: return null
+        val body = fetch<TmdbExternalIdsResponse>(endpoint = "tv/$tmdbId/external_ids", apiKey = apiKey) ?: return null
+        return body.tvdbId?.toString()
     }
 
     suspend fun tmdbToImdb(tmdbId: Int, mediaType: String): String? {
@@ -105,7 +125,7 @@ object TmdbService {
     internal fun normalizeMediaType(mediaType: String): String =
         when (mediaType.trim().lowercase()) {
             "movie", "film" -> "movie"
-            "tv", "series", "show", "tvshow" -> "tv"
+            "tv", "series", "show", "tvshow", "anime" -> "tv"
             else -> mediaType.trim().lowercase()
         }
 }
@@ -145,4 +165,5 @@ private data class TmdbExternalResult(
 @Serializable
 private data class TmdbExternalIdsResponse(
     @SerialName("imdb_id") val imdbId: String? = null,
+    @SerialName("tvdb_id") val tvdbId: Int? = null,
 )

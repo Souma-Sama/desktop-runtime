@@ -43,25 +43,16 @@ internal typealias ContentPlayAction = (
 
 @Composable
 private fun rememberOpenMeta(navController: NuvioNavigator): (MetaPreview) -> Unit {
-    val scope = rememberCoroutineScope()
     return { preview ->
-        scope.launch {
-            val resolvedId = if (preview.id.startsWith("tmdb:")) {
-                val tmdbId = preview.id.removePrefix("tmdb:").toIntOrNull()
-                tmdbId?.let {
-                    TmdbService.tmdbToImdb(
-                        tmdbId = it,
-                        mediaType = preview.type,
-                    )
-                } ?: preview.id
-            } else {
-                preview.id
-            }
+        if (!com.nuvio.app.features.anilist.KaiHooks.isNonVideoMedia(preview.type)) {
             navController.navigate(
                 DetailRoute(
                     type = preview.type,
-                    id = resolvedId,
+                    id = preview.id,
                     title = preview.name,
+                    poster = preview.poster,
+                    banner = preview.banner,
+                    logo = preview.logo,
                 ),
             )
         }
@@ -86,43 +77,49 @@ internal fun DetailsDestination(
     MetaDetailsScreen(
         type = route.type,
         id = route.id,
+        initialTitle = route.title,
+        initialPoster = route.poster,
+        initialBanner = route.banner,
+        initialLogo = route.logo,
         onBack = onBack,
         onPlay = onPlay,
         onPlayManually = onPlayManually,
         onOpenMeta = onOpenMeta,
         onCastClick = { person, avatarTransitionKey ->
-            val tmdbId = person.tmdbId
-            if (tmdbId != null && tmdbId > 0) {
-                navController.navigate(
-                    PersonDetailRoute(
-                        personId = tmdbId,
-                        personName = person.name,
-                        personPhoto = person.photo,
-                        castAvatarTransitionKey = avatarTransitionKey,
-                        preferCrew = person.role?.let {
-                            it.equals("Director", ignoreCase = true) ||
-                                it.equals(directorRole, ignoreCase = true) ||
-                                it.equals("Writer", ignoreCase = true) ||
-                                it.equals(writerRole, ignoreCase = true) ||
-                                it.equals("Creator", ignoreCase = true) ||
-                                it.equals(creatorRole, ignoreCase = true)
-                        } ?: false,
-                    ),
-                )
-            }
+            val personId = person.tmdbId ?: 0
+            val isAnilistMedia = route.id.startsWith("ani_", ignoreCase = true) || route.id.startsWith("anilist:", ignoreCase = true)
+            val isCharacter = person.category.equals("Characters", ignoreCase = true)
+            navController.navigate(
+                PersonDetailRoute(
+                    personId = personId,
+                    personName = person.name,
+                    personPhoto = person.photo,
+                    castAvatarTransitionKey = avatarTransitionKey,
+                    preferCrew = person.role?.let {
+                        it.equals("Director", ignoreCase = true) ||
+                            it.equals(directorRole, ignoreCase = true) ||
+                            it.equals("Writer", ignoreCase = true) ||
+                            it.equals(writerRole, ignoreCase = true) ||
+                            it.equals("Creator", ignoreCase = true) ||
+                            it.equals(creatorRole, ignoreCase = true)
+                    } ?: false,
+                    isAnilist = isAnilistMedia,
+                    isCharacter = isCharacter,
+                ),
+            )
         },
         onCompanyClick = { company, entityKind ->
-            val tmdbId = company.tmdbId
-            if (tmdbId != null && tmdbId > 0) {
-                navController.navigate(
-                    EntityBrowseRoute(
-                        entityKind = entityKind,
-                        entityId = tmdbId,
-                        entityName = company.name,
-                        sourceType = route.type,
-                    ),
-                )
-            }
+            val entityId = company.tmdbId ?: 0
+            val isAnilistMedia = route.id.startsWith("ani_", ignoreCase = true) || route.id.startsWith("anilist:", ignoreCase = true)
+            navController.navigate(
+                EntityBrowseRoute(
+                    entityKind = entityKind,
+                    entityId = entityId,
+                    entityName = company.name,
+                    sourceType = route.type,
+                    isAnilist = isAnilistMedia,
+                ),
+            )
         },
         sharedTransitionScope = sharedTransitionScope,
         animatedVisibilityScope = animatedVisibilityScope,
@@ -145,6 +142,8 @@ internal fun PersonDestination(
         initialProfilePhoto = route.personPhoto,
         avatarTransitionKey = route.castAvatarTransitionKey,
         preferCrew = route.preferCrew,
+        isAnilist = route.isAnilist,
+        isCharacter = route.isCharacter,
         onBack = onBack,
         onOpenMeta = rememberOpenMeta(navController),
         sharedTransitionScope = sharedTransitionScope,
@@ -164,6 +163,7 @@ internal fun EntityDestination(
         entityId = route.entityId,
         entityName = route.entityName,
         sourceType = route.sourceType,
+        isAnilist = route.isAnilist,
         onBack = onBack,
         onOpenMeta = rememberOpenMeta(navController),
         modifier = Modifier.fillMaxSize(),

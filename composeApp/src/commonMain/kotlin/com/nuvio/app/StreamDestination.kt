@@ -124,7 +124,20 @@ internal fun StreamDestination(
             ?.id
             ?.takeIf { it.isNotBlank() }
 
-        effectiveVideoId = resolvedVideoId ?: launch.videoId
+        val candidateId = resolvedVideoId ?: launch.videoId
+        val finalEffectiveId = if (metaId.startsWith("ani_") || metaId.startsWith("anilist:")) {
+            com.nuvio.app.features.anilist.streams.AnimeStreamIdManager.resolvePlaybackVideoId(
+                parentMetaId = metaId,
+                season = launch.seasonNumber ?: 1,
+                episode = launch.episodeNumber ?: 1,
+                isMovie = launch.type == "movie",
+                fallbackVideoId = candidateId,
+            )
+        } else {
+            candidateId
+        }
+
+        effectiveVideoId = finalEffectiveId
         hasResolvedVideoId = true
     }
 
@@ -625,6 +638,7 @@ internal fun StreamDestination(
             resumeProgressFraction = launch.resumeProgressFraction,
             manualSelection = launch.manualSelection,
             startFromBeginning = launch.startFromBeginning,
+            onVideoIdChange = { newId -> effectiveVideoId = newId },
             onStreamSelected = { stream, resolvedResumePositionMs, resolvedResumeProgressFraction ->
                 openSelectedStream(
                     stream = stream,

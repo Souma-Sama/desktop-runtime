@@ -38,6 +38,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.nuvio.app.features.anilist.AnilistPreferencesRepository
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
@@ -48,6 +50,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.draw.blur
 import com.nuvio.app.core.ui.NuvioDesktopImageScaling
 import com.nuvio.app.core.ui.NuvioAsyncImage as AsyncImage
 import com.nuvio.app.core.ui.desktopPageHorizontalPaddingForWidth
@@ -84,7 +87,8 @@ fun DetailHero(
     BoxWithConstraints(
         modifier = modifier.fillMaxWidth(),
     ) {
-        val heroHeight = detailHeroHeight(maxWidth, viewportHeight, isTablet)
+        val isAnilistItem = meta.id.startsWith("ani_") || meta.id.startsWith("anilist:")
+        val heroHeight = detailHeroHeight(maxWidth, viewportHeight, isTablet, isAnilistItem)
         val foregroundHorizontalPadding = if (isDesktop) {
             desktopPageHorizontalPaddingForWidth(maxWidth.value)
         } else if (isTablet) {
@@ -126,6 +130,28 @@ fun DetailHero(
                 val imageUrl = meta.background ?: meta.poster
                 val backdropScale = if (isTablet) 1f else 1.08f
                 if (imageUrl != null) {
+                    val isAnilistBanner = imageUrl.contains("anilistcdn/media/anime/banner", ignoreCase = true)
+                    if (isAnilistBanner) {
+                        AsyncImage(
+                            model = imageUrl,
+                            contentDescription = null,
+                            modifier = Modifier
+                                .align(Alignment.Center)
+                                .fillMaxWidth()
+                                .height(heroHeight)
+                                .heroStretchZoom(stretchPx)
+                                .blur(36.dp)
+                                .graphicsLayer {
+                                    translationY = scrollOffset() * 0.5f
+                                    scaleX = backdropScale
+                                    scaleY = backdropScale
+                                    alpha = 0.55f
+                                },
+                            alignment = Alignment.Center,
+                            contentScale = ContentScale.Crop,
+                            desktopImageScaling = NuvioDesktopImageScaling.Disabled,
+                        )
+                    }
                     AsyncImage(
                         model = if (isDesktop) originalTmdbImageUrl(imageUrl) else imageUrl,
                         contentDescription = meta.name,
@@ -139,8 +165,8 @@ fun DetailHero(
                                 scaleX = backdropScale
                                 scaleY = backdropScale
                             },
-                        alignment = if (isTablet) Alignment.TopCenter else Alignment.Center,
-                        contentScale = ContentScale.Crop,
+                        alignment = if (isAnilistBanner) Alignment.Center else if (isTablet) Alignment.TopCenter else Alignment.Center,
+                        contentScale = if (isAnilistBanner) ContentScale.FillWidth else ContentScale.Crop,
                         desktopImageScaling = NuvioDesktopImageScaling.Disabled,
                         onSuccess = { state ->
                             onBackdropLoaded(
@@ -153,7 +179,14 @@ fun DetailHero(
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
-                            .background(MaterialTheme.colorScheme.surface),
+                            .background(
+                                Brush.verticalGradient(
+                                    colors = listOf(
+                                        heroGradientColor?.copy(alpha = 0.55f) ?: MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f),
+                                        bottomGradientColor,
+                                    ),
+                                ),
+                            ),
                     )
                 }
                 if (heroTrailerSourceUrl != null) {
@@ -245,14 +278,16 @@ fun DetailHero(
                         .padding(bottom = 8.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
+                    val anilistPrefs by AnilistPreferencesRepository.preferences.collectAsStateWithLifecycle()
+                    val heroLogoScale = anilistPrefs.heroTitleLogoScale
                     if (logoUrl != null && !logoLoadError) {
                         AsyncImage(
                             model = logoUrl,
                             contentDescription = stringResource(Res.string.detail_logo_content_description, meta.name),
                             modifier = Modifier
-                                .fillMaxWidth(if (isTablet) 0.56f else 0.6f)
+                                .fillMaxWidth(((if (isTablet) 0.56f else 0.6f) * heroLogoScale).coerceIn(0.25f, 1f))
                                 .widthIn(max = contentMaxWidth)
-                                .height(if (isTablet) 72.dp else 80.dp),
+                                .height(((if (isTablet) 72.dp else 80.dp) * heroLogoScale).coerceIn(30.dp, 200.dp)),
                             alignment = Alignment.Center,
                             contentScale = ContentScale.Fit,
                             onError = { logoLoadError = true },
@@ -281,13 +316,22 @@ fun DetailHero(
     }
 }
 
-private fun detailHeroHeight(maxWidth: Dp, viewportHeight: Dp, isTablet: Boolean): Dp =
+private fun detailHeroHeight(maxWidth: Dp, viewportHeight: Dp, isTablet: Boolean, isAnilistItem: Boolean): Dp =
     if (!isTablet) {
-        (maxWidth * 1.33f).coerceIn(420.dp, 760.dp)
+        if (isAnilistItem) {
+            val landscapeHeight = maxWidth * (9f / 16f)
+            val viewportLimit = viewportHeight
+                .takeIf { it > 0.dp }
+                ?.let { it * 0.65f }
+                ?: 600.dp
+            minOf(landscapeHeight, viewportLimit).coerceIn(220.dp, 600.dp)
+        } else {
+            (maxWidth * 1.33f).coerceIn(420.dp, 760.dp)
+        }
     } else {
         val viewportLimit = viewportHeight
             .takeIf { it > 0.dp }
             ?.let { it * 0.72f }
             ?: 1080.dp
-        minOf(maxWidth * 9f / 16f, viewportLimit).coerceIn(420.dp, 1080.dp)
+        minOf(maxWidth * 9f / 16f, viewportLimit).coerceIn(360.dp, 1080.dp)
     }

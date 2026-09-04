@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -62,6 +63,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.nuvio.app.core.i18n.localizedByteUnit
 import com.nuvio.app.core.network.NetworkCondition
@@ -70,6 +72,7 @@ import com.nuvio.app.core.ui.DisintegratingContainer
 import com.nuvio.app.core.ui.DisintegrationRequest
 import com.nuvio.app.core.ui.NuvioDropdownChip
 import com.nuvio.app.core.ui.NuvioDropdownOption
+import com.nuvio.app.core.ui.LocalNuvioFloatingSidebarPadding
 import com.nuvio.app.core.ui.NuvioScreen
 import com.nuvio.app.core.ui.NuvioNetworkOfflineCard
 import com.nuvio.app.core.ui.NuvioScreenHeader
@@ -81,12 +84,21 @@ import com.nuvio.app.core.ui.posterGridColumnCountForViewport
 import com.nuvio.app.features.home.components.posterGridColumnCountForWidth
 import com.nuvio.app.isDesktop
 import com.nuvio.app.core.ui.rememberPosterCardStyleUiState
+import com.nuvio.app.features.addons.AddonRepository
+import com.nuvio.app.features.anilist.AnilistLibraryItem
+import com.nuvio.app.features.anilist.AnilistLibraryMenuPrefs
+import com.nuvio.app.features.anilist.AnilistLibraryRepository
+import com.nuvio.app.features.anilist.AnilistOpenByResolver
+import com.nuvio.app.features.anilist.AnilistPreferencesRepository
+import com.nuvio.app.features.anilist.components.AnilistLibraryActionMenu
+import com.nuvio.app.features.anilist.components.anilistLibraryContent
 import com.nuvio.app.features.cloud.CloudLibraryFile
 import com.nuvio.app.features.cloud.CloudLibraryItem
 import com.nuvio.app.features.cloud.CloudLibraryItemType
 import com.nuvio.app.features.cloud.CloudLibraryRepository
 import com.nuvio.app.features.cloud.CloudLibraryUiState
 import com.nuvio.app.features.debrid.DebridSettingsRepository
+import com.nuvio.app.features.home.PosterShape
 import com.nuvio.app.features.home.components.HomeEmptyStateCard
 import com.nuvio.app.features.home.components.HomePosterCard
 import com.nuvio.app.features.home.components.HomeSkeletonRow
@@ -110,6 +122,9 @@ fun LibraryScreen(
     onSectionViewAllClick: ((LibrarySection, LibrarySortOption) -> Unit)? = null,
     onCloudFilePlay: ((CloudLibraryItem, CloudLibraryFile) -> Unit)? = null,
     onConnectCloudClick: (() -> Unit)? = null,
+    onAnilistPosterClick: ((AnilistLibraryItem) -> Unit)? = null,
+    onAnilistPosterLongClick: ((AnilistLibraryItem) -> Unit)? = null,
+    onConnectAnilistClick: (() -> Unit)? = null,
     disintegrationRequest: DisintegrationRequest<String>? = null,
 ) {
     val uiState by remember {
@@ -121,6 +136,19 @@ fun LibraryScreen(
         DebridSettingsRepository.ensureLoaded()
         DebridSettingsRepository.uiState
     }.collectAsStateWithLifecycle()
+    val anilistUiState by remember {
+        AnilistLibraryRepository.ensureLoaded()
+        AnilistLibraryRepository.uiState
+    }.collectAsStateWithLifecycle()
+    val anilistPrefs by remember {
+        AnilistPreferencesRepository.ensureLoaded()
+        AnilistPreferencesRepository.preferences
+    }.collectAsStateWithLifecycle()
+    val anilistMenuPrefs by remember {
+        AnilistLibraryMenuPrefs.ensureLoaded()
+        AnilistLibraryMenuPrefs.state
+    }.collectAsStateWithLifecycle()
+    var isAnilistSyncing by remember { mutableStateOf(false) }
     val watchedUiState by remember {
         WatchedRepository.ensureLoaded()
         WatchedRepository.uiState
@@ -136,9 +164,17 @@ fun LibraryScreen(
     val sourceMode = remember(sourceModeName) {
         runCatching { LibraryViewMode.valueOf(sourceModeName) }.getOrDefault(LibraryViewMode.Saved)
     }
+
+    LaunchedEffect(sourceMode) {
+        if (sourceMode == LibraryViewMode.AniList) {
+            AnilistLibraryRepository.ensureFresh()
+        }
+    }
     var selectedProviderId by rememberSaveable { mutableStateOf<String?>(null) }
     var selectedTypeName by rememberSaveable { mutableStateOf<String?>(null) }
     var cloudSearchQuery by rememberSaveable { mutableStateOf("") }
+    var anilistSearchQuery by rememberSaveable { mutableStateOf("") }
+    var anilistSelectedFormat by rememberSaveable { mutableStateOf<String?>(null) }
     val selectedType = remember(selectedTypeName) {
         selectedTypeName?.let { runCatching { CloudLibraryItemType.valueOf(it) }.getOrNull() }
     }
@@ -248,13 +284,15 @@ fun LibraryScreen(
                 posterGridColumnCountForWidth(maxWidth)
             }
         }
+        val animeAddons = remember { AnilistOpenByResolver.animeAddons() }
 
-        NuvioScreen(
-            modifier = Modifier.fillMaxSize(),
-            horizontalPadding = 0.dp,
-            topPadding = if (topChromePadding != null) 0.dp else null,
-            listState = listState,
-        ) {
+        val libraryScreenBody = @Composable {
+            NuvioScreen(
+                modifier = Modifier.fillMaxSize(),
+                horizontalPadding = 0.dp,
+                topPadding = if (topChromePadding != null) 0.dp else null,
+                listState = listState,
+            ) {
             stickyHeader {
                 Box(modifier = Modifier.fillMaxWidth()) {
                     Box(
@@ -263,12 +301,17 @@ fun LibraryScreen(
                             .background(MaterialTheme.colorScheme.background)
                             .nuvioConsumePointerEvents(),
                     )
+                    val floatingSidebarPadding = LocalNuvioFloatingSidebarPadding.current
                     androidx.compose.foundation.layout.Column(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(start = if (floatingSidebarPadding > 0.dp) floatingSidebarPadding - 16.dp else 0.dp),
                     ) {
                         NuvioScreenHeader(
                             title = if (sourceMode == LibraryViewMode.Cloud) {
                                 stringResource(Res.string.library_title)
+                            } else if (sourceMode == LibraryViewMode.AniList) {
+                                "AniList Library"
                             } else {
                                 when (uiState.sourceMode) {
                                     LibrarySourceMode.LOCAL -> stringResource(Res.string.library_title)
@@ -321,6 +364,72 @@ fun LibraryScreen(
                             modifier = Modifier.padding(horizontal = 16.dp),
                         )
                         Spacer(modifier = Modifier.height(6.dp))
+
+                        if (sourceMode == LibraryViewMode.AniList && anilistPrefs.enabled && anilistPrefs.enableInLibraryFilter) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp, vertical = 4.dp)
+                                    .horizontalScroll(rememberScrollState()),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                OutlinedTextField(
+                                    value = anilistSearchQuery,
+                                    onValueChange = { anilistSearchQuery = it },
+                                    placeholder = { Text("Filter titles...", fontSize = 12.sp) },
+                                    leadingIcon = {
+                                        Icon(
+                                            imageVector = Icons.Rounded.Search,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(16.dp),
+                                        )
+                                    },
+                                    trailingIcon = if (anilistSearchQuery.isNotBlank()) {
+                                        {
+                                            IconButton(onClick = { anilistSearchQuery = "" }) {
+                                                Icon(
+                                                    imageVector = Icons.Rounded.Close,
+                                                    contentDescription = "Clear",
+                                                    modifier = Modifier.size(14.dp),
+                                                )
+                                            }
+                                        }
+                                    } else null,
+                                    singleLine = true,
+                                    modifier = Modifier
+                                        .widthIn(min = 160.dp, max = 240.dp)
+                                        .height(44.dp),
+                                    textStyle = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
+                                    shape = RoundedCornerShape(8.dp),
+                                )
+
+                                NuvioDropdownChip(
+                                    title = "Format",
+                                    label = when (anilistSelectedFormat) {
+                                        "TV" -> "TV Series"
+                                        "MOVIE" -> "Movies"
+                                        "OVA" -> "OVAs"
+                                        "ONA" -> "ONAs"
+                                        "SPECIAL" -> "Specials"
+                                        else -> "All Formats"
+                                    },
+                                    selectedKey = anilistSelectedFormat ?: "",
+                                    options = listOf(
+                                        NuvioDropdownOption("", "All Formats"),
+                                        NuvioDropdownOption("TV", "TV Series"),
+                                        NuvioDropdownOption("MOVIE", "Movies"),
+                                        NuvioDropdownOption("OVA", "OVAs"),
+                                        NuvioDropdownOption("ONA", "ONAs"),
+                                        NuvioDropdownOption("SPECIAL", "Specials"),
+                                    ),
+                                    onSelected = { opt ->
+                                        anilistSelectedFormat = opt.key.ifBlank { null }
+                                    },
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(4.dp))
+                        }
                     }
                 }
             }
@@ -356,6 +465,44 @@ fun LibraryScreen(
                     onBackToItems = { selectedCloudItemKey = null },
                     onRefresh = { CloudLibraryRepository.refresh() },
                     onConnectCloudClick = onConnectCloudClick,
+                )
+            } else if (sourceMode == LibraryViewMode.AniList) {
+                anilistLibraryContent(
+                    uiState = anilistUiState,
+                    sectionsConfig = anilistPrefs.librarySections,
+                    sortBy = anilistMenuPrefs.sortBy,
+                    sortAscending = anilistMenuPrefs.sortAscending,
+                    searchQuery = anilistSearchQuery,
+                    selectedFormat = anilistSelectedFormat,
+                    onPosterClick = { item ->
+                        onAnilistPosterClick?.invoke(item) ?: onPosterClick?.invoke(
+                            LibraryItem(
+                                id = "anilist:${item.id}",
+                                type = if (item.format?.equals("MOVIE", ignoreCase = true) == true) "movie" else "series",
+                                name = item.title,
+                                poster = item.posterUrl,
+                                banner = item.posterUrl,
+                                logo = null,
+                                description = null,
+                                releaseInfo = null,
+                                posterShape = PosterShape.Poster,
+                                savedAtEpochMs = item.updatedAt,
+                            ),
+                        )
+                    },
+                    onPosterLongClick = onAnilistPosterLongClick,
+                    onConnectAnilistClick = { onConnectAnilistClick?.invoke() },
+                    onRefresh = {
+                        coroutineScope.launch {
+                            isAnilistSyncing = true
+                            try {
+                                AnilistLibraryRepository.refreshNow()
+                            } finally {
+                                isAnilistSyncing = false
+                            }
+                        }
+                    },
+                    isOffline = observedOfflineState,
                 )
             } else {
                 when {
@@ -456,6 +603,28 @@ fun LibraryScreen(
                     }
                 }
             }
+        }
+    }
+
+        if (sourceMode == LibraryViewMode.AniList) {
+            AnilistLibraryActionMenu(
+                animeAddons = animeAddons,
+                isSyncing = isAnilistSyncing,
+                onSyncClick = {
+                    coroutineScope.launch {
+                        isAnilistSyncing = true
+                        try {
+                            AnilistLibraryRepository.refreshNow()
+                        } finally {
+                            isAnilistSyncing = false
+                        }
+                    }
+                },
+                modifier = Modifier.fillMaxSize(),
+                content = libraryScreenBody,
+            )
+        } else {
+            libraryScreenBody()
         }
     }
 }
@@ -679,6 +848,14 @@ private fun LibrarySourceSwitch(
             selected = selectedMode == LibraryViewMode.Cloud,
             onClick = { onModeSelected(LibraryViewMode.Cloud) },
         )
+        val anilistPrefs by com.nuvio.app.features.anilist.AnilistPreferencesRepository.preferences.collectAsStateWithLifecycle()
+        if (anilistPrefs.enabled) {
+            LibraryChip(
+                label = "AniList",
+                selected = selectedMode == LibraryViewMode.AniList,
+                onClick = { onModeSelected(LibraryViewMode.AniList) },
+            )
+        }
     }
 }
 
@@ -1199,6 +1376,7 @@ private fun CloudSkeletonBlock(
 private enum class LibraryViewMode {
     Saved,
     Cloud,
+    AniList,
 }
 
 private fun LazyListScope.librarySections(
@@ -1215,12 +1393,14 @@ private fun LazyListScope.librarySections(
         items = displaySections,
         key = { section -> "library-horizontal:${section.type}" },
     ) { section ->
+        val floatingSidebarPadding = LocalNuvioFloatingSidebarPadding.current
+        val shelfStartPadding = if (floatingSidebarPadding > 0.dp) floatingSidebarPadding else 16.dp
         NuvioShelfSection(
             title = section.displayTitle,
             entries = section.previewEntries,
             modifier = libraryContentTransitionModifier(),
-            headerHorizontalPadding = 16.dp,
-            rowContentPadding = PaddingValues(horizontal = 16.dp),
+            headerHorizontalPadding = shelfStartPadding,
+            rowContentPadding = PaddingValues(start = shelfStartPadding, end = 16.dp),
             onViewAllClick = section.source
                 ?.takeIf { it.items.size > LIBRARY_SECTION_PREVIEW_LIMIT }
                 ?.let { source -> onSectionViewAllClick?.let { { it(source, sortOption) } } },

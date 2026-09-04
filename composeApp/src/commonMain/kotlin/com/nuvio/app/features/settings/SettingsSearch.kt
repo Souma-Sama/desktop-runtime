@@ -213,6 +213,14 @@ internal fun settingsSearchEntries(
         icon = Icons.Default.Sync,
     )
     addPage(
+        page = SettingsPage.AniList,
+        key = "anilist",
+        title = "AniList",
+        description = "Anime tracking, auto-mark watched, thresholds and display preferences",
+        category = accountCategory,
+        icon = Icons.Rounded.Link,
+    )
+    addPage(
         page = SettingsPage.Appearance,
         key = "layout",
         title = layoutPage,

@@ -21,14 +21,17 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.rounded.Sync
 import androidx.compose.material3.BasicAlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -116,12 +119,15 @@ import nuvio.composeapp.generated.resources.settings_trakt_device_finish_sign_in
 import nuvio.composeapp.generated.resources.settings_trakt_device_instructions
 import nuvio.composeapp.generated.resources.settings_trakt_save_actions_description
 import nuvio.composeapp.generated.resources.settings_trakt_sign_in_description
+import nuvio.composeapp.generated.resources.rating_anilist
+import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
 
 internal enum class TrackingBrand(val displayName: String) {
     NUVIO("Nuvio"),
     TRAKT("Trakt"),
     SIMKL("Simkl"),
+    ANILIST("AniList"),
     TMDB("TMDB"),
 }
 
@@ -138,6 +144,7 @@ internal fun isTrackingBrandAvailable(
 ): Boolean = when (brand) {
     TrackingBrand.NUVIO,
     TrackingBrand.TMDB,
+    TrackingBrand.ANILIST,
     -> true
     TrackingBrand.TRAKT -> traktConnected
     TrackingBrand.SIMKL -> simklConnected
@@ -160,6 +167,7 @@ internal fun TrackingProviderCards(
     isTablet: Boolean,
     traktUiState: TraktAuthUiState,
     simklUiState: SimklAuthUiState,
+    onAnilistClick: (() -> Unit)? = null,
 ) {
     val syncState by remember {
         SimklSyncRepository.ensureLoaded()
@@ -195,10 +203,158 @@ internal fun TrackingProviderCards(
             onInfoRequested = { showSyncInfo = true },
             modifier = Modifier.fillMaxWidth(),
         )
+        AnilistProviderCard(
+            onConfigureClick = onAnilistClick,
+            modifier = Modifier.fillMaxWidth(),
+        )
     }
 
     if (showSyncInfo) {
         SimklSyncInfoDialog(onDismiss = { showSyncInfo = false })
+    }
+}
+
+@Composable
+private fun AnilistProviderCard(
+    onConfigureClick: (() -> Unit)? = null,
+    modifier: Modifier = Modifier,
+) {
+    val isAuth by com.nuvio.app.features.anilist.AnilistAuthRepository.isAuthenticated.collectAsStateWithLifecycle()
+    val user by com.nuvio.app.features.anilist.AnilistAuthRepository.currentUser.collectAsStateWithLifecycle()
+    val uriHandler = LocalUriHandler.current
+    var showTokenDialog by rememberSaveable { mutableStateOf(false) }
+
+    TrackingProviderCard(
+        brand = TrackingBrand.ANILIST,
+        mode = if (isAuth) TrackingConnectionCardMode.CONNECTED else TrackingConnectionCardMode.DISCONNECTED,
+        credentialsConfigured = true,
+        isLoading = false,
+        connectedLabel = stringResource(
+            Res.string.settings_simkl_connected_as,
+            user?.name ?: "User",
+        ),
+        connectedDescription = "Synchronizing anime lists, watch progress, and ratings automatically.",
+        signInDescription = "Sync and track your anime library, episodes, and personal ratings across all devices.",
+        finishSignInLabel = "Connect AniList",
+        approvalDescription = "",
+        connectLabel = "Connect AniList",
+        openLoginLabel = "Connect AniList",
+        disconnectLabel = "Sign Out",
+        missingCredentialsMessage = "",
+        syncLabel = "Sign Out",
+        showSyncIcon = false,
+        onSyncRequested = null,
+        showFooterDisconnect = false,
+        infoLabel = if (onConfigureClick != null) "Preferences & Options" else null,
+        onInfoRequested = onConfigureClick,
+        websiteLabel = "Visit AniList",
+        websiteUrl = "https://anilist.co",
+        onConnectRequested = {
+            uriHandler.openUri(com.nuvio.app.features.anilist.AnilistAuthRepository.OAUTH_AUTHORIZE_URL)
+            showTokenDialog = true
+            null
+        },
+        onResumeAuthorization = { null },
+        onCancelAuthorization = {},
+        onDisconnect = com.nuvio.app.features.anilist.AnilistAuthRepository::logout,
+        modifier = modifier,
+    )
+
+    if (showTokenDialog) {
+        AnilistTokenInputDialog(
+            onDismiss = { showTokenDialog = false },
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun AnilistTokenInputDialog(
+    onDismiss: () -> Unit,
+) {
+    var token by remember { mutableStateOf("") }
+    val scope = rememberCoroutineScope()
+    var isSaving by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
+
+    BasicAlertDialog(
+        onDismissRequest = onDismiss,
+    ) {
+        Surface(
+            shape = RoundedCornerShape(16.dp),
+            color = MaterialTheme.colorScheme.surface,
+            modifier = Modifier.widthIn(max = 400.dp).padding(16.dp),
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Text(
+                    text = "Connect AniList",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                )
+                Text(
+                    text = "Log in to AniList in your browser, copy the access token from the URL, and paste it below:",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                OutlinedTextField(
+                    value = token,
+                    onValueChange = {
+                        token = it
+                        error = null
+                    },
+                    label = { Text("AniList Access Token") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                if (error != null) {
+                    Text(
+                        text = error.orEmpty(),
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    TextButton(onClick = onDismiss) {
+                        Text("Cancel")
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Button(
+                        onClick = {
+                            if (token.isNotBlank()) {
+                                scope.launch {
+                                    isSaving = true
+                                    val success = com.nuvio.app.features.anilist.AnilistAuthRepository.loginWithToken(token)
+                                    isSaving = false
+                                    if (success) {
+                                        onDismiss()
+                                    } else {
+                                        error = "Invalid AniList token. Please check and try again."
+                                    }
+                                }
+                            }
+                        },
+                        enabled = token.isNotBlank() && !isSaving,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFF02A9FF),
+                            contentColor = Color.White,
+                        ),
+                    ) {
+                        if (isSaving) {
+                            CircularProgressIndicator(modifier = Modifier.size(16.dp), color = Color.White)
+                        } else {
+                            Text("Connect")
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -350,6 +506,8 @@ private fun TrackingProviderCard(
     syncLabel: String? = null,
     infoLabel: String? = null,
     isSyncing: Boolean = false,
+    showFooterDisconnect: Boolean = true,
+    showSyncIcon: Boolean = true,
     statusMessage: String? = null,
     errorMessage: String? = null,
     websiteLabel: String? = null,
@@ -413,13 +571,13 @@ private fun TrackingProviderCard(
                         label = connectedLabel,
                         description = connectedDescription,
                     )
-                    if (syncLabel != null && onSyncRequested != null) {
+                    if (syncLabel != null) {
                         TrackingBrandPrimaryButton(
                             label = syncLabel,
                             loading = isSyncing,
                             enabled = !isLoading && !isSyncing,
-                            onClick = onSyncRequested,
-                            showSyncIcon = true,
+                            onClick = onSyncRequested ?: { showDisconnectDialog = true },
+                            showSyncIcon = showSyncIcon && onSyncRequested != null,
                         )
                     }
                 }
@@ -500,9 +658,8 @@ private fun TrackingProviderCard(
             }
 
             val hasWebsiteAction = !websiteLabel.isNullOrBlank() && !websiteUrl.isNullOrBlank()
-            val hasDisconnectAction = mode == TrackingConnectionCardMode.CONNECTED
-            val hasInfoAction = mode == TrackingConnectionCardMode.CONNECTED &&
-                infoLabel != null && onInfoRequested != null
+            val hasDisconnectAction = mode == TrackingConnectionCardMode.CONNECTED && showFooterDisconnect
+            val hasInfoAction = infoLabel != null && onInfoRequested != null
             val footerActionCount = listOf(
                 hasWebsiteAction,
                 hasDisconnectAction,
@@ -727,6 +884,8 @@ private fun TrackingDisconnectDialog(
                             stringResource(Res.string.settings_trakt_disconnect_description)
                         TrackingBrand.SIMKL ->
                             stringResource(Res.string.settings_simkl_disconnect_description)
+                        TrackingBrand.ANILIST ->
+                            "Are you sure you want to disconnect your AniList account? Your local watch progress will be preserved."
                         TrackingBrand.NUVIO,
                         TrackingBrand.TMDB,
                         -> stringResource(
@@ -779,6 +938,12 @@ internal fun TrackingBrandGlyph(
             modifier = modifier,
             contentScale = ContentScale.Fit,
         )
+        TrackingBrand.ANILIST -> Image(
+            painter = painterResource(Res.drawable.rating_anilist),
+            contentDescription = contentDescription,
+            modifier = modifier,
+            contentScale = ContentScale.Fit,
+        )
         TrackingBrand.TMDB -> Image(
             painter = integrationLogoPainter(IntegrationLogo.Tmdb),
             contentDescription = contentDescription,
@@ -799,30 +964,46 @@ private fun TrackingBrandWordmark(
     brand: TrackingBrand,
     contentDescription: String,
 ) {
-    val painter: Painter = when (brand) {
-        TrackingBrand.TRAKT -> traktBrandPainter(TraktBrandAsset.Wordmark)
-        TrackingBrand.SIMKL -> simklBrandPainter(SimklBrandAsset.Wordmark)
+    when (brand) {
+        TrackingBrand.TRAKT -> Image(
+            painter = traktBrandPainter(TraktBrandAsset.Wordmark),
+            contentDescription = contentDescription,
+            modifier = Modifier
+                .width(86.dp)
+                .height(38.dp),
+            contentScale = ContentScale.Fit,
+            alignment = Alignment.CenterStart,
+        )
+        TrackingBrand.SIMKL -> Image(
+            painter = simklBrandPainter(SimklBrandAsset.Wordmark),
+            contentDescription = contentDescription,
+            modifier = Modifier
+                .width(124.dp)
+                .height(30.dp),
+            contentScale = ContentScale.Fit,
+            alignment = Alignment.CenterStart,
+        )
+        TrackingBrand.ANILIST -> Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Image(
+                painter = painterResource(Res.drawable.rating_anilist),
+                contentDescription = contentDescription,
+                modifier = Modifier.size(28.dp),
+                contentScale = ContentScale.Fit,
+            )
+            Text(
+                text = "AniList",
+                style = MaterialTheme.typography.titleLarge,
+                color = Color.White,
+                fontWeight = FontWeight.Bold,
+            )
+        }
         TrackingBrand.NUVIO,
         TrackingBrand.TMDB,
-        -> return
+        -> Unit
     }
-    Image(
-        painter = painter,
-        contentDescription = contentDescription,
-        modifier = when (brand) {
-            TrackingBrand.TRAKT -> Modifier
-                .width(86.dp)
-                .height(38.dp)
-            TrackingBrand.SIMKL -> Modifier
-                .width(124.dp)
-                .height(30.dp)
-            TrackingBrand.NUVIO,
-            TrackingBrand.TMDB,
-            -> Modifier
-        },
-        contentScale = ContentScale.Fit,
-        alignment = Alignment.CenterStart,
-    )
 }
 
 private fun TrackingBrand.cardBrush(): Brush = when (this) {
@@ -831,6 +1012,9 @@ private fun TrackingBrand.cardBrush(): Brush = when (this) {
     )
     TrackingBrand.SIMKL -> Brush.linearGradient(
         colors = listOf(Color(0xFF050505), Color(0xFF292929), Color(0xFF111111)),
+    )
+    TrackingBrand.ANILIST -> Brush.linearGradient(
+        colors = listOf(Color(0xFF0B1622), Color(0xFF152232), Color(0xFF02A9FF)),
     )
     TrackingBrand.NUVIO,
     TrackingBrand.TMDB,

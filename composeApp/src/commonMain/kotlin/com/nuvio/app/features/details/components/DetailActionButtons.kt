@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
@@ -19,11 +20,14 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreHoriz
+import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -58,6 +62,8 @@ data class DetailSecondaryAction(
 @Composable
 fun DetailActionButtons(
     modifier: Modifier = Modifier,
+    meta: com.nuvio.app.features.details.MetaDetails? = null,
+    title: String? = null,
     playLabel: String = stringResource(Res.string.action_play),
     secondaryActions: List<DetailSecondaryAction> = emptyList(),
     actionsMenuLabel: String = stringResource(Res.string.details_actions_menu_label),
@@ -80,7 +86,7 @@ fun DetailActionButtons(
 
     Box(
         modifier = modifier
-            .widthIn(max = if (isTablet) 520.dp else 420.dp)
+            .widthIn(max = if (isTablet) 580.dp else 480.dp)
             .fillMaxWidth()
             .height(buttonHeight),
     ) {
@@ -110,7 +116,8 @@ fun DetailActionButtons(
                             role = Role.Button,
                         )
                         .secondaryClick(onPlayLongClick)
-                        .height(buttonHeight),
+                        .height(buttonHeight)
+                        .padding(horizontal = if (isTablet) 20.dp else 16.dp),
                     horizontalArrangement = Arrangement.Center,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -209,7 +216,69 @@ fun DetailActionButtons(
                     }
                 }
             }
+
+            com.nuvio.app.features.anilist.KaiHooks.DetailsActionButtons(
+                meta = meta,
+                title = title,
+                iconButtonSize = iconButtonSize,
+            )
         }
+    }
+}
+
+@Composable
+fun AnimeStreamIdButton(
+    meta: com.nuvio.app.features.details.MetaDetails?,
+    size: Dp,
+    modifier: Modifier = Modifier,
+) {
+    val anilistPrefs by com.nuvio.app.features.anilist.AnilistPreferencesRepository.preferences.collectAsState()
+    if (!anilistPrefs.enabled) return
+
+    val anilistId = remember(meta?.id) {
+        com.nuvio.app.features.anilist.AnilistTrackerCoordinator.extractAnilistId(meta?.id)
+    } ?: return
+
+    val activeOption = remember(anilistId, anilistPrefs) {
+        com.nuvio.app.features.anilist.streams.AnimeStreamIdManager.getActiveOption(anilistId)
+    }
+    var showSheet by remember { mutableStateOf(false) }
+
+    Surface(
+        modifier = modifier.size(size),
+        shape = CircleShape,
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.82f),
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        tonalElevation = 6.dp,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(size)
+                .clickable(role = Role.Button) {
+                    showSheet = true
+                },
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = Icons.Rounded.Settings,
+                contentDescription = "Stream ID: ${activeOption.formattedLabel}",
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(20.dp),
+            )
+        }
+    }
+
+    if (showSheet) {
+        val firstVideo = meta?.videos?.firstOrNull()
+        val effectiveSeason = firstVideo?.season ?: 1
+        val effectiveEpisode = firstVideo?.episode ?: 1
+        com.nuvio.app.features.anilist.streams.AnimeStreamIdSelectorSheet(
+            anilistId = anilistId,
+            seasonNumber = effectiveSeason,
+            episodeNumber = effectiveEpisode,
+            isMovie = meta?.type == "movie",
+            onDismiss = { showSheet = false },
+        )
     }
 }
 

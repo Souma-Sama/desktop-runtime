@@ -215,7 +215,8 @@ fun DetailSeriesContent(
                             title = sectionTitle,
                         )
                     }
-                    val seasonEpisodes = groupedEpisodes.getValue(seasonForContent)
+                    val seasonEpisodes = groupedEpisodes[seasonForContent] ?: emptyList()
+                    val episodeFallbackImage = if (meta.id.startsWith("ani_") || meta.id.startsWith("anilist:")) null else (meta.background ?: meta.poster)
                     if (episodeCardStyle == MetaEpisodeCardStyle.Horizontal) {
                         EpisodeHorizontalRow(
                             episodes = seasonEpisodes,
@@ -224,7 +225,7 @@ fun DetailSeriesContent(
                             parentMetaId = meta.id,
                             metaType = meta.type,
                             watchedKeys = watchedKeys,
-                            fallbackImage = meta.background ?: meta.poster,
+                            fallbackImage = episodeFallbackImage,
                             progressByVideoId = progressByVideoId,
                             episodeRatings = episodeRatings,
                             blurUnwatchedEpisodes = blurUnwatchedEpisodes,
@@ -249,7 +250,7 @@ fun DetailSeriesContent(
                                 )
                                 EpisodeListCard(
                                     video = episode,
-                                    fallbackImage = meta.background ?: meta.poster,
+                                    fallbackImage = episodeFallbackImage,
                                     progressEntry = progressByVideoId[episodeVideoId],
                                     imdbRating = episode.seasonEpisodeKey()?.let { episodeRatings[it] } ?: episode.rating,
                                     isWatched = progressByVideoId[episodeVideoId]?.isEffectivelyCompleted == true ||
@@ -601,6 +602,16 @@ private fun SeasonPosterScrollRow(
         horizontalArrangement = Arrangement.spacedBy(sizing.seasonChipGap),
     ) {
         items(seasons, key = { season -> season }) { season ->
+            val staticSeasonPoster = groupedEpisodes[season]
+                ?.firstNotNullOfOrNull { episode -> episode.seasonPoster?.takeIf(String::isNotBlank) }
+
+            val epThumbnailFallback = groupedEpisodes[season]
+                ?.firstNotNullOfOrNull { episode -> episode.thumbnail?.takeIf(String::isNotBlank) }
+
+            val posterUrl = staticSeasonPoster
+                ?: (if (season == 1) meta.poster else (epThumbnailFallback ?: meta.poster))
+                ?: meta.background
+
             SeasonPosterButton(
                 label = season.label(),
                 imageUrl = resolveSeasonPoster(
@@ -798,11 +809,20 @@ private fun EpisodeHorizontalCard(
     onClick: (() -> Unit)? = null,
     onLongPress: (() -> Unit)? = null,
 ) {
+    val displayTitle = remember(video.title, video.episode) { cleanDisplayEpisodeTitle(video.title, video.episode) }
     val cardShape = RoundedCornerShape(metrics.cornerRadius)
     val ratingLabel = remember(imdbRating) { imdbRating?.takeIf { it > 0.0 }?.let(::formatEpisodeRating) }
     val formattedDate = remember(video.released) { video.released?.let { formatReleaseDateForDisplay(it) } }
     val runtimeLabel = remember(video.runtime) { video.runtime?.takeIf { it > 0 }?.let(::formatEpisodeRuntime) }
-    val imageUrl = video.thumbnail ?: fallbackImage
+    var candidateIndex by remember(video.id, video.thumbnail, video.fallbackThumbnail) { mutableStateOf(0) }
+    val candidateUrls = remember(video.thumbnail, video.fallbackThumbnail, fallbackImage) {
+        listOfNotNull(
+            video.thumbnail?.takeIf { it.isNotBlank() },
+            video.fallbackThumbnail?.takeIf { it.isNotBlank() },
+            fallbackImage?.takeIf { it.isNotBlank() },
+        ).distinct()
+    }
+    val imageUrl = candidateUrls.getOrNull(candidateIndex)
     val visibleProgressEntry = progressEntry?.takeIf { it.durationMs > 0L && !it.isCompleted }
     val progressBarHeight = 4.dp
     val progressBarContentSpacing = 6.dp
@@ -839,6 +859,11 @@ private fun EpisodeHorizontalCard(
                     .fillMaxSize()
                     .then(if (shouldBlurArtwork) Modifier.blur(18.dp) else Modifier),
                 contentScale = ContentScale.Crop,
+                onError = {
+                    if (candidateIndex < candidateUrls.size - 1) {
+                        candidateIndex++
+                    }
+                },
             )
         }
 
@@ -886,7 +911,7 @@ private fun EpisodeHorizontalCard(
             )
 
             Text(
-                text = video.title,
+                text = displayTitle,
                 style = MaterialTheme.typography.titleMedium.copy(
                     fontSize = metrics.titleTextSize,
                     fontWeight = FontWeight.ExtraBold,
@@ -1181,6 +1206,7 @@ private fun EpisodeListCard(
     onClick: (() -> Unit)? = null,
     onLongPress: (() -> Unit)? = null,
 ) {
+    val displayTitle = remember(video.title, video.episode) { cleanDisplayEpisodeTitle(video.title, video.episode) }
     val cardShape = RoundedCornerShape(sizing.cardRadius)
     val ratingLabel = remember(imdbRating) { imdbRating?.takeIf { it > 0.0 }?.let(::formatEpisodeRating) }
     val formattedDate = remember(video.released) { video.released?.let { formatReleaseDateForDisplay(it) } }
@@ -1212,7 +1238,15 @@ private fun EpisodeListCard(
                     .fillMaxHeight()
                     .clip(RoundedCornerShape(topStart = sizing.cardRadius, bottomStart = sizing.cardRadius)),
             ) {
-                val imageUrl = video.thumbnail ?: fallbackImage
+                var candidateIndex by remember(video.id, video.thumbnail, video.fallbackThumbnail) { mutableStateOf(0) }
+                val candidateUrls = remember(video.thumbnail, video.fallbackThumbnail, fallbackImage) {
+                    listOfNotNull(
+                        video.thumbnail?.takeIf { it.isNotBlank() },
+                        video.fallbackThumbnail?.takeIf { it.isNotBlank() },
+                        fallbackImage?.takeIf { it.isNotBlank() },
+                    ).distinct()
+                }
+                val imageUrl = candidateUrls.getOrNull(candidateIndex)
                 val shouldBlurArtwork = blurUnwatchedEpisodes && !isWatched
                 if (imageUrl != null) {
                     AsyncImage(
@@ -1222,6 +1256,11 @@ private fun EpisodeListCard(
                             .fillMaxSize()
                             .then(if (shouldBlurArtwork) Modifier.blur(18.dp) else Modifier),
                         contentScale = ContentScale.Crop,
+                        onError = {
+                            if (candidateIndex < candidateUrls.size - 1) {
+                                candidateIndex++
+                            }
+                        },
                     )
                 } else {
                     Box(
@@ -1264,7 +1303,7 @@ private fun EpisodeListCard(
                 verticalArrangement = Arrangement.spacedBy(sizing.contentSpacing),
             ) {
                 Text(
-                    text = video.title,
+                    text = displayTitle,
                     style = MaterialTheme.typography.titleMedium.copy(
                         fontSize = sizing.titleTextSize,
                         fontWeight = FontWeight.Bold,
@@ -1278,9 +1317,19 @@ private fun EpisodeListCard(
 
                 if (formattedDate != null || ratingLabel != null) {
                     Row(
+                        modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
+                        ratingLabel?.let { rating ->
+                            ImdbEpisodeRatingBadge(
+                                rating = rating,
+                                logoWidth = 24.dp,
+                                logoHeight = 12.dp,
+                                textSize = sizing.metaTextSize,
+                            )
+                        }
+                        Spacer(modifier = Modifier.weight(1f))
                         formattedDate?.let { date ->
                             Text(
                                 text = date,
@@ -1291,14 +1340,7 @@ private fun EpisodeListCard(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
-                            )
-                        }
-                        ratingLabel?.let { rating ->
-                            ImdbEpisodeRatingBadge(
-                                rating = rating,
-                                logoWidth = 24.dp,
-                                logoHeight = 12.dp,
-                                textSize = sizing.metaTextSize,
+                                textAlign = TextAlign.End,
                             )
                         }
                     }
@@ -1504,6 +1546,16 @@ private fun MetaVideo.episodeBadge(): String =
             localizedSeasonEpisodeCode(seasonNumber = season, episodeNumber = episode).orEmpty()
         else -> runBlocking { getString(Res.string.details_episode_badge_file) }
     }
+
+internal fun cleanDisplayEpisodeTitle(rawTitle: String?, episodeNum: Int?): String {
+    if (rawTitle.isNullOrBlank()) return if (episodeNum != null) "Episode $episodeNum" else ""
+    val trimmed = rawTitle.trim()
+    val cleaned = trimmed
+        .replace(Regex("^(?:Episode|Ep\\.?|E|Special|#)\\s*\\d+\\s*[-:–—|~]\\s*", RegexOption.IGNORE_CASE), "")
+        .replace(Regex("^(?:Episode|Ep\\.?|E|Special|#)\\s*\\d+\\s*$", RegexOption.IGNORE_CASE), "")
+        .trim()
+    return cleaned.ifEmpty { if (episodeNum != null) "Episode $episodeNum" else trimmed }
+}
 
 private fun MetaVideo.seasonEpisodeKey(): Pair<Int, Int>? {
     val seasonNumber = season ?: return null

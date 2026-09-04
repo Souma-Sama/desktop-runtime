@@ -1,14 +1,24 @@
 package com.nuvio.app.features.home.components
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.nuvio.app.core.format.formatReleaseDateForDisplay
 import com.nuvio.app.core.ui.NuvioPosterCard
 import com.nuvio.app.core.ui.NuvioPosterShape
 import com.nuvio.app.core.ui.desktopCatalogShelfPosterBaseWidthDp
 import com.nuvio.app.core.ui.rememberPosterCardStyleUiState
+import com.nuvio.app.features.anilist.AnilistPreferencesRepository
+import com.nuvio.app.features.artwork.MetaHubArtwork
 import com.nuvio.app.features.home.MetaPreview
 import com.nuvio.app.features.home.PosterShape
+
+import kotlinx.coroutines.delay
 
 @Composable
 fun HomePosterCard(
@@ -20,27 +30,68 @@ fun HomePosterCard(
     onLongClick: (() -> Unit)? = null,
 ) {
     val posterCardStyle = rememberPosterCardStyleUiState()
+    val anilistPrefs by AnilistPreferencesRepository.preferences.collectAsStateWithLifecycle()
     val isLandscapeMode = useLandscapeBackdropMode || posterCardStyle.catalogLandscapeModeEnabled
+
+    val deco = com.nuvio.app.features.anilist.KaiHooks.rememberPosterDecorations(item, anilistPrefs)
+    var lazyLogoUrl by remember(item.id) { mutableStateOf(item.logo ?: MetaHubArtwork.getLogoUrl(item.id)) }
+    var lazyMalScore by remember(item.id) { mutableStateOf(item.malScore ?: MetaHubArtwork.getMalScore(item.id)) }
+
+    LaunchedEffect(item.id, deco.showTitleLogos) {
+        if (deco.showTitleLogos && lazyLogoUrl == null) {
+            delay(150)
+            lazyLogoUrl = MetaHubArtwork.resolveLogoUrl(item.id)
+        }
+    }
+
+    LaunchedEffect(item.id, deco.showMalScore) {
+        if (deco.showMalScore && lazyMalScore == null) {
+            delay(150)
+            lazyMalScore = MetaHubArtwork.resolveMalScore(item.id)
+        }
+    }
+
+    val effectiveLogoUrl = if (deco.showTitleLogos) lazyLogoUrl else null
+    val effectiveMalScore = if (deco.showMalScore) lazyMalScore else null
+
+    val isNonVideo = remember(item.type) {
+        com.nuvio.app.features.anilist.KaiHooks.isNonVideoMedia(item.type)
+    }
+    val effectiveOnClick = if (isNonVideo) null else onClick
+    val effectiveOnLongClick = onLongClick
 
     HomePosterHoverPreview(
         item = item,
         isWatched = isWatched,
-        onClick = onClick,
-        onLongClick = onLongClick,
+        onClick = effectiveOnClick,
+        onLongClick = effectiveOnLongClick,
     ) { hoverModifier ->
         NuvioPosterCard(
             title = item.name,
-            imageUrl = if (isLandscapeMode) (item.banner ?: item.poster) else item.poster,
+            imageUrl = if (isLandscapeMode) {
+                (item.banner ?: MetaHubArtwork.getBackdropUrl(item.id) ?: item.poster)
+            } else {
+                (item.poster ?: MetaHubArtwork.getPosterUrl(item.id))
+            },
             modifier = modifier.then(hoverModifier),
             basePosterWidthDp = desktopCatalogShelfPosterBaseWidthDp(posterCardStyle.widthDp),
             shape = if (isLandscapeMode) NuvioPosterShape.Landscape else item.posterShape.toNuvioPosterShape(),
             detailLine = if (isLandscapeMode || posterCardStyle.hideLabelsEnabled) null else item.releaseInfo?.let { formatReleaseDateForDisplay(it) },
             showTitleBelow = !posterCardStyle.hideLabelsEnabled,
-            bottomLeftLogoUrl = if (isLandscapeMode) item.logo else null,
-            bottomLeftText = if (isLandscapeMode && item.logo.isNullOrBlank() && !posterCardStyle.hideLabelsEnabled) item.name else null,
+            bottomLeftLogoUrl = effectiveLogoUrl,
+            bottomLeftText = if (isLandscapeMode && effectiveLogoUrl.isNullOrBlank() && !posterCardStyle.hideLabelsEnabled) item.name else null,
+            anilistScore = deco.anilistScore,
+            malScore = effectiveMalScore,
+            scoreFormat = anilistPrefs.posterScoreFormat,
+            anilistStatus = deco.libraryStatus,
+            anilistProgress = deco.libraryProgress,
+            anilistUserScore = deco.userScore,
+            ratingBadgeScale = anilistPrefs.posterRatingBadgeScale,
+            statusBadgeScale = anilistPrefs.posterStatusBadgeScale,
+            titleLogoScale = anilistPrefs.posterTitleLogoScale,
             isWatched = isWatched,
-            onClick = onClick,
-            onLongClick = onLongClick,
+            onClick = effectiveOnClick,
+            onLongClick = effectiveOnLongClick,
         )
     }
 }

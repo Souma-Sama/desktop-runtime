@@ -8,11 +8,14 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -28,6 +31,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -52,6 +56,7 @@ import com.nuvio.app.features.mdblist.MdbListMetadataService.PROVIDER_TMDB
 import com.nuvio.app.features.mdblist.MdbListMetadataService.PROVIDER_TOMATOES
 import com.nuvio.app.features.mdblist.MdbListMetadataService.PROVIDER_TRAKT
 import nuvio.composeapp.generated.resources.*
+import nuvio.composeapp.generated.resources.rating_anilist
 import nuvio.composeapp.generated.resources.rating_audience_score
 import nuvio.composeapp.generated.resources.rating_imdb
 import nuvio.composeapp.generated.resources.rating_letterboxd
@@ -59,6 +64,7 @@ import nuvio.composeapp.generated.resources.rating_metacritic
 import nuvio.composeapp.generated.resources.rating_rotten_tomatoes
 import nuvio.composeapp.generated.resources.rating_tmdb
 import nuvio.composeapp.generated.resources.rating_trakt
+
 import org.jetbrains.compose.resources.DrawableResource
 import org.jetbrains.compose.resources.getString
 import org.jetbrains.compose.resources.painterResource
@@ -66,6 +72,8 @@ import org.jetbrains.compose.resources.stringResource
 import kotlinx.coroutines.runBlocking
 import kotlin.math.absoluteValue
 import kotlin.math.roundToInt
+
+const val PROVIDER_ANILIST = "anilist"
 
 @Composable
 fun DetailMetaInfo(
@@ -90,9 +98,9 @@ fun DetailMetaInfo(
             ageBadge != null ||
             (validImdbRating != null && !hasMdbImdbRating)
         if (hasMetaRow) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(14.dp),
+            FlowRow(
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 releaseLine?.let { line ->
                     Text(
@@ -113,6 +121,39 @@ fun DetailMetaInfo(
                 ageBadge?.let { badge ->
                     DetailHeroMetaBadge(text = badge)
                 }
+                meta.nextAiringEpisode?.takeIf { it.isNotBlank() }?.let { countdown ->
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(Color(0xFF10B981).copy(alpha = 0.18f))
+                            .border(
+                                1.dp,
+                                Color(0xFF10B981).copy(alpha = 0.5f),
+                                RoundedCornerShape(6.dp),
+                            )
+                            .padding(horizontal = 8.dp, vertical = 3.dp),
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(5.dp),
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(6.dp)
+                                    .clip(RoundedCornerShape(3.dp))
+                                    .background(Color(0xFF10B981))
+                            )
+                            Text(
+                                text = countdown,
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 11.sp,
+                                ),
+                                color = Color(0xFF34D399),
+                            )
+                        }
+                    }
+                }
                 if (validImdbRating != null && !hasMdbImdbRating) {
                     val imdbTextStyle = MaterialTheme.typography.titleMedium.copy(
                         fontWeight = FontWeight.Bold,
@@ -120,12 +161,12 @@ fun DetailMetaInfo(
                     )
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(5.dp),
                     ) {
                         ImdbRatingSourceLabel(
                             storeTextStyle = imdbTextStyle,
                             storeTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
-                        Spacer(modifier = Modifier.width(5.dp))
                         Text(
                             text = validImdbRating,
                             style = imdbTextStyle,
@@ -195,15 +236,17 @@ internal fun DetailRatingsRow(
             .horizontalScroll(scrollState)
             .padding(horizontal = horizontalScrollPadding),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(14.dp),
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         orderedRatings.forEach { (visuals, rating) ->
-            val ratingTextStyle = MaterialTheme.typography.titleSmall.copy(
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 0.sp,
+            val ratingTextStyle = MaterialTheme.typography.titleMedium.copy(
+                fontSize = 15.sp,
+                fontWeight = FontWeight.ExtraBold,
+                letterSpacing = (-0.2).sp,
             )
             Row(
                 verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 if (visuals.source == PROVIDER_IMDB && !AppFeaturePolicy.imdbRatingLogoEnabled) {
                     ImdbRatingSourceLabel(
@@ -214,10 +257,9 @@ internal fun DetailRatingsRow(
                     Image(
                         painter = painterResource(visuals.logo),
                         contentDescription = visuals.displayName,
-                        modifier = Modifier.size(width = visuals.logoWidth, height = 16.dp),
+                        modifier = Modifier.size(width = visuals.logoWidth, height = 20.dp),
                     )
                 }
-                Spacer(modifier = Modifier.width(4.dp))
                 Text(
                     text = visuals.format(rating.value),
                     style = ratingTextStyle,
@@ -325,10 +367,26 @@ private data class RatingVisuals(
 
 private val ratingVisuals = listOf(
     RatingVisuals(
+        source = PROVIDER_ANILIST,
+        displayName = "AniList",
+        logo = Res.drawable.rating_anilist,
+        logoWidth = 20.dp,
+        valueColor = Color(0xFF02A9FF),
+        format = ::formatPercent,
+    ),
+    RatingVisuals(
+        source = PROVIDER_MAL,
+        displayName = "MyAnimeList",
+        logo = Res.drawable.rating_mal,
+        logoWidth = 20.dp,
+        valueColor = Color(0xFF2E51A2),
+        format = ::formatTwoDecimals,
+    ),
+    RatingVisuals(
         source = PROVIDER_IMDB,
         displayName = "IMDb",
         logo = Res.drawable.rating_imdb,
-        logoWidth = 30.dp,
+        logoWidth = 36.dp,
         valueColor = Color(0xFFF5C518),
         format = ::formatOneDecimal,
     ),
@@ -336,7 +394,7 @@ private val ratingVisuals = listOf(
         source = PROVIDER_TMDB,
         displayName = "TMDB",
         logo = Res.drawable.rating_tmdb,
-        logoWidth = 16.dp,
+        logoWidth = 20.dp,
         valueColor = Color(0xFF01B4E4),
         format = ::formatWhole,
     ),
@@ -344,7 +402,7 @@ private val ratingVisuals = listOf(
         source = PROVIDER_TRAKT,
         displayName = "Trakt",
         logo = Res.drawable.rating_trakt,
-        logoWidth = 16.dp,
+        logoWidth = 20.dp,
         valueColor = Color(0xFFED1C24),
         format = ::formatWhole,
     ),
@@ -352,23 +410,15 @@ private val ratingVisuals = listOf(
         source = PROVIDER_LETTERBOXD,
         displayName = "Letterboxd",
         logo = Res.drawable.rating_letterboxd,
-        logoWidth = 16.dp,
+        logoWidth = 20.dp,
         valueColor = Color(0xFF00E054),
-        format = ::formatOneDecimal,
-    ),
-    RatingVisuals(
-        source = PROVIDER_MAL,
-        displayName = "MyAnimeList",
-        logo = Res.drawable.rating_mal,
-        logoWidth = 16.dp,
-        valueColor = Color(0xFF2E51A2),
         format = ::formatOneDecimal,
     ),
     RatingVisuals(
         source = PROVIDER_TOMATOES,
         displayName = "Rotten Tomatoes",
         logo = Res.drawable.rating_rotten_tomatoes,
-        logoWidth = 16.dp,
+        logoWidth = 20.dp,
         valueColor = Color(0xFFFA320A),
         format = ::formatPercent,
     ),
@@ -376,7 +426,7 @@ private val ratingVisuals = listOf(
         source = PROVIDER_AUDIENCE,
         displayName = runBlocking { getString(Res.string.rating_audience_score) },
         logo = Res.drawable.rating_audience_score,
-        logoWidth = 16.dp,
+        logoWidth = 20.dp,
         valueColor = Color(0xFFFA320A),
         format = ::formatPercent,
     ),
@@ -384,7 +434,7 @@ private val ratingVisuals = listOf(
         source = PROVIDER_METACRITIC,
         displayName = "Metacritic",
         logo = Res.drawable.rating_metacritic,
-        logoWidth = 16.dp,
+        logoWidth = 20.dp,
         valueColor = Color(0xFFFFCC33),
         format = ::formatWhole,
     ),
@@ -395,6 +445,13 @@ private fun formatOneDecimal(value: Double): String {
     val whole = rounded / 10
     val decimal = (rounded % 10).absoluteValue
     return "$whole.$decimal"
+}
+
+private fun formatTwoDecimals(value: Double): String {
+    val rounded = (value * 100.0).roundToInt()
+    val whole = rounded / 100
+    val decimal = (rounded % 100).absoluteValue
+    return "$whole.${decimal.toString().padStart(2, '0')}"
 }
 
 private fun formatWhole(value: Double): String = value.roundToInt().toString()

@@ -82,11 +82,12 @@ fun TmdbEntityBrowseScreen(
     entityId: Int,
     entityName: String,
     sourceType: String,
+    isAnilist: Boolean = false,
     onBack: () -> Unit,
     onOpenMeta: (MetaPreview) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    var uiState by remember(entityKind, entityId) {
+    var uiState by remember(entityKind, entityId, isAnilist) {
         mutableStateOf<EntityBrowseUiState>(EntityBrowseUiState.Loading)
     }
     val watchedUiState by remember {
@@ -96,13 +97,14 @@ fun TmdbEntityBrowseScreen(
     val fullyWatchedSeriesKeys by WatchedRepository.fullyWatchedSeriesKeys.collectAsStateWithLifecycle()
     val loadFailedMessage = stringResource(Res.string.details_browse_load_failed, entityName)
 
-    LaunchedEffect(entityKind, entityId) {
+    LaunchedEffect(entityKind, entityId, isAnilist) {
         uiState = EntityBrowseUiState.Loading
         val data = TmdbMetadataService.fetchEntityBrowse(
             entityKind = entityKind,
             entityId = entityId,
             sourceType = sourceType,
             fallbackName = entityName,
+            isAnilist = isAnilist,
         )
         uiState = if (data != null) {
             EntityBrowseUiState.Success(data)
@@ -387,7 +389,25 @@ private fun EntityIdentitySidebar(
                 overflow = TextOverflow.Ellipsis,
             )
 
-            if (!header.logo.isNullOrBlank()) {
+            val localLogo = com.nuvio.app.features.anilist.catalog.AnimeStudioLogos.findLogoResource(header.name)
+            if (localLogo != null) {
+                Box(
+                    modifier = Modifier
+                        .width(184.dp)
+                        .height(104.dp)
+                        .clip(RoundedCornerShape(18.dp))
+                        .background(Color.White)
+                        .padding(18.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    androidx.compose.foundation.Image(
+                        painter = org.jetbrains.compose.resources.painterResource(localLogo),
+                        contentDescription = header.name,
+                        modifier = Modifier.matchParentSize(),
+                        contentScale = ContentScale.Fit,
+                    )
+                }
+            } else if (!header.logo.isNullOrBlank()) {
                 Box(
                     modifier = Modifier
                         .width(184.dp)
@@ -450,11 +470,8 @@ private fun EntityIdentitySidebar(
                     maxLines = 3,
                     overflow = TextOverflow.Ellipsis,
                 )
-                val metaLine = listOfNotNull(
-                    header.secondaryLabel?.takeIf { it.isNotBlank() },
-                    header.originCountry?.takeIf { it.isNotBlank() },
-                ).joinToString(" · ")
-                if (metaLine.isNotBlank()) {
+                val metaLine = header.secondaryLabel?.takeIf { it.isNotBlank() }
+                if (!metaLine.isNullOrBlank()) {
                     Text(
                         text = metaLine,
                         style = MaterialTheme.typography.bodyMedium,
@@ -475,11 +492,7 @@ private fun EntityIdentitySidebar(
                 if (catalogueCount > 0) {
                     EntitySidebarFact(
                         label = stringResource(Res.string.entity_browse_catalogue),
-                        value = if (catalogueCount == 1) {
-                            stringResource(Res.string.entity_browse_title_count_one, catalogueCount)
-                        } else {
-                            stringResource(Res.string.entity_browse_title_count_other, catalogueCount)
-                        },
+                        value = "$catalogueCount ${if (catalogueCount == 1) "title" else "titles"}",
                     )
                 }
             }
@@ -563,7 +576,8 @@ private fun EntityHeroSection(
     header: com.nuvio.app.features.tmdb.TmdbEntityHeader,
     modifier: Modifier = Modifier,
 ) {
-    val hasLogo = !header.logo.isNullOrBlank()
+    val localLogo = com.nuvio.app.features.anilist.catalog.AnimeStudioLogos.findLogoResource(header.name)
+    val hasLogo = localLogo != null || !header.logo.isNullOrBlank()
 
     Column(modifier = modifier.padding(horizontal = 20.dp)) {
         Text(
@@ -580,11 +594,28 @@ private fun EntityHeroSection(
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        if (hasLogo) {
+        if (localLogo != null) {
             Box(
                 modifier = Modifier
-                    .height(60.dp)
-                    .clip(RoundedCornerShape(8.dp))
+                    .height(64.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(Color.White)
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                androidx.compose.foundation.Image(
+                    painter = org.jetbrains.compose.resources.painterResource(localLogo),
+                    contentDescription = header.name,
+                    modifier = Modifier.height(48.dp),
+                    contentScale = ContentScale.Fit,
+                )
+            }
+            Spacer(modifier = Modifier.height(12.dp))
+        } else if (!header.logo.isNullOrBlank()) {
+            Box(
+                modifier = Modifier
+                    .height(64.dp)
+                    .clip(RoundedCornerShape(12.dp))
                     .background(Color.White)
                     .padding(horizontal = 16.dp, vertical = 8.dp),
                 contentAlignment = Alignment.Center,
@@ -592,7 +623,7 @@ private fun EntityHeroSection(
                 AsyncImage(
                     model = header.logo,
                     contentDescription = header.name,
-                    modifier = Modifier.height(44.dp),
+                    modifier = Modifier.height(48.dp),
                     contentScale = ContentScale.Fit,
                 )
             }

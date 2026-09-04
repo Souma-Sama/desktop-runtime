@@ -1,0 +1,67 @@
+name: Build macOS DMG
+
+on:
+  push:
+    branches:
+      - '**'
+  workflow_dispatch:
+
+jobs:
+  build-macos:
+    name: macOS Apple Silicon (arm64) Build
+    runs-on: macos-14
+    permissions:
+      contents: write
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Fetch macOS runtime (Git LFS)
+        run: |
+          git lfs pull --include="composeApp/src/desktopMain/native/macos/runtime/arm64/**" --exclude=""
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Prepare build environment
+        run: |
+          touch local.properties
+
+      - name: Build macOS Release DMG
+        env:
+          NUVIO_MACOS_ARCH: arm64
+        run: |
+          ./gradlew clean :composeApp:packageReleaseDmg \
+            -Pnuvio.macos.arch=arm64 \
+            -Pcompose.desktop.packaging.checkJdkVendor=false \
+            --no-configuration-cache \
+            --no-daemon \
+            --stacktrace
+
+      - name: Upload DMG Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Nuvio-macOS-AppleSilicon-arm64
+          path: composeApp/build/compose/release-dmgs/*.dmg
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Publish Direct Raw DMG to Releases
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: Nuvio Kai Latest Release
+          body: "Direct download of the latest Nuvio Kai macOS DMG."
+          prerelease: true
+          overwrite: true
+          files: composeApp/build/compose/release-dmgs/*.dmg
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+

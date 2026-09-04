@@ -26,6 +26,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -85,7 +87,8 @@ object SearchRepository {
         val hasPendingAddonManifests = enabledAddons.hasPendingEnabledManifests()
         val addonManifestErrorMessage = enabledAddons.firstEnabledManifestError()
         val activeAddons = enabledAddons.filter { it.manifest != null }
-        if (activeAddons.isEmpty()) {
+        val isKaiEnabled = com.nuvio.app.features.anilist.KaiHooks.isKaiSearchEnabled(addons)
+        if (activeAddons.isEmpty() && !isKaiEnabled) {
             activeJob?.cancel()
             lastRequestKey = null
             _uiState.value = SearchUiState(
@@ -99,7 +102,6 @@ object SearchRepository {
             )
             return
         }
-
         val requests = buildSearchRequests(
             addons = activeAddons,
             query = normalizedQuery,
@@ -123,7 +125,7 @@ object SearchRepository {
             append('|')
             append(
                 requests.joinToString(separator = "|") { request ->
-                    "${request.addon.manifestUrl}:${request.type}:${request.catalogId}"
+                    "${request.addon?.manifestUrl ?: "native://anilist"}:${request.type}:${request.catalogId}"
                 },
             )
         }
@@ -224,11 +226,12 @@ object SearchRepository {
         val hasPendingAddonManifests = enabledAddons.hasPendingEnabledManifests()
         val addonManifestErrorMessage = enabledAddons.firstEnabledManifestError()
         val activeAddons = enabledAddons.filter { it.manifest != null }
-        if (activeAddons.isEmpty()) {
+        val isKaiEnabled = com.nuvio.app.features.anilist.KaiHooks.isKaiSearchEnabled(addons)
+        if (activeAddons.isEmpty() && !isKaiEnabled) {
             activeDiscoverJob?.cancel()
             discoverSources = emptyList()
             lastDiscoverRequestKey = null
-            log.d { "Discover refresh aborted: no active addons" }
+            log.d { "Discover refresh aborted: no active addons and AniList disabled" }
             _discoverUiState.value = DiscoverUiState(
                 isLoading = hasPendingAddonManifests,
                 emptyStateReason = when {
@@ -241,7 +244,7 @@ object SearchRepository {
             return
         }
 
-        val sources = buildDiscoverSources(activeAddons)
+        val sources = buildDiscoverSources(addons)
         val current = _discoverUiState.value
         val hideUnreleasedContent = HomeCatalogSettingsRepository.snapshot().hideUnreleasedContent
         val requestKey = DiscoverRequestKey(
@@ -387,6 +390,43 @@ object SearchRepository {
         )
     }
 
+    fun selectDiscoverSort(sort: String?) {
+        val current = _discoverUiState.value
+        if (current.selectedSort == sort) return
+
+        _discoverUiState.value = current.copy(
+            selectedSort = sort,
+            items = emptyList(),
+            isLoading = false,
+            nextSkip = null,
+            emptyStateReason = null,
+            errorMessage = null,
+        )
+        loadDiscoverFeed(
+            reset = true,
+            forceRefresh = false,
+        )
+    }
+
+    private val _advancedFilterState = MutableStateFlow(com.nuvio.app.features.anilist.AnilistAdvancedFilterState())
+    val advancedFilterState: StateFlow<com.nuvio.app.features.anilist.AnilistAdvancedFilterState> = _advancedFilterState.asStateFlow()
+
+    fun updateAdvancedFilter(filter: com.nuvio.app.features.anilist.AnilistAdvancedFilterState) {
+        _advancedFilterState.value = filter
+        loadDiscoverFeed(
+            reset = true,
+            forceRefresh = true,
+        )
+    }
+
+    fun clearAdvancedFilter() {
+        _advancedFilterState.value = com.nuvio.app.features.anilist.AnilistAdvancedFilterState()
+        loadDiscoverFeed(
+            reset = true,
+            forceRefresh = true,
+        )
+    }
+
     fun loadMoreDiscover() {
         val current = _discoverUiState.value
         if (current.isLoading || current.nextSkip == null) return
@@ -399,8 +439,24 @@ object SearchRepository {
     private fun buildSearchRequests(
         addons: List<ManagedAddon>,
         query: String,
-    ): List<SearchCatalogRequest> =
-        addons.mapNotNull { addon ->
+    ): List<SearchCatalogRequest> {
+        val anilistRequest = if (com.nuvio.app.features.anilist.KaiHooks.isKaiSearchEnabled(addons)) {
+            listOf(
+                SearchCatalogRequest(
+                    addon = null,
+                    catalogId = "anilist:search",
+                    catalogName = "Anime",
+                    type = "anime",
+                    query = query,
+                    supportsPagination = false,
+                    isNativeAnilist = true,
+                )
+            )
+        } else emptyList()
+
+        val effectiveAddons = com.nuvio.app.features.anilist.KaiHooks.filterExternalAddons(addons)
+
+        val addonRequests = effectiveAddons.mapNotNull { addon ->
             val manifest = addon.manifest ?: return@mapNotNull null
             addon to manifest
         }.flatMap { (addon, manifest) ->
@@ -414,12 +470,21 @@ object SearchRepository {
                         type = catalog.type,
                         query = query,
                         supportsPagination = catalog.supportsPagination(),
+                        isNativeAnilist = false,
                     )
                 }
         }
 
-    private fun buildDiscoverSources(addons: List<ManagedAddon>): List<DiscoverCatalogOption> =
-        addons.mapNotNull { addon ->
+        return anilistRequest + addonRequests
+    }
+
+    private fun buildDiscoverSources(addons: List<ManagedAddon>): List<DiscoverCatalogOption> {
+        val nativeSources = if (com.nuvio.app.features.anilist.KaiHooks.isKaiSearchEnabled(addons)) {
+            com.nuvio.app.features.anilist.KaiHooks.buildNativeDiscoverSources()
+        } else emptyList()
+
+        val effectiveAddons = com.nuvio.app.features.anilist.KaiHooks.filterExternalAddons(addons)
+        val addonSources = effectiveAddons.mapNotNull { addon ->
             val manifest = addon.manifest ?: return@mapNotNull null
             addon to manifest
         }.flatMap { (addon, manifest) ->
@@ -427,6 +492,7 @@ object SearchRepository {
                 .filter { catalog -> catalog.supportsDiscover() }
                 .map { catalog ->
                     val genreExtra = catalog.genreExtra()
+                    val sortExtra = catalog.extra.firstOrNull { it.name.equals("sort", ignoreCase = true) }
                     DiscoverCatalogOption(
                         key = "${manifest.id}:${catalog.type}:${catalog.id}",
                         addonName = addon.displayTitle,
@@ -435,14 +501,21 @@ object SearchRepository {
                         catalogId = catalog.id,
                         catalogName = catalog.name,
                         genreOptions = genreExtra?.options.orEmpty(),
+                        sortOptions = sortExtra?.options.orEmpty(),
                         genreRequired = genreExtra?.isRequired == true,
                         supportsPagination = catalog.supportsPagination(),
                     )
                 }
         }
+        return nativeSources + addonSources
+    }
 
     private suspend fun SearchCatalogRequest.toSection(forceRefresh: Boolean): HomeCatalogSection {
-        val manifest = requireNotNull(addon.manifest)
+        if (isNativeAnilist) {
+            return com.nuvio.app.features.anilist.KaiHooks.executeSearch(query)
+        }
+
+        val manifest = requireNotNull(addon?.manifest)
         val page = fetchCatalogPage(
             manifestUrl = manifest.transportUrl,
             type = type,
@@ -504,6 +577,7 @@ object SearchRepository {
             errorMessage = null,
         )
 
+        val activeAdvancedFilter = _advancedFilterState.value
         activeDiscoverJob = scope.launch {
             runCatching {
                 fetchCatalogPage(
@@ -511,13 +585,15 @@ object SearchRepository {
                     type = selectedCatalog.type,
                     catalogId = selectedCatalog.catalogId,
                     genre = current.selectedGenre,
+                    sort = current.selectedSort,
+                    advancedFilter = if (activeAdvancedFilter.hasFilters) activeAdvancedFilter else null,
                     skip = requestedSkip.takeIf { it > 0 },
                     forceRefresh = forceRefresh,
                 ).withUnreleasedFilter()
             }.fold(
                 onSuccess = { page ->
                     val latest = _discoverUiState.value
-                    if (latest.selectedCatalogKey != selectedCatalog.key || latest.selectedGenre != current.selectedGenre) {
+                    if (latest.selectedCatalogKey != selectedCatalog.key || latest.selectedGenre != current.selectedGenre || latest.selectedSort != current.selectedSort) {
                         return@fold
                     }
                     val mergedItems = if (reset) {
@@ -596,12 +672,13 @@ private fun CatalogPage.withUnreleasedFilter(): CatalogPage {
 }
 
 private data class SearchCatalogRequest(
-    val addon: ManagedAddon,
+    val addon: ManagedAddon?,
     val catalogId: String,
     val catalogName: String,
     val type: String,
     val query: String,
     val supportsPagination: Boolean,
+    val isNativeAnilist: Boolean = false,
 )
 
 private fun AddonCatalog.supportsSearch(): Boolean =

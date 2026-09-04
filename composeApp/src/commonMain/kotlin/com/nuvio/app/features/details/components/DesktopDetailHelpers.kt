@@ -25,13 +25,36 @@ internal fun DesktopStripePlaceholder(modifier: Modifier = Modifier) {
 }
 
 internal fun desktopYearLabel(meta: MetaDetails): String? =
-    meta.releaseInfo
-        ?.trim()
-        ?.takeIf { it.length >= 4 }
-        ?.take(4)
+    com.nuvio.app.features.details.formatMetaReleaseLineForDetails(meta)
+        ?: meta.releaseInfo?.trim()
 
 internal fun desktopSeasonCountLabel(meta: MetaDetails): String? {
-    val seasons = meta.videos.mapNotNull { it.season }.filter { it > 0 }.toSet().size
-    if (seasons <= 0) return null
-    return if (seasons == 1) "1 Season" else "$seasons Seasons"
+    if (meta.type.equals("movie", ignoreCase = true)) return null
+    val isAnilist = meta.id.startsWith("ani_", ignoreCase = true) || meta.id.startsWith("anilist:", ignoreCase = true)
+    val seasons = meta.videos.mapNotNull { it.season }.toSet()
+    if (seasons.isEmpty()) return null
+
+    if (isAnilist) {
+        val singleSeason = seasons.firstOrNull() ?: 1
+        return when {
+            singleSeason == 0 -> "Special"
+            singleSeason > 1 -> "Season $singleSeason"
+            else -> {
+                val title = meta.name.lowercase()
+                val hasExplicitSeason1 = title.contains("season 1") || title.contains("1st season") ||
+                                         title.contains("part 1") || title.contains("cour 1") ||
+                                         title.contains("first season")
+                if (hasExplicitSeason1) "Season 1" else "1 Season"
+            }
+        }
+    }
+
+    val validSeasons = seasons.filter { it > 0 }
+    return when {
+        validSeasons.size == 1 && validSeasons.first() > 1 -> "Season ${validSeasons.first()}"
+        validSeasons.size == 1 -> "1 Season"
+        validSeasons.size > 1 -> "${validSeasons.size} Seasons"
+        seasons.contains(0) -> "Special"
+        else -> null
+    }
 }

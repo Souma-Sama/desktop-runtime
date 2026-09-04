@@ -74,7 +74,7 @@ fun App(
 internal fun AppEnvironment(content: @Composable () -> Unit) {
     setSingletonImageLoaderFactory { context ->
         ImageLoader.Builder(context)
-            .crossfade(true)
+            .crossfade(false)
             .diskCachePolicy(CachePolicy.ENABLED)
             .memoryCachePolicy(CachePolicy.ENABLED)
             .components {
@@ -89,6 +89,7 @@ internal fun AppEnvironment(content: @Composable () -> Unit) {
             .build()
     }
     val selectedTheme by remember {
+        com.nuvio.app.features.anilist.AnilistAuthRepository.ensureInitialized()
         ThemeSettingsRepository.ensureLoaded()
         ThemeSettingsRepository.selectedTheme
     }.collectAsStateWithLifecycle()

@@ -1,19 +1,25 @@
 package com.nuvio.app.core.ui
 
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -24,6 +30,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -31,12 +39,22 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.hapticfeedback.HapticFeedback
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.onPlaced
+import androidx.compose.ui.layout.positionInParent
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.hazeEffect
@@ -128,6 +146,15 @@ fun rememberNuvioNavBarScrollState(): NuvioNavBarScrollState {
     return androidx.compose.runtime.remember { NuvioNavBarScrollState() }
 }
 
+@Stable
+private class NuvioNavSlidingIndicatorState {
+    var selectedX by mutableStateOf(0.dp)
+    var selectedY by mutableStateOf(0.dp)
+    var selectedWidth by mutableStateOf(0.dp)
+    var selectedHeight by mutableStateOf(0.dp)
+    var hasValidBounds by mutableStateOf(false)
+}
+
 /**
  * Floating pill-shaped navigation bar with scroll-responsive labels.
  *
@@ -142,6 +169,10 @@ fun NuvioNavigationBar(
     navBarStyle: NavBarStyle = NavBarStyle.ADAPTIVE,
     content: @Composable NuvioNavigationBarScope.() -> Unit,
 ) {
+    val density = LocalDensity.current
+    val hapticFeedback = LocalHapticFeedback.current
+    val tokens = MaterialTheme.nuvio
+
     val targetLabelFraction = when (navBarStyle) {
         NavBarStyle.EXPANDED -> 1f
         NavBarStyle.COMPACT -> 0f
@@ -163,6 +194,40 @@ fun NuvioNavigationBar(
     val expandedHorizontalPadding = 28.dp
     val collapsedHorizontalPadding = 58.dp
     val horizontalPadding = expandedHorizontalPadding + (collapsedHorizontalPadding - expandedHorizontalPadding) * (1f - labelFraction)
+
+    val indicatorState = remember { NuvioNavSlidingIndicatorState() }
+    val animatedOffsetX by androidx.compose.animation.core.animateDpAsState(
+        targetValue = indicatorState.selectedX,
+        animationSpec = androidx.compose.animation.core.spring(
+            dampingRatio = 0.78f,
+            stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow,
+        ),
+        label = "nav_indicator_x",
+    )
+    val animatedOffsetY by androidx.compose.animation.core.animateDpAsState(
+        targetValue = indicatorState.selectedY,
+        animationSpec = androidx.compose.animation.core.spring(
+            dampingRatio = 0.78f,
+            stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow,
+        ),
+        label = "nav_indicator_y",
+    )
+    val animatedWidth by androidx.compose.animation.core.animateDpAsState(
+        targetValue = indicatorState.selectedWidth,
+        animationSpec = androidx.compose.animation.core.spring(
+            dampingRatio = 0.78f,
+            stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow,
+        ),
+        label = "nav_indicator_w",
+    )
+    val animatedHeight by androidx.compose.animation.core.animateDpAsState(
+        targetValue = indicatorState.selectedHeight,
+        animationSpec = androidx.compose.animation.core.spring(
+            dampingRatio = 0.78f,
+            stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow,
+        ),
+        label = "nav_indicator_h",
+    )
 
     // Outer container — no background, just safe padding
     Box(
@@ -187,20 +252,35 @@ fun NuvioNavigationBar(
             )
             .background(Color(0xFF1C1C1E).copy(alpha = if (hazeState != null) 0.55f else 0.82f))
 
-        Box(modifier = pillModifier) {
+        Box(
+            modifier = pillModifier.padding(
+                horizontal = NuvioTokens.Space.s6,
+                vertical = NuvioTokens.Space.s4,
+            ),
+        ) {
+            // Fluid sliding indicator capsule in the background
+            if (indicatorState.hasValidBounds && animatedWidth > 0.dp) {
+                Box(
+                    modifier = Modifier
+                        .offset(x = animatedOffsetX, y = animatedOffsetY)
+                        .width(animatedWidth)
+                        .height(animatedHeight)
+                        .clip(RoundedCornerShape(NuvioTokens.Radius.full))
+                        .background(tokens.colors.accent.copy(alpha = NuvioTokens.Opacity.selected)),
+                )
+            }
+
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(
-                        horizontal = NuvioTokens.Space.s6,
-                        vertical = NuvioTokens.Space.s4,
-                    ),
+                modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 NuvioNavigationBarScopeImpl(
                     rowScope = this,
                     labelFraction = labelFraction,
+                    density = density,
+                    indicatorState = indicatorState,
+                    hapticFeedback = hapticFeedback,
                 ).content()
             }
         }
@@ -241,6 +321,9 @@ interface NuvioNavigationBarScope {
 private class NuvioNavigationBarScopeImpl(
     private val rowScope: androidx.compose.foundation.layout.RowScope,
     private val labelFraction: Float,
+    private val density: Density,
+    private val indicatorState: NuvioNavSlidingIndicatorState,
+    private val hapticFeedback: androidx.compose.ui.hapticfeedback.HapticFeedback,
 ) : NuvioNavigationBarScope {
 
     @Composable
@@ -258,24 +341,37 @@ private class NuvioNavigationBarScopeImpl(
             targetValue = if (selected) tokens.colors.accent else tokens.colors.textMuted,
             label = "nav_icon_color",
         )
-        // Selected item gets a pill-shaped highlight using accent at low opacity
-        val selectedBgColor by animateColorAsState(
-            targetValue = if (selected) tokens.colors.accent.copy(alpha = NuvioTokens.Opacity.selected)
-            else Color.Transparent,
-            label = "nav_bg_color",
+        val iconScale by androidx.compose.animation.core.animateFloatAsState(
+            targetValue = if (selected) 1.08f else 1f,
+            animationSpec = androidx.compose.animation.core.spring(
+                dampingRatio = 0.72f,
+                stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow,
+            ),
+            label = "nav_icon_scale",
         )
 
         with(rowScope) {
             Column(
                 modifier = modifier
                     .weight(1f)
+                    .onPlaced { layoutCoords ->
+                        if (selected) {
+                            indicatorState.selectedX = with(density) { layoutCoords.positionInParent().x.toDp() }
+                            indicatorState.selectedY = with(density) { layoutCoords.positionInParent().y.toDp() }
+                            indicatorState.selectedWidth = with(density) { layoutCoords.size.width.toDp() }
+                            indicatorState.selectedHeight = with(density) { layoutCoords.size.height.toDp() }
+                            indicatorState.hasValidBounds = true
+                        }
+                    }
                     .clip(RoundedCornerShape(NuvioTokens.Radius.full))
-                    .background(selectedBgColor)
                     .selectable(
                         selected = selected,
                         enabled = true,
                         role = Role.Tab,
-                        onClick = onClick,
+                        onClick = {
+                            hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            onClick()
+                        },
                     )
                     .padding(vertical = NuvioTokens.Space.s6),
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -283,6 +379,10 @@ private class NuvioNavigationBarScopeImpl(
                 Icon(
                     modifier = Modifier
                         .size(28.dp)
+                        .graphicsLayer {
+                            scaleX = iconScale
+                            scaleY = iconScale
+                        }
                         .then(if (selected) Modifier.gradientMask(palette.accentBrush()) else Modifier),
                     imageVector = icon,
                     contentDescription = contentDescription,
@@ -308,23 +408,37 @@ private class NuvioNavigationBarScopeImpl(
             targetValue = if (selected) tokens.colors.accent else tokens.colors.textMuted,
             label = "nav_icon_color",
         )
-        val selectedBgColor by animateColorAsState(
-            targetValue = if (selected) tokens.colors.accent.copy(alpha = NuvioTokens.Opacity.selected)
-            else Color.Transparent,
-            label = "nav_bg_color",
+        val iconScale by androidx.compose.animation.core.animateFloatAsState(
+            targetValue = if (selected) 1.08f else 1f,
+            animationSpec = androidx.compose.animation.core.spring(
+                dampingRatio = 0.72f,
+                stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow,
+            ),
+            label = "nav_icon_scale",
         )
 
         with(rowScope) {
             Column(
                 modifier = modifier
                     .weight(1f)
+                    .onPlaced { layoutCoords ->
+                        if (selected) {
+                            indicatorState.selectedX = with(density) { layoutCoords.positionInParent().x.toDp() }
+                            indicatorState.selectedY = with(density) { layoutCoords.positionInParent().y.toDp() }
+                            indicatorState.selectedWidth = with(density) { layoutCoords.size.width.toDp() }
+                            indicatorState.selectedHeight = with(density) { layoutCoords.size.height.toDp() }
+                            indicatorState.hasValidBounds = true
+                        }
+                    }
                     .clip(RoundedCornerShape(NuvioTokens.Radius.full))
-                    .background(selectedBgColor)
                     .selectable(
                         selected = selected,
                         enabled = true,
                         role = Role.Tab,
-                        onClick = onClick,
+                        onClick = {
+                            hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            onClick()
+                        },
                     )
                     .padding(vertical = NuvioTokens.Space.s6),
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -332,6 +446,10 @@ private class NuvioNavigationBarScopeImpl(
                 Icon(
                     modifier = Modifier
                         .size(28.dp)
+                        .graphicsLayer {
+                            scaleX = iconScale
+                            scaleY = iconScale
+                        }
                         .then(if (selected) Modifier.gradientMask(palette.accentBrush()) else Modifier),
                     painter = painterResource(icon),
                     contentDescription = contentDescription,
@@ -351,32 +469,53 @@ private class NuvioNavigationBarScopeImpl(
         content: @Composable () -> Unit,
     ) {
         val tokens = MaterialTheme.nuvio
-        val selectedBgColor by animateColorAsState(
-            targetValue = if (selected) tokens.colors.accent.copy(alpha = NuvioTokens.Opacity.selected)
-            else Color.Transparent,
-            label = "nav_bg_color",
-        )
         val iconColor by animateColorAsState(
             targetValue = if (selected) tokens.colors.accent else tokens.colors.textMuted,
             label = "nav_icon_color",
+        )
+        val iconScale by androidx.compose.animation.core.animateFloatAsState(
+            targetValue = if (selected) 1.08f else 1f,
+            animationSpec = androidx.compose.animation.core.spring(
+                dampingRatio = 0.72f,
+                stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow,
+            ),
+            label = "nav_icon_scale",
         )
 
         with(rowScope) {
             Column(
                 modifier = modifier
                     .weight(1f)
+                    .onPlaced { layoutCoords ->
+                        if (selected) {
+                            indicatorState.selectedX = with(density) { layoutCoords.positionInParent().x.toDp() }
+                            indicatorState.selectedY = with(density) { layoutCoords.positionInParent().y.toDp() }
+                            indicatorState.selectedWidth = with(density) { layoutCoords.size.width.toDp() }
+                            indicatorState.selectedHeight = with(density) { layoutCoords.size.height.toDp() }
+                            indicatorState.hasValidBounds = true
+                        }
+                    }
                     .clip(RoundedCornerShape(NuvioTokens.Radius.full))
-                    .background(selectedBgColor)
                     .selectable(
                         selected = selected,
                         enabled = true,
                         role = Role.Tab,
-                        onClick = onClick,
+                        onClick = {
+                            hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            onClick()
+                        },
                     )
                     .padding(vertical = NuvioTokens.Space.s6),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                content()
+                Box(
+                    modifier = Modifier.graphicsLayer {
+                        scaleX = iconScale
+                        scaleY = iconScale
+                    },
+                ) {
+                    content()
+                }
                 NavItemLabel(label = label, labelFraction = labelFraction, iconColor = iconColor, selected = selected)
             }
         }

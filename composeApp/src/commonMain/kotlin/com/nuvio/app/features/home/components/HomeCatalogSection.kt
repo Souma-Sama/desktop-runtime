@@ -4,11 +4,18 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.nuvio.app.core.ui.LocalNuvioFloatingSidebarPadding
 import com.nuvio.app.core.ui.NuvioShelfSection
 import com.nuvio.app.core.ui.NuvioViewAllPillSize
 import com.nuvio.app.core.ui.rememberPosterCardStyleUiState
+import com.nuvio.app.features.anilist.AnilistPreferencesRepository
+import com.nuvio.app.features.artwork.MetaHubArtwork
 import com.nuvio.app.isDesktop
 import com.nuvio.app.features.home.HomeCatalogSection
 import com.nuvio.app.features.home.MetaPreview
@@ -69,13 +76,18 @@ private fun HomeCatalogRowSectionContent(
     onPosterLongClick: ((MetaPreview) -> Unit)?,
 ) {
     val posterCardStyle = rememberPosterCardStyleUiState()
+    val anilistPrefs by AnilistPreferencesRepository.preferences.collectAsStateWithLifecycle()
+
+    val floatingSidebarPadding = LocalNuvioFloatingSidebarPadding.current
+    val rowEndPadding = if (floatingSidebarPadding > 0.dp) 28.dp else sectionPadding
 
     NuvioShelfSection(
         title = section.title,
         entries = entries,
         modifier = modifier,
         headerHorizontalPadding = sectionPadding,
-        rowContentPadding = PaddingValues(horizontal = sectionPadding),
+        headerEndPadding = rowEndPadding,
+        rowContentPadding = PaddingValues(start = sectionPadding, end = rowEndPadding),
         onViewAllClick = onViewAllClick,
         onTitleClick = onViewAllClick?.takeIf { isDesktop },
         viewAllPillSize = NuvioViewAllPillSize.Compact,

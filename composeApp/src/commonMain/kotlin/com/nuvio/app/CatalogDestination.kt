@@ -56,7 +56,16 @@ internal fun CatalogDestination(
         target = target,
         onBack = onBack,
         onPosterClick = { meta ->
-            navController.navigate(DetailRoute(type = meta.type, id = meta.id, title = meta.name))
+            navController.navigate(
+                DetailRoute(
+                    type = meta.type,
+                    id = meta.id,
+                    title = meta.name,
+                    poster = meta.poster,
+                    banner = meta.banner,
+                    logo = meta.logo,
+                )
+            )
         },
         onPosterLongClick = { meta: MetaPreview ->
             onPosterLongClick(

@@ -36,6 +36,7 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -55,6 +56,8 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -67,6 +70,7 @@ import com.nuvio.app.core.ui.NuvioLoadingIndicator
 import com.nuvio.app.core.ui.NuvioNavBarScrollState
 import com.nuvio.app.core.ui.NuvioTokens
 import com.nuvio.app.core.ui.nuvio
+import com.nuvio.app.features.anilist.AnilistLibraryItem
 import com.nuvio.app.features.cloud.CloudLibraryContentType
 import com.nuvio.app.features.cloud.CloudLibraryFile
 import com.nuvio.app.features.cloud.CloudLibraryItem
@@ -170,6 +174,9 @@ internal data class AppTabActions(
     val onLibrarySectionViewAllClick: ((LibrarySection, LibrarySortOption) -> Unit)? = null,
     val onCloudFilePlay: ((CloudLibraryItem, CloudLibraryFile) -> Unit)? = null,
     val onConnectCloudClick: (() -> Unit)? = null,
+    val onAnilistPosterClick: ((AnilistLibraryItem) -> Unit)? = null,
+    val onAnilistPosterLongClick: ((AnilistLibraryItem) -> Unit)? = null,
+    val onConnectAnilistClick: (() -> Unit)? = null,
     val onContinueWatchingClick: ((ContinueWatchingItem) -> Unit)? = null,
     val onContinueWatchingLongPress: ((ContinueWatchingItem) -> Unit)? = null,
     val onSwitchProfile: (() -> Unit)? = null,
@@ -234,8 +241,23 @@ internal fun AppTabHost(
                 HomeScreen(
                     modifier = Modifier
                         .fillMaxSize()
-                        .zIndex(if (isHomeSelected) 1f else 0f)
-                        .alpha(if (isHomeSelected) 1f else 0f),
+                        .then(
+                            if (isHomeSelected) {
+                                Modifier.zIndex(1f)
+                            } else {
+                                Modifier
+                                    .alpha(0f)
+                                    .zIndex(0f)
+                                    .clearAndSetSemantics { }
+                                    .pointerInput(Unit) {
+                                        awaitPointerEventScope {
+                                            while (true) {
+                                                awaitPointerEvent()
+                                            }
+                                        }
+                                    }
+                            }
+                        ),
                     topChromePadding = state.topChromePadding,
                     animateCollectionGifs = state.tabsRouteActiveState.value && isHomeSelected,
                     scrollToTopRequests = requests.homeScrollToTopRequests,
@@ -256,6 +278,7 @@ internal fun AppTabHost(
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
+                        .background(MaterialTheme.colorScheme.background)
                         .zIndex(1f),
                 ) {
                     when (selectedTab) {
@@ -273,6 +296,28 @@ internal fun AppTabHost(
                             )
                         }
 
+                        AppScreenTab.Explore -> {
+                            val anilistPrefs by com.nuvio.app.features.anilist.AnilistPreferencesRepository.preferences.collectAsStateWithLifecycle()
+                            if (anilistPrefs.enabled) {
+                                com.nuvio.app.features.anilist.explore.ExploreScreen(
+                                    onPosterClick = { preview -> actions.onPosterClick?.invoke(preview) },
+                                    onPosterLongClick = { preview -> actions.onPosterLongClick?.invoke(preview) },
+                                    topChromePadding = state.topChromePadding ?: 0.dp,
+                                )
+                            }
+                        }
+
+                        AppScreenTab.Calendar -> {
+                            val anilistPrefs by com.nuvio.app.features.anilist.AnilistPreferencesRepository.preferences.collectAsStateWithLifecycle()
+                            if (anilistPrefs.enabled) {
+                                com.nuvio.app.features.anilist.calendar.CalendarScreen(
+                                    onAnimeClick = { preview -> actions.onPosterClick?.invoke(preview) },
+                                    onAnimeLongClick = { preview -> actions.onPosterLongClick?.invoke(preview) },
+                                    topChromePadding = state.topChromePadding ?: 0.dp,
+                                )
+                            }
+                        }
+
                         AppScreenTab.Library -> {
                             LibraryScreen(
                                 modifier = Modifier.fillMaxSize(),
@@ -283,6 +328,9 @@ internal fun AppTabHost(
                                 onSectionViewAllClick = actions.onLibrarySectionViewAllClick,
                                 onCloudFilePlay = actions.onCloudFilePlay,
                                 onConnectCloudClick = actions.onConnectCloudClick,
+                                onAnilistPosterClick = actions.onAnilistPosterClick,
+                                onAnilistPosterLongClick = actions.onAnilistPosterLongClick,
+                                onConnectAnilistClick = actions.onConnectAnilistClick,
                                 disintegrationRequest = state.libraryDisintegrationRequest,
                             )
                         }
@@ -460,6 +508,8 @@ internal fun TabletFloatingTopBar(
         else -> MaterialTheme.typography.labelLarge
     }
 
+    val anilistPrefs by com.nuvio.app.features.anilist.AnilistPreferencesRepository.preferences.collectAsStateWithLifecycle()
+
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -557,6 +607,30 @@ internal fun TabletFloatingTopBar(
                             )
                         },
                     )
+                    if (anilistPrefs.enabled) {
+                        TabletTopPillItem(
+                            label = "Explore",
+                            selected = selectedTab == AppScreenTab.Explore,
+                            onClick = { onTabSelected(AppScreenTab.Explore) },
+                            labelFraction = labelFraction,
+                            pillHeight = pillHeight,
+                            expandedHorizontalPadding = expandedHorizontalPadding,
+                            collapsedHorizontalPadding = iconCollapsedPadding,
+                            textStyle = labelTextStyle,
+                            icon = {
+                                Icon(
+                                    imageVector = com.nuvio.app.features.anilist.ExploreIconVector,
+                                    contentDescription = "Explore",
+                                    modifier = Modifier.size(navIconSize),
+                                    tint = if (selectedTab == AppScreenTab.Explore) {
+                                        tokens.colors.textPrimary
+                                    } else {
+                                        Color.White.copy(alpha = 0.70f)
+                                    },
+                                )
+                            },
+                        )
+                    }
                     TabletTopPillItem(
                         label = stringResource(Res.string.compose_nav_library),
                         selected = selectedTab == AppScreenTab.Library,
@@ -850,6 +924,22 @@ internal fun DesktopHoverSidebar(
                         modifier = Modifier.size(DesktopSidebarIconSize),
                         tint = color,
                     )
+                }
+                val anilistPrefs by com.nuvio.app.features.anilist.AnilistPreferencesRepository.preferences.collectAsStateWithLifecycle()
+                if (anilistPrefs.enabled) {
+                    DesktopSidebarItem(
+                        label = "Explore",
+                        selected = selectedTab == AppScreenTab.Explore,
+                        expanded = sidebarExpanded,
+                        onClick = { selectTab(AppScreenTab.Explore) },
+                    ) { color ->
+                        Icon(
+                            imageVector = com.nuvio.app.features.anilist.ExploreIconVector,
+                            contentDescription = "Explore",
+                            modifier = Modifier.size(DesktopSidebarIconSize),
+                            tint = color,
+                        )
+                    }
                 }
                 DesktopSidebarItem(
                     label = stringResource(Res.string.compose_nav_library),

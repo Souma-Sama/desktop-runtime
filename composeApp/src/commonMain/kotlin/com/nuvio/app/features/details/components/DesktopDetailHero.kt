@@ -14,10 +14,12 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -36,6 +38,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.nuvio.app.features.anilist.AnilistPreferencesRepository
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.BiasAlignment
 import androidx.compose.ui.Modifier
@@ -48,10 +52,13 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.draw.blur
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.nuvio.app.core.ui.NuvioAsyncImage as AsyncImage
 import com.nuvio.app.core.ui.NuvioDesktopImageScaling
 import com.nuvio.app.core.ui.NuvioTokens
@@ -78,6 +85,7 @@ import org.jetbrains.compose.resources.stringResource
 fun DesktopDetailBackdrop(
     meta: MetaDetails,
     viewportHeight: Dp,
+    scrollOffset: () -> Int = { 0 },
     heroTrailerSourceUrl: String?,
     heroTrailerSourceAudioUrl: String?,
     heroTrailerReady: Boolean,
@@ -122,6 +130,11 @@ fun DesktopDetailBackdrop(
             .width(backdropWidth)
             .fillMaxHeight()
         val artworkModifier = if (blurBackdrop) backdropModifier.blur(30.dp) else backdropModifier
+        val parallaxArtworkModifier = artworkModifier.graphicsLayer {
+            translationY = -scrollOffset() * 0.45f
+            scaleX = 1.05f
+            scaleY = 1.05f
+        }
         val bottomSpreadStrength = ((21f / 9f - aspectRatio) / (5f / 9f)).coerceIn(0f, 1f)
         val baseSideFade = Brush.horizontalGradient(
             colorStops = arrayOf(
@@ -135,10 +148,28 @@ fun DesktopDetailBackdrop(
         )
         val imageUrl = meta.background ?: meta.poster
         if (imageUrl != null) {
+            val isAnilistBanner = imageUrl.contains("anilistcdn/media/anime/banner", ignoreCase = true)
+            if (isAnilistBanner) {
+                AsyncImage(
+                    model = imageUrl,
+                    contentDescription = null,
+                    modifier = backdropModifier
+                        .blur(36.dp)
+                        .graphicsLayer {
+                            translationY = -scrollOffset() * 0.45f
+                            scaleX = 1.05f
+                            scaleY = 1.05f
+                            clip = true
+                        },
+                    alignment = Alignment.Center,
+                    contentScale = ContentScale.Crop,
+                    desktopImageScaling = NuvioDesktopImageScaling.Disabled,
+                )
+            }
             AsyncImage(
                 model = originalTmdbImageUrl(imageUrl),
                 contentDescription = meta.name,
-                modifier = artworkModifier,
+                modifier = parallaxArtworkModifier,
                 alignment = BiasAlignment(0f, DesktopBackdropVerticalBias),
                 contentScale = if (useWideArtworkFrame && !cropSideBackdrop) ContentScale.Fit else ContentScale.Crop,
                 desktopImageScaling = NuvioDesktopImageScaling.Disabled,
@@ -155,7 +186,7 @@ fun DesktopDetailBackdrop(
                 playWhenReady = heroTrailerPlayWhenReady,
                 muted = heroTrailerMuted,
                 fillFrame = true,
-                modifier = artworkModifier.graphicsLayer { alpha = trailerAlpha },
+                modifier = parallaxArtworkModifier.graphicsLayer { alpha = trailerAlpha },
                 onReady = onHeroTrailerReady,
                 onEnded = onHeroTrailerEnded,
                 onError = onHeroTrailerError,
@@ -180,12 +211,35 @@ fun DesktopDetailBackdrop(
                     }
                 },
         )
+
+        // Seamless vertical bottom fade to completely eliminate any sharp backdrop/banner cutoff
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .drawWithCache {
+                    val baseBottomFade = Brush.verticalGradient(
+                        colorStops = arrayOf(
+                            0.00f to Color.Transparent,
+                            0.30f to Color.Transparent,
+                            0.48f to sideGradientColor.copy(alpha = 0.25f * gradientIntensity),
+                            0.65f to sideGradientColor.copy(alpha = 0.65f * gradientIntensity),
+                            0.82f to sideGradientColor.copy(alpha = 0.92f * gradientIntensity),
+                            0.95f to sideGradientColor,
+                            1.00f to sideGradientColor,
+                        ),
+                    )
+                    onDrawBehind {
+                        drawRect(baseBottomFade)
+                    }
+                },
+        )
     }
 }
 
 @Composable
 fun DesktopDetailHero(
     meta: MetaDetails,
+    title: String? = null,
     playButtonLabel: String,
     isSaved: Boolean,
     isWatched: Boolean,
@@ -219,6 +273,16 @@ fun DesktopDetailHero(
         val actionHorizontalInset = fullscreenActionHorizontalInsetForWidth(maxWidth.value)
         val pageHorizontalPadding = desktopPageHorizontalPaddingForWidth(maxWidth.value)
 
+        val isNarrow = maxWidth < 600.dp
+        val isAnilistItem = com.nuvio.app.features.anilist.KaiHooks.isKaiMedia(meta.id)
+        val heroMinHeight = 660.dp
+        val logoMaxHeight = if (isNarrow && isAnilistItem) (heroMinHeight * 0.22f).coerceIn(48.dp, 64.dp)
+                            else if (isNarrow) 80.dp
+                            else 120.dp
+        val logoMaxWidth = if (isNarrow && isAnilistItem) (maxWidth * 0.55f).coerceIn(160.dp, 280.dp)
+                           else if (isNarrow) 360.dp
+                           else 560.dp
+
         Column(
             modifier = Modifier
                 .align(Alignment.BottomStart)
@@ -229,20 +293,22 @@ fun DesktopDetailHero(
                     bottom = space.s40,
                 ),
         ) {
+            val anilistPrefs by AnilistPreferencesRepository.preferences.collectAsStateWithLifecycle()
+            val heroLogoScale = anilistPrefs.heroTitleLogoScale
             if (logoUrl != null && !logoLoadError) {
                 AsyncImage(
                     model = logoUrl,
-                    contentDescription = stringResource(Res.string.detail_logo_content_description, meta.name),
+                    contentDescription = stringResource(Res.string.detail_logo_content_description, title ?: meta.name),
                     modifier = Modifier
-                        .widthIn(max = 560.dp)
-                        .height(120.dp),
+                        .widthIn(max = logoMaxWidth * heroLogoScale)
+                        .height(logoMaxHeight * heroLogoScale),
                     alignment = Alignment.CenterStart,
                     contentScale = ContentScale.Fit,
                     onError = { logoLoadError = true },
                 )
             } else {
                 Text(
-                    text = meta.name,
+                    text = title ?: meta.name,
                     style = MaterialTheme.typography.displayLarge.copy(
                         fontSize = NuvioTokens.Type.displayMd,
                         lineHeight = NuvioTokens.LineHeight.displayMd,
@@ -279,21 +345,22 @@ fun DesktopDetailHero(
             }
             meta.description?.takeIf { it.isNotBlank() }?.let { synopsis ->
                 Spacer(modifier = Modifier.height(space.s16))
-                Text(
+                ExpandableDescription(
                     text = synopsis,
+                    collapsedMaxLines = 3,
                     style = MaterialTheme.typography.bodyLarge.copy(
                         fontSize = NuvioTokens.Type.bodyLg,
                         lineHeight = NuvioTokens.LineHeight.bodyLg,
                         letterSpacing = NuvioTokens.LetterSpacing.none,
                     ),
                     color = colorScheme.onSurface,
-                    maxLines = 4,
-                    overflow = TextOverflow.Ellipsis,
                 )
             }
             Spacer(modifier = Modifier.height(space.s28))
             DetailActionButtons(
                 modifier = Modifier.widthIn(max = 520.dp),
+                meta = meta,
+                title = title,
                 playLabel = playButtonLabel,
                 secondaryActions = listOf(
                     DetailSecondaryAction(
@@ -424,6 +491,39 @@ private fun DesktopHeroMetaRow(meta: MetaDetails) {
                     ),
                     color = colorScheme.onSurfaceVariant,
                 )
+            }
+        }
+        meta.nextAiringEpisode?.takeIf { it.isNotBlank() }?.let { countdown ->
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(androidx.compose.ui.graphics.Color(0xFF10B981).copy(alpha = 0.18f))
+                    .border(
+                        1.dp,
+                        androidx.compose.ui.graphics.Color(0xFF10B981).copy(alpha = 0.5f),
+                        RoundedCornerShape(6.dp),
+                    )
+                    .padding(horizontal = 8.dp, vertical = 3.dp),
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(5.dp),
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(6.dp)
+                            .clip(RoundedCornerShape(3.dp))
+                            .background(androidx.compose.ui.graphics.Color(0xFF10B981))
+                    )
+                    Text(
+                        text = countdown,
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 11.sp,
+                        ),
+                        color = androidx.compose.ui.graphics.Color(0xFF34D399),
+                    )
+                }
             }
         }
     }

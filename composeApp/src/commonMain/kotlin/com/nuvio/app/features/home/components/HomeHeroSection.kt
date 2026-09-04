@@ -39,6 +39,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.BiasAlignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -57,6 +58,8 @@ import androidx.compose.ui.unit.dp
 import com.nuvio.app.isDesktop
 import com.nuvio.app.core.ui.FullscreenActionButton
 import com.nuvio.app.core.ui.DesktopBackdropVerticalBias
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.nuvio.app.features.anilist.AnilistPreferencesRepository
 import com.nuvio.app.core.ui.NuvioDesktopImageScaling
 import com.nuvio.app.core.ui.NuvioAsyncImage as AsyncImage
 import com.nuvio.app.core.ui.NuvioTokens
@@ -65,10 +68,12 @@ import com.nuvio.app.core.format.formatReleaseDateForDisplay
 import com.nuvio.app.core.ui.heroStretchHeight
 import com.nuvio.app.core.ui.heroStretchZoom
 import com.nuvio.app.core.ui.ultrawideViewportProgress
+import com.nuvio.app.features.artwork.MetaHubArtwork
 import com.nuvio.app.features.home.MetaPreview
 import com.nuvio.app.features.tmdb.originalTmdbImageUrl
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import nuvio.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.stringResource
@@ -125,18 +130,23 @@ fun HomeHeroSection(
     val pagerState = rememberPagerState(pageCount = { items.size })
     val coroutineScope = rememberCoroutineScope()
     var pagerDragActive by remember { mutableStateOf(false) }
-    val autoScrollPage = pagerState.currentPage
 
-    LaunchedEffect(autoScrollPage, items.size) {
-        if (items.size <= 1) return@LaunchedEffect
-        delay(HERO_AUTO_SCROLL_INTERVAL_MS)
-        while (pagerState.isScrollInProgress) {
-            delay(100L)
+    LaunchedEffect(items) {
+        items.take(6).forEach { item ->
+            launch {
+                MetaHubArtwork.resolveImdbId(item.id)
+            }
         }
+    }
 
-        val nextPage = (pagerState.currentPage + 1) % items.size
-        coroutineScope.launch {
-            pagerState.animateScrollToPage(nextPage)
+    LaunchedEffect(items.size) {
+        if (items.size <= 1) return@LaunchedEffect
+        while (isActive) {
+            delay(HERO_AUTO_SCROLL_INTERVAL_MS)
+            if (!pagerDragActive && !pagerState.isScrollInProgress && items.isNotEmpty()) {
+                val nextPage = (pagerState.currentPage + 1) % items.size
+                pagerState.animateScrollToPage(nextPage)
+            }
         }
     }
 
@@ -157,11 +167,13 @@ fun HomeHeroSection(
                 },
             ),
     ) {
+        val isAnilistCatalog = items.any { it.id.startsWith("ani_") || it.id.startsWith("anilist:") }
         val layout = homeHeroLayout(
             maxWidthDp = maxWidth.value,
             viewportHeightDp = viewportHeight?.value,
             mobileBelowSectionHeightHintDp = mobileBelowSectionHeightHint?.value,
             preferDesktopLayout = isDesktop,
+            isAnilistCatalog = isAnilistCatalog,
         )
         val heroWidthPx = with(LocalDensity.current) { maxWidth.toPx() }
         val heroHeightPx = with(LocalDensity.current) { layout.heroHeight.toPx() }
@@ -237,7 +249,21 @@ private fun HeroBackgroundLayers(
     val backgroundMotionStrength = if (desktopFrame) layout.backgroundMotionStrength else 1f
     layerPages.forEach { page ->
         val item = items[page]
-        val imageUrl = item.banner ?: item.poster
+        var backdropUrl by remember(item.id, item.banner) {
+            mutableStateOf(MetaHubArtwork.getBackdropUrl(item.id) ?: item.banner)
+        }
+
+        LaunchedEffect(item.id) {
+            val resolved = MetaHubArtwork.resolveBackdropUrl(item.id)
+            if (!resolved.isNullOrBlank()) {
+                backdropUrl = resolved
+            }
+        }
+
+        val backgroundModel = backdropUrl ?: item.banner ?: item.poster
+        val isAnilistItem = item.id.startsWith("ani_") || item.id.startsWith("anilist:")
+        val isAnilistBanner = isAnilistItem && (backgroundModel?.contains("anilistcdn/media/anime/banner", ignoreCase = true) == true)
+
         val backgroundModifier = if (desktopFrame) {
             Modifier
                 .fillMaxSize()
@@ -248,8 +274,41 @@ private fun HeroBackgroundLayers(
                 .height(layout.heroHeight)
                 .heroStretchZoom(stretchPx)
         }
+
+        if (isAnilistBanner) {
+            AsyncImage(
+                model = backgroundModel,
+                contentDescription = null,
+                modifier = backgroundModifier
+                    .blur(36.dp)
+                    .graphicsLayer {
+                        val pageOffset = heroPageOffset(pagerState, page)
+                        val scrollOffsetPx = heroScrollOffsetPx(listState, heroHeightPx)
+                        val scrollScale = if (desktopFrame) {
+                            1f + (heroBackgroundScrollScale(scrollOffsetPx) - 1f) * backgroundMotionStrength
+                        } else {
+                            heroBackgroundScrollScale(scrollOffsetPx)
+                        }
+
+                        alpha = heroPageVisibility(pageOffset) * 0.55f
+                        translationX = -pageOffset * heroWidthPx * HERO_BACKGROUND_PARALLAX
+                        translationY = if (desktopFrame) {
+                            heroDesktopBackgroundScrollTranslationY(scrollOffsetPx) * backgroundMotionStrength
+                        } else {
+                            heroBackgroundScrollTranslationY(scrollOffsetPx)
+                        }
+                        val baseScale = if (desktopFrame) 1.04f else HERO_BACKGROUND_SCALE
+                        scaleX = baseScale * scrollScale
+                        scaleY = baseScale * scrollScale
+                    },
+                alignment = Alignment.Center,
+                contentScale = ContentScale.Crop,
+                desktopImageScaling = NuvioDesktopImageScaling.Disabled,
+            )
+        }
+
         AsyncImage(
-            model = if (desktopFrame) originalTmdbImageUrl(imageUrl) else imageUrl,
+            model = if (desktopFrame) originalTmdbImageUrl(backgroundModel) else backgroundModel,
             contentDescription = item.name,
             modifier = backgroundModifier
                 .graphicsLayer {
@@ -273,6 +332,7 @@ private fun HeroBackgroundLayers(
                     scaleY = baseScale * scrollScale
                 },
             alignment = when {
+                isAnilistBanner -> Alignment.Center
                 desktopFrame -> BiasAlignment(
                     horizontalBias = 0f,
                     verticalBias = DesktopBackdropVerticalBias,
@@ -280,7 +340,7 @@ private fun HeroBackgroundLayers(
                 layout.isTablet -> Alignment.TopCenter
                 else -> Alignment.Center
             },
-            contentScale = ContentScale.Crop,
+            contentScale = if (isAnilistBanner) ContentScale.FillWidth else ContentScale.Crop,
             desktopImageScaling = NuvioDesktopImageScaling.Disabled,
         )
     }
@@ -302,18 +362,18 @@ private fun HeroContentLayers(
     )
 
     layerPages.forEach { page ->
+        val pageOffset = heroPageOffset(pagerState, page)
+        val visibility = heroPageVisibility(pageOffset)
         Box(
             modifier = Modifier.graphicsLayer {
-                val pageOffset = heroPageOffset(pagerState, page)
-
-                alpha = heroPageVisibility(pageOffset)
+                alpha = visibility
                 translationX = -pageOffset * heroWidthPx * HERO_CONTENT_PARALLAX
             },
         ) {
             HeroContentBlock(
                 item = items[page],
                 layout = layout,
-                onItemClick = onItemClick,
+                onItemClick = if (visibility > 0.5f) onItemClick else null,
             )
         }
     }
@@ -368,20 +428,20 @@ private fun HeroDesktopContentLayers(
     )
 
     layerPages.forEach { page ->
+        val pageOffset = heroPageOffset(pagerState, page)
+        val visibility = heroPageVisibility(pageOffset)
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .graphicsLayer {
-                    val pageOffset = heroPageOffset(pagerState, page)
-
-                    alpha = heroPageVisibility(pageOffset)
+                    alpha = visibility
                     translationX = -pageOffset * heroWidthPx * HERO_CONTENT_PARALLAX
                 },
         ) {
             DesktopHeroContentBlock(
                 item = items[page],
                 layout = layout,
-                onItemClick = onItemClick,
+                onItemClick = if (visibility > 0.5f) onItemClick else null,
             )
         }
     }
@@ -779,10 +839,23 @@ private fun HeroContentBlock(
     layout: HomeHeroLayout,
     onItemClick: ((MetaPreview) -> Unit)?,
 ) {
-    var logoLoadError by remember(item.type, item.id, item.logo) {
+    var logoLoadError by remember(item.type, item.id) {
         mutableStateOf(false)
     }
-    val logoUrl = item.logo?.takeIf { it.isNotBlank() }
+    var resolvedLogo by remember(item.type, item.id, item.logo) {
+        mutableStateOf(item.logo?.takeIf { it.isNotBlank() } ?: MetaHubArtwork.getLogoUrl(item.id))
+    }
+    LaunchedEffect(item.type, item.id) {
+        if (resolvedLogo == null) {
+            val logo = MetaHubArtwork.resolveLogoUrl(item.id)
+            if (logo != null) {
+                resolvedLogo = logo
+            }
+        }
+    }
+    val logoUrl = resolvedLogo
+    val anilistPrefs by AnilistPreferencesRepository.preferences.collectAsStateWithLifecycle()
+    val heroLogoScale = anilistPrefs.heroTitleLogoScale
 
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -793,7 +866,7 @@ private fun HeroContentBlock(
                 model = logoUrl,
                 contentDescription = item.name,
                 modifier = Modifier
-                    .fillMaxWidth(layout.logoWidthFraction)
+                    .fillMaxWidth((layout.logoWidthFraction * heroLogoScale).coerceIn(0.25f, 1f))
                     .aspectRatio(2.6f)
                     .clickable(enabled = onItemClick != null) {
                         onItemClick?.invoke(item)
@@ -853,10 +926,24 @@ private fun DesktopHeroContentBlock(
     onItemClick: ((MetaPreview) -> Unit)?,
 ) {
     val colorScheme = MaterialTheme.colorScheme
-    var logoLoadError by remember(item.type, item.id, item.logo) {
+    val isCompact = layout.heroHeight <= 340.dp
+    var logoLoadError by remember(item.type, item.id) {
         mutableStateOf(false)
     }
-    val logoUrl = item.logo?.takeIf { it.isNotBlank() }
+    var resolvedLogo by remember(item.type, item.id, item.logo) {
+        mutableStateOf(item.logo?.takeIf { it.isNotBlank() } ?: MetaHubArtwork.getLogoUrl(item.id))
+    }
+    LaunchedEffect(item.type, item.id) {
+        if (resolvedLogo == null) {
+            val logo = MetaHubArtwork.resolveLogoUrl(item.id)
+            if (logo != null) {
+                resolvedLogo = logo
+            }
+        }
+    }
+    val logoUrl = resolvedLogo
+    val anilistPrefs by AnilistPreferencesRepository.preferences.collectAsStateWithLifecycle()
+    val heroLogoScale = anilistPrefs.heroTitleLogoScale
 
     Column(
         modifier = Modifier
@@ -874,14 +961,14 @@ private fun DesktopHeroContentBlock(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(desktopHeroLogoSlotHeight(layout)),
+                    .height(desktopHeroLogoSlotHeight(layout) * heroLogoScale),
                 contentAlignment = Alignment.CenterStart,
             ) {
                 AsyncImage(
                     model = logoUrl,
                     contentDescription = item.name,
                     modifier = Modifier
-                        .fillMaxWidth(desktopHeroLogoWidthFraction(layout))
+                        .fillMaxWidth((desktopHeroLogoWidthFraction(layout) * heroLogoScale).coerceIn(0.25f, 1f))
                         .fillMaxHeight(),
                     alignment = Alignment.CenterStart,
                     contentScale = ContentScale.Fit,
@@ -893,26 +980,32 @@ private fun DesktopHeroContentBlock(
             Text(
                 text = item.name,
                 modifier = Modifier.fillMaxWidth(),
-                style = MaterialTheme.typography.displayLarge.copy(
-                    fontSize = NuvioTokens.Type.displayMd,
-                    lineHeight = NuvioTokens.LineHeight.displayMd,
-                    fontWeight = FontWeight.ExtraBold,
-                    letterSpacing = NuvioTokens.LetterSpacing.none,
-                ),
+                style = if (isCompact) {
+                    MaterialTheme.typography.titleLarge.copy(
+                        fontWeight = FontWeight.ExtraBold,
+                    )
+                } else {
+                    MaterialTheme.typography.displayLarge.copy(
+                        fontSize = NuvioTokens.Type.displayMd,
+                        lineHeight = NuvioTokens.LineHeight.displayMd,
+                        fontWeight = FontWeight.ExtraBold,
+                        letterSpacing = NuvioTokens.LetterSpacing.none,
+                    )
+                },
                 color = colorScheme.onBackground,
                 textAlign = TextAlign.Start,
-                maxLines = 3,
+                maxLines = if (isCompact) 2 else 3,
                 overflow = TextOverflow.Ellipsis,
             )
         }
 
         val genreText = desktopHeroGenreText(item)
         if (genreText.isNotBlank()) {
-            Spacer(modifier = Modifier.height(NuvioTokens.Space.s12))
+            Spacer(modifier = Modifier.height(if (isCompact) NuvioTokens.Space.s6 else NuvioTokens.Space.s12))
             Text(
                 text = genreText,
                 style = MaterialTheme.typography.bodyMedium.copy(
-                    fontSize = NuvioTokens.Type.bodyMd,
+                    fontSize = if (isCompact) NuvioTokens.Type.bodySm else NuvioTokens.Type.bodyMd,
                     fontWeight = FontWeight.SemiBold,
                     letterSpacing = NuvioTokens.LetterSpacing.none,
                 ),
@@ -922,42 +1015,52 @@ private fun DesktopHeroContentBlock(
             )
         }
 
-        item.description?.takeIf { it.isNotBlank() }?.let { description ->
-            Spacer(modifier = Modifier.height(NuvioTokens.Space.s16))
+        com.nuvio.app.core.format.cleanHtmlDescription(item.description)?.let { rawDescription ->
+            val description = remember(rawDescription) {
+                val trimmed = rawDescription.trim()
+                if (trimmed.length > 220) {
+                    val lastSpace = trimmed.substring(0, 215).lastIndexOf(' ')
+                    if (lastSpace > 140) trimmed.substring(0, lastSpace) + "..."
+                    else trimmed.substring(0, 215) + "..."
+                } else {
+                    trimmed
+                }
+            }
+            Spacer(modifier = Modifier.height(if (isCompact) NuvioTokens.Space.s8 else NuvioTokens.Space.s16))
             Text(
                 text = description,
                 style = MaterialTheme.typography.bodyLarge.copy(
-                    fontSize = NuvioTokens.Type.bodyLg,
-                    lineHeight = NuvioTokens.LineHeight.bodyLg,
+                    fontSize = if (isCompact) NuvioTokens.Type.bodySm else NuvioTokens.Type.bodyLg,
+                    lineHeight = if (isCompact) NuvioTokens.LineHeight.bodySm else NuvioTokens.LineHeight.bodyLg,
                     letterSpacing = NuvioTokens.LetterSpacing.none,
                 ),
                 color = colorScheme.onSurface,
-                maxLines = 4,
+                maxLines = if (isCompact) 2 else 3,
                 overflow = TextOverflow.Ellipsis,
             )
         }
 
         if (onItemClick != null) {
-            Spacer(modifier = Modifier.height(NuvioTokens.Space.s24))
+            Spacer(modifier = Modifier.height(if (isCompact) NuvioTokens.Space.s12 else NuvioTokens.Space.s24))
             Row(
                 horizontalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s12),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Surface(
                     modifier = Modifier
-                        .height(48.dp)
+                        .height(if (isCompact) 38.dp else 48.dp)
                         .clickable { onItemClick(item) },
                     color = colorScheme.onBackground,
                     contentColor = colorScheme.background,
                     shape = RoundedCornerShape(40.dp),
                 ) {
                     Box(
-                        modifier = Modifier.padding(horizontal = 24.dp),
+                        modifier = Modifier.padding(horizontal = if (isCompact) 18.dp else 24.dp),
                         contentAlignment = Alignment.Center,
                     ) {
                         Text(
                             text = stringResource(Res.string.home_view_details),
-                            style = MaterialTheme.typography.titleSmall,
+                            style = if (isCompact) MaterialTheme.typography.labelLarge else MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.Bold,
                             maxLines = 1,
                         )
@@ -970,13 +1073,17 @@ private fun DesktopHeroContentBlock(
 
 private fun desktopHeroLogoWidthFraction(layout: HomeHeroLayout): Float =
     when {
+        layout.heroHeight <= 300.dp -> 0.48f
+        layout.heroHeight <= 420.dp -> 0.60f
         layout.contentMaxWidth >= 640.dp -> 0.74f
         layout.contentMaxWidth >= 520.dp -> 0.74f
-        else -> 0.8f
+        else -> 0.76f
     }
 
 private fun desktopHeroLogoSlotHeight(layout: HomeHeroLayout): Dp =
     when {
+        layout.heroHeight <= 300.dp -> (layout.heroHeight * 0.24f).coerceIn(46.dp, 60.dp)
+        layout.heroHeight <= 420.dp -> (layout.heroHeight * 0.22f).coerceIn(60.dp, 84.dp)
         layout.contentMaxWidth >= 640.dp -> 120.dp
         layout.contentMaxWidth >= 520.dp -> 112.dp
         else -> 104.dp
@@ -1005,12 +1112,17 @@ internal fun homeHeroLayout(
     viewportHeightDp: Float? = null,
     mobileBelowSectionHeightHintDp: Float? = null,
     preferDesktopLayout: Boolean = false,
+    isAnilistCatalog: Boolean = false,
 ): HomeHeroLayout {
     if (preferDesktopLayout) {
-        val heroHeight = desktopHeroHeight(
-            maxWidthDp = maxWidthDp,
-            viewportHeightDp = viewportHeightDp,
-        )
+        val heroHeight = if (isAnilistCatalog) {
+            (maxWidthDp * (9f / 16f)).dp.coerceIn(240.dp, 660.dp)
+        } else {
+            desktopHeroHeight(
+                maxWidthDp = maxWidthDp,
+                viewportHeightDp = viewportHeightDp,
+            )
+        }
         val ultrawideProgress = ultrawideViewportProgress(
             widthDp = maxWidthDp,
             heightDp = viewportHeightDp,
@@ -1035,7 +1147,7 @@ internal fun homeHeroLayout(
                 fraction = ultrawideProgress,
             ).dp,
             topFadeHeight = DESKTOP_HERO_TOP_FADE_HEIGHT_DP.dp,
-            bottomFadeHeight = DESKTOP_HERO_BOTTOM_FADE_HEIGHT_DP.dp,
+            bottomFadeHeight = if (isAnilistCatalog) 120.dp else DESKTOP_HERO_BOTTOM_FADE_HEIGHT_DP.dp,
             logoWidthFraction = 0.74f,
             backgroundMotionStrength = 1f - ultrawideProgress,
         )
@@ -1081,23 +1193,30 @@ internal fun homeHeroLayout(
             logoWidthFraction = 0.54f,
             backgroundMotionStrength = 1f,
         )
-        else -> HomeHeroLayout(
-            isTablet = false,
-            heroHeight = mobileHeroHeight(
-                maxWidthDp = maxWidthDp,
-                viewportHeightDp = viewportHeightDp,
-                mobileBelowSectionHeightHintDp = mobileBelowSectionHeightHintDp,
-            ),
-            contentMaxWidth = 480.dp,
-            contentContainerMaxWidth = maxWidthDp.dp,
-            contentWidthFraction = 1f,
-            contentHorizontalPadding = 24.dp,
-            contentVerticalPadding = 16.dp,
-            topFadeHeight = 0.dp,
-            bottomFadeHeight = 220.dp,
-            logoWidthFraction = 0.62f,
-            backgroundMotionStrength = 1f,
-        )
+        else -> {
+            val heroHeight = if (isAnilistCatalog) {
+                (maxWidthDp * (9f / 16f)).dp.coerceIn(220.dp, 500.dp)
+            } else {
+                mobileHeroHeight(
+                    maxWidthDp = maxWidthDp,
+                    viewportHeightDp = viewportHeightDp,
+                    mobileBelowSectionHeightHintDp = mobileBelowSectionHeightHintDp,
+                )
+            }
+            HomeHeroLayout(
+                isTablet = false,
+                heroHeight = heroHeight,
+                contentMaxWidth = 480.dp,
+                contentContainerMaxWidth = maxWidthDp.dp,
+                contentWidthFraction = 1f,
+                contentHorizontalPadding = 24.dp,
+                contentVerticalPadding = 16.dp,
+                topFadeHeight = 0.dp,
+                bottomFadeHeight = if (isAnilistCatalog) 120.dp else 220.dp,
+                logoWidthFraction = 0.62f,
+                backgroundMotionStrength = 1f,
+            )
+        }
     }
 }
 

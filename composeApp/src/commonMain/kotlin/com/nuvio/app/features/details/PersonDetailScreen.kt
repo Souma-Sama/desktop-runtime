@@ -94,27 +94,37 @@ fun PersonDetailScreen(
     initialProfilePhoto: String? = null,
     avatarTransitionKey: String? = null,
     preferCrew: Boolean = false,
+    isAnilist: Boolean = false,
+    isCharacter: Boolean = false,
     onBack: () -> Unit,
     onOpenMeta: (MetaPreview) -> Unit,
     sharedTransitionScope: SharedTransitionScope? = null,
     animatedVisibilityScope: AnimatedVisibilityScope? = null,
     modifier: Modifier = Modifier,
 ) {
-    var uiState by remember(personId) { mutableStateOf<PersonDetailUiState>(PersonDetailUiState.Loading) }
+    var uiState by remember(personId, isAnilist, isCharacter) { mutableStateOf<PersonDetailUiState>(PersonDetailUiState.Loading) }
+    var trackerSheetPreview by remember { mutableStateOf<MetaPreview?>(null) }
     val watchedUiState by remember {
         WatchedRepository.ensureLoaded()
         WatchedRepository.uiState
     }.collectAsStateWithLifecycle()
     val resolvedAvatarTransitionKey = avatarTransitionKey ?: castAvatarSharedTransitionKey(personId)
 
-    LaunchedEffect(personId) {
+    LaunchedEffect(personId, personName, isAnilist, isCharacter) {
         uiState = PersonDetailUiState.Loading
         val detail = TmdbMetadataService.fetchPersonDetail(
             personId = personId,
             preferCrewCredits = preferCrew,
+            fallbackName = personName,
+            isAnilist = isAnilist,
+            isCharacter = isCharacter,
         )
         uiState = if (detail != null) {
-            PersonDetailUiState.Success(detail)
+            PersonDetailUiState.Success(
+                if (detail.profilePhoto.isNullOrBlank() && !initialProfilePhoto.isNullOrBlank()) {
+                    detail.copy(profilePhoto = initialProfilePhoto)
+                } else detail
+            )
         } else {
             PersonDetailUiState.Error(getString(Res.string.person_load_failed, personName))
         }
@@ -145,12 +155,13 @@ fun PersonDetailScreen(
                 person = state.personDetail,
                 watchedKeys = watchedUiState.watchedKeys,
                 onOpenMeta = onOpenMeta,
+                onPosterLongClick = { item -> trackerSheetPreview = item },
                 initialProfilePhoto = initialProfilePhoto,
                 avatarTransitionKey = resolvedAvatarTransitionKey,
                 sharedTransitionScope = sharedTransitionScope,
                 animatedVisibilityScope = animatedVisibilityScope,
             )
-            }
+        }
 
         if (!LocalUseNativeNavigation.current) {
             if (isDesktop) {
@@ -185,6 +196,14 @@ fun PersonDetailScreen(
                 }
             }
         }
+
+        trackerSheetPreview?.let { preview ->
+            com.nuvio.app.features.anilist.KaiHooks.PosterAction(
+                targetPreview = preview,
+                onDismiss = { trackerSheetPreview = null },
+                onDefaultContent = {},
+            )
+        }
     }
 }
 
@@ -194,6 +213,7 @@ private fun PersonDetailContent(
     person: PersonDetail,
     watchedKeys: Set<String>,
     onOpenMeta: (MetaPreview) -> Unit,
+    onPosterLongClick: ((MetaPreview) -> Unit)? = null,
     initialProfilePhoto: String? = null,
     avatarTransitionKey: String,
     sharedTransitionScope: SharedTransitionScope? = null,
@@ -243,10 +263,24 @@ private fun PersonDetailContent(
             .sortedBy { it.rawReleaseDate ?: "" }
     }
 
+    val isAnimePerson = person.knownFor == "Voice Acting" || allCredits.any { it.id.startsWith("ani_") }
+    val displayPopularCredits = remember(popularCredits, isAnimePerson) {
+        if (isAnimePerson) popularCredits.take(10) else popularCredits
+    }
+    val animeTvCredits = remember(person.tvCredits) {
+        person.tvCredits
+            .filter { it.id.startsWith("ani_") || it.id.startsWith("anilist:") }
+            .sortedByDescending { it.rawReleaseDate ?: "" }
+    }
+    val animeMovieCredits = remember(person.movieCredits) {
+        person.movieCredits
+            .filter { it.id.startsWith("ani_") || it.id.startsWith("anilist:") }
+            .sortedByDescending { it.rawReleaseDate ?: "" }
+    }
+
     val scrollState = rememberScrollState()
     val haptic = LocalHapticFeedback.current
 
-    // Hero collapse: 0 = fully expanded, 1 = fully collapsed
     val collapseProgress by remember {
         derivedStateOf {
             (scrollState.value / HERO_COLLAPSE_SCROLL_RANGE).coerceIn(0f, 1f)
@@ -254,35 +288,31 @@ private fun PersonDetailContent(
     }
 
     val shouldTriggerCatalogHaptic by remember {
-        derivedStateOf { scrollState.value >= HAPTIC_TRIGGER_SCROLL_THRESHOLD_PX }
+        derivedStateOf { scrollState.value > 0 }
     }
-    var didTriggerCatalogHaptic by remember(person.tmdbId) { mutableStateOf(false) }
-    LaunchedEffect(shouldTriggerCatalogHaptic, didTriggerCatalogHaptic) {
-        if (shouldTriggerCatalogHaptic && !didTriggerCatalogHaptic) {
+    var catalogScrolledPastZero by remember { mutableStateOf(false) }
+    LaunchedEffect(shouldTriggerCatalogHaptic) {
+        if (shouldTriggerCatalogHaptic != catalogScrolledPastZero) {
+            catalogScrolledPastZero = shouldTriggerCatalogHaptic
             haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-            didTriggerCatalogHaptic = true
         }
     }
 
-    val accentGradient = remember(accentColor) {
+    val systemBarBackground = MaterialTheme.colorScheme.surface
+    val accentGradient = remember(accentColor, systemBarBackground) {
         Brush.verticalGradient(
-            colorStops = arrayOf(
-                0.0f to accentColor.copy(alpha = 0.18f),
-                0.15f to accentColor.copy(alpha = 0.10f),
-                0.30f to accentColor.copy(alpha = 0.04f),
-                0.50f to Color.Transparent,
-            ),
+            0.0f to accentColor.copy(alpha = 0.04f),
+            0.20f to accentColor.copy(alpha = 0.02f),
+            0.45f to systemBarBackground.copy(alpha = 0.0f),
+            1.0f to systemBarBackground.copy(alpha = 0.0f),
         )
     }
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background),
-    ) {
+    Box(modifier = Modifier.fillMaxSize()) {
         Box(
             modifier = Modifier
-                .fillMaxSize()
+                .fillMaxWidth()
+                .fillMaxHeight(0.35f)
                 .background(accentGradient),
         )
 
@@ -295,11 +325,15 @@ private fun PersonDetailContent(
                 if (useWideLayout) {
                     WidePersonDetailContent(
                         person = person,
-                        popularCredits = popularCredits,
+                        popularCredits = displayPopularCredits,
+                        animeTvCredits = animeTvCredits,
+                        animeMovieCredits = animeMovieCredits,
                         latestCredits = latestCredits,
                         upcomingCredits = upcomingCredits,
+                        isAnimePerson = isAnimePerson,
                         watchedKeys = watchedKeys,
                         onOpenMeta = onOpenMeta,
+                        onPosterLongClick = onPosterLongClick,
                         fallbackProfilePhoto = initialProfilePhoto,
                         avatarTransitionKey = avatarTransitionKey,
                         sharedTransitionScope = sharedTransitionScope,
@@ -323,18 +357,43 @@ private fun PersonDetailContent(
                                 animatedVisibilityScope = animatedVisibilityScope,
                             )
 
-                            if (popularCredits.isNotEmpty()) {
+                            if (displayPopularCredits.isNotEmpty()) {
                                 Spacer(modifier = Modifier.height(24.dp))
                                 DetailPosterRailSection(
-                                    title = stringResource(Res.string.person_popular),
-                                    items = popularCredits,
+                                    title = if (isAnimePerson) "Popular Works" else stringResource(Res.string.person_popular),
+                                    items = displayPopularCredits,
                                     watchedKeys = watchedKeys,
                                     headerHorizontalPadding = 20.dp,
                                     onPosterClick = onOpenMeta,
+                                    onPosterLongClick = onPosterLongClick,
                                 )
                             }
 
-                            if (latestCredits.isNotEmpty()) {
+                            if (animeTvCredits.isNotEmpty() && isAnimePerson) {
+                                Spacer(modifier = Modifier.height(24.dp))
+                                DetailPosterRailSection(
+                                    title = "Anime Series",
+                                    items = animeTvCredits,
+                                    watchedKeys = watchedKeys,
+                                    headerHorizontalPadding = 20.dp,
+                                    onPosterClick = onOpenMeta,
+                                    onPosterLongClick = onPosterLongClick,
+                                )
+                            }
+
+                            if (animeMovieCredits.isNotEmpty() && isAnimePerson) {
+                                Spacer(modifier = Modifier.height(24.dp))
+                                DetailPosterRailSection(
+                                    title = "Anime Movies & Specials",
+                                    items = animeMovieCredits,
+                                    watchedKeys = watchedKeys,
+                                    headerHorizontalPadding = 20.dp,
+                                    onPosterClick = onOpenMeta,
+                                    onPosterLongClick = onPosterLongClick,
+                                )
+                            }
+
+                            if (latestCredits.isNotEmpty() && !isAnimePerson) {
                                 Spacer(modifier = Modifier.height(24.dp))
                                 DetailPosterRailSection(
                                     title = stringResource(Res.string.person_latest),
@@ -342,6 +401,7 @@ private fun PersonDetailContent(
                                     watchedKeys = watchedKeys,
                                     headerHorizontalPadding = 20.dp,
                                     onPosterClick = onOpenMeta,
+                                    onPosterLongClick = onPosterLongClick,
                                 )
                             }
 
@@ -353,6 +413,7 @@ private fun PersonDetailContent(
                                     watchedKeys = watchedKeys,
                                     headerHorizontalPadding = 20.dp,
                                     onPosterClick = onOpenMeta,
+                                    onPosterLongClick = onPosterLongClick,
                                 )
                             }
 
@@ -383,10 +444,14 @@ private const val HAPTIC_TRIGGER_SCROLL_THRESHOLD_PX = 56
 private fun WidePersonDetailContent(
     person: PersonDetail,
     popularCredits: List<MetaPreview>,
+    animeTvCredits: List<MetaPreview> = emptyList(),
+    animeMovieCredits: List<MetaPreview> = emptyList(),
     latestCredits: List<MetaPreview>,
     upcomingCredits: List<MetaPreview>,
+    isAnimePerson: Boolean = false,
     watchedKeys: Set<String>,
     onOpenMeta: (MetaPreview) -> Unit,
+    onPosterLongClick: ((MetaPreview) -> Unit)? = null,
     fallbackProfilePhoto: String?,
     avatarTransitionKey: String,
     sharedTransitionScope: SharedTransitionScope?,
@@ -430,21 +495,45 @@ private fun WidePersonDetailContent(
             ) {
                 if (popularCredits.isNotEmpty()) {
                     DetailPosterRailSection(
-                        title = stringResource(Res.string.person_popular),
+                        title = if (isAnimePerson) "Popular Works" else stringResource(Res.string.person_popular),
                         items = popularCredits,
                         watchedKeys = watchedKeys,
                         headerHorizontalPadding = 0.dp,
                         onPosterClick = onOpenMeta,
+                        onPosterLongClick = onPosterLongClick,
                     )
                 }
 
-                if (latestCredits.isNotEmpty()) {
+                if (animeTvCredits.isNotEmpty() && isAnimePerson) {
+                    DetailPosterRailSection(
+                        title = "Anime Series",
+                        items = animeTvCredits,
+                        watchedKeys = watchedKeys,
+                        headerHorizontalPadding = 0.dp,
+                        onPosterClick = onOpenMeta,
+                        onPosterLongClick = onPosterLongClick,
+                    )
+                }
+
+                if (animeMovieCredits.isNotEmpty() && isAnimePerson) {
+                    DetailPosterRailSection(
+                        title = "Anime Movies & Specials",
+                        items = animeMovieCredits,
+                        watchedKeys = watchedKeys,
+                        headerHorizontalPadding = 0.dp,
+                        onPosterClick = onOpenMeta,
+                        onPosterLongClick = onPosterLongClick,
+                    )
+                }
+
+                if (latestCredits.isNotEmpty() && !isAnimePerson) {
                     DetailPosterRailSection(
                         title = stringResource(Res.string.person_latest),
                         items = latestCredits,
                         watchedKeys = watchedKeys,
                         headerHorizontalPadding = 0.dp,
                         onPosterClick = onOpenMeta,
+                        onPosterLongClick = onPosterLongClick,
                     )
                 }
 
@@ -455,6 +544,7 @@ private fun WidePersonDetailContent(
                         watchedKeys = watchedKeys,
                         headerHorizontalPadding = 0.dp,
                         onPosterClick = onOpenMeta,
+                        onPosterLongClick = onPosterLongClick,
                     )
                 }
             }

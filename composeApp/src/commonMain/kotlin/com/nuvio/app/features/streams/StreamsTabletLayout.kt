@@ -63,6 +63,8 @@ import org.jetbrains.compose.resources.stringResource
 
 @Composable
 internal fun TabletStreamsLayout(
+    type: String,
+    parentMetaId: String,
     isEpisode: Boolean,
     title: String,
     logo: String?,
@@ -77,6 +79,7 @@ internal fun TabletStreamsLayout(
     appendInstantServiceToDefaultName: Boolean,
     resumePositionMs: Long?,
     resumeProgressFraction: Float?,
+    onVideoIdChanged: (String) -> Unit = {},
     dominantColorEnabled: Boolean,
     onStreamSelected: (stream: StreamItem, resumePositionMs: Long?, resumeProgressFraction: Float?) -> Unit,
     onStreamLongPress: (StreamItem) -> Unit,
@@ -86,6 +89,8 @@ internal fun TabletStreamsLayout(
 ) {
     if (!isDesktop) {
         LegacyTabletStreamsLayout(
+            type = type,
+            parentMetaId = parentMetaId,
             isEpisode = isEpisode,
             title = title,
             logo = logo,
@@ -100,6 +105,7 @@ internal fun TabletStreamsLayout(
             appendInstantServiceToDefaultName = appendInstantServiceToDefaultName,
             resumePositionMs = resumePositionMs,
             resumeProgressFraction = resumeProgressFraction,
+            onVideoIdChanged = onVideoIdChanged,
             onStreamSelected = onStreamSelected,
             onStreamLongPress = onStreamLongPress,
             onStreamSecondaryClick = onStreamSecondaryClick,
@@ -263,6 +269,29 @@ internal fun TabletStreamsLayout(
                         )
                     }
 
+                    val anilistIdForStreamQuickBar = remember(parentMetaId) {
+                        com.nuvio.app.features.anilist.AnilistTrackerCoordinator.extractAnilistId(parentMetaId)
+                    }
+                    if (anilistIdForStreamQuickBar != null) {
+                        com.nuvio.app.features.anilist.streams.AnimeStreamIdQuickBar(
+                            anilistId = anilistIdForStreamQuickBar,
+                            seasonNumber = seasonNumber,
+                            episodeNumber = episodeNumber,
+                            isMovie = type == "movie",
+                            onOptionChanged = { newVideoId ->
+                                onVideoIdChanged(newVideoId)
+                                StreamsRepository.reload(
+                                    type = type,
+                                    videoId = newVideoId,
+                                    parentMetaId = parentMetaId,
+                                    season = seasonNumber,
+                                    episode = episodeNumber,
+                                    manualSelection = true,
+                                )
+                            },
+                        )
+                    }
+
                     ProviderFilterRow(
                         groups = uiState.groups,
                         selectedFilter = uiState.selectedFilter,
@@ -294,6 +323,8 @@ internal fun TabletStreamsLayout(
 
 @Composable
 private fun LegacyTabletStreamsLayout(
+    type: String,
+    parentMetaId: String,
     isEpisode: Boolean,
     title: String,
     logo: String?,
@@ -308,6 +339,7 @@ private fun LegacyTabletStreamsLayout(
     appendInstantServiceToDefaultName: Boolean,
     resumePositionMs: Long?,
     resumeProgressFraction: Float?,
+    onVideoIdChanged: (String) -> Unit = {},
     onStreamSelected: (stream: StreamItem, resumePositionMs: Long?, resumeProgressFraction: Float?) -> Unit,
     onStreamLongPress: (StreamItem) -> Unit,
     onStreamSecondaryClick: (StreamItem, Offset) -> Unit,
@@ -437,6 +469,28 @@ private fun LegacyTabletStreamsLayout(
                             )
                         }
 
+                        val anilistIdForStreamQuickBar = remember(parentMetaId) {
+                            com.nuvio.app.features.anilist.AnilistTrackerCoordinator.extractAnilistId(parentMetaId)
+                        }
+                        if (anilistIdForStreamQuickBar != null) {
+                            com.nuvio.app.features.anilist.streams.AnimeStreamIdQuickBar(
+                                anilistId = anilistIdForStreamQuickBar,
+                                seasonNumber = seasonNumber,
+                                episodeNumber = episodeNumber,
+                                isMovie = type == "movie",
+                                onOptionChanged = { newVideoId ->
+                                    onVideoIdChanged(newVideoId)
+                                    StreamsRepository.reload(
+                                        type = type,
+                                        videoId = newVideoId,
+                                        parentMetaId = parentMetaId,
+                                        season = seasonNumber,
+                                        episode = episodeNumber,
+                                        manualSelection = true,
+                                    )
+                                },
+                            )
+                        }
                         ProviderFilterRow(
                             groups = uiState.groups,
                             selectedFilter = uiState.selectedFilter,

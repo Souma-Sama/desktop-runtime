@@ -47,6 +47,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -188,6 +189,10 @@ internal fun detailScrolledBackgroundAlpha(
 fun MetaDetailsScreen(
     type: String,
     id: String,
+    initialTitle: String? = null,
+    initialPoster: String? = null,
+    initialBanner: String? = null,
+    initialLogo: String? = null,
     onBack: () -> Unit,
     onPlay: ((type: String, videoId: String, parentMetaId: String, parentMetaType: String, title: String, logo: String?, poster: String?, background: String?, seasonNumber: Int?, episodeNumber: Int?, episodeTitle: String?, episodeThumbnail: String?, pauseDescription: String?, resumePositionMs: Long?) -> Unit)? = null,
     onPlayManually: ((type: String, videoId: String, parentMetaId: String, parentMetaType: String, title: String, logo: String?, poster: String?, background: String?, seasonNumber: Int?, episodeNumber: Int?, episodeTitle: String?, episodeThumbnail: String?, pauseDescription: String?, resumePositionMs: Long?) -> Unit)? = null,
@@ -199,8 +204,10 @@ fun MetaDetailsScreen(
     modifier: Modifier = Modifier,
 ) {
     val uiState by MetaDetailsRepository.uiState.collectAsStateWithLifecycle()
-    val displayedMeta = uiState.meta?.takeIf { it.type == type && it.id == id }
-        ?: MetaDetailsRepository.peek(type, id)
+    val displayedMeta = uiState.meta?.takeIf {
+        (it.id == id || (com.nuvio.app.features.anilist.KaiHooks.isKaiMedia(it.id) && com.nuvio.app.features.anilist.KaiHooks.isKaiMedia(id) && com.nuvio.app.features.anilist.AnilistTrackerCoordinator.extractAnilistId(it.id) == com.nuvio.app.features.anilist.AnilistTrackerCoordinator.extractAnilistId(id))) &&
+        (it.type.equals(type, ignoreCase = true) || (it.type in listOf("series", "movie") && type in listOf("series", "movie", "anime", "show", "tv")))
+    } ?: MetaDetailsRepository.peek(type, id)
     val metaScreenSettingsUiState by remember {
         MetaScreenSettingsRepository.ensureLoaded()
         MetaScreenSettingsRepository.uiState
@@ -267,6 +274,7 @@ fun MetaDetailsScreen(
     val trackingListsUpdateFailedMessage = stringResource(Res.string.tracking_lists_update_failed)
     var episodeImdbRatings by remember(type, id) { mutableStateOf<Map<Pair<Int, Int>, Double>>(emptyMap()) }
     var deferredMetaWorkAllowed by remember(type, id) { mutableStateOf(false) }
+    var trackerSheetPreview by remember(type, id) { mutableStateOf<MetaPreview?>(null) }
 
     LaunchedEffect(
         displayedMeta?.id,
@@ -327,9 +335,29 @@ fun MetaDetailsScreen(
         displayedMeta != null &&
         displayedMeta.type.lowercase().let { it == "movie" || it == "series" || it == "show" || it == "tv" }
 
-    LaunchedEffect(displayedMeta?.id) {
+    val effectiveTitle = initialTitle?.takeIf { it.isNotBlank() }
+        ?: displayedMeta?.name.orEmpty()
+
+    LaunchedEffect(displayedMeta?.id, effectiveTitle, id) {
         deferredMetaWorkAllowed = false
-        if (displayedMeta != null) {
+        val isKaiItem = com.nuvio.app.features.anilist.KaiHooks.isKaiMedia(id) ||
+                        com.nuvio.app.features.anilist.KaiHooks.isKaiMedia(displayedMeta?.id)
+        if (isKaiItem && (effectiveTitle.isNotBlank() || displayedMeta != null || id.isNotBlank())) {
+            val videoIds = displayedMeta?.videos.orEmpty().map { it.id }
+            val effectiveMediaId = when {
+                com.nuvio.app.features.anilist.AnilistTrackerCoordinator.hasAnimeId(id) -> id
+                com.nuvio.app.features.anilist.AnilistTrackerCoordinator.hasAnimeId(displayedMeta?.id) -> displayedMeta?.id
+                else -> videoIds.firstOrNull { com.nuvio.app.features.anilist.AnilistTrackerCoordinator.hasAnimeId(it) } ?: (displayedMeta?.id ?: id)
+            }
+            val metaYear = displayedMeta?.releaseInfo?.take(4)?.toIntOrNull()
+            com.nuvio.app.features.anilist.AnilistTrackerCoordinator.loadForMedia(
+                title = effectiveTitle,
+                mediaId = effectiveMediaId,
+                year = metaYear,
+                genres = displayedMeta?.genres.orEmpty(),
+                country = displayedMeta?.country,
+                language = displayedMeta?.language,
+            )
             delay(250)
             deferredMetaWorkAllowed = true
         }
@@ -357,19 +385,27 @@ fun MetaDetailsScreen(
         isCommentsLoading = false
     }
 
-    LaunchedEffect(displayedMeta?.id, displayedMeta?.videos, deferredMetaWorkAllowed) {
+    LaunchedEffect(displayedMeta?.id, id) {
         val metaForRatings = displayedMeta
-        if (!deferredMetaWorkAllowed) return@LaunchedEffect
         if (metaForRatings == null || !metaForRatings.isSeriesLikeForEpisodeRatings()) {
             episodeImdbRatings = emptyMap()
             return@LaunchedEffect
         }
 
-        val imdbId = extractImdbId(metaForRatings.id) ?: extractImdbId(id)
+        val isAnilistItem = metaForRatings.id.startsWith("ani_") || id.startsWith("ani_")
+        val armMapping = if (isAnilistItem) {
+            val anilistId = com.nuvio.app.features.anilist.AnilistTrackerCoordinator.extractAnilistId(metaForRatings.id)
+                ?: com.nuvio.app.features.anilist.AnilistTrackerCoordinator.extractAnilistId(id)
+            anilistId?.let { com.nuvio.app.features.anilist.catalog.AnilistMetaDetailsResolver.resolveArmMapping(it) }
+        } else null
+
+        val imdbId = extractImdbId(metaForRatings.id)
+            ?: extractImdbId(id)
+            ?: armMapping?.imdbId
+
         val tmdbId = extractTmdbId(metaForRatings.id)
             ?: extractTmdbId(id)
-            ?: TmdbService.ensureTmdbId(metaForRatings.id, metaForRatings.type)?.toIntOrNull()
-            ?: TmdbService.ensureTmdbId(id, type)?.toIntOrNull()
+            ?: armMapping?.tmdbId
 
         if (imdbId == null && tmdbId == null) {
             episodeImdbRatings = emptyMap()
@@ -382,27 +418,8 @@ fun MetaDetailsScreen(
         )
     }
 
-    LaunchedEffect(type, id, displayedMeta, uiState.isLoading, autoLoadAttempted) {
-        if (!autoLoadAttempted && displayedMeta == null && !uiState.isLoading) {
-            autoLoadAttempted = true
-            MetaDetailsRepository.load(type, id)
-        }
-    }
-
-    LaunchedEffect(
-        type,
-        id,
-        displayedMeta?.id,
-        uiState.isLoading,
-        trackingSettingsUiState.moreLikeThisSource,
-        traktAuthUiState.mode,
-        tmdbSettingsUiState.enabled,
-        tmdbSettingsUiState.useMoreLikeThis,
-        tmdbSettingsUiState.language,
-    ) {
-        if (displayedMeta != null && !uiState.isLoading) {
-            MetaDetailsRepository.load(type, id)
-        }
+    LaunchedEffect(type, id) {
+        MetaDetailsRepository.load(type, id)
     }
 
     LaunchedEffect(networkStatusUiState.condition, displayedMeta, uiState.isLoading, type, id) {
@@ -630,9 +647,21 @@ fun MetaDetailsScreen(
                 val seriesPauseDescription = remember(seriesActionVideo) {
                     seriesActionVideo?.overview
                 }
-                val seriesStreamVideoId = remember(seriesAction, seriesActionVideo) {
+                val anilistPrefsForStreamId by com.nuvio.app.features.anilist.AnilistPreferencesRepository.preferences.collectAsState()
+                val seriesStreamVideoId = remember(seriesAction, seriesActionVideo, anilistPrefsForStreamId) {
                     val action = seriesAction ?: return@remember null
-                    seriesActionVideo?.id?.takeIf { it.isNotBlank() } ?: action.videoId
+                    val raw = seriesActionVideo?.id?.takeIf { it.isNotBlank() } ?: action.videoId
+                    if (meta.id.startsWith("ani_") || meta.id.startsWith("anilist:")) {
+                        com.nuvio.app.features.anilist.streams.AnimeStreamIdManager.resolvePlaybackVideoId(
+                            parentMetaId = meta.id,
+                            season = action.seasonNumber ?: 1,
+                            episode = action.episodeNumber ?: 1,
+                            isMovie = meta.type == "movie",
+                            fallbackVideoId = raw,
+                        )
+                    } else {
+                        raw
+                    }
                 }
                 val hasEpisodes = meta.videos.any { it.season != null || it.episode != null }
                 val episodeListGroupedEpisodes = remember(
@@ -789,9 +818,20 @@ fun MetaDetailsScreen(
                         }
 
                         else -> {
+                            val movieVideoId = if (meta.id.startsWith("ani_") || meta.id.startsWith("anilist:")) {
+                                com.nuvio.app.features.anilist.streams.AnimeStreamIdManager.resolvePlaybackVideoId(
+                                    parentMetaId = meta.id,
+                                    season = 1,
+                                    episode = 1,
+                                    isMovie = true,
+                                    fallbackVideoId = meta.id,
+                                )
+                            } else {
+                                meta.id
+                            }
                             onPlay?.invoke(
                                 meta.type,
-                                meta.id,
+                                movieVideoId,
                                 meta.id,
                                 meta.type,
                                 meta.name,
@@ -835,9 +875,20 @@ fun MetaDetailsScreen(
                                 }
 
                                 else -> {
+                                    val movieVideoId = if (meta.id.startsWith("ani_") || meta.id.startsWith("anilist:")) {
+                                        com.nuvio.app.features.anilist.streams.AnimeStreamIdManager.resolvePlaybackVideoId(
+                                            parentMetaId = meta.id,
+                                            season = 1,
+                                            episode = 1,
+                                            isMovie = true,
+                                            fallbackVideoId = meta.id,
+                                        )
+                                    } else {
+                                        meta.id
+                                    }
                                     manualPlay(
                                         meta.type,
-                                        meta.id,
+                                        movieVideoId,
                                         meta.id,
                                         meta.type,
                                         meta.name,
@@ -864,7 +915,18 @@ fun MetaDetailsScreen(
                         episodeNumber = episode,
                         fallbackVideoId = video.id,
                     )
-                    val streamVideoId = video.id.takeIf { it.isNotBlank() } ?: playbackVideoId
+                    val rawStreamVideoId = video.id.takeIf { it.isNotBlank() } ?: playbackVideoId
+                    val streamVideoId = if (meta.id.startsWith("ani_") || meta.id.startsWith("anilist:")) {
+                        com.nuvio.app.features.anilist.streams.AnimeStreamIdManager.resolvePlaybackVideoId(
+                            parentMetaId = meta.id,
+                            season = season ?: 1,
+                            episode = episode ?: 1,
+                            isMovie = meta.type == "movie",
+                            fallbackVideoId = rawStreamVideoId,
+                        )
+                    } else {
+                        rawStreamVideoId
+                    }
                     val savedProgress = watchProgressUiState.progressForVideo(
                         videoId = streamVideoId,
                         parentMetaId = meta.id,
@@ -898,7 +960,18 @@ fun MetaDetailsScreen(
                         episodeNumber = episode,
                         fallbackVideoId = video.id,
                     )
-                    val streamVideoId = video.id.takeIf { it.isNotBlank() } ?: playbackVideoId
+                    val rawStreamVideoId = video.id.takeIf { it.isNotBlank() } ?: playbackVideoId
+                    val streamVideoId = if (meta.id.startsWith("ani_") || meta.id.startsWith("anilist:")) {
+                        com.nuvio.app.features.anilist.streams.AnimeStreamIdManager.resolvePlaybackVideoId(
+                            parentMetaId = meta.id,
+                            season = season ?: 1,
+                            episode = episode ?: 1,
+                            isMovie = meta.type == "movie",
+                            fallbackVideoId = rawStreamVideoId,
+                        )
+                    } else {
+                        rawStreamVideoId
+                    }
                     val savedProgress = watchProgressUiState.progressForVideo(
                         videoId = streamVideoId,
                         parentMetaId = meta.id,
@@ -1095,6 +1168,7 @@ fun MetaDetailsScreen(
                             DesktopDetailBackdrop(
                                 meta = meta,
                                 viewportHeight = viewportHeight,
+                                scrollOffset = heroScrollOffset,
                                 heroTrailerSourceUrl = heroTrailerSourceUrl,
                                 heroTrailerSourceAudioUrl = heroTrailerSourceAudioUrl,
                                 heroTrailerReady = heroTrailerReady,
@@ -1119,6 +1193,7 @@ fun MetaDetailsScreen(
                                 DesktopDetailBackdrop(
                                     meta = meta,
                                     viewportHeight = viewportHeight,
+                                    scrollOffset = heroScrollOffset,
                                     heroTrailerSourceUrl = null,
                                     heroTrailerSourceAudioUrl = null,
                                     heroTrailerReady = false,
@@ -1176,6 +1251,7 @@ fun MetaDetailsScreen(
                                 ) {
                                     DesktopDetailHero(
                                         meta = meta,
+                                        title = effectiveTitle,
                                         playButtonLabel = playButtonLabel,
                                         isSaved = isSaved,
                                         isWatched = isWatched,
@@ -1200,6 +1276,7 @@ fun MetaDetailsScreen(
                                         },
                                     ),
                                     meta = meta,
+                                    title = effectiveTitle,
                                     isTablet = true,
                                     contentHorizontalPadding = desktopPageHorizontalPadding,
                                     contentMaxWidth = Dp.Unspecified,
@@ -1274,6 +1351,13 @@ fun MetaDetailsScreen(
                                     },
                                     onSeasonLongPress = { season -> selectedSeasonForActions = season },
                                     onOpenMeta = onOpenMeta,
+                                    onPosterLongClick = { item ->
+                                        val anilistPrefs = com.nuvio.app.features.anilist.AnilistPreferencesRepository.snapshot()
+                                        val isKai = com.nuvio.app.features.anilist.KaiHooks.isKaiMedia(item.id)
+                                        if (anilistPrefs.enabled && isKai) {
+                                            trackerSheetPreview = item
+                                        }
+                                    },
                                     onCastClick = onCastClick,
                                     onCompanyClick = onCompanyClick,
                                     sharedTransitionScope = sharedTransitionScope,
@@ -1324,6 +1408,7 @@ fun MetaDetailsScreen(
                                 configuredMetaSectionItems(
                                     settings = metaScreenSettingsUiState,
                                     meta = meta,
+                                    title = effectiveTitle,
                                     isTablet = isTablet,
                                     contentHorizontalPadding = contentHorizontalPadding,
                                     contentMaxWidth = if (isTablet) contentMaxWidth else Dp.Unspecified,
@@ -1395,6 +1480,13 @@ fun MetaDetailsScreen(
                                     onEpisodeLongPress = { video -> selectedEpisodeForActions = video },
                                     onSeasonLongPress = { season -> selectedSeasonForActions = season },
                                     onOpenMeta = onOpenMeta,
+                                    onPosterLongClick = { item ->
+                                        val anilistPrefs = com.nuvio.app.features.anilist.AnilistPreferencesRepository.snapshot()
+                                        val isKai = com.nuvio.app.features.anilist.KaiHooks.isKaiMedia(item.id)
+                                        if (anilistPrefs.enabled && isKai) {
+                                            trackerSheetPreview = item
+                                        }
+                                    },
                                     onCastClick = onCastClick,
                                     onCompanyClick = onCompanyClick,
                                     sharedTransitionScope = sharedTransitionScope,
@@ -1927,6 +2019,14 @@ fun MetaDetailsScreen(
                 },
             )
         }
+
+        trackerSheetPreview?.let { preview ->
+            com.nuvio.app.features.details.components.AnimeTrackerSheet(
+                preview = preview,
+                title = preview.name,
+                onDismiss = { trackerSheetPreview = null },
+            )
+        }
     }
 }
 
@@ -2014,6 +2114,7 @@ private fun MetaDetails.toMetaPreview(): MetaPreview =
 private fun LazyListScope.configuredMetaSectionItems(
     settings: MetaScreenSettingsUiState,
     meta: MetaDetails,
+    title: String? = null,
     isTablet: Boolean,
     contentHorizontalPadding: Dp,
     contentMaxWidth: Dp,
@@ -2057,6 +2158,7 @@ private fun LazyListScope.configuredMetaSectionItems(
     onEpisodeLongPress: (MetaVideo) -> Unit,
     onSeasonLongPress: (Int) -> Unit,
     onOpenMeta: ((MetaPreview) -> Unit)?,
+    onPosterLongClick: ((MetaPreview) -> Unit)? = null,
     onCastClick: ((MetaPerson, String?) -> Unit)?,
     onCompanyClick: ((MetaCompany, String) -> Unit)?,
     sharedTransitionScope: SharedTransitionScope?,
@@ -2095,6 +2197,7 @@ private fun LazyListScope.configuredMetaSectionItems(
                         tabLayout = forceTabLayout,
                     ),
                     meta = meta,
+                    title = title,
                     isTablet = isTablet,
                     horizontalScrollPadding = contentHorizontalPadding,
                     playButtonLabel = playButtonLabel,
@@ -2133,6 +2236,7 @@ private fun LazyListScope.configuredMetaSectionItems(
                     onEpisodeLongPress = onEpisodeLongPress,
                     onSeasonLongPress = onSeasonLongPress,
                     onOpenMeta = onOpenMeta,
+                    onPosterLongClick = onPosterLongClick,
                     onCastClick = onCastClick,
                     onCompanyClick = onCompanyClick,
                     sharedTransitionScope = sharedTransitionScope,
@@ -2299,25 +2403,31 @@ private fun metaSectionHasContent(
     comments: List<TraktCommentReview>,
     isCommentsLoading: Boolean,
     commentsError: String?,
-): Boolean =
-    when (key) {
+): Boolean {
+    val isAnilistItem = meta.id.startsWith("ani_") || meta.id.startsWith("anilist:")
+    return when (key) {
         MetaScreenSectionKey.ACTIONS -> true
         MetaScreenSectionKey.OVERVIEW -> true
         MetaScreenSectionKey.PRODUCTION -> hasProductionSection
         MetaScreenSectionKey.CAST -> meta.cast.isNotEmpty()
-        MetaScreenSectionKey.COMMENTS -> shouldShowComments && (isCommentsLoading || comments.isNotEmpty() || !commentsError.isNullOrBlank())
+        MetaScreenSectionKey.COMMENTS -> {
+            if (isAnilistItem) true
+            else shouldShowComments && (isCommentsLoading || comments.isNotEmpty() || !commentsError.isNullOrBlank())
+        }
         MetaScreenSectionKey.TRAILERS -> hasTrailersSection
         MetaScreenSectionKey.EPISODES -> hasEpisodes
         MetaScreenSectionKey.DETAILS -> hasAdditionalInfoSection
         MetaScreenSectionKey.COLLECTION -> !hasEpisodes && hasCollectionSection
-        MetaScreenSectionKey.MORE_LIKE_THIS -> hasMoreLikeThisSection
+        MetaScreenSectionKey.MORE_LIKE_THIS -> if (isAnilistItem) false else (hasMoreLikeThisSection || meta.relations.isNotEmpty())
     }
+}
 
 @Composable
 @OptIn(ExperimentalSharedTransitionApi::class)
 private fun ConfiguredMetaSections(
     settings: MetaScreenSettingsUiState,
     meta: MetaDetails,
+    title: String? = null,
     isTablet: Boolean,
     horizontalScrollPadding: Dp,
     playButtonLabel: String,
@@ -2356,6 +2466,7 @@ private fun ConfiguredMetaSections(
     onEpisodeLongPress: (MetaVideo) -> Unit,
     onSeasonLongPress: (Int) -> Unit,
     onOpenMeta: ((MetaPreview) -> Unit)?,
+    onPosterLongClick: ((MetaPreview) -> Unit)? = null,
     onCastClick: ((MetaPerson, String?) -> Unit)?,
     onCompanyClick: ((MetaCompany, String) -> Unit)?,
     sharedTransitionScope: SharedTransitionScope?,
@@ -2370,12 +2481,19 @@ private fun ConfiguredMetaSections(
             MetaScreenSectionKey.OVERVIEW -> true
             MetaScreenSectionKey.PRODUCTION -> hasProductionSection
             MetaScreenSectionKey.CAST -> meta.cast.isNotEmpty()
-            MetaScreenSectionKey.COMMENTS -> shouldShowComments && (isCommentsLoading || comments.isNotEmpty() || !commentsError.isNullOrBlank())
+            MetaScreenSectionKey.COMMENTS -> {
+                val isAnilistItem = meta.id.startsWith("ani_") || meta.id.startsWith("anilist:")
+                if (isAnilistItem) true
+                else shouldShowComments && (isCommentsLoading || comments.isNotEmpty() || !commentsError.isNullOrBlank())
+            }
             MetaScreenSectionKey.TRAILERS -> hasTrailersSection
             MetaScreenSectionKey.EPISODES -> hasEpisodes
             MetaScreenSectionKey.DETAILS -> hasAdditionalInfoSection
             MetaScreenSectionKey.COLLECTION -> !hasEpisodes && hasCollectionSection
-            MetaScreenSectionKey.MORE_LIKE_THIS -> hasMoreLikeThisSection
+            MetaScreenSectionKey.MORE_LIKE_THIS -> {
+                val isAnilistItem = meta.id.startsWith("ani_") || meta.id.startsWith("anilist:")
+                if (isAnilistItem) false else (hasMoreLikeThisSection || meta.relations.isNotEmpty())
+            }
         }
     }
 
@@ -2384,6 +2502,8 @@ private fun ConfiguredMetaSections(
         when (key) {
             MetaScreenSectionKey.ACTIONS -> {
                 DetailActionButtons(
+                    meta = meta,
+                    title = title,
                     playLabel = playButtonLabel,
                     secondaryActions = buildList {
                         add(DetailSecondaryAction(
@@ -2443,7 +2563,54 @@ private fun ConfiguredMetaSections(
                 )
             }
             MetaScreenSectionKey.COMMENTS -> {
-                if (shouldShowComments && (isCommentsLoading || comments.isNotEmpty() || !commentsError.isNullOrBlank())) {
+                val isAnilistItem = meta.id.startsWith("ani_") || meta.id.startsWith("anilist:")
+                val anilistMediaId = if (isAnilistItem) {
+                    com.nuvio.app.features.anilist.AnilistTrackerCoordinator.extractAnilistId(meta.id)
+                } else null
+
+                if (anilistMediaId != null && anilistMediaId > 0) {
+                    com.nuvio.app.features.anilist.ui.AnilistCommunityHub(
+                        mediaId = anilistMediaId,
+                        animeTitle = meta.name,
+                        relations = meta.relations,
+                        horizontalScrollPadding = horizontalScrollPadding,
+                        onAnimeClick = { targetAnilistId ->
+                            onOpenMeta?.invoke(
+                                com.nuvio.app.features.home.MetaPreview(
+                                    id = "anilist:$targetAnilistId",
+                                    type = "series",
+                                    name = "",
+                                )
+                            )
+                        },
+                        onRelationClick = { relation ->
+                            val isNonVideo = com.nuvio.app.features.anilist.KaiHooks.isNonVideoMedia(relation.format, relation.type)
+                            if (!isNonVideo) {
+                                onOpenMeta?.invoke(
+                                    com.nuvio.app.features.home.MetaPreview(
+                                        id = relation.id,
+                                        type = relation.type,
+                                        name = relation.title,
+                                        poster = relation.poster,
+                                    )
+                                )
+                            }
+                        },
+                        onRelationLongClick = { relation ->
+                            val isNonVideo = com.nuvio.app.features.anilist.KaiHooks.isNonVideoMedia(relation.format, relation.type)
+                            if (!isNonVideo) {
+                                onPosterLongClick?.invoke(
+                                    com.nuvio.app.features.home.MetaPreview(
+                                        id = relation.id,
+                                        type = relation.type,
+                                        name = relation.title,
+                                        poster = relation.poster,
+                                    )
+                                )
+                            }
+                        },
+                    )
+                } else if (shouldShowComments && (isCommentsLoading || comments.isNotEmpty() || !commentsError.isNullOrBlank())) {
                     DetailCommentsSection(
                         comments = comments,
                         isLoading = isCommentsLoading,
@@ -2501,25 +2668,62 @@ private fun ConfiguredMetaSections(
                         showHeader = showHeader,
                         horizontalScrollPadding = horizontalScrollPadding,
                         onPosterClick = onOpenMeta,
+                        onPosterLongClick = onPosterLongClick,
                     )
                 }
             }
             MetaScreenSectionKey.MORE_LIKE_THIS -> {
-                if (hasMoreLikeThisSection) {
-                    val sourceLabel = when (meta.moreLikeThisSource) {
-                        MoreLikeThisSource.TMDB -> stringResource(Res.string.detail_more_like_this_powered_by_tmdb)
-                        MoreLikeThisSource.TRAKT -> stringResource(Res.string.detail_more_like_this_powered_by_trakt)
-                        null -> null
+                val isAnilistItem = meta.id.startsWith("ani_") || meta.id.startsWith("anilist:")
+                if (!isAnilistItem) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(24.dp),
+                    ) {
+                        if (meta.relations.isNotEmpty()) {
+                            com.nuvio.app.features.details.components.DetailRelationsSection(
+                                relations = meta.relations,
+                                showHeader = true,
+                                horizontalScrollPadding = horizontalScrollPadding,
+                                onRelationClick = { relation ->
+                                    onOpenMeta?.invoke(
+                                        com.nuvio.app.features.home.MetaPreview(
+                                            id = relation.id,
+                                            type = relation.type,
+                                            name = relation.title,
+                                            poster = relation.poster,
+                                        )
+                                    )
+                                },
+                                onRelationLongClick = { relation ->
+                                    onPosterLongClick?.invoke(
+                                        com.nuvio.app.features.home.MetaPreview(
+                                            id = relation.id,
+                                            type = relation.type,
+                                            name = relation.title,
+                                            poster = relation.poster,
+                                        )
+                                    )
+                                },
+                            )
+                        }
+                        if (hasMoreLikeThisSection) {
+                            val sourceLabel = when (meta.moreLikeThisSource) {
+                                MoreLikeThisSource.TMDB -> stringResource(Res.string.detail_more_like_this_powered_by_tmdb)
+                                MoreLikeThisSource.TRAKT -> stringResource(Res.string.detail_more_like_this_powered_by_trakt)
+                                null -> null
+                            }
+                            DetailPosterRailSection(
+                                title = stringResource(Res.string.details_more_like_this),
+                                items = meta.moreLikeThis,
+                                watchedKeys = watchedKeys,
+                                showHeader = true,
+                                horizontalScrollPadding = horizontalScrollPadding,
+                                sourceLabel = sourceLabel,
+                                onPosterClick = onOpenMeta,
+                                onPosterLongClick = onPosterLongClick,
+                            )
+                        }
                     }
-                    DetailPosterRailSection(
-                        title = stringResource(Res.string.details_more_like_this),
-                        items = meta.moreLikeThis,
-                        watchedKeys = watchedKeys,
-                        showHeader = showHeader,
-                        horizontalScrollPadding = horizontalScrollPadding,
-                        sourceLabel = sourceLabel,
-                        onPosterClick = onOpenMeta,
-                    )
                 }
             }
         }
