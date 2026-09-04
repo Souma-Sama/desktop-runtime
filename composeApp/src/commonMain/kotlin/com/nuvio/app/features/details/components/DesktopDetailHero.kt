@@ -137,20 +137,36 @@ fun DesktopDetailBackdrop(
             scaleX = 1.05f
             scaleY = 1.05f
         }
-        val bottomSpreadStrength = ((21f / 9f - aspectRatio) / (5f / 9f)).coerceIn(0f, 1f)
-        val baseSideFade = Brush.horizontalGradient(
-            colorStops = arrayOf(
-                0.00f to sideGradientColor,
-                0.12f to sideGradientColor.copy(alpha = 0.98f * gradientIntensity),
-                0.34f to sideGradientColor.copy(alpha = opacity.overlayHeavy * gradientIntensity),
-                0.62f to sideGradientColor.copy(alpha = opacity.overlayLight * gradientIntensity),
-                0.86f to sideGradientColor.copy(alpha = opacity.subtle * gradientIntensity),
-                1.00f to Color.Transparent,
-            ),
-        )
+        val isKai = com.nuvio.app.features.anilist.KaiHooks.isKaiMedia(meta.id)
         val imageUrl = meta.background ?: meta.poster
+        val isAnilistBanner = imageUrl?.contains("anilistcdn/media/anime/banner", ignoreCase = true) == true
+        val isAnimeMedia = isKai || isAnilistBanner
+
+        val bottomSpreadStrength = if (isAnimeMedia) 0f else ((21f / 9f - aspectRatio) / (5f / 9f)).coerceIn(0f, 1f)
+        val baseSideFade = if (isAnimeMedia) {
+            Brush.horizontalGradient(
+                colorStops = arrayOf(
+                    0.00f to sideGradientColor.copy(alpha = 0.88f * gradientIntensity),
+                    0.08f to sideGradientColor.copy(alpha = 0.65f * gradientIntensity),
+                    0.18f to sideGradientColor.copy(alpha = 0.32f * gradientIntensity),
+                    0.30f to sideGradientColor.copy(alpha = 0.10f * gradientIntensity),
+                    0.45f to Color.Transparent,
+                    1.00f to Color.Transparent,
+                ),
+            )
+        } else {
+            Brush.horizontalGradient(
+                colorStops = arrayOf(
+                    0.00f to sideGradientColor,
+                    0.12f to sideGradientColor.copy(alpha = 0.98f * gradientIntensity),
+                    0.34f to sideGradientColor.copy(alpha = opacity.overlayHeavy * gradientIntensity),
+                    0.62f to sideGradientColor.copy(alpha = opacity.overlayLight * gradientIntensity),
+                    0.86f to sideGradientColor.copy(alpha = opacity.subtle * gradientIntensity),
+                    1.00f to Color.Transparent,
+                ),
+            )
+        }
         if (imageUrl != null) {
-            val isAnilistBanner = imageUrl.contains("anilistcdn/media/anime/banner", ignoreCase = true)
             if (isAnilistBanner) {
                 AsyncImage(
                     model = imageUrl,
@@ -163,7 +179,7 @@ fun DesktopDetailBackdrop(
                             scaleY = 1.05f
                             clip = true
                         },
-                    alignment = Alignment.Center,
+                    alignment = BiasAlignment(0f, DesktopBackdropVerticalBias),
                     contentScale = ContentScale.Crop,
                     desktopImageScaling = NuvioDesktopImageScaling.Disabled,
                 )
@@ -238,17 +254,30 @@ fun DesktopDetailBackdrop(
             modifier = Modifier
                 .fillMaxSize()
                 .drawWithCache {
-                    val baseBottomFade = Brush.verticalGradient(
-                        colorStops = arrayOf(
-                            0.00f to Color.Transparent,
-                            0.30f to Color.Transparent,
-                            0.48f to sideGradientColor.copy(alpha = 0.25f * gradientIntensity),
-                            0.65f to sideGradientColor.copy(alpha = 0.65f * gradientIntensity),
-                            0.82f to sideGradientColor.copy(alpha = 0.92f * gradientIntensity),
-                            0.95f to sideGradientColor,
-                            1.00f to sideGradientColor,
-                        ),
-                    )
+                    val baseBottomFade = if (isAnimeMedia) {
+                        Brush.verticalGradient(
+                            colorStops = arrayOf(
+                                0.00f to Color.Transparent,
+                                0.50f to Color.Transparent,
+                                0.66f to sideGradientColor.copy(alpha = 0.28f * gradientIntensity),
+                                0.82f to sideGradientColor.copy(alpha = 0.70f * gradientIntensity),
+                                0.95f to sideGradientColor,
+                                1.00f to sideGradientColor,
+                            ),
+                        )
+                    } else {
+                        Brush.verticalGradient(
+                            colorStops = arrayOf(
+                                0.00f to Color.Transparent,
+                                0.30f to Color.Transparent,
+                                0.48f to sideGradientColor.copy(alpha = 0.25f * gradientIntensity),
+                                0.65f to sideGradientColor.copy(alpha = 0.65f * gradientIntensity),
+                                0.82f to sideGradientColor.copy(alpha = 0.92f * gradientIntensity),
+                                0.95f to sideGradientColor,
+                                1.00f to sideGradientColor,
+                            ),
+                        )
+                    }
                     onDrawBehind {
                         drawRect(baseBottomFade)
                     }
