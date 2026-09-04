@@ -62,6 +62,7 @@ fun AnilistCommunityHub(
     relations: List<MetaRelation> = emptyList(),
     horizontalScrollPadding: Dp = 16.dp,
     onAnimeClick: ((Int) -> Unit)? = null,
+    onRecommendationLongClick: ((AnilistRecommendation) -> Unit)? = null,
     onRelationClick: ((MetaRelation) -> Unit)? = null,
     onRelationLongClick: ((MetaRelation) -> Unit)? = null,
 ) {
@@ -310,6 +311,7 @@ fun AnilistCommunityHub(
                                             onAnimeClick?.invoke(rec.mediaId)
                                         }
                                     },
+                                    onLongClick = onRecommendationLongClick?.let { { it(rec) } },
                                 )
                             }
                         }
@@ -337,7 +339,7 @@ fun AnilistCommunityHub(
                                 AnilistRelationCard(
                                     relation = relation,
                                     onClick = if (isMangaOrNovel) null else onRelationClick?.let { { it(relation) } },
-                                    onLongClick = if (isMangaOrNovel) null else onRelationLongClick?.let { { it(relation) } },
+                                    onLongClick = onRelationLongClick?.let { { it(relation) } },
                                 )
                             }
                         }

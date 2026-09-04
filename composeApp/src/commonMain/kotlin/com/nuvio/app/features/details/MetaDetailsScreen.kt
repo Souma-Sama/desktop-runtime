@@ -2583,6 +2583,17 @@ private fun ConfiguredMetaSections(
                                 )
                             )
                         },
+                        onRecommendationLongClick = { rec ->
+                            val isNonVideo = com.nuvio.app.features.anilist.KaiHooks.isNonVideoMedia(rec.format)
+                            onPosterLongClick?.invoke(
+                                com.nuvio.app.features.home.MetaPreview(
+                                    id = "anilist:${rec.mediaId}",
+                                    type = if (isNonVideo) (rec.format?.lowercase() ?: "manga") else "series",
+                                    name = rec.title,
+                                    poster = rec.coverImage,
+                                )
+                            )
+                        },
                         onRelationClick = { relation ->
                             val isNonVideo = com.nuvio.app.features.anilist.KaiHooks.isNonVideoMedia(relation.format, relation.type)
                             if (!isNonVideo) {
@@ -2597,17 +2608,14 @@ private fun ConfiguredMetaSections(
                             }
                         },
                         onRelationLongClick = { relation ->
-                            val isNonVideo = com.nuvio.app.features.anilist.KaiHooks.isNonVideoMedia(relation.format, relation.type)
-                            if (!isNonVideo) {
-                                onPosterLongClick?.invoke(
-                                    com.nuvio.app.features.home.MetaPreview(
-                                        id = relation.id,
-                                        type = relation.type,
-                                        name = relation.title,
-                                        poster = relation.poster,
-                                    )
+                            onPosterLongClick?.invoke(
+                                com.nuvio.app.features.home.MetaPreview(
+                                    id = relation.id,
+                                    type = relation.type,
+                                    name = relation.title,
+                                    poster = relation.poster,
                                 )
-                            }
+                            )
                         },
                     )
                 } else if (shouldShowComments && (isCommentsLoading || comments.isNotEmpty() || !commentsError.isNullOrBlank())) {

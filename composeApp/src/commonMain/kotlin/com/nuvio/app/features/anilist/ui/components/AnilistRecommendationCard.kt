@@ -1,6 +1,7 @@
 package com.nuvio.app.features.anilist.ui.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
@@ -37,6 +38,7 @@ import com.nuvio.app.features.anilist.recommendations.AnilistRecommendation
 fun AnilistRecommendationCard(
     recommendation: AnilistRecommendation,
     onClick: () -> Unit,
+    onLongClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val posterCardStyle = rememberPosterCardStyleUiState()
@@ -100,32 +102,44 @@ fun AnilistRecommendationCard(
             statusBadgeScale = anilistPrefs.posterStatusBadgeScale,
             titleLogoScale = anilistPrefs.posterTitleLogoScale,
             onClick = if (isMangaOrNovel) null else onClick,
+            onLongClick = onLongClick,
         )
 
-        // Community Agreement Badge (Top End)
+        // Community Agreement Badge (Top Start - offset past status ribbon if present)
         if (recommendation.rating > 0) {
+            val scale = anilistPrefs.posterRatingBadgeScale
+            val statusOffset = if (anilistStatus != null) {
+                (24.dp * anilistPrefs.posterStatusBadgeScale) + 4.dp
+            } else {
+                6.dp * scale
+            }
             Box(
                 modifier = Modifier
-                    .padding(6.dp)
-                    .clip(RoundedCornerShape(6.dp))
-                    .background(Color.Black.copy(alpha = 0.78f))
-                    .padding(horizontal = 5.dp, vertical = 2.dp)
-                    .align(Alignment.TopEnd),
+                    .padding(start = statusOffset, top = 6.dp * scale)
+                    .clip(RoundedCornerShape(4.dp * scale))
+                    .background(Color.Black.copy(alpha = 0.72f))
+                    .border(
+                        width = 0.5.dp * scale,
+                        color = Color.White.copy(alpha = 0.18f),
+                        shape = RoundedCornerShape(4.dp * scale),
+                    )
+                    .padding(horizontal = 4.dp * scale, vertical = 2.dp * scale)
+                    .align(Alignment.TopStart),
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Icon(
                         imageVector = Icons.Default.ArrowDropUp,
-                        contentDescription = null,
+                        contentDescription = "Recommendations",
                         tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(14.dp),
+                        modifier = Modifier.size(14.dp * scale),
                     )
                     Text(
                         text = if (recommendation.rating >= 1000) "${recommendation.rating / 1000}k" else "${recommendation.rating}",
                         style = MaterialTheme.typography.labelSmall.copy(
-                            fontWeight = FontWeight.ExtraBold,
-                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = (9 * scale).sp,
                         ),
                         color = Color.White,
                     )

@@ -108,13 +108,18 @@ fun AnilistRelationCard(
             statusBadgeScale = anilistPrefs.posterStatusBadgeScale,
             titleLogoScale = anilistPrefs.posterTitleLogoScale,
             onClick = if (isMangaOrNovel) null else onClick,
-            onLongClick = if (isMangaOrNovel) null else onLongClick,
+            onLongClick = onLongClick,
         )
 
         // Relation Type Badge (Prequel, Sequel, Side Story, Movie, etc.)
+        val statusOffset = if (anilistStatus != null) {
+            (24.dp * anilistPrefs.posterStatusBadgeScale) + 4.dp
+        } else {
+            6.dp
+        }
         Box(
             modifier = Modifier
-                .padding(6.dp)
+                .padding(start = statusOffset, top = 6.dp)
                 .clip(RoundedCornerShape(6.dp))
                 .background(
                     when (relation.relationType.uppercase()) {
