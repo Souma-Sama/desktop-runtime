@@ -36,7 +36,7 @@ actual object AppUpdaterPlatform {
     private val store = DesktopStorage.store(desktopUpdaterPreferencesName)
     actual val isDebugBuild: Boolean = false
 
-    actual val isSupported: Boolean = currentOs != DesktopUpdaterOs.UNKNOWN
+    actual val isSupported: Boolean = false
 
     actual val releaseSource: AppUpdateReleaseSource = AppUpdateReleaseSource(
         owner = "NuvioMedia",

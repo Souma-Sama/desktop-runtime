@@ -3,7 +3,7 @@ package com.nuvio.app.features.updater
 import com.nuvio.app.core.build.AppVersionConfig
 
 actual object AppUpdaterPlatform {
-    actual val isSupported: Boolean = true
+    actual val isSupported: Boolean = false
     actual val isDebugBuild: Boolean
         get() = AndroidAppUpdaterPlatform.isDebugBuild()
 
