@@ -9,7 +9,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 object AnilistAuthRepository {
-    const val CLIENT_ID = "49419"
+    const val CLIENT_ID = "41382"
     const val OAUTH_AUTHORIZE_URL = "https://anilist.co/api/v2/oauth/authorize?client_id=$CLIENT_ID&response_type=token"
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
