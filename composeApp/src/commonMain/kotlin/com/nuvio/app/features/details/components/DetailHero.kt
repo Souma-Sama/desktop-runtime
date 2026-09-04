@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.VolumeOff
 import androidx.compose.material.icons.rounded.VolumeUp
@@ -41,7 +42,9 @@ import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.nuvio.app.features.anilist.AnilistPreferencesRepository
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.graphics.painter.Painter
@@ -51,6 +54,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.draw.blur
+import androidx.compose.ui.draw.drawWithContent
 import com.nuvio.app.core.ui.NuvioDesktopImageScaling
 import com.nuvio.app.core.ui.NuvioAsyncImage as AsyncImage
 import com.nuvio.app.core.ui.desktopPageHorizontalPaddingForWidth
@@ -130,7 +134,7 @@ fun DetailHero(
                 val imageUrl = meta.background ?: meta.poster
                 val backdropScale = if (isTablet) 1f else 1.08f
                 if (imageUrl != null) {
-                    val isAnilistBanner = imageUrl.contains("anilistcdn/media/anime/banner", ignoreCase = true)
+                    val isAnilistBanner = isAnilistItem && (imageUrl.contains("anilistcdn/media/anime/banner", ignoreCase = true) || imageUrl.contains("/banner/", ignoreCase = true))
                     if (isAnilistBanner) {
                         AsyncImage(
                             model = imageUrl,
@@ -156,15 +160,55 @@ fun DetailHero(
                         model = if (isDesktop) originalTmdbImageUrl(imageUrl) else imageUrl,
                         contentDescription = meta.name,
                         modifier = Modifier
-                            .align(Alignment.TopCenter)
+                            .align(if (isAnilistBanner) Alignment.Center else if (isTablet) Alignment.TopCenter else Alignment.Center)
                             .fillMaxWidth()
-                            .height(heroHeight)
-                            .heroStretchZoom(stretchPx)
-                            .graphicsLayer {
-                                translationY = scrollOffset() * 0.5f
-                                scaleX = backdropScale
-                                scaleY = backdropScale
-                            },
+                            .then(
+                                if (isAnilistBanner) {
+                                    Modifier
+                                        .wrapContentHeight()
+                                        .heroStretchZoom(stretchPx)
+                                        .graphicsLayer {
+                                            translationY = scrollOffset() * 0.5f
+                                            scaleX = backdropScale
+                                            scaleY = backdropScale
+                                            compositingStrategy = CompositingStrategy.Offscreen
+                                        }
+                                        .drawWithContent {
+                                            drawContent()
+                                            drawRect(
+                                                brush = Brush.verticalGradient(
+                                                    colorStops = arrayOf(
+                                                        0.00f to Color.Transparent,
+                                                        0.14f to Color.Black,
+                                                        0.86f to Color.Black,
+                                                        1.00f to Color.Transparent,
+                                                    ),
+                                                ),
+                                                blendMode = BlendMode.DstIn,
+                                            )
+                                            drawRect(
+                                                brush = Brush.horizontalGradient(
+                                                    colorStops = arrayOf(
+                                                        0.00f to Color.Transparent,
+                                                        0.04f to Color.Black,
+                                                        0.96f to Color.Black,
+                                                        1.00f to Color.Transparent,
+                                                    ),
+                                                ),
+                                                blendMode = BlendMode.DstIn,
+                                            )
+                                        }
+                                } else {
+                                    Modifier
+                                        .height(heroHeight)
+                                        .heroStretchZoom(stretchPx)
+                                        .graphicsLayer {
+                                            translationY = scrollOffset() * 0.5f
+                                            scaleX = backdropScale
+                                            scaleY = backdropScale
+                                        }
+                                }
+                            ),
                         alignment = if (isAnilistBanner) Alignment.Center else if (isTablet) Alignment.TopCenter else Alignment.Center,
                         contentScale = if (isAnilistBanner) ContentScale.FillWidth else ContentScale.Crop,
                         desktopImageScaling = NuvioDesktopImageScaling.Disabled,
