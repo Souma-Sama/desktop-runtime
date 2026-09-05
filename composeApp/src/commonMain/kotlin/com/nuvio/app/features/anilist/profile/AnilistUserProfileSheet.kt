@@ -535,8 +535,8 @@ private fun AniHyouHeaderRow(
                             val nextTheme = when (themeTokens.theme) {
                                 AnilistTrackerTheme.FROSTED_GLASS -> AnilistTrackerTheme.WATER_GLASS
                                 AnilistTrackerTheme.WATER_GLASS -> AnilistTrackerTheme.MIDNIGHT_GLASS
-                                AnilistTrackerTheme.MIDNIGHT_GLASS -> AnilistTrackerTheme.SIDEBAR_GLASS
-                                AnilistTrackerTheme.SIDEBAR_GLASS -> AnilistTrackerTheme.FROSTED_GLASS
+                                AnilistTrackerTheme.MIDNIGHT_GLASS -> AnilistTrackerTheme.SMOKED_GLASS
+                                AnilistTrackerTheme.SMOKED_GLASS -> AnilistTrackerTheme.FROSTED_GLASS
                             }
                             AnilistPreferencesRepository.setTrackerTheme(nextTheme)
                         },

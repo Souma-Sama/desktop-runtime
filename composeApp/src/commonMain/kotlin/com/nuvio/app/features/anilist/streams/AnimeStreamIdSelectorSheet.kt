@@ -112,15 +112,35 @@ fun AnimeStreamIdSelectorSheet(
                 onDismissRequest = onDismiss,
                 properties = DialogProperties(usePlatformDefaultWidth = false),
             ) {
-                Surface(
+                Box(
                     modifier = Modifier
                         .widthIn(min = 480.dp, max = 540.dp)
-                        .clip(ShapeDialog),
-                    shape = ShapeDialog,
-                    color = themeTokens.dialogBackground,
-                    border = BorderStroke(1.dp, themeTokens.dialogBorder),
-                    shadowElevation = 24.dp,
+                        .shadow(
+                            elevation = 20.dp,
+                            shape = ShapeDialog,
+                            spotColor = Color.Black.copy(alpha = 0.50f),
+                            ambientColor = Color.Black.copy(alpha = 0.30f),
+                        )
+                        .clip(ShapeDialog)
+                        .background(themeTokens.dialogBackground)
+                        .border(1.dp, themeTokens.dialogBorder, ShapeDialog),
                 ) {
+                    // Top highlight sheen for liquid smoked glass
+                    Box(
+                        modifier = Modifier
+                            .matchParentSize()
+                            .clip(ShapeDialog)
+                            .background(
+                                brush = Brush.verticalGradient(
+                                    colors = listOf(
+                                        Color.White.copy(alpha = 0.12f),
+                                        Color.White.copy(alpha = 0.02f),
+                                        Color.Transparent,
+                                    ),
+                                ),
+                            ),
+                    )
+
                     StreamIdSelectorContent(
                         anilistId = anilistId,
                         seasonNumber = seasonNumber,
@@ -311,8 +331,8 @@ private fun StreamIdSelectorContent(
                                 val nextTheme = when (themeTokens.theme) {
                                     AnilistTrackerTheme.FROSTED_GLASS -> AnilistTrackerTheme.WATER_GLASS
                                     AnilistTrackerTheme.WATER_GLASS -> AnilistTrackerTheme.MIDNIGHT_GLASS
-                                    AnilistTrackerTheme.MIDNIGHT_GLASS -> AnilistTrackerTheme.SIDEBAR_GLASS
-                                    AnilistTrackerTheme.SIDEBAR_GLASS -> AnilistTrackerTheme.FROSTED_GLASS
+                                    AnilistTrackerTheme.MIDNIGHT_GLASS -> AnilistTrackerTheme.SMOKED_GLASS
+                                    AnilistTrackerTheme.SMOKED_GLASS -> AnilistTrackerTheme.FROSTED_GLASS
                                 }
                                 AnilistPreferencesRepository.setTrackerTheme(nextTheme)
                             },

@@ -536,49 +536,48 @@ private val MidnightGlassTokens by lazy {
     )
 }
 
-private val SidebarGlassTokens by lazy {
+private val SmokedGlassTokens by lazy {
     val selectedBgs = TrackerStatusItems.associate { item ->
         item.color to Brush.verticalGradient(
-            listOf(item.color.copy(alpha = 0.32f), item.color.copy(alpha = 0.14f)),
+            listOf(Color.White, Color(0xFFF2F4F7)),
         )
     }
     val selectedBorders = TrackerStatusItems.associate { item ->
         item.color to Brush.verticalGradient(
-            listOf(item.color.copy(alpha = 0.88f), item.color.copy(alpha = 0.50f)),
+            listOf(Color.White, Color.White.copy(alpha = 0.85f)),
         )
     }
     TrackerThemeTokens(
-        theme = AnilistTrackerTheme.SIDEBAR_GLASS,
-        dialogBackground = Color(0xFF14151C).copy(alpha = 0.88f),
+        theme = AnilistTrackerTheme.SMOKED_GLASS,
+        dialogBackground = Color(0xFF14151C).copy(alpha = 0.58f),
         dialogBorder = Brush.verticalGradient(
             listOf(
-                Color.White.copy(alpha = 0.32f),
-                Color.White.copy(alpha = 0.12f),
-                Color.White.copy(alpha = 0.05f),
-                Color.White.copy(alpha = 0.16f),
+                Color.White.copy(alpha = 0.28f),
+                Color.White.copy(alpha = 0.10f),
+                Color.White.copy(alpha = 0.04f),
+                Color.White.copy(alpha = 0.14f),
             ),
         ),
         headerBackground = Brush.verticalGradient(
             listOf(
-                Color(0xFF1E202B).copy(alpha = 0.85f),
-                Color(0xFF14151C).copy(alpha = 0.85f),
+                Color.White.copy(alpha = 0.09f),
+                Color.White.copy(alpha = 0.02f),
             ),
         ),
         headerHairline = Brush.horizontalGradient(
             listOf(
                 Color.Transparent,
-                Color.White.copy(alpha = 0.15f),
-                Color.White.copy(alpha = 0.05f),
+                Color.White.copy(alpha = 0.16f),
                 Color.Transparent,
             ),
         ),
         cardBackground = Brush.verticalGradient(
             listOf(
-                Color(0xFF1C1E28).copy(alpha = 0.60f),
-                Color(0xFF14151D).copy(alpha = 0.60f),
+                Color.White.copy(alpha = 0.07f),
+                Color.White.copy(alpha = 0.03f),
             ),
         ),
-        cardBackgroundColor = Color(0xFF1A1C26).copy(alpha = 0.65f),
+        cardBackgroundColor = Color.White.copy(alpha = 0.05f),
         cardBorder = Brush.verticalGradient(
             listOf(
                 Color.White.copy(alpha = 0.18f),
@@ -588,12 +587,11 @@ private val SidebarGlassTokens by lazy {
         cardGleam = Brush.horizontalGradient(
             listOf(
                 Color.Transparent,
-                Color.White.copy(alpha = 0.14f),
-                Color.White.copy(alpha = 0.04f),
+                Color.White.copy(alpha = 0.16f),
                 Color.Transparent,
             ),
         ),
-        subtleChipBackground = Color.White.copy(alpha = 0.07f),
+        subtleChipBackground = Color.White.copy(alpha = 0.08f),
         subtleChipBorder = Brush.verticalGradient(
             listOf(
                 Color.White.copy(alpha = 0.22f),
@@ -602,21 +600,21 @@ private val SidebarGlassTokens by lazy {
         ),
         stepperBackground = Brush.verticalGradient(
             listOf(
-                Color(0xFF1C1E28).copy(alpha = 0.75f),
-                Color(0xFF14151D).copy(alpha = 0.75f),
+                Color.White.copy(alpha = 0.08f),
+                Color.White.copy(alpha = 0.035f),
             ),
         ),
         stepperBorder = Brush.verticalGradient(
             listOf(
-                Color.White.copy(alpha = 0.22f),
-                Color.White.copy(alpha = 0.07f),
+                Color.White.copy(alpha = 0.20f),
+                Color.White.copy(alpha = 0.06f),
             ),
         ),
         stepperDivider = Color.White.copy(alpha = 0.12f),
         actionButtonBackground = Brush.verticalGradient(
             listOf(
-                Color(0xFF222533).copy(alpha = 0.82f),
-                Color(0xFF161824).copy(alpha = 0.82f),
+                Color.White.copy(alpha = 0.12f),
+                Color.White.copy(alpha = 0.05f),
             ),
         ),
         actionButtonBorder = Brush.verticalGradient(
@@ -627,19 +625,19 @@ private val SidebarGlassTokens by lazy {
         ),
         statusUnselectedBg = Brush.verticalGradient(
             listOf(
-                Color(0xFF1A1C26).copy(alpha = 0.60f),
-                Color(0xFF13141C).copy(alpha = 0.60f),
+                Color.White.copy(alpha = 0.06f),
+                Color.White.copy(alpha = 0.025f),
             ),
         ),
         statusUnselectedBorder = Brush.verticalGradient(
             listOf(
-                Color.White.copy(alpha = 0.14f),
-                Color.White.copy(alpha = 0.04f),
+                Color.White.copy(alpha = 0.15f),
+                Color.White.copy(alpha = 0.05f),
             ),
         ),
         statusSelectedBgs = selectedBgs,
         statusSelectedBorders = selectedBorders,
-        scrimAlpha = 0.50f,
+        scrimAlpha = 0.30f,
     )
 }
 
@@ -647,7 +645,7 @@ fun getTrackerThemeTokens(theme: AnilistTrackerTheme): TrackerThemeTokens = when
     AnilistTrackerTheme.FROSTED_GLASS -> FrostedGlassTokens
     AnilistTrackerTheme.WATER_GLASS -> WaterGlassTokens
     AnilistTrackerTheme.MIDNIGHT_GLASS -> MidnightGlassTokens
-    AnilistTrackerTheme.SIDEBAR_GLASS -> SidebarGlassTokens
+    AnilistTrackerTheme.SMOKED_GLASS -> SmokedGlassTokens
 }
 
 val LocalTrackerThemeTokens = staticCompositionLocalOf {
@@ -865,16 +863,36 @@ fun AnimeTrackerSheet(
             onDismissRequest = onDismiss,
             properties = DialogProperties(usePlatformDefaultWidth = false),
         ) {
-            Surface(
+            Box(
                 modifier = Modifier
                     .fillMaxHeight(0.88f)
                     .widthIn(min = 480.dp, max = 530.dp)
-                    .clip(ShapeDialog),
-                shape = ShapeDialog,
-                color = themeTokens.dialogBackground,
-                border = BorderStroke(1.dp, themeTokens.dialogBorder),
-                shadowElevation = 24.dp,
+                    .shadow(
+                        elevation = 20.dp,
+                        shape = ShapeDialog,
+                        spotColor = Color.Black.copy(alpha = 0.50f),
+                        ambientColor = Color.Black.copy(alpha = 0.30f),
+                    )
+                    .clip(ShapeDialog)
+                    .background(themeTokens.dialogBackground)
+                    .border(1.dp, themeTokens.dialogBorder, ShapeDialog),
             ) {
+                // Subtle liquid glass top highlight sheen (identical to FloatingGlassDesktopSidebar)
+                Box(
+                    modifier = Modifier
+                        .matchParentSize()
+                        .clip(ShapeDialog)
+                        .background(
+                            brush = Brush.verticalGradient(
+                                colors = listOf(
+                                    Color.White.copy(alpha = 0.14f),
+                                    Color.White.copy(alpha = 0.03f),
+                                    Color.Transparent,
+                                ),
+                            ),
+                        ),
+                )
+
                 AnimeTrackerSheetContent(
                     meta = meta,
                     preview = preview,
@@ -1058,8 +1076,8 @@ fun AnimeTrackerSheetContent(
                                     val nextTheme = when (currentTheme) {
                                         AnilistTrackerTheme.FROSTED_GLASS -> AnilistTrackerTheme.WATER_GLASS
                                         AnilistTrackerTheme.WATER_GLASS -> AnilistTrackerTheme.MIDNIGHT_GLASS
-                                        AnilistTrackerTheme.MIDNIGHT_GLASS -> AnilistTrackerTheme.SIDEBAR_GLASS
-                                        AnilistTrackerTheme.SIDEBAR_GLASS -> AnilistTrackerTheme.FROSTED_GLASS
+                                        AnilistTrackerTheme.MIDNIGHT_GLASS -> AnilistTrackerTheme.SMOKED_GLASS
+                                        AnilistTrackerTheme.SMOKED_GLASS -> AnilistTrackerTheme.FROSTED_GLASS
                                     }
                                     com.nuvio.app.features.anilist.AnilistPreferencesRepository.setTrackerTheme(nextTheme)
                                 },
@@ -1499,12 +1517,28 @@ fun AnimeTrackerSheetContent(
                                 themeTokens.statusUnselectedBorder
                             }
 
-                            Box(
-                                modifier = Modifier
+                            val isSmokedGlass = themeTokens.theme == AnilistTrackerTheme.SMOKED_GLASS
+                            val tileModifier = if (isSelected && isSmokedGlass) {
+                                Modifier
+                                    .weight(1f)
+                                    .shadow(
+                                        elevation = 6.dp,
+                                        shape = ShapeTile,
+                                        spotColor = Color.White.copy(alpha = 0.30f),
+                                    )
+                                    .clip(ShapeTile)
+                                    .background(bgBrush)
+                                    .border(1.dp, borderBrush, ShapeTile)
+                            } else {
+                                Modifier
                                     .weight(1f)
                                     .clip(ShapeTile)
                                     .background(bgBrush)
                                     .border(if (isSelected) 1.5.dp else 1.dp, borderBrush, ShapeTile)
+                            }
+
+                            Box(
+                                modifier = tileModifier
                                     .clickable(role = Role.Button) {
                                         hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                         AnilistTrackerCoordinator.updateStatus(item.status)
@@ -1521,11 +1555,16 @@ fun AnimeTrackerSheetContent(
                                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                                         modifier = Modifier.weight(1f, fill = false),
                                     ) {
+                                        val iconColor = when {
+                                            isSelected && isSmokedGlass -> Color(0xFF12131A)
+                                            isSelected -> item.color
+                                            else -> Color.White.copy(alpha = 0.65f)
+                                        }
                                         Icon(
                                             imageVector = item.icon,
                                             contentDescription = null,
                                             modifier = Modifier.size(16.dp),
-                                            tint = if (isSelected) item.color else Color.White.copy(alpha = 0.65f),
+                                            tint = iconColor,
                                         )
                                         val statusLabel = when (item.status) {
                                             AnilistMediaListStatus.CURRENT -> if (isReading) "Reading" else "Watching"
@@ -1533,13 +1572,18 @@ fun AnimeTrackerSheetContent(
                                             AnilistMediaListStatus.REPEATING -> if (isReading) "Rereading" else "Rewatching"
                                             else -> item.status.label
                                         }
+                                        val textColor = when {
+                                            isSelected && isSmokedGlass -> Color(0xFF12131A)
+                                            isSelected -> item.color
+                                            else -> Color.White.copy(alpha = 0.82f)
+                                        }
                                         Text(
                                             text = statusLabel,
                                             style = MaterialTheme.typography.labelMedium.copy(
                                                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                                                 fontSize = 12.5.sp,
                                             ),
-                                            color = if (isSelected) item.color else Color.White.copy(alpha = 0.82f),
+                                            color = textColor,
                                             maxLines = 1,
                                             overflow = TextOverflow.Ellipsis,
                                         )
@@ -1551,7 +1595,7 @@ fun AnimeTrackerSheetContent(
                                                 .size(7.dp)
                                                 .clip(ShapePill)
                                                 .background(item.color)
-                                                .border(1.dp, Color.White.copy(alpha = 0.50f), ShapePill),
+                                                .border(1.dp, if (isSmokedGlass) Color.Black.copy(alpha = 0.20f) else Color.White.copy(alpha = 0.50f), ShapePill),
                                         )
                                     }
                                 }
@@ -2622,11 +2666,12 @@ private fun TrackerProgressStepperSection(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(4.dp),
                     ) {
+                        val allColor = if (tokens.theme == AnilistTrackerTheme.SMOKED_GLASS) Color.White else accentColor
                         Icon(
                             imageVector = Icons.Default.Check,
                             contentDescription = null,
                             modifier = Modifier.size(14.dp),
-                            tint = accentColor,
+                            tint = allColor,
                         )
                         Text(
                             text = "All",
@@ -2634,7 +2679,7 @@ private fun TrackerProgressStepperSection(
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 12.sp,
                             ),
-                            color = accentColor,
+                            color = allColor,
                         )
                     }
                 }
