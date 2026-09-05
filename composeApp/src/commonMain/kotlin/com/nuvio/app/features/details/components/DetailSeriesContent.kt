@@ -1553,6 +1553,7 @@ internal fun cleanDisplayEpisodeTitle(rawTitle: String?, episodeNum: Int?): Stri
     val cleaned = trimmed
         .replace(Regex("^(?:Episode|Ep\\.?|E|Special|#)\\s*\\d+\\s*[-:–—|~]\\s*", RegexOption.IGNORE_CASE), "")
         .replace(Regex("^(?:Episode|Ep\\.?|E|Special|#)\\s*\\d+\\s*$", RegexOption.IGNORE_CASE), "")
+        .replace(Regex("^(?:Mini Anime.*?/\\s*(?:(?:Vol\\.?|Special Edition)\\s*[:\\d]*\\s*[:\\-–—]\\s*)?|.*?\\s+/\\s*(?:Vol\\.?|Special Edition)\\s*[:\\d]*\\s*[:\\-–—]\\s*|Vol\\.?\\s*\\d+\\s*[:\\-–—]\\s*)", RegexOption.IGNORE_CASE), "")
         .trim()
     return cleaned.ifEmpty { if (episodeNum != null) "Episode $episodeNum" else trimmed }
 }
