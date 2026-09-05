@@ -103,5 +103,6 @@ enum class AnilistTrackerTheme(val label: String) {
     FROSTED_GLASS("Frosted Glass"),
     WATER_GLASS("Water Glass"),
     MIDNIGHT_GLASS("Midnight Glass"),
+    SIDEBAR_GLASS("Sidebar Glass"),
 }
 

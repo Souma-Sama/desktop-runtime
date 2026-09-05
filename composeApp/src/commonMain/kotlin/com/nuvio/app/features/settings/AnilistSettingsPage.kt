@@ -974,6 +974,7 @@ private fun AnilistDisplayPreferencesSection(isTablet: Boolean) {
                         AnilistTrackerTheme.FROSTED_GLASS -> "Frosted Acrylic: Balanced diffusion, high text legibility, and refined specular sheen"
                         AnilistTrackerTheme.WATER_GLASS -> "Water Glass: Translucent liquid caustics, vibrant specular refraction, and edge gleam"
                         AnilistTrackerTheme.MIDNIGHT_GLASS -> "Midnight Glass: Deep obsidian dark glass with high contrast and vivid status accents"
+                        AnilistTrackerTheme.SIDEBAR_GLASS -> "Sidebar Glass: Smoked liquid glass dock aesthetic with pure white accents and ambient glow"
                     },
                 )
             }

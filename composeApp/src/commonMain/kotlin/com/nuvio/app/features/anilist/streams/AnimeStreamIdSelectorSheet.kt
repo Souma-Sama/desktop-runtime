@@ -25,6 +25,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -45,6 +46,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -58,6 +61,7 @@ import com.nuvio.app.core.ui.appIconPainter
 import com.nuvio.app.core.ui.dismissNuvioBottomSheet
 import com.nuvio.app.core.ui.nuvioDesktopDragScroll
 import com.nuvio.app.features.anilist.AnilistPreferencesRepository
+import com.nuvio.app.features.anilist.AnilistTrackerTheme
 import com.nuvio.app.features.anilist.catalog.AnilistMetaDetailsResolver
 import com.nuvio.app.features.details.components.AnilistEmblemBgBrush
 import com.nuvio.app.features.details.components.AnilistEmblemBorderBrush
@@ -291,22 +295,54 @@ private fun StreamIdSelectorContent(
                     }
                 }
 
-                // Close Button
-                Box(
-                    modifier = Modifier
-                        .size(30.dp)
-                        .clip(ShapePill)
-                        .background(themeTokens.subtleChipBackground)
-                        .border(1.dp, themeTokens.subtleChipBorder, ShapePill)
-                        .clickable(role = Role.Button, onClick = onClose),
-                    contentAlignment = Alignment.Center,
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Close,
-                        contentDescription = "Close",
-                        modifier = Modifier.size(15.dp),
-                        tint = Color.White.copy(alpha = 0.85f),
-                    )
+                    val hapticFeedback = LocalHapticFeedback.current
+                    Box(
+                        modifier = Modifier
+                            .size(30.dp)
+                            .clip(ShapePill)
+                            .background(themeTokens.subtleChipBackground)
+                            .border(1.dp, themeTokens.subtleChipBorder, ShapePill)
+                            .clickable(role = Role.Button) {
+                                hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                val nextTheme = when (themeTokens.theme) {
+                                    AnilistTrackerTheme.FROSTED_GLASS -> AnilistTrackerTheme.WATER_GLASS
+                                    AnilistTrackerTheme.WATER_GLASS -> AnilistTrackerTheme.MIDNIGHT_GLASS
+                                    AnilistTrackerTheme.MIDNIGHT_GLASS -> AnilistTrackerTheme.SIDEBAR_GLASS
+                                    AnilistTrackerTheme.SIDEBAR_GLASS -> AnilistTrackerTheme.FROSTED_GLASS
+                                }
+                                AnilistPreferencesRepository.setTrackerTheme(nextTheme)
+                            },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Palette,
+                            contentDescription = "Theme: ${themeTokens.theme.label}",
+                            modifier = Modifier.size(15.dp),
+                            tint = Color.White.copy(alpha = 0.85f),
+                        )
+                    }
+
+                    // Close Button
+                    Box(
+                        modifier = Modifier
+                            .size(30.dp)
+                            .clip(ShapePill)
+                            .background(themeTokens.subtleChipBackground)
+                            .border(1.dp, themeTokens.subtleChipBorder, ShapePill)
+                            .clickable(role = Role.Button, onClick = onClose),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "Close",
+                            modifier = Modifier.size(15.dp),
+                            tint = Color.White.copy(alpha = 0.85f),
+                        )
+                    }
                 }
             }
         }

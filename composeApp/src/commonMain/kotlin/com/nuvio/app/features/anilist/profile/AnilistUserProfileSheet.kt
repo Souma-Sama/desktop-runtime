@@ -35,6 +35,7 @@ import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.rounded.BarChart
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.People
 import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material3.Button
@@ -62,7 +63,10 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -77,6 +81,7 @@ import com.nuvio.app.core.ui.dismissNuvioBottomSheet
 import com.nuvio.app.core.ui.nuvioHorizontalScroll
 import com.nuvio.app.features.anilist.AnilistAuthRepository
 import com.nuvio.app.features.anilist.AnilistPreferencesRepository
+import com.nuvio.app.features.anilist.AnilistTrackerTheme
 import com.nuvio.app.features.anilist.community.AnilistContentBlockItem
 import com.nuvio.app.features.anilist.community.parseAnilistRichContent
 import com.nuvio.app.features.details.components.LocalTrackerThemeTokens
@@ -515,6 +520,34 @@ private fun AniHyouHeaderRow(
                             )
                         }
                     }
+                }
+
+                // Theme switcher palette button
+                val hapticFeedback = LocalHapticFeedback.current
+                Box(
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(CircleShape)
+                        .background(themeTokens.subtleChipBackground)
+                        .border(1.dp, themeTokens.subtleChipBorder, CircleShape)
+                        .clickable(role = Role.Button) {
+                            hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            val nextTheme = when (themeTokens.theme) {
+                                AnilistTrackerTheme.FROSTED_GLASS -> AnilistTrackerTheme.WATER_GLASS
+                                AnilistTrackerTheme.WATER_GLASS -> AnilistTrackerTheme.MIDNIGHT_GLASS
+                                AnilistTrackerTheme.MIDNIGHT_GLASS -> AnilistTrackerTheme.SIDEBAR_GLASS
+                                AnilistTrackerTheme.SIDEBAR_GLASS -> AnilistTrackerTheme.FROSTED_GLASS
+                            }
+                            AnilistPreferencesRepository.setTrackerTheme(nextTheme)
+                        },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Palette,
+                        contentDescription = "Theme: ${themeTokens.theme.label}",
+                        tint = Color.White.copy(alpha = 0.85f),
+                        modifier = Modifier.size(15.dp),
+                    )
                 }
 
                 val uriHandler = LocalUriHandler.current

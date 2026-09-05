@@ -536,10 +536,118 @@ private val MidnightGlassTokens by lazy {
     )
 }
 
+private val SidebarGlassTokens by lazy {
+    val selectedBgs = TrackerStatusItems.associate { item ->
+        item.color to Brush.verticalGradient(
+            listOf(item.color.copy(alpha = 0.32f), item.color.copy(alpha = 0.14f)),
+        )
+    }
+    val selectedBorders = TrackerStatusItems.associate { item ->
+        item.color to Brush.verticalGradient(
+            listOf(item.color.copy(alpha = 0.88f), item.color.copy(alpha = 0.50f)),
+        )
+    }
+    TrackerThemeTokens(
+        theme = AnilistTrackerTheme.SIDEBAR_GLASS,
+        dialogBackground = Color(0xFF14151C).copy(alpha = 0.88f),
+        dialogBorder = Brush.verticalGradient(
+            listOf(
+                Color.White.copy(alpha = 0.32f),
+                Color.White.copy(alpha = 0.12f),
+                Color.White.copy(alpha = 0.05f),
+                Color.White.copy(alpha = 0.16f),
+            ),
+        ),
+        headerBackground = Brush.verticalGradient(
+            listOf(
+                Color(0xFF1E202B).copy(alpha = 0.85f),
+                Color(0xFF14151C).copy(alpha = 0.85f),
+            ),
+        ),
+        headerHairline = Brush.horizontalGradient(
+            listOf(
+                Color.Transparent,
+                Color.White.copy(alpha = 0.15f),
+                Color.White.copy(alpha = 0.05f),
+                Color.Transparent,
+            ),
+        ),
+        cardBackground = Brush.verticalGradient(
+            listOf(
+                Color(0xFF1C1E28).copy(alpha = 0.60f),
+                Color(0xFF14151D).copy(alpha = 0.60f),
+            ),
+        ),
+        cardBackgroundColor = Color(0xFF1A1C26).copy(alpha = 0.65f),
+        cardBorder = Brush.verticalGradient(
+            listOf(
+                Color.White.copy(alpha = 0.18f),
+                Color.White.copy(alpha = 0.06f),
+            ),
+        ),
+        cardGleam = Brush.horizontalGradient(
+            listOf(
+                Color.Transparent,
+                Color.White.copy(alpha = 0.14f),
+                Color.White.copy(alpha = 0.04f),
+                Color.Transparent,
+            ),
+        ),
+        subtleChipBackground = Color.White.copy(alpha = 0.07f),
+        subtleChipBorder = Brush.verticalGradient(
+            listOf(
+                Color.White.copy(alpha = 0.22f),
+                Color.White.copy(alpha = 0.07f),
+            ),
+        ),
+        stepperBackground = Brush.verticalGradient(
+            listOf(
+                Color(0xFF1C1E28).copy(alpha = 0.75f),
+                Color(0xFF14151D).copy(alpha = 0.75f),
+            ),
+        ),
+        stepperBorder = Brush.verticalGradient(
+            listOf(
+                Color.White.copy(alpha = 0.22f),
+                Color.White.copy(alpha = 0.07f),
+            ),
+        ),
+        stepperDivider = Color.White.copy(alpha = 0.12f),
+        actionButtonBackground = Brush.verticalGradient(
+            listOf(
+                Color(0xFF222533).copy(alpha = 0.82f),
+                Color(0xFF161824).copy(alpha = 0.82f),
+            ),
+        ),
+        actionButtonBorder = Brush.verticalGradient(
+            listOf(
+                Color.White.copy(alpha = 0.26f),
+                Color.White.copy(alpha = 0.08f),
+            ),
+        ),
+        statusUnselectedBg = Brush.verticalGradient(
+            listOf(
+                Color(0xFF1A1C26).copy(alpha = 0.60f),
+                Color(0xFF13141C).copy(alpha = 0.60f),
+            ),
+        ),
+        statusUnselectedBorder = Brush.verticalGradient(
+            listOf(
+                Color.White.copy(alpha = 0.14f),
+                Color.White.copy(alpha = 0.04f),
+            ),
+        ),
+        statusSelectedBgs = selectedBgs,
+        statusSelectedBorders = selectedBorders,
+        scrimAlpha = 0.50f,
+    )
+}
+
 fun getTrackerThemeTokens(theme: AnilistTrackerTheme): TrackerThemeTokens = when (theme) {
     AnilistTrackerTheme.FROSTED_GLASS -> FrostedGlassTokens
     AnilistTrackerTheme.WATER_GLASS -> WaterGlassTokens
     AnilistTrackerTheme.MIDNIGHT_GLASS -> MidnightGlassTokens
+    AnilistTrackerTheme.SIDEBAR_GLASS -> SidebarGlassTokens
 }
 
 val LocalTrackerThemeTokens = staticCompositionLocalOf {
@@ -950,7 +1058,8 @@ fun AnimeTrackerSheetContent(
                                     val nextTheme = when (currentTheme) {
                                         AnilistTrackerTheme.FROSTED_GLASS -> AnilistTrackerTheme.WATER_GLASS
                                         AnilistTrackerTheme.WATER_GLASS -> AnilistTrackerTheme.MIDNIGHT_GLASS
-                                        AnilistTrackerTheme.MIDNIGHT_GLASS -> AnilistTrackerTheme.FROSTED_GLASS
+                                        AnilistTrackerTheme.MIDNIGHT_GLASS -> AnilistTrackerTheme.SIDEBAR_GLASS
+                                        AnilistTrackerTheme.SIDEBAR_GLASS -> AnilistTrackerTheme.FROSTED_GLASS
                                     }
                                     com.nuvio.app.features.anilist.AnilistPreferencesRepository.setTrackerTheme(nextTheme)
                                 },
