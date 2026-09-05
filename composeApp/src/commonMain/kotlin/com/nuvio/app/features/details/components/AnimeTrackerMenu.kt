@@ -139,18 +139,18 @@ fun getStatusColor(status: AnilistMediaListStatus?): Color = when (status) {
 }
 
 // Static Shape Tokens to prevent recomposition allocations
-private val ShapePill = CircleShape
-private val ShapeSheetTop = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
-private val ShapeDialog = RoundedCornerShape(26.dp)
-private val ShapeModal = RoundedCornerShape(22.dp)
-private val ShapeCard = RoundedCornerShape(18.dp)
-private val ShapeTile = RoundedCornerShape(14.dp)
-private val ShapeStepper = RoundedCornerShape(13.dp)
-private val ShapePoster = RoundedCornerShape(12.dp)
-private val ShapeEmblem = RoundedCornerShape(11.dp)
-private val ShapeAction = RoundedCornerShape(10.dp)
-private val ShapeRoundCapsule = RoundedCornerShape(999.dp)
-private val ShapeProgressBar = RoundedCornerShape(3.dp)
+internal val ShapePill = CircleShape
+internal val ShapeSheetTop = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
+internal val ShapeDialog = RoundedCornerShape(26.dp)
+internal val ShapeModal = RoundedCornerShape(22.dp)
+internal val ShapeCard = RoundedCornerShape(18.dp)
+internal val ShapeTile = RoundedCornerShape(14.dp)
+internal val ShapeStepper = RoundedCornerShape(13.dp)
+internal val ShapePoster = RoundedCornerShape(12.dp)
+internal val ShapeEmblem = RoundedCornerShape(11.dp)
+internal val ShapeAction = RoundedCornerShape(10.dp)
+internal val ShapeRoundCapsule = RoundedCornerShape(999.dp)
+internal val ShapeProgressBar = RoundedCornerShape(3.dp)
 
 // Static Cached Utility Brushes
 private val PosterBorderBrush = Brush.verticalGradient(
@@ -547,7 +547,7 @@ val LocalTrackerThemeTokens = staticCompositionLocalOf {
 }
 
 @Composable
-private fun TrackerGlassCard(
+internal fun TrackerGlassCard(
     modifier: Modifier = Modifier,
     shape: RoundedCornerShape = ShapeCard,
     backgroundColor: Color? = null,

@@ -6,15 +6,11 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.rememberScrollState
-import com.nuvio.app.core.ui.nuvioHorizontalScroll
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -23,14 +19,16 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.Chat
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.PersonRemove
 import androidx.compose.material.icons.filled.Star
@@ -38,21 +36,19 @@ import androidx.compose.material.icons.rounded.BarChart
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.People
-import androidx.compose.material.icons.rounded.Settings
-import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -61,6 +57,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
@@ -70,21 +67,31 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import coil3.compose.AsyncImage
 import com.nuvio.app.core.ui.NuvioDesktopVerticalScrollbar
-import com.nuvio.app.core.ui.nuvioDesktopDragScroll
+import com.nuvio.app.core.ui.NuvioModalBottomSheet
+import com.nuvio.app.core.ui.dismissNuvioBottomSheet
+import com.nuvio.app.core.ui.nuvioHorizontalScroll
 import com.nuvio.app.features.anilist.AnilistAuthRepository
+import com.nuvio.app.features.anilist.AnilistPreferencesRepository
 import com.nuvio.app.features.anilist.community.AnilistContentBlockItem
 import com.nuvio.app.features.anilist.community.parseAnilistRichContent
+import com.nuvio.app.features.details.components.LocalTrackerThemeTokens
+import com.nuvio.app.features.details.components.ShapeCard
+import com.nuvio.app.features.details.components.ShapeDialog
+import com.nuvio.app.features.details.components.ShapePill
+import com.nuvio.app.features.details.components.ShapeSheetTop
+import com.nuvio.app.features.details.components.ShapeTile
+import com.nuvio.app.features.details.components.TrackerGlassCard
+import com.nuvio.app.features.details.components.TrackerThemeTokens
+import com.nuvio.app.features.details.components.getTrackerThemeTokens
+import com.nuvio.app.isDesktop
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
 private val AniHyouCyanAccent = Color(0xFF40C4FF)
-private val AniHyouDarkBackground = Color(0xFF0C0D10)
-private val AniHyouCardSurface = Color(0xFF16181F)
-private val AniHyouChipInactiveBg = Color(0xFF1F222B)
-private val AniHyouChipActiveBg = Color(0xFF323642)
-private val AniHyouChipBorder = Color(0xFF2C303D)
 private val AniHyouSubtleText = Color(0xFF8E92A0)
 
 private enum class AniHyouProfileTab(val label: String, val icon: ImageVector) {
@@ -123,13 +130,16 @@ fun AnilistUserProfileSheet(
     onDismiss: () -> Unit,
     onAnimeClick: ((Int) -> Unit)? = null,
 ) {
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()
     var profile by remember { mutableStateOf<AnilistFullUserProfile?>(null) }
     var isLoading by remember { mutableStateOf(true) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var selectedTab by remember { mutableStateOf(AniHyouProfileTab.STATS) }
     var isFollowing by remember { mutableStateOf(false) }
+
+    val anilistPrefs by AnilistPreferencesRepository.preferences.collectAsState()
+    val currentTheme = anilistPrefs.trackerTheme
+    val themeTokens = remember(currentTheme) { getTrackerThemeTokens(currentTheme) }
 
     val currentUserId = AnilistAuthRepository.currentUser.value?.id
     val isSelf = currentUserId != null && currentUserId == userId
@@ -149,27 +159,173 @@ fun AnilistUserProfileSheet(
         }
     }
 
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState,
-        containerColor = AniHyouDarkBackground,
-        contentColor = Color.White,
-        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
-        dragHandle = null,
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(720.dp),
+    val content: @Composable () -> Unit = {
+        CompositionLocalProvider(LocalTrackerThemeTokens provides themeTokens) {
+            UserProfileSheetContent(
+                user = profile,
+                isLoading = isLoading,
+                errorMessage = errorMessage,
+                selectedTab = selectedTab,
+                onSelectTab = { selectedTab = it },
+                isSelf = isSelf,
+                isLoggedIn = isLoggedIn,
+                isFollowing = isFollowing,
+                onToggleFollow = {
+                    scope.launch {
+                        val newFollow = !isFollowing
+                        isFollowing = newFollow
+                        profile?.let { AnilistProfileRepository.toggleFollow(it.id) }
+                    }
+                },
+                onDismiss = onDismiss,
+                onAnimeClick = onAnimeClick,
+                themeTokens = themeTokens,
+            )
+        }
+    }
+
+    if (isDesktop) {
+        Dialog(
+            onDismissRequest = onDismiss,
+            properties = DialogProperties(usePlatformDefaultWidth = false),
         ) {
+            Surface(
+                modifier = Modifier
+                    .fillMaxHeight(0.90f)
+                    .widthIn(min = 600.dp, max = 740.dp)
+                    .clip(ShapeDialog),
+                shape = ShapeDialog,
+                color = themeTokens.dialogBackground,
+                border = BorderStroke(1.dp, themeTokens.dialogBorder),
+                shadowElevation = 24.dp,
+            ) {
+                content()
+            }
+        }
+    } else {
+        val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        val coroutineScope = rememberCoroutineScope()
+
+        NuvioModalBottomSheet(
+            onDismissRequest = {
+                coroutineScope.launch {
+                    dismissNuvioBottomSheet(sheetState = sheetState, onDismiss = onDismiss)
+                }
+            },
+            sheetState = sheetState,
+            containerColor = themeTokens.dialogBackground,
+            shape = ShapeSheetTop,
+            showDragHandle = true,
+        ) {
+            content()
+        }
+    }
+}
+
+@Composable
+private fun UserProfileSheetContent(
+    user: AnilistFullUserProfile?,
+    isLoading: Boolean,
+    errorMessage: String?,
+    selectedTab: AniHyouProfileTab,
+    onSelectTab: (AniHyouProfileTab) -> Unit,
+    isSelf: Boolean,
+    isLoggedIn: Boolean,
+    isFollowing: Boolean,
+    onToggleFollow: () -> Unit,
+    onDismiss: () -> Unit,
+    onAnimeClick: ((Int) -> Unit)?,
+    themeTokens: TrackerThemeTokens,
+) {
+    Column(modifier = Modifier.fillMaxSize()) {
+        if (user != null) {
+            // Pinned Glass Header
+            AniHyouHeaderRow(
+                user = user,
+                isSelf = isSelf,
+                isLoggedIn = isLoggedIn,
+                isFollowing = isFollowing,
+                onToggleFollow = onToggleFollow,
+                onClose = onDismiss,
+                themeTokens = themeTokens,
+            )
+
+            // Pinned Glass Segmented Tab Bar
+            AniHyouPillNavigationBar(
+                selectedTab = selectedTab,
+                onTabSelected = onSelectTab,
+                themeTokens = themeTokens,
+            )
+
+            // Scrollable Content
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth(),
+            ) {
+                val listState = rememberLazyListState()
+
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 20.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                ) {
+                    item { Spacer(modifier = Modifier.height(6.dp)) }
+
+                    when (selectedTab) {
+                        AniHyouProfileTab.INFO -> item { AniHyouInfoTabContent(user = user) }
+                        AniHyouProfileTab.ACTIVITY -> item { AniHyouActivityTabContent(userId = user.id, onAnimeClick = onAnimeClick) }
+                        AniHyouProfileTab.STATS -> item { AniHyouStatsTabContent(userId = user.id) }
+                        AniHyouProfileTab.FAVORITES -> item { AniHyouFavoritesTabContent(user = user, onAnimeClick = onAnimeClick) }
+                        AniHyouProfileTab.SOCIAL -> item { AniHyouSocialTabContent(userId = user.id) }
+                    }
+
+                    item { Spacer(modifier = Modifier.height(28.dp)) }
+                }
+
+                NuvioDesktopVerticalScrollbar(
+                    state = listState,
+                    modifier = Modifier
+                        .align(Alignment.CenterEnd)
+                        .padding(vertical = 6.dp),
+                )
+            }
+        } else {
+            // Header close button when loading or error
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                contentAlignment = Alignment.TopEnd,
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(CircleShape)
+                        .background(themeTokens.subtleChipBackground)
+                        .border(1.dp, themeTokens.subtleChipBorder, CircleShape)
+                        .clickable(onClick = onDismiss),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = "Close",
+                        tint = Color.White.copy(alpha = 0.8f),
+                        modifier = Modifier.size(16.dp),
+                    )
+                }
+            }
+
             if (isLoading) {
                 Box(
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center,
                 ) {
-                    CircularProgressIndicator(color = AniHyouCyanAccent)
+                    CircularProgressIndicator(color = AniHyouCyanAccent, strokeWidth = 2.dp)
                 }
-            } else if (errorMessage != null || profile == null) {
+            } else {
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
@@ -190,59 +346,6 @@ fun AnilistUserProfileSheet(
                         Text("Close", color = Color.Black, fontWeight = FontWeight.Bold)
                     }
                 }
-            } else {
-                val user = profile!!
-                val listState = rememberLazyListState()
-
-                LazyColumn(
-                    state = listState,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(horizontal = 18.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
-                ) {
-                    item { Spacer(modifier = Modifier.height(14.dp)) }
-
-                    item {
-                        AniHyouHeaderRow(
-                            user = user,
-                            isSelf = isSelf,
-                            isLoggedIn = isLoggedIn,
-                            isFollowing = isFollowing,
-                            onToggleFollow = {
-                                scope.launch {
-                                    val newFollow = !isFollowing
-                                    isFollowing = newFollow
-                                    AnilistProfileRepository.toggleFollow(user.id)
-                                }
-                            },
-                        )
-                    }
-
-                    item {
-                        AniHyouPillNavigationBar(
-                            selectedTab = selectedTab,
-                            onTabSelected = { selectedTab = it },
-                        )
-                    }
-
-                    when (selectedTab) {
-                        AniHyouProfileTab.INFO -> item { AniHyouInfoTabContent(user = user) }
-                        AniHyouProfileTab.ACTIVITY -> item { AniHyouActivityTabContent(userId = user.id, onAnimeClick = onAnimeClick) }
-                        AniHyouProfileTab.STATS -> item { AniHyouStatsTabContent(userId = user.id) }
-                        AniHyouProfileTab.FAVORITES -> item { AniHyouFavoritesTabContent(user = user, onAnimeClick = onAnimeClick) }
-                        AniHyouProfileTab.SOCIAL -> item { AniHyouSocialTabContent(userId = user.id) }
-                    }
-
-                    item { Spacer(modifier = Modifier.height(32.dp)) }
-                }
-
-                NuvioDesktopVerticalScrollbar(
-                    state = listState,
-                    modifier = Modifier
-                        .align(Alignment.CenterEnd)
-                        .padding(vertical = 6.dp),
-                )
             }
         }
     }
@@ -255,107 +358,208 @@ private fun AniHyouHeaderRow(
     isLoggedIn: Boolean,
     isFollowing: Boolean,
     onToggleFollow: () -> Unit,
+    onClose: () -> Unit,
+    themeTokens: TrackerThemeTokens,
 ) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(themeTokens.headerBackground),
     ) {
         Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp, vertical = 14.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            Box(
-                modifier = Modifier
-                    .size(76.dp)
-                    .clip(CircleShape)
-                    .background(AniHyouCardSurface)
-                    .border(2.dp, AniHyouChipBorder, CircleShape),
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
+                modifier = Modifier.weight(1f, fill = false),
             ) {
-                val avatarUrl = user.avatarLarge ?: user.avatarMedium
-                if (!avatarUrl.isNullOrBlank()) {
-                    AsyncImage(
-                        model = avatarUrl,
-                        contentDescription = user.name,
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop,
+                Box(
+                    modifier = Modifier
+                        .size(62.dp)
+                        .clip(CircleShape)
+                        .background(themeTokens.subtleChipBackground)
+                        .border(
+                            BorderStroke(
+                                1.5.dp,
+                                Brush.linearGradient(
+                                    listOf(
+                                        Color.White.copy(alpha = 0.6f),
+                                        Color.White.copy(alpha = 0.1f),
+                                    ),
+                                ),
+                            ),
+                            CircleShape,
+                        ),
+                ) {
+                    val avatarUrl = user.avatarLarge ?: user.avatarMedium
+                    if (!avatarUrl.isNullOrBlank()) {
+                        AsyncImage(
+                            model = avatarUrl,
+                            contentDescription = user.name,
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop,
+                        )
+                    } else {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(
+                                text = user.name.take(1).uppercase(),
+                                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                                color = Color.White,
+                            )
+                        }
+                    }
+                }
+
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Text(
+                            text = user.name,
+                            style = MaterialTheme.typography.titleLarge.copy(
+                                fontWeight = FontWeight.ExtraBold,
+                                fontSize = 20.sp,
+                                letterSpacing = (-0.3).sp,
+                            ),
+                            color = Color.White,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+
+                        if (user.donatorTier > 0 && !user.donatorBadge.isNullOrBlank()) {
+                            Box(
+                                modifier = Modifier
+                                    .clip(ShapePill)
+                                    .background(Color(0xFFE50914).copy(alpha = 0.18f))
+                                    .border(0.75.dp, Color(0xFFE50914).copy(alpha = 0.45f), ShapePill)
+                                    .padding(horizontal = 7.dp, vertical = 2.dp),
+                            ) {
+                                Text(
+                                    text = user.donatorBadge,
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 9.sp,
+                                    ),
+                                    color = Color(0xFFFF5252),
+                                )
+                            }
+                        }
+                    }
+
+                    Text(
+                        text = "AniList Profile",
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            fontSize = 11.5.sp,
+                            fontWeight = FontWeight.Normal,
+                        ),
+                        color = Color.White.copy(alpha = 0.45f),
                     )
-                } else {
+                }
+            }
+
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                if (isLoggedIn && !isSelf) {
+                    val followBg = if (isFollowing) {
+                        themeTokens.subtleChipBackground
+                    } else {
+                        Color(0xFF00A2FF).copy(alpha = 0.22f)
+                    }
+                    val followBorder = if (isFollowing) {
+                        themeTokens.subtleChipBorder
+                    } else {
+                        Brush.verticalGradient(
+                            listOf(Color(0xFF00A2FF).copy(alpha = 0.8f), Color(0xFF00A2FF).copy(alpha = 0.4f)),
+                        )
+                    }
+                    val followColor = if (isFollowing) Color.White.copy(alpha = 0.85f) else Color(0xFF00A2FF)
+
                     Box(
                         modifier = Modifier
-                            .fillMaxSize()
-                            .background(AniHyouChipActiveBg),
+                            .clip(ShapePill)
+                            .background(followBg)
+                            .border(1.dp, followBorder, ShapePill)
+                            .clickable(onClick = onToggleFollow)
+                            .padding(horizontal = 12.dp, vertical = 6.dp),
                         contentAlignment = Alignment.Center,
                     ) {
-                        Text(
-                            text = user.name.take(1).uppercase(),
-                            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                            color = Color.White,
-                        )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(5.dp),
+                        ) {
+                            Icon(
+                                imageVector = if (isFollowing) Icons.Default.PersonRemove else Icons.Default.PersonAdd,
+                                contentDescription = null,
+                                tint = followColor,
+                                modifier = Modifier.size(14.dp),
+                            )
+                            Text(
+                                text = if (isFollowing) "Following" else "Follow",
+                                style = MaterialTheme.typography.labelMedium.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 12.sp,
+                                ),
+                                color = followColor,
+                            )
+                        }
                     }
                 }
-            }
 
-            Column {
-                Text(
-                    text = user.name,
-                    style = MaterialTheme.typography.headlineSmall.copy(
-                        fontWeight = FontWeight.ExtraBold,
-                        fontSize = 24.sp,
-                        letterSpacing = (-0.5).sp,
-                    ),
-                    color = Color.White,
-                )
-                if (user.donatorTier > 0 && !user.donatorBadge.isNullOrBlank()) {
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Surface(
-                        color = Color(0xFFE50914).copy(alpha = 0.2f),
-                        shape = RoundedCornerShape(6.dp),
-                        border = BorderStroke(1.dp, Color(0xFFE50914).copy(alpha = 0.4f)),
-                    ) {
-                        Text(
-                            text = user.donatorBadge,
-                            style = MaterialTheme.typography.labelSmall.copy(
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 10.sp,
-                            ),
-                            color = Color(0xFFFF5252),
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                        )
-                    }
-                }
-            }
-        }
-
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            if (isLoggedIn && !isSelf) {
-                OutlinedButton(
-                    onClick = onToggleFollow,
-                    shape = RoundedCornerShape(20.dp),
-                    border = BorderStroke(1.dp, if (isFollowing) AniHyouChipBorder else AniHyouCyanAccent),
-                    colors = ButtonDefaults.outlinedButtonColors(
-                        containerColor = if (isFollowing) AniHyouChipActiveBg else AniHyouCyanAccent.copy(alpha = 0.15f),
-                    ),
-                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
+                val uriHandler = LocalUriHandler.current
+                Box(
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(CircleShape)
+                        .background(themeTokens.subtleChipBackground)
+                        .border(1.dp, themeTokens.subtleChipBorder, CircleShape)
+                        .clickable { uriHandler.openUri("https://anilist.co/user/${user.name}") },
+                    contentAlignment = Alignment.Center,
                 ) {
                     Icon(
-                        imageVector = if (isFollowing) Icons.Default.PersonRemove else Icons.Default.PersonAdd,
-                        contentDescription = null,
-                        tint = if (isFollowing) Color.White else AniHyouCyanAccent,
-                        modifier = Modifier.size(16.dp),
+                        imageVector = Icons.Default.OpenInNew,
+                        contentDescription = "Open in AniList",
+                        tint = Color.White.copy(alpha = 0.75f),
+                        modifier = Modifier.size(15.dp),
                     )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = if (isFollowing) "Following" else "Follow",
-                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-                        color = if (isFollowing) Color.White else AniHyouCyanAccent,
+                }
+
+                Box(
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(CircleShape)
+                        .background(themeTokens.subtleChipBackground)
+                        .border(1.dp, themeTokens.subtleChipBorder, CircleShape)
+                        .clickable(onClick = onClose),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = "Close",
+                        tint = Color.White.copy(alpha = 0.8f),
+                        modifier = Modifier.size(16.dp),
                     )
                 }
             }
         }
+
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .height(1.dp)
+                .background(themeTokens.headerHairline),
+        )
     }
 }
 
@@ -363,46 +567,61 @@ private fun AniHyouHeaderRow(
 private fun AniHyouPillNavigationBar(
     selectedTab: AniHyouProfileTab,
     onTabSelected: (AniHyouProfileTab) -> Unit,
+    themeTokens: TrackerThemeTokens,
 ) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
-        color = AniHyouCardSurface,
-        border = BorderStroke(1.dp, AniHyouChipBorder.copy(alpha = 0.6f)),
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp, vertical = 10.dp)
+            .clip(ShapePill)
+            .background(themeTokens.subtleChipBackground)
+            .border(1.dp, themeTokens.subtleChipBorder, ShapePill)
+            .padding(3.dp),
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 6.dp, horizontal = 8.dp),
+            modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
             AniHyouProfileTab.entries.forEach { tab ->
                 val isSelected = selectedTab == tab
-                val containerColor by animateColorAsState(
+                val pillBg by animateColorAsState(
                     targetValue = if (isSelected) Color.White else Color.Transparent,
                     animationSpec = tween(180),
                 )
-                val iconColor by animateColorAsState(
-                    targetValue = if (isSelected) Color.Black else AniHyouSubtleText,
+                val contentColor by animateColorAsState(
+                    targetValue = if (isSelected) Color(0xFF0F1424) else Color.White.copy(alpha = 0.60f),
                     animationSpec = tween(180),
                 )
 
                 Box(
                     modifier = Modifier
                         .weight(1f)
-                        .height(44.dp)
-                        .clip(RoundedCornerShape(22.dp))
-                        .background(containerColor)
+                        .height(36.dp)
+                        .clip(ShapePill)
+                        .background(pillBg)
                         .clickable { onTabSelected(tab) },
                     contentAlignment = Alignment.Center,
                 ) {
-                    Icon(
-                        imageVector = tab.icon,
-                        contentDescription = tab.label,
-                        tint = iconColor,
-                        modifier = Modifier.size(22.dp),
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(5.dp),
+                    ) {
+                        Icon(
+                            imageVector = tab.icon,
+                            contentDescription = tab.label,
+                            tint = contentColor,
+                            modifier = Modifier.size(15.dp),
+                        )
+                        Text(
+                            text = tab.label,
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                fontSize = 11.5.sp,
+                            ),
+                            color = contentColor,
+                        )
+                    }
                 }
             }
         }
@@ -416,36 +635,49 @@ private fun AniHyouFilterChip(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val bg = if (selected) AniHyouChipActiveBg else AniHyouChipInactiveBg
-    val border = if (selected) Color(0xFF4A4E5C) else AniHyouChipBorder
-    val textColor = if (selected) Color.White else AniHyouSubtleText
+    val tokens = LocalTrackerThemeTokens.current
+    val bg = if (selected) {
+        Color.White.copy(alpha = 0.16f)
+    } else {
+        tokens.subtleChipBackground
+    }
+    val border = if (selected) {
+        Brush.verticalGradient(
+            listOf(
+                Color.White.copy(alpha = 0.45f),
+                Color.White.copy(alpha = 0.15f),
+            ),
+        )
+    } else {
+        tokens.subtleChipBorder
+    }
+    val textColor = if (selected) Color.White else Color.White.copy(alpha = 0.60f)
 
-    Surface(
+    Box(
         modifier = modifier
-            .clip(RoundedCornerShape(8.dp))
-            .clickable(onClick = onClick),
-        shape = RoundedCornerShape(8.dp),
-        color = bg,
-        border = BorderStroke(1.dp, border),
+            .clip(ShapePill)
+            .background(bg)
+            .border(1.dp, border, ShapePill)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 13.dp, vertical = 6.dp),
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            horizontalArrangement = Arrangement.spacedBy(5.dp),
         ) {
             if (selected) {
                 Icon(
                     imageVector = Icons.Rounded.Check,
                     contentDescription = null,
                     tint = Color.White,
-                    modifier = Modifier.size(15.dp),
+                    modifier = Modifier.size(13.dp),
                 )
             }
             Text(
                 text = label,
-                style = MaterialTheme.typography.bodyMedium.copy(
+                style = MaterialTheme.typography.bodySmall.copy(
                     fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-                    fontSize = 14.sp,
+                    fontSize = 12.sp,
                 ),
                 color = textColor,
             )
@@ -490,7 +722,6 @@ private fun AniHyouStatsTabContent(
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         val categoryScrollState = rememberScrollState()
-        // Horizontally scrolling category chips: Overview, Genres, Tags, Staff, Voice Actors, Studios
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -506,7 +737,6 @@ private fun AniHyouStatsTabContent(
             }
         }
 
-        // Medium selection chips: Anime, Manga
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -530,17 +760,19 @@ private fun AniHyouStatsTabContent(
                 CircularProgressIndicator(color = AniHyouCyanAccent, strokeWidth = 2.dp)
             }
         } else if (errorMessage != null || statsState == null) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(32.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    text = errorMessage ?: "No statistics available.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = AniHyouSubtleText,
-                )
+            TrackerGlassCard(shape = ShapeTile) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(32.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = errorMessage ?: "No statistics available.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = AniHyouSubtleText,
+                    )
+                }
             }
         } else {
             val stats = statsState!!
@@ -695,26 +927,91 @@ private fun AniHyouStatsTabContent(
 
 @Composable
 private fun AniHyouMetricGrid(stats: AnilistMediumStatistics, isAnime: Boolean) {
-    Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(22.dp)) {
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            MetricGridCell(value = "${stats.count}", label = "Total", modifier = Modifier.weight(1f))
-            MetricGridCell(value = if (isAnime) formatNumberWithCommas(stats.episodesWatched) else formatNumberWithCommas(stats.chaptersRead), label = if (isAnime) "Episodes\nwatched" else "Chapters\nread", modifier = Modifier.weight(1f))
-            MetricGridCell(value = "${stats.daysWatched.roundToInt()}", label = if (isAnime) "Days watched" else "Days read", modifier = Modifier.weight(1f))
-        }
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            MetricGridCell(value = "${stats.daysPlanned.roundToInt()}", label = "Days planned", modifier = Modifier.weight(1f))
-            MetricGridCell(value = if (stats.meanScore > 0) "${stats.meanScore}" else "—", label = "Mean score", modifier = Modifier.weight(1f))
-            MetricGridCell(value = if (stats.standardDeviation > 0) "${stats.standardDeviation}" else "—", label = "Standard\ndeviation", modifier = Modifier.weight(1f))
+    TrackerGlassCard(shape = ShapeCard) {
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                MetricGridCell(
+                    value = "${stats.count}",
+                    label = "Total Titles",
+                    valueColor = Color(0xFF40C4FF),
+                    modifier = Modifier.weight(1f),
+                )
+                MetricGridCell(
+                    value = if (isAnime) formatNumberWithCommas(stats.episodesWatched) else formatNumberWithCommas(stats.chaptersRead),
+                    label = if (isAnime) "Episodes Watched" else "Chapters Read",
+                    valueColor = Color(0xFF00E676),
+                    modifier = Modifier.weight(1f),
+                )
+                MetricGridCell(
+                    value = "${stats.daysWatched.roundToInt()}",
+                    label = if (isAnime) "Days Watched" else "Days Read",
+                    valueColor = Color(0xFFFFB800),
+                    modifier = Modifier.weight(1f),
+                )
+            }
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(1.dp)
+                    .background(Color.White.copy(alpha = 0.07f)),
+            )
+
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                MetricGridCell(
+                    value = "${stats.daysPlanned.roundToInt()}",
+                    label = "Days Planned",
+                    valueColor = Color(0xFFAB47BC),
+                    modifier = Modifier.weight(1f),
+                )
+                MetricGridCell(
+                    value = if (stats.meanScore > 0) "${stats.meanScore}" else "—",
+                    label = "Mean Score",
+                    valueColor = Color(0xFFFF5252),
+                    modifier = Modifier.weight(1f),
+                )
+                MetricGridCell(
+                    value = if (stats.standardDeviation > 0) "${stats.standardDeviation}" else "—",
+                    label = "Standard Deviation",
+                    valueColor = Color(0xFF64B5F6),
+                    modifier = Modifier.weight(1f),
+                )
+            }
         }
     }
 }
 
 @Composable
-private fun MetricGridCell(value: String, label: String, modifier: Modifier = Modifier) {
+private fun MetricGridCell(
+    value: String,
+    label: String,
+    valueColor: Color = Color.White,
+    modifier: Modifier = Modifier,
+) {
     Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(text = value, style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.ExtraBold, fontSize = 21.sp), color = Color.White)
-        Spacer(modifier = Modifier.height(3.dp))
-        Text(text = label, style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp, lineHeight = 15.sp), color = AniHyouSubtleText, textAlign = TextAlign.Center)
+        Text(
+            text = value,
+            style = MaterialTheme.typography.titleLarge.copy(
+                fontWeight = FontWeight.ExtraBold,
+                fontSize = 22.sp,
+                letterSpacing = (-0.5).sp,
+            ),
+            color = valueColor,
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodySmall.copy(
+                fontSize = 11.5.sp,
+                lineHeight = 14.sp,
+                fontWeight = FontWeight.Medium,
+            ),
+            color = Color.White.copy(alpha = 0.55f),
+            textAlign = TextAlign.Center,
+        )
     }
 }
 
@@ -725,34 +1022,36 @@ private fun AniHyouScoreSection(
     onSortChange: (AniHyouStatSortMetric) -> Unit,
     isAnime: Boolean,
 ) {
-    Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        Text(text = "Score", style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold, fontSize = 20.sp), color = Color.White)
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            AniHyouFilterChip(label = "Titles", selected = sortMetric == AniHyouStatSortMetric.TITLES, onClick = { onSortChange(AniHyouStatSortMetric.TITLES) })
-            AniHyouFilterChip(label = "Time", selected = sortMetric == AniHyouStatSortMetric.TIME, onClick = { onSortChange(AniHyouStatSortMetric.TIME) })
-        }
-        val items = scores.map { item ->
-            val value = when (sortMetric) {
-                AniHyouStatSortMetric.TITLES -> item.count.toFloat()
-                AniHyouStatSortMetric.TIME -> if (isAnime) (item.minutesWatched / 60f) else item.chaptersRead.toFloat()
-                else -> item.count.toFloat()
+    TrackerGlassCard(shape = ShapeCard) {
+        Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            Text(text = "Score Distribution", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, fontSize = 17.sp), color = Color.White)
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                AniHyouFilterChip(label = "Titles", selected = sortMetric == AniHyouStatSortMetric.TITLES, onClick = { onSortChange(AniHyouStatSortMetric.TITLES) })
+                AniHyouFilterChip(label = "Time", selected = sortMetric == AniHyouStatSortMetric.TIME, onClick = { onSortChange(AniHyouStatSortMetric.TIME) })
             }
-            val display = when (sortMetric) {
-                AniHyouStatSortMetric.TITLES -> "${item.count}"
-                AniHyouStatSortMetric.TIME -> "${(if (isAnime) item.minutesWatched / 60 else item.chaptersRead.toLong())}h"
-                else -> "${item.count}"
+            val items = scores.map { item ->
+                val value = when (sortMetric) {
+                    AniHyouStatSortMetric.TITLES -> item.count.toFloat()
+                    AniHyouStatSortMetric.TIME -> if (isAnime) (item.minutesWatched / 60f) else item.chaptersRead.toFloat()
+                    else -> item.count.toFloat()
+                }
+                val display = when (sortMetric) {
+                    AniHyouStatSortMetric.TITLES -> "${item.count}"
+                    AniHyouStatSortMetric.TIME -> "${(if (isAnime) item.minutesWatched / 60 else item.chaptersRead.toLong())}h"
+                    else -> "${item.count}"
+                }
+                VerticalStatItem(
+                    label = "${item.score}",
+                    value = value,
+                    displayValue = if (value > 0f) display else "",
+                    color = item.score.point100PrimaryColor(),
+                )
             }
-            VerticalStatItem(
-                label = "${item.score}",
-                value = value,
-                displayValue = if (value > 0f) display else "",
-                color = item.score.point100PrimaryColor(),
+            AniHyouVerticalStatsBar(
+                stats = items,
+                mapColorTo = { it.color ?: it.label.toIntOrNull()?.point100PrimaryColor() ?: stat_dark_blue },
             )
         }
-        AniHyouVerticalStatsBar(
-            stats = items,
-            mapColorTo = { it.color ?: it.label.toIntOrNull()?.point100PrimaryColor() ?: stat_dark_blue },
-        )
     }
 }
 
@@ -763,32 +1062,34 @@ private fun AniHyouLengthSection(
     onSortChange: (AniHyouStatSortMetric) -> Unit,
     isAnime: Boolean,
 ) {
-    Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        Text(text = if (isAnime) "Episode Count" else "Chapter Count", style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold, fontSize = 20.sp), color = Color.White)
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            AniHyouFilterChip(label = "Titles", selected = sortMetric == AniHyouStatSortMetric.TITLES, onClick = { onSortChange(AniHyouStatSortMetric.TITLES) })
-            AniHyouFilterChip(label = "Time", selected = sortMetric == AniHyouStatSortMetric.TIME, onClick = { onSortChange(AniHyouStatSortMetric.TIME) })
-            AniHyouFilterChip(label = "Score", selected = sortMetric == AniHyouStatSortMetric.SCORE, onClick = { onSortChange(AniHyouStatSortMetric.SCORE) })
-        }
-        val items = lengths.map { item ->
-            val value = when (sortMetric) {
-                AniHyouStatSortMetric.TITLES -> item.count.toFloat()
-                AniHyouStatSortMetric.TIME -> (item.minutesWatched / 60f)
-                AniHyouStatSortMetric.SCORE -> item.meanScore.toFloat()
+    TrackerGlassCard(shape = ShapeCard) {
+        Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            Text(text = if (isAnime) "Episode Count" else "Chapter Count", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, fontSize = 17.sp), color = Color.White)
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                AniHyouFilterChip(label = "Titles", selected = sortMetric == AniHyouStatSortMetric.TITLES, onClick = { onSortChange(AniHyouStatSortMetric.TITLES) })
+                AniHyouFilterChip(label = "Time", selected = sortMetric == AniHyouStatSortMetric.TIME, onClick = { onSortChange(AniHyouStatSortMetric.TIME) })
+                AniHyouFilterChip(label = "Score", selected = sortMetric == AniHyouStatSortMetric.SCORE, onClick = { onSortChange(AniHyouStatSortMetric.SCORE) })
             }
-            val display = when (sortMetric) {
-                AniHyouStatSortMetric.TITLES -> "${item.count}"
-                AniHyouStatSortMetric.TIME -> "${item.minutesWatched / 60}h"
-                AniHyouStatSortMetric.SCORE -> if (item.meanScore > 0) "${item.meanScore.toInt()}%" else "—"
+            val items = lengths.map { item ->
+                val value = when (sortMetric) {
+                    AniHyouStatSortMetric.TITLES -> item.count.toFloat()
+                    AniHyouStatSortMetric.TIME -> (item.minutesWatched / 60f)
+                    AniHyouStatSortMetric.SCORE -> item.meanScore.toFloat()
+                }
+                val display = when (sortMetric) {
+                    AniHyouStatSortMetric.TITLES -> "${item.count}"
+                    AniHyouStatSortMetric.TIME -> "${item.minutesWatched / 60}h"
+                    AniHyouStatSortMetric.SCORE -> if (item.meanScore > 0) "${item.meanScore.toInt()}%" else "—"
+                }
+                VerticalStatItem(
+                    label = item.length,
+                    value = value,
+                    displayValue = display,
+                    color = stat_dark_blue,
+                )
             }
-            VerticalStatItem(
-                label = item.length,
-                value = value,
-                displayValue = display,
-                color = stat_dark_blue,
-            )
+            AniHyouVerticalStatsBar(stats = items)
         }
-        AniHyouVerticalStatsBar(stats = items)
     }
 }
 
@@ -797,26 +1098,28 @@ private fun AniHyouStatusSection(
     statuses: List<AnilistStatusStatItem>,
     isAnime: Boolean,
 ) {
-    Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text(text = "Status Distribution", style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold, fontSize = 20.sp), color = Color.White)
-        val items = statuses.map { st ->
-            val label = when (st.status.uppercase()) {
-                "CURRENT" -> if (isAnime) "Watching" else "Reading"
-                "COMPLETED" -> "Completed"
-                "PLANNING" -> if (isAnime) "Plan to Watch" else "Plan to Read"
-                "PAUSED" -> "Paused"
-                "DROPPED" -> "Dropped"
-                "REPEATING" -> if (isAnime) "Rewatching" else "Rereading"
-                else -> st.status
+    TrackerGlassCard(shape = ShapeCard) {
+        Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text(text = "Status Distribution", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, fontSize = 17.sp), color = Color.White)
+            val items = statuses.map { st ->
+                val label = when (st.status.uppercase()) {
+                    "CURRENT" -> if (isAnime) "Watching" else "Reading"
+                    "COMPLETED" -> "Completed"
+                    "PLANNING" -> if (isAnime) "Plan to Watch" else "Plan to Read"
+                    "PAUSED" -> "Paused"
+                    "DROPPED" -> "Dropped"
+                    "REPEATING" -> if (isAnime) "Rewatching" else "Rereading"
+                    else -> st.status
+                }
+                HorizontalStatItem(
+                    label = label,
+                    value = st.count.toFloat(),
+                    color = statusToPrimaryColor(st.status),
+                    onColor = statusToOnPrimaryColor(st.status),
+                )
             }
-            HorizontalStatItem(
-                label = label,
-                value = st.count.toFloat(),
-                color = statusToPrimaryColor(st.status),
-                onColor = statusToOnPrimaryColor(st.status),
-            )
+            AniHyouHorizontalStatsBar(stats = items)
         }
-        AniHyouHorizontalStatsBar(stats = items)
     }
 }
 
@@ -824,17 +1127,19 @@ private fun AniHyouStatusSection(
 private fun AniHyouFormatSection(
     formats: List<AnilistFormatStatItem>,
 ) {
-    Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text(text = "Format Distribution", style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold, fontSize = 20.sp), color = Color.White)
-        val items = formats.map { fmt ->
-            HorizontalStatItem(
-                label = fmt.format.replace("_", " "),
-                value = fmt.count.toFloat(),
-                color = formatToPrimaryColor(fmt.format),
-                onColor = formatToOnPrimaryColor(fmt.format),
-            )
+    TrackerGlassCard(shape = ShapeCard) {
+        Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text(text = "Format Distribution", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, fontSize = 17.sp), color = Color.White)
+            val items = formats.map { fmt ->
+                HorizontalStatItem(
+                    label = fmt.format.replace("_", " "),
+                    value = fmt.count.toFloat(),
+                    color = formatToPrimaryColor(fmt.format),
+                    onColor = formatToOnPrimaryColor(fmt.format),
+                )
+            }
+            AniHyouHorizontalStatsBar(stats = items)
         }
-        AniHyouHorizontalStatsBar(stats = items)
     }
 }
 
@@ -842,17 +1147,19 @@ private fun AniHyouFormatSection(
 private fun AniHyouCountrySection(
     countries: List<AnilistCountryStatItem>,
 ) {
-    Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text(text = "Country Distribution", style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold, fontSize = 20.sp), color = Color.White)
-        val items = countries.map { cty ->
-            HorizontalStatItem(
-                label = cty.country,
-                value = cty.count.toFloat(),
-                color = countryToPrimaryColor(cty.country),
-                onColor = countryToOnPrimaryColor(cty.country),
-            )
+    TrackerGlassCard(shape = ShapeCard) {
+        Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text(text = "Country Distribution", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, fontSize = 17.sp), color = Color.White)
+            val items = countries.map { cty ->
+                HorizontalStatItem(
+                    label = cty.country,
+                    value = cty.count.toFloat(),
+                    color = countryToPrimaryColor(cty.country),
+                    onColor = countryToOnPrimaryColor(cty.country),
+                )
+            }
+            AniHyouHorizontalStatsBar(stats = items)
         }
-        AniHyouHorizontalStatsBar(stats = items)
     }
 }
 
@@ -863,35 +1170,37 @@ private fun AniHyouReleaseYearSection(
     onSortChange: (AniHyouStatSortMetric) -> Unit,
     isAnime: Boolean,
 ) {
-    Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text(text = "Release Year", style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold, fontSize = 20.sp), color = Color.White)
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            AniHyouFilterChip(label = "Titles", selected = sortMetric == AniHyouStatSortMetric.TITLES, onClick = { onSortChange(AniHyouStatSortMetric.TITLES) })
-            AniHyouFilterChip(label = "Time", selected = sortMetric == AniHyouStatSortMetric.TIME, onClick = { onSortChange(AniHyouStatSortMetric.TIME) })
-            AniHyouFilterChip(label = "Score", selected = sortMetric == AniHyouStatSortMetric.SCORE, onClick = { onSortChange(AniHyouStatSortMetric.SCORE) })
-        }
-        val items = releaseYears.map { yr ->
-            val value = when (sortMetric) {
-                AniHyouStatSortMetric.TITLES -> yr.count.toFloat()
-                AniHyouStatSortMetric.TIME -> (yr.minutesWatched / 60f)
-                AniHyouStatSortMetric.SCORE -> yr.meanScore.toFloat()
+    TrackerGlassCard(shape = ShapeCard) {
+        Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text(text = "Release Year", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, fontSize = 17.sp), color = Color.White)
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                AniHyouFilterChip(label = "Titles", selected = sortMetric == AniHyouStatSortMetric.TITLES, onClick = { onSortChange(AniHyouStatSortMetric.TITLES) })
+                AniHyouFilterChip(label = "Time", selected = sortMetric == AniHyouStatSortMetric.TIME, onClick = { onSortChange(AniHyouStatSortMetric.TIME) })
+                AniHyouFilterChip(label = "Score", selected = sortMetric == AniHyouStatSortMetric.SCORE, onClick = { onSortChange(AniHyouStatSortMetric.SCORE) })
             }
-            val display = when (sortMetric) {
-                AniHyouStatSortMetric.TITLES -> "${yr.count}"
-                AniHyouStatSortMetric.TIME -> "${yr.minutesWatched / 60}h"
-                AniHyouStatSortMetric.SCORE -> if (yr.meanScore > 0) "${yr.meanScore.toInt()}%" else "—"
+            val items = releaseYears.map { yr ->
+                val value = when (sortMetric) {
+                    AniHyouStatSortMetric.TITLES -> yr.count.toFloat()
+                    AniHyouStatSortMetric.TIME -> (yr.minutesWatched / 60f)
+                    AniHyouStatSortMetric.SCORE -> yr.meanScore.toFloat()
+                }
+                val display = when (sortMetric) {
+                    AniHyouStatSortMetric.TITLES -> "${yr.count}"
+                    AniHyouStatSortMetric.TIME -> "${yr.minutesWatched / 60}h"
+                    AniHyouStatSortMetric.SCORE -> if (yr.meanScore > 0) "${yr.meanScore.toInt()}%" else "—"
+                }
+                VerticalStatItem(
+                    label = "${yr.releaseYear}",
+                    value = value,
+                    displayValue = display,
+                    color = yearToPrimaryColor(yr.releaseYear),
+                )
             }
-            VerticalStatItem(
-                label = "${yr.releaseYear}",
-                value = value,
-                displayValue = display,
-                color = yearToPrimaryColor(yr.releaseYear),
+            AniHyouVerticalStatsBar(
+                stats = items,
+                mapColorTo = { it.color ?: yearToPrimaryColor(it.label.toIntOrNull() ?: 2020) },
             )
         }
-        AniHyouVerticalStatsBar(
-            stats = items,
-            mapColorTo = { it.color ?: yearToPrimaryColor(it.label.toIntOrNull() ?: 2020) },
-        )
     }
 }
 
@@ -902,35 +1211,37 @@ private fun AniHyouWatchYearSection(
     onSortChange: (AniHyouStatSortMetric) -> Unit,
     isAnime: Boolean,
 ) {
-    Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text(text = if (isAnime) "Watch Year" else "Read Year", style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold, fontSize = 20.sp), color = Color.White)
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            AniHyouFilterChip(label = "Titles", selected = sortMetric == AniHyouStatSortMetric.TITLES, onClick = { onSortChange(AniHyouStatSortMetric.TITLES) })
-            AniHyouFilterChip(label = "Time", selected = sortMetric == AniHyouStatSortMetric.TIME, onClick = { onSortChange(AniHyouStatSortMetric.TIME) })
-            AniHyouFilterChip(label = "Score", selected = sortMetric == AniHyouStatSortMetric.SCORE, onClick = { onSortChange(AniHyouStatSortMetric.SCORE) })
-        }
-        val items = startYears.map { yr ->
-            val value = when (sortMetric) {
-                AniHyouStatSortMetric.TITLES -> yr.count.toFloat()
-                AniHyouStatSortMetric.TIME -> (yr.minutesWatched / 60f)
-                AniHyouStatSortMetric.SCORE -> yr.meanScore.toFloat()
+    TrackerGlassCard(shape = ShapeCard) {
+        Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text(text = if (isAnime) "Watch Year" else "Read Year", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, fontSize = 17.sp), color = Color.White)
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                AniHyouFilterChip(label = "Titles", selected = sortMetric == AniHyouStatSortMetric.TITLES, onClick = { onSortChange(AniHyouStatSortMetric.TITLES) })
+                AniHyouFilterChip(label = "Time", selected = sortMetric == AniHyouStatSortMetric.TIME, onClick = { onSortChange(AniHyouStatSortMetric.TIME) })
+                AniHyouFilterChip(label = "Score", selected = sortMetric == AniHyouStatSortMetric.SCORE, onClick = { onSortChange(AniHyouStatSortMetric.SCORE) })
             }
-            val display = when (sortMetric) {
-                AniHyouStatSortMetric.TITLES -> "${yr.count}"
-                AniHyouStatSortMetric.TIME -> "${yr.minutesWatched / 60}h"
-                AniHyouStatSortMetric.SCORE -> if (yr.meanScore > 0) "${yr.meanScore.toInt()}%" else "—"
+            val items = startYears.map { yr ->
+                val value = when (sortMetric) {
+                    AniHyouStatSortMetric.TITLES -> yr.count.toFloat()
+                    AniHyouStatSortMetric.TIME -> (yr.minutesWatched / 60f)
+                    AniHyouStatSortMetric.SCORE -> yr.meanScore.toFloat()
+                }
+                val display = when (sortMetric) {
+                    AniHyouStatSortMetric.TITLES -> "${yr.count}"
+                    AniHyouStatSortMetric.TIME -> "${yr.minutesWatched / 60}h"
+                    AniHyouStatSortMetric.SCORE -> if (yr.meanScore > 0) "${yr.meanScore.toInt()}%" else "—"
+                }
+                VerticalStatItem(
+                    label = "${yr.startYear}",
+                    value = value,
+                    displayValue = display,
+                    color = yearToPrimaryColor(yr.startYear),
+                )
             }
-            VerticalStatItem(
-                label = "${yr.startYear}",
-                value = value,
-                displayValue = display,
-                color = yearToPrimaryColor(yr.startYear),
+            AniHyouVerticalStatsBar(
+                stats = items,
+                mapColorTo = { it.color ?: yearToPrimaryColor(it.label.toIntOrNull() ?: 2020) },
             )
         }
-        AniHyouVerticalStatsBar(
-            stats = items,
-            mapColorTo = { it.color ?: yearToPrimaryColor(it.label.toIntOrNull() ?: 2020) },
-        )
     }
 }
 
@@ -960,16 +1271,28 @@ private fun AniHyouPositionalListSection(
     }
 
     Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        Text(text = title, style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold, fontSize = 20.sp), color = Color.White)
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            AniHyouFilterChip(label = "Titles", selected = sortMetric == AniHyouStatSortMetric.TITLES, onClick = { onSortChange(AniHyouStatSortMetric.TITLES) })
-            AniHyouFilterChip(label = "Time", selected = sortMetric == AniHyouStatSortMetric.TIME, onClick = { onSortChange(AniHyouStatSortMetric.TIME) })
-            AniHyouFilterChip(label = "Score", selected = sortMetric == AniHyouStatSortMetric.SCORE, onClick = { onSortChange(AniHyouStatSortMetric.SCORE) })
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, fontSize = 18.sp),
+                color = Color.White,
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                AniHyouFilterChip(label = "Titles", selected = sortMetric == AniHyouStatSortMetric.TITLES, onClick = { onSortChange(AniHyouStatSortMetric.TITLES) })
+                AniHyouFilterChip(label = "Time", selected = sortMetric == AniHyouStatSortMetric.TIME, onClick = { onSortChange(AniHyouStatSortMetric.TIME) })
+                AniHyouFilterChip(label = "Score", selected = sortMetric == AniHyouStatSortMetric.SCORE, onClick = { onSortChange(AniHyouStatSortMetric.SCORE) })
+            }
         }
 
         if (sorted.isEmpty()) {
-            Box(modifier = Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
-                Text(text = "No $title stats recorded.", color = AniHyouSubtleText, fontSize = 14.sp)
+            TrackerGlassCard(shape = ShapeTile) {
+                Box(modifier = Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
+                    Text(text = "No $title stats recorded.", color = AniHyouSubtleText, fontSize = 14.sp)
+                }
             }
         } else {
             Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -993,13 +1316,29 @@ private fun AniHyouPositionalListSection(
 private fun AniHyouInfoTabContent(user: AnilistFullUserProfile) {
     val primaryColor = AniHyouCyanAccent
     val uriHandler = LocalUriHandler.current
-    val bioBlocks = remember(user.about, primaryColor) { user.about?.let { parseAnilistRichContent(it, primaryColor) } ?: emptyList() }
-    Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        if (bioBlocks.isNotEmpty()) {
-            bioBlocks.forEach { block -> AnilistContentBlockItem(block = block, primaryColor = primaryColor, uriHandler = uriHandler) }
-        } else {
-            Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
-                Text(text = "No bio provided.", style = MaterialTheme.typography.bodyMedium, color = AniHyouSubtleText)
+    val bioBlocks = remember(user.about, primaryColor) {
+        user.about?.let { parseAnilistRichContent(it, primaryColor) } ?: emptyList()
+    }
+    TrackerGlassCard(shape = ShapeCard) {
+        Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            Text(
+                text = "About",
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, fontSize = 17.sp),
+                color = Color.White,
+            )
+            if (bioBlocks.isNotEmpty()) {
+                bioBlocks.forEach { block ->
+                    AnilistContentBlockItem(block = block, primaryColor = primaryColor, uriHandler = uriHandler)
+                }
+            } else {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 20.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(text = "No bio provided.", style = MaterialTheme.typography.bodyMedium, color = AniHyouSubtleText)
+                }
             }
         }
     }
@@ -1020,16 +1359,33 @@ private fun AniHyouActivityTabContent(userId: Int, onAnimeClick: ((Int) -> Unit)
             CircularProgressIndicator(color = AniHyouCyanAccent, strokeWidth = 2.dp)
         }
     } else if (activities.isEmpty()) {
-        Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
-            Text(text = "No recent activity.", style = MaterialTheme.typography.bodyMedium, color = AniHyouSubtleText)
+        TrackerGlassCard(shape = ShapeTile) {
+            Box(modifier = Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
+                Text(text = "No recent activity.", style = MaterialTheme.typography.bodyMedium, color = AniHyouSubtleText)
+            }
         }
     } else {
         Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             activities.forEach { act ->
-                Surface(modifier = Modifier.fillMaxWidth().clickable { onAnimeClick?.invoke(act.mediaId) }, shape = RoundedCornerShape(12.dp), color = AniHyouCardSurface, border = BorderStroke(1.dp, AniHyouChipBorder.copy(alpha = 0.5f))) {
-                    Row(modifier = Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                TrackerGlassCard(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = ShapeTile,
+                    onClick = { onAnimeClick?.invoke(act.mediaId) },
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
                         if (!act.coverImage.isNullOrBlank()) {
-                            AsyncImage(model = act.coverImage, contentDescription = act.mediaTitle, modifier = Modifier.width(42.dp).aspectRatio(0.7f).clip(RoundedCornerShape(6.dp)), contentScale = ContentScale.Crop)
+                            AsyncImage(
+                                model = act.coverImage,
+                                contentDescription = act.mediaTitle,
+                                modifier = Modifier
+                                    .width(44.dp)
+                                    .aspectRatio(0.7f)
+                                    .clip(RoundedCornerShape(8.dp)),
+                                contentScale = ContentScale.Crop,
+                            )
                         }
                         Column(modifier = Modifier.weight(1f)) {
                             val actionText = when {
@@ -1039,10 +1395,10 @@ private fun AniHyouActivityTabContent(userId: Int, onAnimeClick: ((Int) -> Unit)
 
                             Text(
                                 text = actionText,
-                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Medium),
+                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
                                 color = AniHyouCyanAccent,
                             )
-                            Spacer(modifier = Modifier.height(2.dp))
+                            Spacer(modifier = Modifier.height(3.dp))
                             Text(
                                 text = act.mediaTitle,
                                 style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
@@ -1108,8 +1464,17 @@ private fun AniHyouFavoritesTabContent(
                                             modifier = Modifier
                                                 .fillMaxWidth()
                                                 .aspectRatio(0.7f)
-                                                .clip(RoundedCornerShape(8.dp))
-                                                .background(AniHyouCardSurface),
+                                                .clip(RoundedCornerShape(10.dp))
+                                                .border(
+                                                    1.dp,
+                                                    Brush.verticalGradient(
+                                                        listOf(
+                                                            Color.White.copy(alpha = 0.25f),
+                                                            Color.White.copy(alpha = 0.05f),
+                                                        ),
+                                                    ),
+                                                    RoundedCornerShape(10.dp),
+                                                ),
                                         ) {
                                             if (!anime.coverImage.isNullOrBlank()) {
                                                 AsyncImage(
@@ -1120,16 +1485,18 @@ private fun AniHyouFavoritesTabContent(
                                                 )
                                             }
                                             if (anime.averageScore != null && anime.averageScore > 0) {
-                                                Surface(
-                                                    color = Color.Black.copy(alpha = 0.78f),
-                                                    shape = RoundedCornerShape(4.dp),
+                                                Box(
                                                     modifier = Modifier
                                                         .align(Alignment.TopEnd)
-                                                        .padding(4.dp),
+                                                        .padding(5.dp)
+                                                        .clip(ShapePill)
+                                                        .background(Color.Black.copy(alpha = 0.75f))
+                                                        .border(0.5.dp, Color.White.copy(alpha = 0.2f), ShapePill)
+                                                        .padding(horizontal = 5.dp, vertical = 2.dp),
                                                 ) {
                                                     Row(
                                                         verticalAlignment = Alignment.CenterVertically,
-                                                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
+                                                        horizontalArrangement = Arrangement.spacedBy(2.dp),
                                                     ) {
                                                         Icon(
                                                             imageVector = Icons.Default.Star,
@@ -1137,7 +1504,6 @@ private fun AniHyouFavoritesTabContent(
                                                             tint = Color(0xFFFFB800),
                                                             modifier = Modifier.size(10.dp),
                                                         )
-                                                        Spacer(modifier = Modifier.width(2.dp))
                                                         Text(
                                                             text = "${anime.averageScore}%",
                                                             style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp, fontWeight = FontWeight.Bold),
@@ -1147,10 +1513,13 @@ private fun AniHyouFavoritesTabContent(
                                                 }
                                             }
                                         }
-                                        Spacer(modifier = Modifier.height(5.dp))
+                                        Spacer(modifier = Modifier.height(6.dp))
                                         Text(
                                             text = anime.title,
-                                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                            style = MaterialTheme.typography.labelSmall.copy(
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 12.sp,
+                                            ),
                                             color = Color.White,
                                             maxLines = 2,
                                             overflow = TextOverflow.Ellipsis,
@@ -1164,8 +1533,10 @@ private fun AniHyouFavoritesTabContent(
                         }
                     }
                 } else {
-                    Box(modifier = Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
-                        Text("No favorite anime.", color = AniHyouSubtleText)
+                    TrackerGlassCard(shape = ShapeTile) {
+                        Box(modifier = Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
+                            Text("No favorite anime.", color = AniHyouSubtleText)
+                        }
                     }
                 }
             }
@@ -1191,7 +1562,16 @@ private fun AniHyouFavoritesTabContent(
                                             modifier = Modifier
                                                 .size(76.dp)
                                                 .clip(CircleShape)
-                                                .background(AniHyouCardSurface),
+                                                .border(
+                                                    1.5.dp,
+                                                    Brush.linearGradient(
+                                                        listOf(
+                                                            Color.White.copy(alpha = 0.50f),
+                                                            Color.White.copy(alpha = 0.10f),
+                                                        ),
+                                                    ),
+                                                    CircleShape,
+                                                ),
                                         ) {
                                             if (!char.image.isNullOrBlank()) {
                                                 AsyncImage(
@@ -1202,10 +1582,13 @@ private fun AniHyouFavoritesTabContent(
                                                 )
                                             }
                                         }
-                                        Spacer(modifier = Modifier.height(5.dp))
+                                        Spacer(modifier = Modifier.height(6.dp))
                                         Text(
                                             text = char.name,
-                                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                            style = MaterialTheme.typography.labelSmall.copy(
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 12.sp,
+                                            ),
                                             color = Color.White,
                                             maxLines = 2,
                                             overflow = TextOverflow.Ellipsis,
@@ -1220,8 +1603,10 @@ private fun AniHyouFavoritesTabContent(
                         }
                     }
                 } else {
-                    Box(modifier = Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
-                        Text("No favorite characters.", color = AniHyouSubtleText)
+                    TrackerGlassCard(shape = ShapeTile) {
+                        Box(modifier = Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
+                            Text("No favorite characters.", color = AniHyouSubtleText)
+                        }
                     }
                 }
             }
@@ -1278,17 +1663,19 @@ private fun AniHyouSocialTabContent(
                 CircularProgressIndicator(color = AniHyouCyanAccent, strokeWidth = 2.dp)
             }
         } else if (users.isEmpty()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(32.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    text = "No $socialSubTab found.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = AniHyouSubtleText,
-                )
+            TrackerGlassCard(shape = ShapeTile) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(24.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = "No $socialSubTab found.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = AniHyouSubtleText,
+                    )
+                }
             }
         } else {
             Column(
@@ -1296,22 +1683,28 @@ private fun AniHyouSocialTabContent(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 users.forEach { u ->
-                    Surface(
+                    TrackerGlassCard(
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp),
-                        color = AniHyouCardSurface,
-                        border = BorderStroke(1.dp, AniHyouChipBorder.copy(alpha = 0.5f)),
+                        shape = ShapeTile,
                     ) {
                         Row(
-                            modifier = Modifier.padding(10.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(12.dp),
                         ) {
                             Box(
                                 modifier = Modifier
-                                    .size(40.dp)
+                                    .size(42.dp)
                                     .clip(CircleShape)
-                                    .background(AniHyouChipActiveBg),
+                                    .border(
+                                        1.dp,
+                                        Brush.linearGradient(
+                                            listOf(
+                                                Color.White.copy(alpha = 0.50f),
+                                                Color.White.copy(alpha = 0.10f),
+                                            ),
+                                        ),
+                                        CircleShape,
+                                    ),
                             ) {
                                 if (!u.avatar.isNullOrBlank()) {
                                     AsyncImage(
