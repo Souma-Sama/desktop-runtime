@@ -154,12 +154,16 @@ fun StreamsScreen(
     }
     val initialEffectiveId = remember(anilistIdForStream, videoId, seasonNumber, episodeNumber) {
         if (anilistIdForStream != null) {
+            val offset = com.nuvio.app.features.anilist.catalog.AnilistMetaDetailsResolver.getCachedEpisodeOffset(anilistIdForStream)
+            val ep = episodeNumber ?: 1
+            val relEp = if (offset > 0 && ep > offset) (ep - offset) else ep
             com.nuvio.app.features.anilist.streams.AnimeStreamIdManager.resolvePlaybackVideoId(
                 parentMetaId = parentMetaId,
                 season = seasonNumber ?: 1,
-                episode = episodeNumber ?: 1,
+                episode = ep,
                 isMovie = type == "movie",
                 fallbackVideoId = videoId,
+                relativeEpisode = relEp,
             )
         } else {
             videoId

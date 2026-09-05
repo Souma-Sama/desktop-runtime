@@ -39,6 +39,7 @@ object AnilistMetaDetailsResolver {
     private fun JsonElement?.asIntOrNull(): Int? = if (this is JsonPrimitive && this !is JsonNull) (this.intOrNull ?: this.contentOrNull?.toIntOrNull()) else null
 
     private val resolvedMetaDetailsCache = mutableMapOf<String, MetaDetails>()
+    private val episodeOffsetCache = mutableMapOf<Int, Int>()
 
     fun buildBaseMetaFromAnilistMedia(
         media: AnilistMedia,
@@ -1410,6 +1411,33 @@ object AnilistMetaDetailsResolver {
         return resolveEpisodeOffset(media, arm.season, emptyList())
     }
 
+    fun getCachedEpisodeOffset(anilistId: Int): Int {
+        episodeOffsetCache[anilistId]?.let { return it }
+        val media = AnilistApi.getCachedMedia(anilistId)
+            ?: AnilistTrackerCoordinator.getCachedMedia(anilistId)
+        if (media != null && media.relations.isNotEmpty()) {
+            val arm = armMappingCache[anilistId]
+            val targetSeason = arm?.season ?: 1
+            if (targetSeason > 0) {
+                var sum = 0
+                val prequels = media.relations.filter { it.relationType.equals("PREQUEL", ignoreCase = true) }
+                for (prequel in prequels) {
+                    val prequelArm = armMappingCache[prequel.id]
+                    if (prequelArm != null && prequelArm.season == targetSeason) {
+                        val pMedia = AnilistApi.getCachedMedia(prequel.id)
+                        val eps = pMedia?.episodes ?: 0
+                        sum += eps
+                    }
+                }
+                if (sum > 0) {
+                    episodeOffsetCache[anilistId] = sum
+                    return sum
+                }
+            }
+        }
+        return 0
+    }
+
     private suspend fun resolveEpisodeOffset(
         media: AnilistMedia?,
         targetSeason: Int,
@@ -1420,13 +1448,17 @@ object AnilistMetaDetailsResolver {
         // 1. Dynamic ARM Season-Aware Prequel Summation
         val armOffset = collectPrequelChainBySeason(media.relations, targetSeason)
         if (armOffset > 0) {
+            episodeOffsetCache[media.id] = armOffset
             return armOffset
         }
 
         // 2. Secondary Heuristic: Title Regex Part/Cour Summation
         val title = (media.title?.displayTitle.orEmpty() + " " + media.title?.romaji.orEmpty() + " " + media.title?.english.orEmpty())
         val partNum = extractPartNumber(title)
-        if (partNum <= 1) return 0
+        if (partNum <= 1) {
+            episodeOffsetCache[media.id] = 0
+            return 0
+        }
 
         // Traverse all prequels in the chain
         val traversed = collectPrequelChain(media.relations, title)
@@ -1443,6 +1475,7 @@ object AnilistMetaDetailsResolver {
             totalOffset += missingParts.size * avgPrequelEps
         }
 
+        episodeOffsetCache[media.id] = totalOffset
         return totalOffset
     }
 

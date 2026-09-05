@@ -121,7 +121,7 @@ import org.jetbrains.compose.resources.painterResource
 import kotlin.math.roundToInt
 
 // Status Color Tokens
-private val StatusColorWatching = Color(0xFF00A2FF)
+internal val StatusColorWatching = Color(0xFF00A2FF)
 private val StatusColorPlanning = Color(0xFFA855F7)
 private val StatusColorCompleted = Color(0xFF10B981)
 private val StatusColorOnHold = Color(0xFFF59E0B)
@@ -156,10 +156,10 @@ internal val ShapeProgressBar = RoundedCornerShape(3.dp)
 private val PosterBorderBrush = Brush.verticalGradient(
     listOf(Color.White.copy(alpha = 0.35f), Color.White.copy(alpha = 0.10f)),
 )
-private val AnilistEmblemBgBrush = Brush.linearGradient(
+internal val AnilistEmblemBgBrush = Brush.linearGradient(
     listOf(Color(0xFF00B4D8), Color(0xFF0077B6)),
 )
-private val AnilistEmblemBorderBrush = Brush.verticalGradient(
+internal val AnilistEmblemBorderBrush = Brush.verticalGradient(
     listOf(Color.White.copy(alpha = 0.50f), Color.White.copy(alpha = 0.20f)),
 )
 private val DeleteNormalBgBrush = Brush.verticalGradient(

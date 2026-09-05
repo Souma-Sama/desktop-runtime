@@ -140,12 +140,18 @@ object AnimeStreamIdManager {
             ?: return fallbackVideoId
         val activeOption = getActiveOption(anilistId)
         val targetSeason = if (activeOption.season == 0 || season == 0) 0 else if (activeOption.season > 0) activeOption.season else season
+        val offset = com.nuvio.app.features.anilist.catalog.AnilistMetaDetailsResolver.getCachedEpisodeOffset(anilistId)
+        val effectiveRelativeEp = if (relativeEpisode == episode && offset > 0 && episode > offset) {
+            episode - offset
+        } else {
+            relativeEpisode
+        }
         return AnimeStreamIdFormatter.formatVideoId(
             option = activeOption,
             season = targetSeason,
             episode = episode,
             isMovie = isMovie,
-            relativeEpisode = relativeEpisode,
+            relativeEpisode = effectiveRelativeEp,
         )
     }
 }
