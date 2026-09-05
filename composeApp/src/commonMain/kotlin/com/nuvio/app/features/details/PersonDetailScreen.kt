@@ -124,12 +124,15 @@ fun PersonDetailScreen(
             isAnilist = isAnilist,
             isCharacter = isCharacter,
         )
+        val outage = com.nuvio.app.features.anilist.AnilistApi.outageMessage.value
         uiState = if (detail != null) {
             PersonDetailUiState.Success(
                 if (detail.profilePhoto.isNullOrBlank() && !initialProfilePhoto.isNullOrBlank()) {
                     detail.copy(profilePhoto = initialProfilePhoto)
                 } else detail
             )
+        } else if (isAnilist && !outage.isNullOrBlank()) {
+            PersonDetailUiState.Error(outage)
         } else {
             PersonDetailUiState.Error(getString(Res.string.person_load_failed, personName))
         }
@@ -1366,9 +1369,16 @@ private fun PersonDetailError(
             ),
         contentAlignment = Alignment.Center,
     ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.padding(horizontal = 24.dp),
+        ) {
+            val isAniListOutage = message.contains("AniList", ignoreCase = true) ||
+                message.contains("temporarily disabled", ignoreCase = true) ||
+                message.contains("stability issues", ignoreCase = true)
+
             Text(
-                text = stringResource(Res.string.person_something_wrong),
+                text = if (isAniListOutage) "AniList Service Outage" else stringResource(Res.string.person_something_wrong),
                 style = MaterialTheme.typography.titleLarge,
                 color = MaterialTheme.colorScheme.onSurface,
             )
@@ -1377,6 +1387,7 @@ private fun PersonDetailError(
                 text = message,
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
             )
             Spacer(modifier = Modifier.height(24.dp))
             Button(

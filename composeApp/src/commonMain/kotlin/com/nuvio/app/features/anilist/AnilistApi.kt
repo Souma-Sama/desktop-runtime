@@ -5,6 +5,9 @@ import com.nuvio.app.features.addons.httpPostJsonWithHeaders
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
@@ -49,6 +52,12 @@ object AnilistApi {
         val timestamp: Long,
         val data: JsonObject,
     )
+
+    private val _outageMessage = MutableStateFlow<String?>(null)
+    val outageMessage: StateFlow<String?> = _outageMessage.asStateFlow()
+
+    var lastErrorMessage: String? = null
+        private set
 
     var lastDebugLog: String = "No requests made yet"
         private set
@@ -113,6 +122,13 @@ object AnilistApi {
                     }
                     lastDebugLog = "HTTP POST $GRAPHQL_ENDPOINT\nPayload: $payload\nResponse: ${responseText.take(400)}"
                 } catch (e: Exception) {
+                    val exMsg = e.message
+                    if (exMsg?.contains("temporarily disabled", ignoreCase = true) == true ||
+                        exMsg?.contains("stability issues", ignoreCase = true) == true) {
+                        _outageMessage.value = exMsg
+                        lastErrorMessage = exMsg
+                        return@withPermit null
+                    }
                     lastDebugLog = "HTTP POST $GRAPHQL_ENDPOINT failed (attempt $attempt): ${e.message}\nPayload: $payload"
                     log.w(e) { "executeGraphQL attempt $attempt failed: ${e.message}" }
                     if (attempt < maxAttempts) {
@@ -139,6 +155,23 @@ object AnilistApi {
                         val status = errors.firstOrNull()?.jsonObject?.get("status")?.jsonPrimitive?.intOrNull
                         lastDebugLog = "GraphQL Error: $errMsg (status: $status)\nRaw: $responseText"
 
+                        if (!errMsg.isNullOrBlank()) {
+                            lastErrorMessage = errMsg
+                        }
+
+                        val isOutage = status == 403 ||
+                            errMsg?.contains("temporarily disabled", ignoreCase = true) == true ||
+                            errMsg?.contains("stability issues", ignoreCase = true) == true ||
+                            errMsg?.contains("maintenance", ignoreCase = true)
+
+                        if (isOutage) {
+                            val cleanMsg = errMsg ?: "The AniList API has been temporarily disabled due to severe stability issues."
+                            _outageMessage.value = cleanMsg
+                            lastErrorMessage = cleanMsg
+                            log.w { "AniList API outage detected: $cleanMsg" }
+                            return@withPermit null
+                        }
+
                         // Check for rate limiting
                         val isRateLimited = status == 429 ||
                                             errMsg?.contains("Too Many Requests", ignoreCase = true) == true ||
@@ -151,6 +184,8 @@ object AnilistApi {
                     }
 
                     if (root.containsKey("data") && root["data"] !is JsonNull) {
+                        _outageMessage.value = null
+                        lastErrorMessage = null
                         if (!isMutation) {
                             responseCacheMutex.withLock {
                                 responseCache[cacheKey] = CachedGraphQLResponse(timestamp = now, data = root)
@@ -158,6 +193,8 @@ object AnilistApi {
                         }
                         return@withPermit root
                     } else if (errors == null || errors.isEmpty()) {
+                        _outageMessage.value = null
+                        lastErrorMessage = null
                         return@withPermit root
                     }
                 } catch (e: Exception) {

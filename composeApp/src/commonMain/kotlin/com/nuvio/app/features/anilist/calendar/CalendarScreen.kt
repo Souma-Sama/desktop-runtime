@@ -158,20 +158,32 @@ fun CalendarScreen(
             val hasSchedule = remember(state.scheduleItems) {
                 state.scheduleItems.values.any { it.isNotEmpty() }
             }
+            val outageMessage by com.nuvio.app.features.anilist.AnilistApi.outageMessage.collectAsState()
+            val effectiveError = outageMessage ?: state.errorMessage
+
             if (state.isLoading && !hasSchedule) {
                 CircularProgressIndicator(
                     color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(44.dp),
                 )
-            } else if (state.errorMessage != null && !hasSchedule) {
+            } else if (effectiveError != null && !hasSchedule) {
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(10.dp),
+                    modifier = Modifier.padding(horizontal = 24.dp),
                 ) {
+                    if (effectiveError.contains("AniList", ignoreCase = true) || effectiveError.contains("temporarily disabled", ignoreCase = true)) {
+                        Text(
+                            text = "AniList Service Outage",
+                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                    }
                     Text(
-                        text = state.errorMessage ?: "Unable to load airing schedule",
+                        text = effectiveError,
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                     )
                     Box(
                         modifier = Modifier

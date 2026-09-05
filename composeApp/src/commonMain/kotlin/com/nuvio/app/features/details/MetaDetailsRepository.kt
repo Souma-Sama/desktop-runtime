@@ -185,8 +185,9 @@ object MetaDetailsRepository {
             }
 
             log.w { "No addon provides meta for type=$type id=$id (lookupId=$metaLookupId)" }
+            val outage = if (isAnilistItem) com.nuvio.app.features.anilist.AnilistApi.outageMessage.value else null
             _uiState.value = MetaDetailsUiState(
-                errorMessage = getString(Res.string.details_no_addon_meta),
+                errorMessage = outage ?: getString(Res.string.details_no_addon_meta),
             )
             activeRequestKey = null
         }

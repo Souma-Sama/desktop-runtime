@@ -136,6 +136,10 @@ private suspend fun executeTextRequest(
     desktopHttpClient.newCall(request).execute().use { response ->
         val payload = readResponseBody(response.body)
         if (!response.isSuccessful) {
+            val isJson = payload.isNotBlank() && (payload.trimStart().startsWith("{") || payload.trimStart().startsWith("["))
+            if (isJson) {
+                return@use payload
+            }
             error("HTTP request failed with status ${response.code}")
         }
         if (payload.isBlank()) {

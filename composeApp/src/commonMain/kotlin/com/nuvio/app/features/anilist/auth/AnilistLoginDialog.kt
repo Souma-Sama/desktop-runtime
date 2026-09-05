@@ -176,7 +176,8 @@ fun AnilistLoginDialog(
                             onSuccess?.invoke()
                             onDismiss()
                         } else {
-                            errorMessage = "Invalid token or network error. Please try again."
+                            val outage = com.nuvio.app.features.anilist.AnilistApi.outageMessage.value
+                            errorMessage = outage ?: "Invalid token or network error. Please try again."
                         }
                     }
                 },

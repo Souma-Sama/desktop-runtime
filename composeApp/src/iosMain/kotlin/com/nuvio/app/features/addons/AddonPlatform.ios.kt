@@ -128,6 +128,10 @@ actual suspend fun httpGetTextWithHeaders(
         .let { response ->
             val payload = response.bodyAsText()
             if (!response.status.isSuccess()) {
+                val isJson = payload.isNotBlank() && (payload.trimStart().startsWith("{") || payload.trimStart().startsWith("["))
+                if (isJson) {
+                    return@let payload
+                }
                 error(runBlocking { getString(Res.string.network_request_failed_http, response.status.value) })
             }
             if (payload.isBlank()) {
@@ -153,6 +157,10 @@ actual suspend fun httpPostJsonWithHeaders(
         .let { response ->
             val payload = response.bodyAsText()
             if (!response.status.isSuccess()) {
+                val isJson = payload.isNotBlank() && (payload.trimStart().startsWith("{") || payload.trimStart().startsWith("["))
+                if (isJson) {
+                    return@let payload
+                }
                 error(runBlocking { getString(Res.string.network_request_failed_http, response.status.value) })
             }
             if (payload.isBlank()) {

@@ -167,7 +167,8 @@ internal fun ExploreMediaListView(
                 page = targetPage
             } catch (e: Exception) {
                 if (targetPage == 1) {
-                    errorMessage = e.message ?: "Failed to load chart"
+                    val outage = com.nuvio.app.features.anilist.AnilistApi.outageMessage.value
+                    errorMessage = outage ?: e.message ?: "Failed to load chart"
                 }
             } finally {
                 isLoading = false

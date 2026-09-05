@@ -208,6 +208,10 @@ private suspend fun executeTextRequest(
     AddonHttpClientProvider.get().newCall(request).execute().use { response ->
         val payload = readResponseBody(response.body)
         if (!response.isSuccessful) {
+            val isJson = payload.isNotBlank() && (payload.trimStart().startsWith("{") || payload.trimStart().startsWith("["))
+            if (isJson) {
+                return@use payload
+            }
             error(runBlocking { getString(Res.string.network_request_failed_http, response.code) })
         }
         if (payload.isBlank()) {

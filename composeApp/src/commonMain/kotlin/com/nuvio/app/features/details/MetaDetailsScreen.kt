@@ -478,19 +478,25 @@ fun MetaDetailsScreen(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
+                    val isOutage = uiState.errorMessage?.contains("AniList", ignoreCase = true) == true ||
+                        uiState.errorMessage?.contains("temporarily disabled", ignoreCase = true) == true ||
+                        uiState.errorMessage?.contains("stability issues", ignoreCase = true) == true
                     Text(
-                        text = stringResource(Res.string.details_failed_to_load),
+                        text = if (isOutage) "AniList Service Outage" else stringResource(Res.string.details_failed_to_load),
                         style = MaterialTheme.typography.titleLarge,
                         color = MaterialTheme.colorScheme.onBackground,
                     )
                     Text(
-                        text = when (networkStatusUiState.condition) {
+                        text = if (isOutage) {
+                            uiState.errorMessage.orEmpty()
+                        } else when (networkStatusUiState.condition) {
                             NetworkCondition.NoInternet -> stringResource(Res.string.details_check_connection)
                             NetworkCondition.ServersUnreachable -> stringResource(Res.string.details_servers_unreachable)
                             else -> uiState.errorMessage.orEmpty()
                         },
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     Button(

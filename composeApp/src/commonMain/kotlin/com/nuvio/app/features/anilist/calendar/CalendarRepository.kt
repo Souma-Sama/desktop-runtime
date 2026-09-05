@@ -108,11 +108,12 @@ object CalendarRepository {
         } catch (e: Exception) {
             log.e(e) { "Failed to load weekly schedule" }
             val existing = mutex.withLock { weeklyScheduleCache }
+            val outage = AnilistApi.outageMessage.value
             _uiState.value = _uiState.value.copy(
                 scheduleItems = existing ?: emptyMap(),
                 isLoading = false,
                 errorMessage = if (existing == null || existing.values.all { it.isEmpty() }) {
-                    e.message ?: "AniList service is temporarily unavailable. Please try again later."
+                    outage ?: e.message ?: "AniList service is temporarily unavailable. Please try again later."
                 } else null,
             )
         }
@@ -179,7 +180,10 @@ object CalendarRepository {
         }
 
         val json = AnilistApi.executeGraphQL(query, variables)
-            ?: throw IllegalStateException("AniList service is temporarily unavailable. Please try again later.")
+        if (json == null) {
+            val outage = AnilistApi.outageMessage.value
+            throw IllegalStateException(outage ?: "AniList service is temporarily unavailable. Please try again later.")
+        }
         val pageObj = json["data"].asJsonObjectOrNull()?.get("Page").asJsonObjectOrNull()
             ?: throw IllegalStateException("Unable to parse airing schedule from AniList.")
         val schedules = pageObj["airingSchedules"].asJsonArrayOrNull()
