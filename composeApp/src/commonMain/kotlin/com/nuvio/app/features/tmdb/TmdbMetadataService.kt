@@ -69,21 +69,7 @@ object TmdbMetadataService {
                 }
             }.getOrNull()
 
-            val resolved = anilistPerson ?: if (!fallbackName.isNullOrBlank()) {
-                PersonDetail(
-                    tmdbId = personId,
-                    name = fallbackName,
-                    biography = null,
-                    birthday = null,
-                    deathday = null,
-                    placeOfBirth = "Japan",
-                    profilePhoto = null,
-                    knownFor = if (isCharacter) "Character" else "Voice Acting",
-                    movieCredits = emptyList(),
-                    tvCredits = emptyList(),
-                )
-            } else null
-
+            val resolved = anilistPerson
             if (resolved != null) {
                 personCache[cacheKey] = resolved
             }
@@ -91,26 +77,12 @@ object TmdbMetadataService {
         }
 
         val anilistFallback = if (personId > 0 || !fallbackName.isNullOrBlank()) {
-            val staffDetail = runCatching {
+            runCatching {
                 com.nuvio.app.features.anilist.AnilistApi.fetchStaffDetail(
                     staffId = personId.takeIf { it > 0 },
                     searchName = fallbackName,
                 )
             }.getOrNull()
-            staffDetail ?: if (!fallbackName.isNullOrBlank()) {
-                PersonDetail(
-                    tmdbId = personId,
-                    name = fallbackName,
-                    biography = null,
-                    birthday = null,
-                    deathday = null,
-                    placeOfBirth = "Japan",
-                    profilePhoto = null,
-                    knownFor = "Voice Acting",
-                    movieCredits = emptyList(),
-                    tvCredits = emptyList(),
-                )
-            } else null
         } else null
 
         if (!settings.enabled || !settings.hasApiKey || personId <= 0) {

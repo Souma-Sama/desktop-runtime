@@ -84,6 +84,18 @@ object CalendarRepository {
 
         try {
             val schedule = fetchWeeklyScheduleFromApi()
+            val hasItems = schedule.values.any { it.isNotEmpty() }
+            if (!hasItems) {
+                val existing = mutex.withLock { weeklyScheduleCache }
+                if (existing != null && existing.values.any { it.isNotEmpty() }) {
+                    _uiState.value = _uiState.value.copy(
+                        scheduleItems = existing,
+                        isLoading = false,
+                        errorMessage = null,
+                    )
+                    return
+                }
+            }
             mutex.withLock {
                 weeklyScheduleCache = schedule
                 weeklyScheduleCachedAtMs = now
@@ -95,9 +107,13 @@ object CalendarRepository {
             )
         } catch (e: Exception) {
             log.e(e) { "Failed to load weekly schedule" }
+            val existing = mutex.withLock { weeklyScheduleCache }
             _uiState.value = _uiState.value.copy(
+                scheduleItems = existing ?: emptyMap(),
                 isLoading = false,
-                errorMessage = e.message ?: "Failed to load weekly schedule",
+                errorMessage = if (existing == null || existing.values.all { it.isEmpty() }) {
+                    e.message ?: "AniList service is temporarily unavailable. Please try again later."
+                } else null,
             )
         }
     }
@@ -162,11 +178,12 @@ object CalendarRepository {
             put("airingAt_lesser", sundayEndSec)
         }
 
-        val json = AnilistApi.executeGraphQL(query, variables) ?: return@withContext emptyMap()
-        val schedules = json["data"].asJsonObjectOrNull()
-            ?.get("Page").asJsonObjectOrNull()
-            ?.get("airingSchedules").asJsonArrayOrNull()
-            ?: return@withContext emptyMap()
+        val json = AnilistApi.executeGraphQL(query, variables)
+            ?: throw IllegalStateException("AniList service is temporarily unavailable. Please try again later.")
+        val pageObj = json["data"].asJsonObjectOrNull()?.get("Page").asJsonObjectOrNull()
+            ?: throw IllegalStateException("Unable to parse airing schedule from AniList.")
+        val schedules = pageObj["airingSchedules"].asJsonArrayOrNull()
+            ?: throw IllegalStateException("Unable to parse airing schedule items.")
 
         val hideAdult = AnilistPreferencesRepository.snapshot().hideAdultContent
         val preferredLang = AnilistPreferencesRepository.snapshot().preferredTitleLanguage.name

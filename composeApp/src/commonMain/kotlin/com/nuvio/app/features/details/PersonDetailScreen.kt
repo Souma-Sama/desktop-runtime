@@ -23,12 +23,15 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
@@ -110,7 +113,9 @@ fun PersonDetailScreen(
     }.collectAsStateWithLifecycle()
     val resolvedAvatarTransitionKey = avatarTransitionKey ?: castAvatarSharedTransitionKey(personId)
 
-    LaunchedEffect(personId, personName, isAnilist, isCharacter) {
+    var retryTrigger by remember { mutableStateOf(0) }
+
+    LaunchedEffect(personId, personName, isAnilist, isCharacter, retryTrigger) {
         uiState = PersonDetailUiState.Loading
         val detail = TmdbMetadataService.fetchPersonDetail(
             personId = personId,
@@ -133,7 +138,12 @@ fun PersonDetailScreen(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background),
+            .background(MaterialTheme.colorScheme.background)
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = {},
+            ),
     ) {
         when (val state = uiState) {
             is PersonDetailUiState.Loading -> PersonDetailSkeleton(
@@ -147,8 +157,7 @@ fun PersonDetailScreen(
             is PersonDetailUiState.Error -> PersonDetailError(
                 message = state.message,
                 onRetry = {
-                    uiState = PersonDetailUiState.Loading
-                    // Retry will be triggered by the LaunchedEffect above if we reset
+                    retryTrigger++
                 },
             )
             is PersonDetailUiState.Success -> PersonDetailContent(
@@ -414,7 +423,34 @@ private fun PersonDetailContent(
                                     headerHorizontalPadding = 20.dp,
                                     onPosterClick = onOpenMeta,
                                     onPosterLongClick = onPosterLongClick,
-                                )
+                                    )
+                            }
+
+                            if (allCredits.isEmpty()) {
+                                Spacer(modifier = Modifier.height(32.dp))
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 32.dp),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    Column(
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Rounded.Info,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                                            modifier = Modifier.size(40.dp),
+                                        )
+                                        Text(
+                                            text = "No media credits available",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    }
+                                }
                             }
 
                             Spacer(modifier = Modifier.height(32.dp))
@@ -546,6 +582,38 @@ private fun WidePersonDetailContent(
                         onPosterClick = onOpenMeta,
                         onPosterLongClick = onPosterLongClick,
                     )
+                }
+
+                val hasAnyCredits = popularCredits.isNotEmpty() ||
+                    animeTvCredits.isNotEmpty() ||
+                    animeMovieCredits.isNotEmpty() ||
+                    latestCredits.isNotEmpty() ||
+                    upcomingCredits.isNotEmpty()
+
+                if (!hasAnyCredits) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 80.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(10.dp),
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.Info,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                                modifier = Modifier.size(44.dp),
+                            )
+                            Text(
+                                text = "No media credits available",
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
                 }
             }
             NuvioDesktopVerticalScrollbar(
@@ -1290,7 +1358,12 @@ private fun PersonDetailError(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background),
+            .background(MaterialTheme.colorScheme.background)
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = {},
+            ),
         contentAlignment = Alignment.Center,
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {

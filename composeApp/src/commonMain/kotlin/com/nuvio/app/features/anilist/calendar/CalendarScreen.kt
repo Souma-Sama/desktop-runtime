@@ -4,6 +4,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -102,7 +103,12 @@ fun CalendarScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background),
+            .background(MaterialTheme.colorScheme.background)
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = {},
+            ),
     ) {
         // AniHyou-style Top Bar
         CalendarHeader(
@@ -149,12 +155,15 @@ fun CalendarScreen(
                 .weight(1f),
             contentAlignment = Alignment.Center,
         ) {
-            if (state.isLoading && state.scheduleItems.isEmpty()) {
+            val hasSchedule = remember(state.scheduleItems) {
+                state.scheduleItems.values.any { it.isNotEmpty() }
+            }
+            if (state.isLoading && !hasSchedule) {
                 CircularProgressIndicator(
                     color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(44.dp),
                 )
-            } else if (state.errorMessage != null && state.scheduleItems.isEmpty()) {
+            } else if (state.errorMessage != null && !hasSchedule) {
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -177,6 +186,34 @@ fun CalendarScreen(
                     ) {
                         Text(
                             text = "Retry",
+                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.onPrimary,
+                        )
+                    }
+                }
+            } else if (!hasSchedule) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    Text(
+                        text = "No scheduled anime broadcasts found for this week",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(MaterialTheme.colorScheme.primary)
+                            .clickable {
+                                scope.launch {
+                                    CalendarRepository.loadWeeklySchedule(force = true)
+                                }
+                            }
+                            .padding(horizontal = 18.dp, vertical = 8.dp),
+                    ) {
+                        Text(
+                            text = "Refresh",
                             style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
                             color = MaterialTheme.colorScheme.onPrimary,
                         )
