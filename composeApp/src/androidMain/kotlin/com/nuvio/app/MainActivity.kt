@@ -124,6 +124,7 @@ open class MainActivity : AppCompatActivity() {
         AnilistAuthStorage.initialize(applicationContext)
         AnilistPreferencesStorage.initialize(applicationContext)
         AnilistLibraryStorage.initialize(applicationContext)
+        com.nuvio.app.features.anilist.streams.ArmLocalCache.initialize(applicationContext)
         LibraryDisplaySettingsStorage.initialize(applicationContext)
         ContinueWatchingPreferencesStorage.initialize(applicationContext)
         ResumePromptStorage.initialize(applicationContext)

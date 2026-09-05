@@ -12,6 +12,8 @@ import com.nuvio.app.features.anilist.AnilistRelation
 import com.nuvio.app.features.anilist.AnilistTitleLanguage
 import com.nuvio.app.features.anilist.AnilistTrackerCoordinator
 import com.nuvio.app.features.anilist.streams.AnimeStreamIdManager
+import com.nuvio.app.features.anilist.streams.ArmLocalCache
+import com.nuvio.app.features.anilist.streams.ArmStaticIndex
 import com.nuvio.app.features.artwork.MetaHubArtwork
 import com.nuvio.app.features.details.MetaDetails
 import com.nuvio.app.features.details.MetaTrailer
@@ -290,6 +292,8 @@ object AnilistMetaDetailsResolver {
         // If we already have cached media (from home/catalog/search/anichart), construct baseMeta instantly!
         if (cached != null) {
             val cachedArm = armMappingCache[anilistId]
+                ?: ArmStaticIndex.find(anilistId)?.also { armMappingCache[anilistId] = it }
+                ?: ArmLocalCache.get(anilistId)?.also { armMappingCache[anilistId] = it }
             if (cachedArm == null) {
                 launch {
                     runCatching { resolveArmMapping(anilistId) }
@@ -559,8 +563,33 @@ object AnilistMetaDetailsResolver {
 
         // Stream ARM mapping & Metahub backdrop & Kitsu episodes concurrently
         launch {
-            val media = mediaDeferred.await()
             val arm = armDeferred.await()
+            val directImdbId = arm.imdbId
+
+            // Fast-path: If direct IMDb ID is present (0ms hit from static index or local cache), emit Metahub backdrop/logo and register streams immediately
+            if (!directImdbId.isNullOrBlank()) {
+                val cachedIsSpecial = cachedMedia?.let { isSpecialAnime(it) } ?: false
+                val fastSeason = if (cachedIsSpecial || arm.season == 0) 0 else arm.season
+                AnimeStreamIdManager.registerOptions(
+                    anilistId = anilistId,
+                    imdbId = directImdbId,
+                    kitsuId = arm.kitsuId?.removePrefix("kitsu:"),
+                    tmdbId = arm.tmdbId,
+                    season = fastSeason,
+                )
+                MetaHubArtwork.cacheImdbId("ani_$anilistId", directImdbId)
+                MetaHubArtwork.cacheImdbId("anilist:$anilistId", directImdbId)
+                val metahubBackdrop = "https://images.metahub.space/background/medium/$directImdbId/img"
+                val metahubLogo = if (!cachedIsSpecial && fastSeason != 0) "https://images.metahub.space/logo/medium/$directImdbId/img" else null
+                onUpdate { current ->
+                    current.copy(
+                        background = metahubBackdrop,
+                        logo = metahubLogo ?: current.logo,
+                    )
+                }
+            }
+
+            val media = mediaDeferred.await()
             val effectiveImdbId = resolveEffectiveImdbId(media, arm.imdbId)
             val isSpecial = isSpecialAnime(media)
             val targetSeason = when {
@@ -572,7 +601,7 @@ object AnilistMetaDetailsResolver {
             val kitsuId = arm.kitsuId?.removePrefix("kitsu:")?.takeIf { it.isNotBlank() }
                 ?: resolveKitsuId(anilistId, media)
 
-            com.nuvio.app.features.anilist.streams.AnimeStreamIdManager.registerOptions(
+            AnimeStreamIdManager.registerOptions(
                 anilistId = anilistId,
                 imdbId = effectiveImdbId,
                 kitsuId = kitsuId,
@@ -580,8 +609,8 @@ object AnilistMetaDetailsResolver {
                 season = targetSeason,
             )
 
-            // Update Metahub backdrop immediately as soon as IMDb ID resolves
-            if (!effectiveImdbId.isNullOrBlank()) {
+            // Refine Metahub backdrop if not set during fast-path or if effectiveImdbId/isSpecial changed
+            if (!effectiveImdbId.isNullOrBlank() && (directImdbId.isNullOrBlank() || isSpecial || targetSeason == 0)) {
                 MetaHubArtwork.cacheImdbId("ani_$anilistId", effectiveImdbId)
                 MetaHubArtwork.cacheImdbId("anilist:$anilistId", effectiveImdbId)
                 val metahubBackdrop = "https://images.metahub.space/background/medium/$effectiveImdbId/img"
@@ -738,8 +767,22 @@ object AnilistMetaDetailsResolver {
     private val kitsuIdCache = mutableMapOf<String, String>()
 
     suspend fun resolveArmMapping(anilistId: Int): ArmMapping {
+        // Tier 0: In-memory RAM cache (0ms)
         armMappingCache[anilistId]?.let { return it }
 
+        // Tier 1: Pre-compiled offline static index (8,500 anime mappings, instant 0ms, zero network)
+        ArmStaticIndex.find(anilistId)?.let {
+            armMappingCache[anilistId] = it
+            return it
+        }
+
+        // Tier 2: Persistent local storage cache (fast disk hit for previously discovered anime)
+        ArmLocalCache.get(anilistId)?.let {
+            armMappingCache[anilistId] = it
+            return it
+        }
+
+        // Tier 3: Remote fallback to arm.haglund.dev (for newly airing shows not yet in static index)
         return withTimeoutOrNull(7000L) {
             runCatching {
                 val url = "https://arm.haglund.dev/api/v2/ids?source=anilist&id=$anilistId"
@@ -763,6 +806,9 @@ object AnilistMetaDetailsResolver {
                     season = if (season >= 0) season else 1,
                 )
                 armMappingCache[anilistId] = mapping
+                if (!mapping.imdbId.isNullOrBlank() || !mapping.kitsuId.isNullOrBlank()) {
+                    ArmLocalCache.put(anilistId, mapping)
+                }
                 mapping
             }.getOrDefault(ArmMapping(null, null, null, null, null, 1))
         } ?: ArmMapping(null, null, null, null, null, 1)

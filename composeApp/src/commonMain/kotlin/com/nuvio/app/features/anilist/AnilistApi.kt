@@ -28,12 +28,19 @@ import kotlinx.serialization.json.longOrNull
 import kotlinx.serialization.json.put
 import kotlin.math.roundToInt
 
+enum class AnilistRequestPriority {
+    CRITICAL,
+    SOCIAL,
+}
+
 object AnilistApi {
     private val log = Logger.withTag("AnilistApi")
     private const val GRAPHQL_ENDPOINT = "https://graphql.anilist.co"
     private val json = Json { ignoreUnknownKeys = true; isLenient = true }
 
-    private val requestSemaphore = Semaphore(4)
+    // Priority Concurrency Lanes: 3 permits for critical metadata/playback/catalogs, 1 for social/community
+    private val criticalSemaphore = Semaphore(3)
+    private val socialSemaphore = Semaphore(1)
     private val responseCacheMutex = Mutex()
     private val responseCache = mutableMapOf<String, CachedGraphQLResponse>()
     private const val GRAPHQL_CACHE_TTL_MS = 5 * 60 * 1000L // 5 minutes
@@ -51,6 +58,7 @@ object AnilistApi {
         variables: JsonObject = buildJsonObject {},
         token: String? = null,
         bypassCache: Boolean = false,
+        priority: AnilistRequestPriority = AnilistRequestPriority.CRITICAL,
     ): JsonObject? {
         val payload = buildJsonObject {
             put("query", query)
@@ -70,7 +78,8 @@ object AnilistApi {
             }
         }
 
-        return requestSemaphore.withPermit {
+        val targetSemaphore = if (priority == AnilistRequestPriority.SOCIAL) socialSemaphore else criticalSemaphore
+        return targetSemaphore.withPermit {
             val headers = mutableMapOf(
                 "User-Agent" to "Nuvio Kai/1.0",
             )
@@ -2833,7 +2842,12 @@ object AnilistApi {
             put("perPage", perPage)
         }
 
-        val root = executeGraphQL(query = query, variables = variables, token = token)
+        val root = executeGraphQL(
+            query = query,
+            variables = variables,
+            token = token,
+            priority = AnilistRequestPriority.SOCIAL,
+        )
         val pageObj = root?.get("data").asJsonObjectOrNull()?.get("Page").asJsonObjectOrNull()
             ?: return com.nuvio.app.features.anilist.community.AnilistReviewPage()
 
@@ -2903,7 +2917,12 @@ object AnilistApi {
             }
         }
 
-        val root = executeGraphQL(query = mutation, variables = variables, token = token)
+        val root = executeGraphQL(
+            query = mutation,
+            variables = variables,
+            token = token,
+            priority = AnilistRequestPriority.SOCIAL,
+        )
         val rObj = root?.get("data").asJsonObjectOrNull()?.get("SaveReview").asJsonObjectOrNull() ?: return null
         return parseReview(rObj)
     }
@@ -2929,7 +2948,12 @@ object AnilistApi {
             put("rating", rating)
         }
 
-        val root = executeGraphQL(query = mutation, variables = variables, token = token)
+        val root = executeGraphQL(
+            query = mutation,
+            variables = variables,
+            token = token,
+            priority = AnilistRequestPriority.SOCIAL,
+        )
         val rObj = root?.get("data").asJsonObjectOrNull()?.get("RateReview").asJsonObjectOrNull() ?: return null
         val id = rObj["id"].asIntOrNull() ?: reviewId
         val updatedRating = rObj["rating"].asIntOrNull() ?: 0
@@ -2959,7 +2983,12 @@ object AnilistApi {
             put("id", reviewId)
         }
 
-        val root = executeGraphQL(query = mutation, variables = variables, token = token)
+        val root = executeGraphQL(
+            query = mutation,
+            variables = variables,
+            token = token,
+            priority = AnilistRequestPriority.SOCIAL,
+        )
         return root?.get("data").asJsonObjectOrNull()?.get("DeleteReview").asJsonObjectOrNull()
             ?.get("deleted")?.jsonPrimitive?.contentOrNull?.toBoolean() ?: false
     }
@@ -3578,7 +3607,12 @@ object AnilistApi {
             put("perPage", perPage)
         }
         val token = com.nuvio.app.features.anilist.AnilistAuthRepository.token.value
-        val root = executeGraphQL(query = query, variables = variables, token = token) ?: return emptyList()
+        val root = executeGraphQL(
+            query = query,
+            variables = variables,
+            token = token,
+            priority = AnilistRequestPriority.SOCIAL,
+        ) ?: return emptyList()
         val users = root["data"].asJsonObjectOrNull()?.get("Page").asJsonObjectOrNull()?.get("following").asJsonArrayOrNull() ?: return emptyList()
         return users.mapNotNull { el ->
             val u = el.asJsonObjectOrNull() ?: return@mapNotNull null
@@ -3615,7 +3649,12 @@ object AnilistApi {
             put("perPage", perPage)
         }
         val token = com.nuvio.app.features.anilist.AnilistAuthRepository.token.value
-        val root = executeGraphQL(query = query, variables = variables, token = token) ?: return emptyList()
+        val root = executeGraphQL(
+            query = query,
+            variables = variables,
+            token = token,
+            priority = AnilistRequestPriority.SOCIAL,
+        ) ?: return emptyList()
         val users = root["data"].asJsonObjectOrNull()?.get("Page").asJsonObjectOrNull()?.get("followers").asJsonArrayOrNull() ?: return emptyList()
         return users.mapNotNull { el ->
             val u = el.asJsonObjectOrNull() ?: return@mapNotNull null
@@ -3662,7 +3701,11 @@ object AnilistApi {
             put("page", page)
             put("perPage", perPage)
         }
-        val root = executeGraphQL(query = query, variables = variables) ?: return emptyList()
+        val root = executeGraphQL(
+            query = query,
+            variables = variables,
+            priority = AnilistRequestPriority.SOCIAL,
+        ) ?: return emptyList()
         val activities = root["data"].asJsonObjectOrNull()?.get("Page").asJsonObjectOrNull()?.get("activities").asJsonArrayOrNull() ?: return emptyList()
         val lang = AnilistPreferencesRepository.snapshot().preferredTitleLanguage
 
@@ -3739,7 +3782,12 @@ object AnilistApi {
             put("page", page)
         }
 
-        val root = executeGraphQL(query = query, variables = variables, token = token)
+        val root = executeGraphQL(
+            query = query,
+            variables = variables,
+            token = token,
+            priority = AnilistRequestPriority.SOCIAL,
+        )
         val pageObj = root?.get("data").asJsonObjectOrNull()?.get("Page").asJsonObjectOrNull()
         val hasNextPage = pageObj?.get("pageInfo").asJsonObjectOrNull()?.get("hasNextPage")?.jsonPrimitive?.contentOrNull?.toBoolean() ?: false
         val threadsArray = pageObj?.get("threads").asJsonArrayOrNull() ?: return com.nuvio.app.features.anilist.threads.AnilistThreadPage()
@@ -3811,7 +3859,11 @@ object AnilistApi {
         val variables = buildJsonObject {
             put("id", threadId)
         }
-        val root = executeGraphQL(query = query, variables = variables)
+        val root = executeGraphQL(
+            query = query,
+            variables = variables,
+            priority = AnilistRequestPriority.SOCIAL,
+        )
         return root?.get("data")
             .asJsonObjectOrNull()?.get("Thread")
             .asJsonObjectOrNull()?.get("body")
@@ -3853,7 +3905,12 @@ object AnilistApi {
             put("page", page)
         }
 
-        val root = executeGraphQL(query = query, variables = variables, token = token)
+        val root = executeGraphQL(
+            query = query,
+            variables = variables,
+            token = token,
+            priority = AnilistRequestPriority.SOCIAL,
+        )
         val commentsArray = root?.get("data").asJsonObjectOrNull()
             ?.get("Page").asJsonObjectOrNull()
             ?.get("threadComments").asJsonArrayOrNull() ?: return emptyList()
@@ -3928,7 +3985,12 @@ object AnilistApi {
             put("comment", comment)
         }
 
-        val root = executeGraphQL(query = mutation, variables = variables, token = token)
+        val root = executeGraphQL(
+            query = mutation,
+            variables = variables,
+            token = token,
+            priority = AnilistRequestPriority.SOCIAL,
+        )
         val c = root?.get("data").asJsonObjectOrNull()?.get("SaveThreadComment").asJsonObjectOrNull() ?: return null
         val id = c["id"].asIntOrNull() ?: return null
         val tId = c["threadId"].asIntOrNull() ?: threadId
@@ -3990,7 +4052,12 @@ object AnilistApi {
             put("type", type)
         }
 
-        val root = executeGraphQL(query = mutation, variables = variables, token = token)
+        val root = executeGraphQL(
+            query = mutation,
+            variables = variables,
+            token = token,
+            priority = AnilistRequestPriority.SOCIAL,
+        )
         return root?.get("data") != null
     }
 

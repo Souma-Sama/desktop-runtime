@@ -215,10 +215,31 @@ object MetaDetailsRepository {
                     ?: com.nuvio.app.features.anilist.AnilistTrackerCoordinator.getCachedMedia(anilistId)
                     ?: com.nuvio.app.features.anilist.AnilistTrackerCoordinator.getCachedMedia(id)
                 if (cachedMedia != null) {
+                    val staticArm = com.nuvio.app.features.anilist.streams.ArmStaticIndex.find(anilistId)
+                        ?: com.nuvio.app.features.anilist.streams.ArmLocalCache.get(anilistId)
+                    val fastImdbId = staticArm?.imdbId
                     val isSpecial = com.nuvio.app.features.anilist.catalog.AnilistMetaDetailsResolver.isSpecialAnime(cachedMedia)
+                    val fastSeason = when {
+                        staticArm?.season == 0 -> 0
+                        isSpecial -> 0
+                        else -> staticArm?.season ?: 1
+                    }
+                    val fastBackdrop = if (!fastImdbId.isNullOrBlank()) {
+                        "https://images.metahub.space/background/medium/$fastImdbId/img"
+                    } else cachedMedia.bannerImage
+                    val fastLogo = if (!isSpecial && fastSeason != 0 && !fastImdbId.isNullOrBlank()) {
+                        "https://images.metahub.space/logo/medium/$fastImdbId/img"
+                    } else null
+                    if (!fastImdbId.isNullOrBlank()) {
+                        com.nuvio.app.features.artwork.MetaHubArtwork.cacheImdbId("ani_$anilistId", fastImdbId)
+                        com.nuvio.app.features.artwork.MetaHubArtwork.cacheImdbId("anilist:$anilistId", fastImdbId)
+                    }
                     return com.nuvio.app.features.anilist.catalog.AnilistMetaDetailsResolver.buildBaseMetaFromAnilistMedia(
                         media = cachedMedia,
-                        season = if (isSpecial) 0 else 1,
+                        backdrop = fastBackdrop,
+                        logo = fastLogo,
+                        season = fastSeason,
+                        imdbId = fastImdbId,
                         requestedId = id,
                     )
                 }
