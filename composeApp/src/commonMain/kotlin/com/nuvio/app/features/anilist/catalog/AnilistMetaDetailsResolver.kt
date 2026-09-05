@@ -53,14 +53,14 @@ object AnilistMetaDetailsResolver {
     ): MetaDetails {
         val anilistId = media.id
         val isMovie = media.format == "MOVIE"
-        val totalEpisodes = media.episodes ?: media.streamingEpisodes.size.takeIf { it > 0 } ?: 12
+        val isSpecial = isSpecialAnime(media) || season == 0
+        val totalEpisodes = media.episodes ?: media.streamingEpisodes.size.takeIf { it > 0 } ?: if (isSpecial) 6 else 12
 
         val poster = media.coverImage?.bestUrl
             ?: media.coverImage?.extraLarge
             ?: media.coverImage?.large
             ?: media.coverImage?.medium
 
-        val isSpecial = isSpecialAnime(media) || season == 0
         val effectiveLogo = if (isSpecial) logo else (logo ?: MetaHubArtwork.getLogoUrl("ani_$anilistId"))
         val cleanDescription = com.nuvio.app.core.format.cleanHtmlDescription(media.description)
         val castPersons = buildCategorizedCast(media)
@@ -609,9 +609,15 @@ object AnilistMetaDetailsResolver {
                     emptyList()
                 } else if (targetSeason == 0) {
                     val specialVideos = cinemetaVideos.filter { it.season == 0 }
+                    val availableFromOffset = specialVideos.filter { (it.episode ?: 0) > episodeOffset }
+                    val effectiveTotal = media?.episodes
+                        ?: availableFromOffset.size.takeIf { it > 0 }
+                        ?: media?.streamingEpisodes?.size?.takeIf { it > 0 }
+                        ?: kitsuEpisodes.size.takeIf { it > 0 }
+                        ?: 1
                     val startsAtZero = media?.description?.contains("Includes Episode 0", ignoreCase = true) == true ||
                         (media?.description?.contains("Episode 0", ignoreCase = true) == true && media.streamingEpisodes.any { it.title?.contains("Episode 0", ignoreCase = true) == true })
-                    val epRange = if (startsAtZero) (0 until totalEpisodes) else (1..totalEpisodes)
+                    val epRange = if (startsAtZero) (0 until effectiveTotal) else (1..effectiveTotal)
 
                     epRange.map { idx ->
                         val actualEpNumber = idx + episodeOffset
@@ -977,8 +983,12 @@ object AnilistMetaDetailsResolver {
                     )
                 )
             } else {
-                // Multi-episode Special / ONA / Mini-Series (e.g. Sousou no Frieren: ●● no Mahou with 11 episodes)
-                val totalEps = media?.episodes ?: specialVideos.size.takeIf { it > 0 } ?: kitsuEpisodes.size.takeIf { it > 0 } ?: 1
+                // Multi-episode Special / ONA / Mini-Series (e.g. Sousou no Frieren: ●● no Mahou)
+                val availableFromOffset = specialVideos.filter { (it.episode ?: 0) > episodeOffset }
+                val totalEps = media?.episodes
+                    ?: availableFromOffset.size.takeIf { it > 0 }
+                    ?: kitsuEpisodes.size.takeIf { it > 0 }
+                    ?: 1
                 (1..totalEps).map { idx ->
                     val actualEpNumber = idx + episodeOffset
                     val matchingCinemetaEp = specialVideos.firstOrNull { it.episode == actualEpNumber } ?: specialVideos.firstOrNull { it.episode == idx }
