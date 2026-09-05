@@ -766,11 +766,17 @@ object AnilistMetaDetailsResolver {
         if (isMainlineTvSeries) return null
 
         // Only look at PARENT or valid PREQUEL relations (e.g. for Season 2 / cour 2 referencing Season 1)
+        // For specials/OVAs, also check SEQUEL if pointing to the parent TV series (e.g. prequel OVAs like Attack on Titan: No Regrets)
         // NEVER look at SPIN_OFF, SIDE_STORY, ALTERNATIVE, or OTHER which can cross-contaminate unrelated spin-offs!
-        val priorityTypes = listOf("PARENT", "PREQUEL")
+        val isSpecial = isSpecialAnime(media)
+        val priorityTypes = if (isSpecial) listOf("PARENT", "PREQUEL", "SEQUEL") else listOf("PARENT", "PREQUEL")
         val candidateRelations = media.relations.filter { rel ->
             val type = rel.relationType?.uppercase()
             if (type !in priorityTypes) return@filter false
+            if (type == "SEQUEL") {
+                val relFormat = rel.format?.uppercase()
+                if (!isSpecial || relFormat != "TV") return@filter false
+            }
             // If checking PREQUEL, ensure the candidate is not an ONA/MOVIE/SPECIAL one-shot when current is a TV series
             if (type == "PREQUEL") {
                 val relFormat = rel.format?.uppercase()
