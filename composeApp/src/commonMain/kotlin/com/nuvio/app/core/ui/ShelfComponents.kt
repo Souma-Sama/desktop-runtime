@@ -467,13 +467,21 @@ private fun NuvioShelfSectionHeader(
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(tokens.spacing.controlGap),
+            horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
                 text = title,
                 modifier = Modifier
-                    .weight(1f)
+                    .weight(1f, fill = false)
+                    .then(
+                        if (onViewAllClick != null) {
+                            Modifier.padding(end = tokens.spacing.controlGap)
+                        } else {
+                            Modifier
+                        }
+                    )
+                    .clip(RoundedCornerShape(NuvioTokens.Radius.xs))
                     .then(if (onTitleClick != null) Modifier.clickable(onClick = onTitleClick) else Modifier),
                 style = MaterialTheme.typography.titleLarge,
                 color = tokens.colors.textPrimary,

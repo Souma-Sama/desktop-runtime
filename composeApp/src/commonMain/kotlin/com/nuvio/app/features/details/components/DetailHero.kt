@@ -106,9 +106,11 @@ fun DetailHero(
             label = "detail_hero_trailer_alpha",
         )
         val muteIconSize = if (isTablet) 20.dp else 22.dp
-        val heroChromeTopPadding = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() +
-            8.dp +
-            ((40.dp - muteIconSize) / 2)
+        val heroChromeTopPadding = if (isDesktop) {
+            32.dp + ((48.dp - muteIconSize) / 2)
+        } else {
+            8.dp + ((40.dp - muteIconSize) / 2)
+        }
         val bottomGradientColor = heroGradientColor ?: MaterialTheme.colorScheme.background
         var logoLoadError by remember(meta.id, meta.logo) {
             mutableStateOf(false)
@@ -293,6 +295,24 @@ fun DetailHero(
                             modifier = Modifier.size(muteIconSize),
                         )
                     }
+                }
+
+                if (!isDesktop) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(56.dp)
+                            .align(Alignment.TopCenter)
+                            .background(
+                                Brush.verticalGradient(
+                                    colors = listOf(
+                                        MaterialTheme.colorScheme.background.copy(alpha = 0.65f),
+                                        MaterialTheme.colorScheme.background.copy(alpha = 0.25f),
+                                        Color.Transparent,
+                                    ),
+                                ),
+                            ),
+                    )
                 }
 
                 Box(
