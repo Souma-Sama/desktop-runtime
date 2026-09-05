@@ -23,7 +23,6 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -100,6 +99,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import coil3.compose.AsyncImage
 import com.nuvio.app.core.ui.NuvioModalBottomSheet
 import com.nuvio.app.core.ui.dismissNuvioBottomSheet
@@ -137,21 +137,33 @@ fun getStatusColor(status: AnilistMediaListStatus?): Color = when (status) {
 private fun TrackerGlassCard(
     modifier: Modifier = Modifier,
     shape: RoundedCornerShape = RoundedCornerShape(18.dp),
-    backgroundColor: Color = Color.White.copy(alpha = 0.045f),
-    borderColor: Color? = null,
+    backgroundColor: Color = Color.Transparent,
+    backgroundBrush: Brush? = Brush.verticalGradient(
+        listOf(
+            Color.White.copy(alpha = 0.08f),
+            Color.White.copy(alpha = 0.035f),
+        ),
+    ),
     borderBrush: Brush? = Brush.verticalGradient(
         listOf(
-            Color.White.copy(alpha = 0.14f),
-            Color.White.copy(alpha = 0.04f),
+            Color.White.copy(alpha = 0.32f),
+            Color.White.copy(alpha = 0.08f),
+            Color.White.copy(alpha = 0.02f),
         ),
     ),
     onClick: (() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    val finalBorderModifier = when {
-        borderBrush != null -> Modifier.border(1.dp, borderBrush, shape)
-        borderColor != null -> Modifier.border(1.dp, borderColor, shape)
-        else -> Modifier
+    val bgModifier = if (backgroundBrush != null) {
+        Modifier.background(backgroundBrush)
+    } else {
+        Modifier.background(backgroundColor)
+    }
+
+    val borderModifier = if (borderBrush != null) {
+        Modifier.border(1.dp, borderBrush, shape)
+    } else {
+        Modifier
     }
 
     val clickModifier = if (onClick != null) {
@@ -163,10 +175,27 @@ private fun TrackerGlassCard(
     Box(
         modifier = modifier
             .clip(shape)
-            .background(backgroundColor)
-            .then(finalBorderModifier)
+            .then(bgModifier)
+            .then(borderModifier)
             .then(clickModifier),
     ) {
+        // Specular top light refraction line (Water Glass gleam)
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(1.dp)
+                .background(
+                    Brush.horizontalGradient(
+                        listOf(
+                            Color.Transparent,
+                            Color.White.copy(alpha = 0.25f),
+                            Color.White.copy(alpha = 0.08f),
+                            Color.Transparent,
+                        ),
+                    ),
+                ),
+        )
+
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -207,9 +236,9 @@ fun AnimeTrackerButton(
 
     val containerColor by animateColorAsState(
         targetValue = when {
-            isTrackingActive -> statusColor.copy(alpha = 0.20f)
+            isTrackingActive -> statusColor.copy(alpha = 0.22f)
             showSheet -> MaterialTheme.colorScheme.onBackground
-            else -> Color(0xFF141722).copy(alpha = 0.85f)
+            else -> Color(0xFF101524).copy(alpha = 0.82f)
         },
         animationSpec = tween(250),
         label = "TrackerButtonBg",
@@ -217,9 +246,9 @@ fun AnimeTrackerButton(
 
     val borderColor by animateColorAsState(
         targetValue = when {
-            isTrackingActive -> statusColor.copy(alpha = 0.80f)
+            isTrackingActive -> statusColor.copy(alpha = 0.85f)
             showSheet -> MaterialTheme.colorScheme.primary
-            else -> Color.White.copy(alpha = 0.18f)
+            else -> Color.White.copy(alpha = 0.22f)
         },
         animationSpec = tween(250),
         label = "TrackerButtonBorder",
@@ -326,20 +355,25 @@ fun AnimeTrackerSheet(
     }
 
     if (isDesktop) {
-        Dialog(onDismissRequest = onDismiss) {
+        Dialog(
+            onDismissRequest = onDismiss,
+            properties = DialogProperties(usePlatformDefaultWidth = false),
+        ) {
             Surface(
                 modifier = Modifier
-                    .widthIn(min = 480.dp, max = 540.dp)
+                    .fillMaxHeight(0.88f)
+                    .widthIn(min = 480.dp, max = 530.dp)
                     .clip(RoundedCornerShape(26.dp)),
                 shape = RoundedCornerShape(26.dp),
-                color = Color(0xFF0C0E15).copy(alpha = 0.94f),
+                color = Color(0xFF0C101D).copy(alpha = 0.72f),
                 border = BorderStroke(
                     1.dp,
                     Brush.verticalGradient(
                         listOf(
-                            Color.White.copy(alpha = 0.24f),
-                            Color.White.copy(alpha = 0.08f),
-                            Color.White.copy(alpha = 0.02f),
+                            Color.White.copy(alpha = 0.45f),
+                            Color.White.copy(alpha = 0.16f),
+                            Color.White.copy(alpha = 0.05f),
+                            Color.White.copy(alpha = 0.15f),
                         ),
                     ),
                 ),
@@ -364,7 +398,7 @@ fun AnimeTrackerSheet(
                 }
             },
             sheetState = sheetState,
-            containerColor = Color(0xFF0C0E15).copy(alpha = 0.96f),
+            containerColor = Color(0xFF0C101D).copy(alpha = 0.88f),
             shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
             showDragHandle = true,
         ) {
@@ -402,598 +436,560 @@ fun AnimeTrackerSheetContent(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .then(if (isDesktop) Modifier.heightIn(max = 760.dp) else Modifier)
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 22.dp, vertical = if (isDesktop) 20.dp else 12.dp),
+            .fillMaxHeight(),
     ) {
-        // --- 1. HEADER BAR ---
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
+        // --- 1. PINNED APPLE WATER GLASS HEADER BAR ---
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(
+                    Brush.verticalGradient(
+                        listOf(
+                            Color.White.copy(alpha = 0.08f),
+                            Color.White.copy(alpha = 0.02f),
+                        ),
+                    ),
+                )
+                .padding(horizontal = 20.dp, vertical = 14.dp),
         ) {
             Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(38.dp)
-                        .clip(RoundedCornerShape(11.dp))
-                        .background(
-                            Brush.linearGradient(
-                                listOf(Color(0xFF00B4D8), Color(0xFF0077B6)),
-                            ),
-                        )
-                        .border(
-                            width = 1.dp,
-                            color = Color.White.copy(alpha = 0.35f),
-                            shape = RoundedCornerShape(11.dp),
-                        ),
-                    contentAlignment = Alignment.Center,
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(11.dp),
                 ) {
-                    Image(
-                        painter = painterResource(Res.drawable.rating_anilist),
-                        contentDescription = "AniList",
-                        modifier = Modifier.size(22.dp),
-                    )
-                }
-
-                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Text(
-                        text = "AniList Tracker",
-                        style = MaterialTheme.typography.titleMedium.copy(
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 17.sp,
-                            letterSpacing = (-0.2).sp,
-                        ),
-                        color = Color.White,
-                    )
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(5.dp),
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(6.dp)
-                                .clip(CircleShape)
-                                .background(if (trackerState.isAuthenticated) Color(0xFF10B981) else Color(0xFFF59E0B)),
-                        )
-                        Text(
-                            text = if (trackerState.isAuthenticated) "Cloud Synced" else "Not Logged In",
-                            style = MaterialTheme.typography.labelSmall.copy(
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Medium,
-                            ),
-                            color = Color.White.copy(alpha = 0.55f),
-                        )
-                    }
-                }
-            }
-
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                if (trackerState.isAuthenticated) {
-                    val user = trackerState.user
                     Box(
                         modifier = Modifier
-                            .clip(RoundedCornerShape(999.dp))
-                            .background(Color.White.copy(alpha = 0.07f))
-                            .border(1.dp, Color.White.copy(alpha = 0.12f), RoundedCornerShape(999.dp))
-                            .clickable(role = Role.Button) { showUserProfileSheet = true }
-                            .padding(horizontal = 10.dp, vertical = 5.dp),
+                            .size(36.dp)
+                            .clip(RoundedCornerShape(11.dp))
+                            .background(
+                                Brush.linearGradient(
+                                    listOf(Color(0xFF00B4D8), Color(0xFF0077B6)),
+                                ),
+                            )
+                            .border(
+                                width = 1.dp,
+                                brush = Brush.verticalGradient(
+                                    listOf(
+                                        Color.White.copy(alpha = 0.50f),
+                                        Color.White.copy(alpha = 0.20f),
+                                    ),
+                                ),
+                                shape = RoundedCornerShape(11.dp),
+                            ),
+                        contentAlignment = Alignment.Center,
                     ) {
+                        Image(
+                            painter = painterResource(Res.drawable.rating_anilist),
+                            contentDescription = "AniList",
+                            modifier = Modifier.size(20.dp),
+                        )
+                    }
+
+                    Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                        Text(
+                            text = "AniList Tracker",
+                            style = MaterialTheme.typography.titleMedium.copy(
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 16.sp,
+                                letterSpacing = (-0.2).sp,
+                            ),
+                            color = Color.White,
+                        )
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            horizontalArrangement = Arrangement.spacedBy(5.dp),
                         ) {
-                            val avatarUrl = user?.avatarUrl
-                            if (avatarUrl != null) {
-                                AsyncImage(
-                                    model = avatarUrl,
-                                    contentDescription = null,
-                                    modifier = Modifier
-                                        .size(18.dp)
-                                        .clip(CircleShape),
-                                    contentScale = ContentScale.Crop,
-                                )
-                            }
+                            Box(
+                                modifier = Modifier
+                                    .size(6.dp)
+                                    .clip(CircleShape)
+                                    .background(if (trackerState.isAuthenticated) Color(0xFF10B981) else Color(0xFFF59E0B)),
+                            )
                             Text(
-                                text = user?.name ?: "Connected",
+                                text = if (trackerState.isAuthenticated) "Cloud Synced" else "Not Logged In",
                                 style = MaterialTheme.typography.labelSmall.copy(
-                                    fontWeight = FontWeight.SemiBold,
-                                    fontSize = 12.sp,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Medium,
                                 ),
-                                color = Color.White.copy(alpha = 0.90f),
-                                maxLines = 1,
+                                color = Color.White.copy(alpha = 0.55f),
                             )
                         }
                     }
                 }
 
-                Box(
-                    modifier = Modifier
-                        .size(32.dp)
-                        .clip(CircleShape)
-                        .background(Color.White.copy(alpha = 0.08f))
-                        .border(1.dp, Color.White.copy(alpha = 0.14f), CircleShape)
-                        .clickable(role = Role.Button) { onClose() },
-                    contentAlignment = Alignment.Center,
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Close,
-                        contentDescription = "Close",
-                        modifier = Modifier.size(16.dp),
-                        tint = Color.White.copy(alpha = 0.85f),
-                    )
+                    if (trackerState.isAuthenticated) {
+                        val user = trackerState.user
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(999.dp))
+                                .background(Color.White.copy(alpha = 0.08f))
+                                .border(
+                                    1.dp,
+                                    Brush.verticalGradient(
+                                        listOf(
+                                            Color.White.copy(alpha = 0.22f),
+                                            Color.White.copy(alpha = 0.08f),
+                                        ),
+                                    ),
+                                    RoundedCornerShape(999.dp),
+                                )
+                                .clickable(role = Role.Button) { showUserProfileSheet = true }
+                                .padding(horizontal = 9.dp, vertical = 4.dp),
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            ) {
+                                val avatarUrl = user?.avatarUrl
+                                if (avatarUrl != null) {
+                                    AsyncImage(
+                                        model = avatarUrl,
+                                        contentDescription = null,
+                                        modifier = Modifier
+                                            .size(17.dp)
+                                            .clip(CircleShape),
+                                        contentScale = ContentScale.Crop,
+                                    )
+                                }
+                                Text(
+                                    text = user?.name ?: "Connected",
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        fontWeight = FontWeight.SemiBold,
+                                        fontSize = 11.5.sp,
+                                    ),
+                                    color = Color.White.copy(alpha = 0.90f),
+                                    maxLines = 1,
+                                )
+                            }
+                        }
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .size(30.dp)
+                            .clip(CircleShape)
+                            .background(Color.White.copy(alpha = 0.09f))
+                            .border(
+                                1.dp,
+                                Brush.verticalGradient(
+                                    listOf(
+                                        Color.White.copy(alpha = 0.25f),
+                                        Color.White.copy(alpha = 0.08f),
+                                    ),
+                                ),
+                                CircleShape,
+                            )
+                            .clickable(role = Role.Button) { onClose() },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "Close",
+                            modifier = Modifier.size(15.dp),
+                            tint = Color.White.copy(alpha = 0.85f),
+                        )
+                    }
                 }
             }
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // --- 2. AUTHENTICATION PROMPT (If not logged in) ---
-        if (!trackerState.isAuthenticated) {
-            TrackerGlassCard(
-                backgroundColor = Color.White.copy(alpha = 0.04f),
-            ) {
-                Text(
-                    text = "Connect your AniList account to synchronize your watch history, scores, dates, notes, and custom lists across all your devices.",
-                    style = MaterialTheme.typography.bodySmall.copy(
-                        fontSize = 13.sp,
-                        lineHeight = 18.sp,
+        // Frosted specular hairline divider
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(1.dp)
+                .background(
+                    Brush.horizontalGradient(
+                        listOf(
+                            Color.Transparent,
+                            Color.White.copy(alpha = 0.16f),
+                            Color.White.copy(alpha = 0.06f),
+                            Color.Transparent,
+                        ),
                     ),
-                    color = Color.White.copy(alpha = 0.70f),
-                )
-                Spacer(modifier = Modifier.height(14.dp))
+                ),
+        )
 
-                if (!showTokenInput) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    ) {
-                        Button(
-                            onClick = {
-                                uriHandler.openUri(AnilistAuthRepository.OAUTH_AUTHORIZE_URL)
-                            },
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier.weight(1f),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = Color(0xFF00A2FF),
-                                contentColor = Color.White,
-                            ),
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.OpenInNew,
-                                contentDescription = null,
-                                modifier = Modifier.size(15.dp),
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("Authorize", fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                        }
-                        OutlinedButton(
-                            onClick = { showTokenInput = true },
-                            shape = RoundedCornerShape(12.dp),
-                            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.15f)),
-                        ) {
-                            Text("Paste Token", fontSize = 13.sp, color = Color.White.copy(alpha = 0.80f))
-                        }
-                    }
-                } else {
-                    Column(modifier = Modifier.fillMaxWidth()) {
-                        OutlinedTextField(
-                            value = tokenInput,
-                            onValueChange = { tokenInput = it },
-                            placeholder = { Text("Paste AniList Token / Pin URL...", fontSize = 12.sp, color = Color.White.copy(0.35f)) },
-                            singleLine = true,
-                            shape = RoundedCornerShape(12.dp),
-                            textStyle = MaterialTheme.typography.bodySmall.copy(fontSize = 13.sp, color = Color.White),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = Color(0xFF00A2FF),
-                                unfocusedBorderColor = Color.White.copy(0.15f),
-                            ),
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                        Spacer(modifier = Modifier.height(10.dp))
+        // --- 2. SCROLLABLE WATER GLASS BODY ---
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f, fill = false)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp, vertical = 14.dp),
+        ) {
+            // --- AUTHENTICATION PROMPT (If not logged in) ---
+            if (!trackerState.isAuthenticated) {
+                TrackerGlassCard {
+                    Text(
+                        text = "Connect your AniList account to synchronize your watch history, scores, dates, notes, and custom lists across all your devices.",
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            fontSize = 13.sp,
+                            lineHeight = 18.sp,
+                        ),
+                        color = Color.White.copy(alpha = 0.70f),
+                    )
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    if (!showTokenInput) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
                         ) {
                             Button(
                                 onClick = {
-                                    if (tokenInput.isNotBlank()) {
-                                        coroutineScope.launch {
-                                            val token = tokenInput.substringAfter("access_token=").substringBefore("&").trim()
-                                            AnilistAuthRepository.loginWithToken(token)
-                                            showTokenInput = false
-                                        }
-                                    }
+                                    uriHandler.openUri(AnilistAuthRepository.OAUTH_AUTHORIZE_URL)
                                 },
-                                enabled = tokenInput.isNotBlank(),
-                                shape = RoundedCornerShape(10.dp),
+                                shape = RoundedCornerShape(12.dp),
                                 modifier = Modifier.weight(1f),
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = Color(0xFF00A2FF),
                                     contentColor = Color.White,
                                 ),
                             ) {
-                                Text("Save Token", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                                Icon(
+                                    imageVector = Icons.Default.OpenInNew,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(15.dp),
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Authorize", fontSize = 13.sp, fontWeight = FontWeight.Bold)
                             }
-                            TextButton(
-                                onClick = { showTokenInput = false },
+                            OutlinedButton(
+                                onClick = { showTokenInput = true },
+                                shape = RoundedCornerShape(12.dp),
+                                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.18f)),
                             ) {
-                                Text("Cancel", fontSize = 13.sp, color = Color.White.copy(alpha = 0.60f))
+                                Text("Paste Token", fontSize = 13.sp, color = Color.White.copy(alpha = 0.85f))
+                            }
+                        }
+                    } else {
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            OutlinedTextField(
+                                value = tokenInput,
+                                onValueChange = { tokenInput = it },
+                                placeholder = { Text("Paste AniList Token / Pin URL...", fontSize = 12.sp, color = Color.White.copy(0.35f)) },
+                                singleLine = true,
+                                shape = RoundedCornerShape(12.dp),
+                                textStyle = MaterialTheme.typography.bodySmall.copy(fontSize = 13.sp, color = Color.White),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = Color(0xFF00A2FF),
+                                    unfocusedBorderColor = Color.White.copy(0.18f),
+                                ),
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                Button(
+                                    onClick = {
+                                        if (tokenInput.isNotBlank()) {
+                                            coroutineScope.launch {
+                                                val token = tokenInput.substringAfter("access_token=").substringBefore("&").trim()
+                                                AnilistAuthRepository.loginWithToken(token)
+                                                showTokenInput = false
+                                            }
+                                        }
+                                    },
+                                    enabled = tokenInput.isNotBlank(),
+                                    shape = RoundedCornerShape(10.dp),
+                                    modifier = Modifier.weight(1f),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = Color(0xFF00A2FF),
+                                        contentColor = Color.White,
+                                    ),
+                                ) {
+                                    Text("Save Token", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                                }
+                                TextButton(
+                                    onClick = { showTokenInput = false },
+                                ) {
+                                    Text("Cancel", fontSize = 13.sp, color = Color.White.copy(alpha = 0.60f))
+                                }
                             }
                         }
                     }
                 }
+                Spacer(modifier = Modifier.height(20.dp))
+                return@Column
             }
-            Spacer(modifier = Modifier.height(24.dp))
-            return@Column
-        }
 
-        // --- 3. LOADING STATE ---
-        if (trackerState.isLoading) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(160.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
+            // --- LOADING STATE ---
+            if (trackerState.isLoading) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(160.dp),
+                    contentAlignment = Alignment.Center,
                 ) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(32.dp),
-                        strokeWidth = 2.5.dp,
-                        color = Color(0xFF00A2FF),
-                    )
-                    Text(
-                        text = "Matching anime on AniList...",
-                        style = MaterialTheme.typography.labelMedium.copy(
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Medium,
-                        ),
-                        color = Color.White.copy(alpha = 0.65f),
-                    )
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(32.dp),
+                            strokeWidth = 2.5.dp,
+                            color = Color(0xFF00A2FF),
+                        )
+                        Text(
+                            text = "Matching anime on AniList...",
+                            style = MaterialTheme.typography.labelMedium.copy(
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Medium,
+                            ),
+                            color = Color.White.copy(alpha = 0.65f),
+                        )
+                    }
                 }
+                Spacer(modifier = Modifier.height(20.dp))
+                return@Column
             }
-            Spacer(modifier = Modifier.height(24.dp))
-            return@Column
-        }
 
-        // --- 4. UNMATCHED ANIME STATE ---
-        if (trackerState.media == null) {
-            TrackerGlassCard(
-                backgroundColor = Color.White.copy(alpha = 0.04f),
-            ) {
-                Text(
-                    text = trackerState.error ?: "Could not automatically match this anime on AniList.",
-                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 13.sp),
-                    color = Color(0xFFEF4444),
-                    fontWeight = FontWeight.Medium,
-                )
-                Spacer(modifier = Modifier.height(12.dp))
+            // --- UNMATCHED ANIME STATE ---
+            if (trackerState.media == null) {
+                TrackerGlassCard {
+                    Text(
+                        text = trackerState.error ?: "Could not automatically match this anime on AniList.",
+                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 13.sp),
+                        color = Color(0xFFEF4444),
+                        fontWeight = FontWeight.Medium,
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
 
-                val effectiveRetryTitle = title?.takeIf { it.isNotBlank() } ?: preview?.name ?: meta?.name.orEmpty()
-                if (effectiveRetryTitle.isNotBlank() || preview != null || meta != null) {
+                    val effectiveRetryTitle = title?.takeIf { it.isNotBlank() } ?: preview?.name ?: meta?.name.orEmpty()
+                    if (effectiveRetryTitle.isNotBlank() || preview != null || meta != null) {
+                        Button(
+                            onClick = {
+                                val metaYear = preview?.releaseInfo?.take(4)?.toIntOrNull() ?: meta?.releaseInfo?.take(4)?.toIntOrNull()
+                                AnilistTrackerCoordinator.loadForMedia(
+                                    title = effectiveRetryTitle,
+                                    mediaId = preview?.id ?: meta?.id,
+                                    year = metaYear,
+                                    genres = preview?.genres ?: meta?.genres.orEmpty(),
+                                    country = meta?.country,
+                                    language = meta?.language,
+                                    forceRefresh = true,
+                                )
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color(0xFF00A2FF),
+                                contentColor = Color.White,
+                            ),
+                        ) {
+                            Icon(imageVector = Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(15.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Retry Auto-Detect", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+                    OutlinedTextField(
+                        value = manualSearchText,
+                        onValueChange = { manualSearchText = it },
+                        placeholder = { Text("Search title or enter AniList ID...", fontSize = 12.sp, color = Color.White.copy(0.35f)) },
+                        singleLine = true,
+                        shape = RoundedCornerShape(12.dp),
+                        textStyle = MaterialTheme.typography.bodySmall.copy(fontSize = 13.sp, color = Color.White),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = Color(0xFF00A2FF),
+                            unfocusedBorderColor = Color.White.copy(0.18f),
+                        ),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
                     Button(
                         onClick = {
-                            val metaYear = preview?.releaseInfo?.take(4)?.toIntOrNull() ?: meta?.releaseInfo?.take(4)?.toIntOrNull()
-                            AnilistTrackerCoordinator.loadForMedia(
-                                title = effectiveRetryTitle,
-                                mediaId = preview?.id ?: meta?.id,
-                                year = metaYear,
-                                genres = preview?.genres ?: meta?.genres.orEmpty(),
-                                country = meta?.country,
-                                language = meta?.language,
-                                forceRefresh = true,
-                            )
+                            if (manualSearchText.isNotBlank()) {
+                                val query = manualSearchText.trim()
+                                val numId = query.toIntOrNull()
+                                if (numId != null) {
+                                    AnilistTrackerCoordinator.loadForMedia(
+                                        title = query,
+                                        mediaId = "anilist:$numId",
+                                        forceRefresh = true,
+                                    )
+                                } else {
+                                    AnilistTrackerCoordinator.loadForMedia(
+                                        title = query,
+                                        forceRefresh = true,
+                                    )
+                                }
+                            }
                         },
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFF00A2FF),
-                            contentColor = Color.White,
-                        ),
+                        enabled = manualSearchText.isNotBlank(),
                     ) {
-                        Icon(imageVector = Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(15.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("Retry Auto-Detect", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                        Text("Search AniList", fontSize = 13.sp)
                     }
                 }
-
-                Spacer(modifier = Modifier.height(10.dp))
-                OutlinedTextField(
-                    value = manualSearchText,
-                    onValueChange = { manualSearchText = it },
-                    placeholder = { Text("Search title or enter AniList ID...", fontSize = 12.sp, color = Color.White.copy(0.35f)) },
-                    singleLine = true,
-                    shape = RoundedCornerShape(12.dp),
-                    textStyle = MaterialTheme.typography.bodySmall.copy(fontSize = 13.sp, color = Color.White),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = Color(0xFF00A2FF),
-                        unfocusedBorderColor = Color.White.copy(0.15f),
-                    ),
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Button(
-                    onClick = {
-                        if (manualSearchText.isNotBlank()) {
-                            val query = manualSearchText.trim()
-                            val numId = query.toIntOrNull()
-                            if (numId != null) {
-                                AnilistTrackerCoordinator.loadForMedia(
-                                    title = query,
-                                    mediaId = "anilist:$numId",
-                                    forceRefresh = true,
-                                )
-                            } else {
-                                AnilistTrackerCoordinator.loadForMedia(
-                                    title = query,
-                                    forceRefresh = true,
-                                )
-                            }
-                        }
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    enabled = manualSearchText.isNotBlank(),
-                ) {
-                    Text("Search AniList", fontSize = 13.sp)
-                }
+                Spacer(modifier = Modifier.height(20.dp))
+                return@Column
             }
-            Spacer(modifier = Modifier.height(24.dp))
-            return@Column
-        }
 
-        val media = trackerState.media!!
-        val entry = trackerState.entry
-        val isReading = remember(media.format) {
-            com.nuvio.app.features.anilist.KaiHooks.isNonVideoMedia(media.format)
-        }
+            val media = trackerState.media!!
+            val entry = trackerState.entry
+            val isReading = remember(media.format) {
+                com.nuvio.app.features.anilist.KaiHooks.isNonVideoMedia(media.format)
+            }
 
-        // --- 5. MATCHED ANIME / MANGA HERO IDENTITY CARD ---
-        TrackerGlassCard(
-            backgroundColor = Color.White.copy(alpha = 0.045f),
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(14.dp),
-            ) {
-                // Cover Poster
-                val cover = media.coverImage?.large ?: media.coverImage?.medium
-                Box(
-                    modifier = Modifier
-                        .size(width = 54.dp, height = 76.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(Color.White.copy(alpha = 0.06f))
-                        .border(1.dp, Color.White.copy(alpha = 0.16f), RoundedCornerShape(12.dp)),
+            // --- 3. MATCHED ANIME / MANGA HERO CARD ---
+            TrackerGlassCard {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(14.dp),
                 ) {
-                    if (cover != null) {
-                        AsyncImage(
-                            model = cover,
-                            contentDescription = media.title?.displayTitle,
-                            modifier = Modifier.fillMaxSize(),
-                            contentScale = ContentScale.Crop,
-                        )
-                    }
-                }
-
-                // Metadata Details
-                Column(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
-                ) {
-                    Text(
-                        text = media.title?.displayTitle ?: if (isReading) "Manga" else "Anime",
-                        style = MaterialTheme.typography.titleSmall.copy(
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 14.sp,
-                            lineHeight = 18.sp,
-                        ),
-                        color = Color.White,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-
-                    val metaLine = if (isReading) {
-                        listOfNotNull(
-                            media.format?.replace("_", " ")?.lowercase()?.replaceFirstChar { it.uppercase() } ?: "Manga",
-                            media.chapters?.let { "$it ch" },
-                            media.volumes?.let { "$it vol" },
-                            media.startDateYear?.toString(),
-                        ).joinToString(" • ")
-                    } else {
-                        listOfNotNull(
-                            media.format?.takeIf { it.isNotBlank() },
-                            media.episodes?.let { "$it eps" },
-                            media.startDateYear?.toString(),
-                        ).joinToString(" • ")
-                    }
-
-                    if (metaLine.isNotBlank()) {
-                        Text(
-                            text = metaLine,
-                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
-                            color = Color.White.copy(alpha = 0.55f),
-                            maxLines = 1,
-                        )
-                    }
-
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    // Cover Poster
+                    val cover = media.coverImage?.large ?: media.coverImage?.medium
+                    Box(
+                        modifier = Modifier
+                            .size(width = 54.dp, height = 76.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(Color.White.copy(alpha = 0.08f))
+                            .border(
+                                1.dp,
+                                Brush.verticalGradient(
+                                    listOf(
+                                        Color.White.copy(alpha = 0.35f),
+                                        Color.White.copy(alpha = 0.10f),
+                                    ),
+                                ),
+                                RoundedCornerShape(12.dp),
+                            ),
                     ) {
-                        if (media.averageScore != null && media.averageScore > 0) {
+                        if (cover != null) {
+                            AsyncImage(
+                                model = cover,
+                                contentDescription = media.title?.displayTitle,
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = ContentScale.Crop,
+                            )
+                        }
+                    }
+
+                    // Metadata Details
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        Text(
+                            text = media.title?.displayTitle ?: if (isReading) "Manga" else "Anime",
+                            style = MaterialTheme.typography.titleSmall.copy(
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 14.sp,
+                                lineHeight = 18.sp,
+                            ),
+                            color = Color.White,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+
+                        val metaLine = if (isReading) {
+                            listOfNotNull(
+                                media.format?.replace("_", " ")?.lowercase()?.replaceFirstChar { it.uppercase() } ?: "Manga",
+                                media.chapters?.let { "$it ch" },
+                                media.volumes?.let { "$it vol" },
+                                media.startDateYear?.toString(),
+                            ).joinToString(" • ")
+                        } else {
+                            listOfNotNull(
+                                media.format?.takeIf { it.isNotBlank() },
+                                media.episodes?.let { "$it eps" },
+                                media.startDateYear?.toString(),
+                            ).joinToString(" • ")
+                        }
+
+                        if (metaLine.isNotBlank()) {
+                            Text(
+                                text = metaLine,
+                                style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
+                                color = Color.White.copy(alpha = 0.55f),
+                                maxLines = 1,
+                            )
+                        }
+
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            if (media.averageScore != null && media.averageScore > 0) {
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(999.dp))
+                                        .background(Color(0xFFFFB800).copy(alpha = 0.14f))
+                                        .border(1.dp, Color(0xFFFFB800).copy(alpha = 0.35f), RoundedCornerShape(999.dp))
+                                        .padding(horizontal = 7.dp, vertical = 2.dp),
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(3.dp),
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Star,
+                                            contentDescription = null,
+                                            tint = Color(0xFFFFB800),
+                                            modifier = Modifier.size(11.dp),
+                                        )
+                                        Text(
+                                            text = "${media.averageScore}% Score",
+                                            style = MaterialTheme.typography.labelSmall.copy(
+                                                fontSize = 10.5.sp,
+                                                fontWeight = FontWeight.Bold,
+                                            ),
+                                            color = Color(0xFFFFB800),
+                                        )
+                                    }
+                                }
+                            }
+
+                            val mediaWebUrl = "https://anilist.co/${if (isReading) "manga" else "anime"}/${media.id}"
                             Box(
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(999.dp))
-                                    .background(Color(0xFFFFB800).copy(alpha = 0.12f))
-                                    .border(1.dp, Color(0xFFFFB800).copy(alpha = 0.30f), RoundedCornerShape(999.dp))
+                                    .background(Color.White.copy(alpha = 0.08f))
+                                    .border(
+                                        1.dp,
+                                        Brush.verticalGradient(
+                                            listOf(
+                                                Color.White.copy(alpha = 0.22f),
+                                                Color.White.copy(alpha = 0.08f),
+                                            ),
+                                        ),
+                                        RoundedCornerShape(999.dp),
+                                    )
+                                    .clickable(role = Role.Button) { uriHandler.openUri(mediaWebUrl) }
                                     .padding(horizontal = 7.dp, vertical = 2.dp),
                             ) {
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(3.dp),
                                 ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Star,
-                                        contentDescription = null,
-                                        tint = Color(0xFFFFB800),
-                                        modifier = Modifier.size(11.dp),
-                                    )
                                     Text(
-                                        text = "${media.averageScore}% Score",
+                                        text = "AniList",
                                         style = MaterialTheme.typography.labelSmall.copy(
                                             fontSize = 10.5.sp,
-                                            fontWeight = FontWeight.Bold,
+                                            fontWeight = FontWeight.SemiBold,
                                         ),
-                                        color = Color(0xFFFFB800),
+                                        color = Color.White.copy(alpha = 0.80f),
                                     )
-                                }
-                            }
-                        }
-
-                        val mediaWebUrl = "https://anilist.co/${if (isReading) "manga" else "anime"}/${media.id}"
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(999.dp))
-                                .background(Color.White.copy(alpha = 0.06f))
-                                .border(1.dp, Color.White.copy(alpha = 0.12f), RoundedCornerShape(999.dp))
-                                .clickable(role = Role.Button) { uriHandler.openUri(mediaWebUrl) }
-                                .padding(horizontal = 7.dp, vertical = 2.dp),
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(3.dp),
-                            ) {
-                                Text(
-                                    text = "AniList",
-                                    style = MaterialTheme.typography.labelSmall.copy(
-                                        fontSize = 10.5.sp,
-                                        fontWeight = FontWeight.SemiBold,
-                                    ),
-                                    color = Color.White.copy(alpha = 0.70f),
-                                )
-                                Icon(
-                                    imageVector = Icons.Default.OpenInNew,
-                                    contentDescription = null,
-                                    tint = Color.White.copy(alpha = 0.70f),
-                                    modifier = Modifier.size(10.dp),
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // --- 6. STATUS CAPSULES GRID (2x3) ---
-        Text(
-            text = if (isReading) "Reading Status" else "Watch Status",
-            style = MaterialTheme.typography.labelMedium.copy(
-                fontWeight = FontWeight.Bold,
-                fontSize = 13.sp,
-                letterSpacing = 0.2.sp,
-            ),
-            color = Color.White.copy(alpha = 0.90f),
-        )
-
-        Spacer(modifier = Modifier.height(10.dp))
-
-        val currentStatus = entry?.status
-        val statuses = listOf(
-            Triple(AnilistMediaListStatus.CURRENT, Icons.Outlined.PlayCircle, StatusColorWatching),
-            Triple(AnilistMediaListStatus.PLANNING, Icons.Default.CalendarToday, StatusColorPlanning),
-            Triple(AnilistMediaListStatus.COMPLETED, Icons.Outlined.CheckCircle, StatusColorCompleted),
-            Triple(AnilistMediaListStatus.PAUSED, Icons.Outlined.PauseCircle, StatusColorOnHold),
-            Triple(AnilistMediaListStatus.DROPPED, Icons.Outlined.RemoveCircleOutline, StatusColorDropped),
-            Triple(AnilistMediaListStatus.REPEATING, Icons.Default.Replay, StatusColorRepeating),
-        )
-
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            statuses.chunked(2).forEach { rowStatuses ->
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    rowStatuses.forEach { (status, icon, color) ->
-                        val isSelected = currentStatus == status
-                        val backgroundModifier = if (isSelected) {
-                            Modifier.background(
-                                Brush.verticalGradient(
-                                    listOf(color.copy(alpha = 0.22f), color.copy(alpha = 0.12f)),
-                                ),
-                            )
-                        } else {
-                            Modifier.background(Color.White.copy(alpha = 0.035f))
-                        }
-                        val borderModifier = if (isSelected) {
-                            Modifier.border(1.5.dp, color.copy(alpha = 0.85f), RoundedCornerShape(14.dp))
-                        } else {
-                            Modifier.border(1.dp, Color.White.copy(alpha = 0.07f), RoundedCornerShape(14.dp))
-                        }
-
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .clip(RoundedCornerShape(14.dp))
-                                .then(backgroundModifier)
-                                .then(borderModifier)
-                                .clickable(role = Role.Button) {
-                                    hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                    AnilistTrackerCoordinator.updateStatus(status)
-                                }
-                                .padding(horizontal = 12.dp, vertical = 10.dp),
-                        ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                            ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                    modifier = Modifier.weight(1f, fill = false),
-                                ) {
                                     Icon(
-                                        imageVector = icon,
+                                        imageVector = Icons.Default.OpenInNew,
                                         contentDescription = null,
-                                        modifier = Modifier.size(16.dp),
-                                        tint = if (isSelected) color else Color.White.copy(alpha = 0.50f),
-                                    )
-                                    val statusLabel = when (status) {
-                                        AnilistMediaListStatus.CURRENT -> if (isReading) "Reading" else "Watching"
-                                        AnilistMediaListStatus.PLANNING -> if (isReading) "Plan to Read" else "Plan to Watch"
-                                        AnilistMediaListStatus.REPEATING -> if (isReading) "Rereading" else "Rewatching"
-                                        else -> status.label
-                                    }
-                                    Text(
-                                        text = statusLabel,
-                                        style = MaterialTheme.typography.labelMedium.copy(
-                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                            fontSize = 12.5.sp,
-                                        ),
-                                        color = if (isSelected) color else Color.White.copy(alpha = 0.75f),
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                    )
-                                }
-
-                                if (isSelected) {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(6.dp)
-                                            .clip(CircleShape)
-                                            .background(color),
+                                        tint = Color.White.copy(alpha = 0.80f),
+                                        modifier = Modifier.size(10.dp),
                                     )
                                 }
                             }
@@ -1001,833 +997,1022 @@ fun AnimeTrackerSheetContent(
                     }
                 }
             }
-        }
 
-        Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(14.dp))
 
-        // --- 7. PROGRESS STEPPERS (Continuous Apple Pill with Direct Dialog & Max) ---
-        val activeColor = getStatusColor(currentStatus)
-        if (isReading) {
-            // Chapters Stepper
-            TrackerProgressStepperSection(
-                title = "Chapter Progress",
-                icon = Icons.Default.EditNote,
-                unitLabel = "Ch",
-                currentUnits = entry?.progress ?: 0,
-                totalUnits = media.chapters,
-                accentColor = activeColor,
-                onIncrement = { AnilistTrackerCoordinator.incrementProgress() },
-                onDecrement = { AnilistTrackerCoordinator.decrementProgress() },
-                onSetExact = { target -> AnilistTrackerCoordinator.updateProgress(target) },
+            // --- 4. STATUS CAPSULES (2x3 WATER GLASS TILES) ---
+            Text(
+                text = if (isReading) "Reading Status" else "Watch Status",
+                style = MaterialTheme.typography.labelMedium.copy(
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 13.sp,
+                    letterSpacing = 0.2.sp,
+                ),
+                color = Color.White.copy(alpha = 0.90f),
             )
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
-            // Volumes Stepper
-            val currentVolumes = entry?.progressVolumes ?: 0
-            val totalVolumes = media.volumes
-            TrackerProgressStepperSection(
-                title = "Volume Progress",
-                icon = Icons.Default.ContentCopy,
-                unitLabel = "Vol",
-                currentUnits = currentVolumes,
-                totalUnits = totalVolumes,
-                accentColor = Color(0xFFA855F7),
-                onIncrement = { AnilistTrackerCoordinator.updateProgressVolumes(currentVolumes + 1) },
-                onDecrement = { if (currentVolumes > 0) AnilistTrackerCoordinator.updateProgressVolumes(currentVolumes - 1) },
-                onSetExact = { target -> AnilistTrackerCoordinator.updateProgressVolumes(target) },
+            val currentStatus = entry?.status
+            val statuses = listOf(
+                Triple(AnilistMediaListStatus.CURRENT, Icons.Outlined.PlayCircle, StatusColorWatching),
+                Triple(AnilistMediaListStatus.PLANNING, Icons.Default.CalendarToday, StatusColorPlanning),
+                Triple(AnilistMediaListStatus.COMPLETED, Icons.Outlined.CheckCircle, StatusColorCompleted),
+                Triple(AnilistMediaListStatus.PAUSED, Icons.Outlined.PauseCircle, StatusColorOnHold),
+                Triple(AnilistMediaListStatus.DROPPED, Icons.Outlined.RemoveCircleOutline, StatusColorDropped),
+                Triple(AnilistMediaListStatus.REPEATING, Icons.Default.Replay, StatusColorRepeating),
             )
-        } else {
-            // Episode Stepper (Anime)
-            TrackerProgressStepperSection(
-                title = "Episode Progress",
-                icon = Icons.Default.EditNote,
-                unitLabel = "Ep",
-                currentUnits = entry?.progress ?: 0,
-                totalUnits = media.episodes,
-                accentColor = activeColor,
-                onIncrement = { AnilistTrackerCoordinator.incrementProgress() },
-                onDecrement = { AnilistTrackerCoordinator.decrementProgress() },
-                onSetExact = { target -> AnilistTrackerCoordinator.updateProgress(target) },
-            )
-        }
 
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // --- 8. SCORE RATING SECTION (1-10 STARS APPLE DIAL) ---
-        val rawScore = entry?.score ?: 0.0
-        val currentScore = if (rawScore >= 10.0) rawScore / 10.0 else rawScore
-        val scoreInt = ((currentScore * 10.0).roundToInt() / 10.0).roundToInt()
-
-        TrackerGlassCard(
-            backgroundColor = Color.White.copy(alpha = 0.045f),
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Star,
-                        contentDescription = null,
-                        tint = Color(0xFFFFB800),
-                        modifier = Modifier.size(17.dp),
-                    )
-                    Text(
-                        text = "Score Rating",
-                        style = MaterialTheme.typography.labelMedium.copy(
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 13.sp,
-                        ),
-                        color = Color.White,
-                    )
-                }
-
-                if (scoreInt > 0) {
-                    val ratingLabel = when (scoreInt) {
-                        10 -> "10 • Masterpiece"
-                        9 -> "9 • Great"
-                        8 -> "8 • Very Good"
-                        7 -> "7 • Good"
-                        6 -> "6 • Fine"
-                        5 -> "5 • Average"
-                        4 -> "4 • Bad"
-                        3 -> "3 • Very Bad"
-                        2 -> "2 • Horrible"
-                        1 -> "1 • Appalling"
-                        else -> "$scoreInt • Rated"
-                    }
-
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    ) {
-                        Text(
-                            text = ratingLabel,
-                            style = MaterialTheme.typography.labelSmall.copy(
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 12.sp,
-                            ),
-                            color = Color(0xFFFFB800),
-                        )
-                        Box(
-                            modifier = Modifier
-                                .size(18.dp)
-                                .clip(CircleShape)
-                                .background(Color.White.copy(alpha = 0.08f))
-                                .clickable(role = Role.Button) {
-                                    hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                    AnilistTrackerCoordinator.updateScore(0.0)
-                                },
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Close,
-                                contentDescription = "Clear Score",
-                                tint = Color.White.copy(alpha = 0.60f),
-                                modifier = Modifier.size(11.dp),
-                            )
-                        }
-                    }
-                } else {
-                    Text(
-                        text = "Unrated",
-                        style = MaterialTheme.typography.labelSmall.copy(
-                            fontWeight = FontWeight.Medium,
-                            fontSize = 12.sp,
-                        ),
-                        color = Color.White.copy(alpha = 0.40f),
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // 10-Star Row
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                (1..10).forEach { starIndex ->
-                    val isFilled = starIndex <= scoreInt
-                    Box(
-                        modifier = Modifier
-                            .size(32.dp)
-                            .clip(CircleShape)
-                            .clickable(role = Role.Button) {
-                                hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                val newScore = if (scoreInt == starIndex) 0.0 else starIndex.toDouble()
-                                AnilistTrackerCoordinator.updateScore(newScore)
-                            },
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Icon(
-                            imageVector = if (isFilled) Icons.Default.Star else Icons.Default.StarBorder,
-                            contentDescription = "Rate $starIndex",
-                            modifier = Modifier.size(22.dp),
-                            tint = if (isFilled) Color(0xFFFFB800) else Color.White.copy(alpha = 0.20f),
-                        )
-                    }
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // --- 9. TRACKING DATES (Apple Grouped Inset Card) ---
-        TrackerGlassCard(
-            backgroundColor = Color.White.copy(alpha = 0.045f),
-        ) {
-            // Start Date
-            val startedAt = entry?.startedAt
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.CalendarMonth,
-                        contentDescription = null,
-                        modifier = Modifier.size(17.dp),
-                        tint = Color.White.copy(alpha = 0.60f),
-                    )
-                    Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
-                        Text(
-                            text = "Start Date",
-                            style = MaterialTheme.typography.labelMedium.copy(
-                                fontWeight = FontWeight.SemiBold,
-                                fontSize = 12.5.sp,
-                            ),
-                            color = Color.White,
-                        )
-                        Text(
-                            text = startedAt?.formatted() ?: "Not set",
-                            style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.5.sp),
-                            color = if (startedAt?.isSet == true) Color(0xFF00A2FF) else Color.White.copy(alpha = 0.40f),
-                        )
-                    }
-                }
-
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(999.dp))
-                            .background(Color.White.copy(alpha = 0.07f))
-                            .border(1.dp, Color.White.copy(alpha = 0.12f), RoundedCornerShape(999.dp))
-                            .clickable(role = Role.Button) {
-                                val now = io.ktor.util.date.GMTDate()
-                                val today = AnilistFuzzyDate(
-                                    year = now.year,
-                                    month = now.month.ordinal + 1,
-                                    day = now.dayOfMonth,
-                                )
-                                AnilistTrackerCoordinator.updateStartedAt(today)
-                            }
-                            .padding(horizontal = 10.dp, vertical = 4.dp),
-                    ) {
-                        Text(
-                            text = "Set Today",
-                            style = MaterialTheme.typography.labelSmall.copy(
-                                fontWeight = FontWeight.SemiBold,
-                                fontSize = 11.sp,
-                            ),
-                            color = Color.White.copy(alpha = 0.85f),
-                        )
-                    }
-                    if (startedAt?.isSet == true) {
-                        Box(
-                            modifier = Modifier
-                                .size(26.dp)
-                                .clip(CircleShape)
-                                .background(Color.White.copy(alpha = 0.06f))
-                                .clickable(role = Role.Button) { AnilistTrackerCoordinator.updateStartedAt(null) },
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Close,
-                                contentDescription = "Clear",
-                                modifier = Modifier.size(13.dp),
-                                tint = Color.White.copy(alpha = 0.60f),
-                            )
-                        }
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(10.dp))
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(1.dp)
-                    .background(Color.White.copy(alpha = 0.06f)),
-            )
-            Spacer(modifier = Modifier.height(10.dp))
-
-            // Finish / End Date
-            val completedAt = entry?.completedAt
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.CalendarToday,
-                        contentDescription = null,
-                        modifier = Modifier.size(17.dp),
-                        tint = Color.White.copy(alpha = 0.60f),
-                    )
-                    Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
-                        Text(
-                            text = "Finish Date",
-                            style = MaterialTheme.typography.labelMedium.copy(
-                                fontWeight = FontWeight.SemiBold,
-                                fontSize = 12.5.sp,
-                            ),
-                            color = Color.White,
-                        )
-                        Text(
-                            text = completedAt?.formatted() ?: "Not set",
-                            style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.5.sp),
-                            color = if (completedAt?.isSet == true) Color(0xFF10B981) else Color.White.copy(alpha = 0.40f),
-                        )
-                    }
-                }
-
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(999.dp))
-                            .background(Color.White.copy(alpha = 0.07f))
-                            .border(1.dp, Color.White.copy(alpha = 0.12f), RoundedCornerShape(999.dp))
-                            .clickable(role = Role.Button) {
-                                val now = io.ktor.util.date.GMTDate()
-                                val today = AnilistFuzzyDate(
-                                    year = now.year,
-                                    month = now.month.ordinal + 1,
-                                    day = now.dayOfMonth,
-                                )
-                                AnilistTrackerCoordinator.updateCompletedAt(today)
-                            }
-                            .padding(horizontal = 10.dp, vertical = 4.dp),
-                    ) {
-                        Text(
-                            text = "Set Today",
-                            style = MaterialTheme.typography.labelSmall.copy(
-                                fontWeight = FontWeight.SemiBold,
-                                fontSize = 11.sp,
-                            ),
-                            color = Color.White.copy(alpha = 0.85f),
-                        )
-                    }
-                    if (completedAt?.isSet == true) {
-                        Box(
-                            modifier = Modifier
-                                .size(26.dp)
-                                .clip(CircleShape)
-                                .background(Color.White.copy(alpha = 0.06f))
-                            .clickable(role = Role.Button) { AnilistTrackerCoordinator.updateCompletedAt(null) },
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Close,
-                                contentDescription = "Clear",
-                                modifier = Modifier.size(13.dp),
-                                tint = Color.White.copy(alpha = 0.60f),
-                            )
-                        }
-                    }
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // --- 10. ADVANCED DETAILS (Apple Accordion: Repeat, Privacy, Notes) ---
-        var showAdvancedOptions by remember { mutableStateOf(false) }
-
-        TrackerGlassCard(
-            backgroundColor = Color.White.copy(alpha = 0.045f),
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(10.dp))
-                    .clickable(role = Role.Button) { showAdvancedOptions = !showAdvancedOptions },
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Tune,
-                        contentDescription = null,
-                        modifier = Modifier.size(17.dp),
-                        tint = Color(0xFF00A2FF),
-                    )
-                    Text(
-                        text = "Advanced Tracking Details",
-                        style = MaterialTheme.typography.labelMedium.copy(
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 13.sp,
-                        ),
-                        color = Color.White,
-                    )
-                }
-
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(999.dp))
-                        .background(Color.White.copy(alpha = 0.06f))
-                        .border(1.dp, Color.White.copy(alpha = 0.10f), RoundedCornerShape(999.dp))
-                        .padding(horizontal = 9.dp, vertical = 3.dp),
-                ) {
-                    Text(
-                        text = if (showAdvancedOptions) "Hide ▲" else "Expand ▼",
-                        style = MaterialTheme.typography.labelSmall.copy(
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 11.sp,
-                        ),
-                        color = Color(0xFF00A2FF),
-                    )
-                }
-            }
-
-            AnimatedVisibility(
-                visible = showAdvancedOptions,
-                enter = expandVertically() + fadeIn(),
-                exit = shrinkVertically() + fadeOut(),
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 14.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    // Repeat Stepper
-                    val currentRepeat = entry?.repeat ?: 0
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                statuses.chunked(2).forEach { rowStatuses ->
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Replay,
-                                contentDescription = null,
-                                modifier = Modifier.size(17.dp),
-                                tint = Color.White.copy(alpha = 0.60f),
-                            )
-                            Column {
-                                Text(
-                                    text = if (isReading) "Reread Count" else "Rewatch Count",
-                                    style = MaterialTheme.typography.labelMedium.copy(
-                                        fontWeight = FontWeight.SemiBold,
-                                        fontSize = 12.5.sp,
+                        rowStatuses.forEach { (status, icon, color) ->
+                            val isSelected = currentStatus == status
+                            val backgroundModifier = if (isSelected) {
+                                Modifier.background(
+                                    Brush.verticalGradient(
+                                        listOf(
+                                            color.copy(alpha = 0.36f),
+                                            color.copy(alpha = 0.16f),
+                                        ),
                                     ),
-                                    color = Color.White,
                                 )
-                                Text(
-                                    text = if (isReading) "$currentRepeat times reread" else "$currentRepeat times rewatched",
-                                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
-                                    color = Color.White.copy(alpha = 0.45f),
+                            } else {
+                                Modifier.background(
+                                    Brush.verticalGradient(
+                                        listOf(
+                                            Color.White.copy(alpha = 0.065f),
+                                            Color.White.copy(alpha = 0.025f),
+                                        ),
+                                    ),
                                 )
                             }
+                            val borderModifier = if (isSelected) {
+                                Modifier.border(
+                                    1.5.dp,
+                                    Brush.verticalGradient(
+                                        listOf(
+                                            color.copy(alpha = 0.95f),
+                                            color.copy(alpha = 0.60f),
+                                        ),
+                                    ),
+                                    RoundedCornerShape(14.dp),
+                                )
+                            } else {
+                                Modifier.border(
+                                    1.dp,
+                                    Brush.verticalGradient(
+                                        listOf(
+                                            Color.White.copy(alpha = 0.18f),
+                                            Color.White.copy(alpha = 0.06f),
+                                        ),
+                                    ),
+                                    RoundedCornerShape(14.dp),
+                                )
+                            }
+
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(14.dp))
+                                    .then(backgroundModifier)
+                                    .then(borderModifier)
+                                    .clickable(role = Role.Button) {
+                                        hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                        AnilistTrackerCoordinator.updateStatus(status)
+                                    }
+                                    .padding(horizontal = 12.dp, vertical = 11.dp),
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                        modifier = Modifier.weight(1f, fill = false),
+                                    ) {
+                                        Icon(
+                                            imageVector = icon,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(16.dp),
+                                            tint = if (isSelected) color else Color.White.copy(alpha = 0.65f),
+                                        )
+                                        val statusLabel = when (status) {
+                                            AnilistMediaListStatus.CURRENT -> if (isReading) "Reading" else "Watching"
+                                            AnilistMediaListStatus.PLANNING -> if (isReading) "Plan to Read" else "Plan to Watch"
+                                            AnilistMediaListStatus.REPEATING -> if (isReading) "Rereading" else "Rewatching"
+                                            else -> status.label
+                                        }
+                                        Text(
+                                            text = statusLabel,
+                                            style = MaterialTheme.typography.labelMedium.copy(
+                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                                fontSize = 12.5.sp,
+                                            ),
+                                            color = if (isSelected) color else Color.White.copy(alpha = 0.82f),
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                        )
+                                    }
+
+                                    if (isSelected) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(7.dp)
+                                                .clip(CircleShape)
+                                                .background(color)
+                                                .border(1.dp, Color.White.copy(alpha = 0.50f), CircleShape),
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // --- 5. PROGRESS STEPPERS (CONTINUOUS WATER GLASS PILL) ---
+            val activeColor = getStatusColor(currentStatus)
+            if (isReading) {
+                // Chapters Stepper
+                TrackerProgressStepperSection(
+                    title = "Chapter Progress",
+                    icon = Icons.Default.EditNote,
+                    unitLabel = "Ch",
+                    currentUnits = entry?.progress ?: 0,
+                    totalUnits = media.chapters,
+                    accentColor = activeColor,
+                    onIncrement = { AnilistTrackerCoordinator.incrementProgress() },
+                    onDecrement = { AnilistTrackerCoordinator.decrementProgress() },
+                    onSetExact = { target -> AnilistTrackerCoordinator.updateProgress(target) },
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Volumes Stepper
+                val currentVolumes = entry?.progressVolumes ?: 0
+                val totalVolumes = media.volumes
+                TrackerProgressStepperSection(
+                    title = "Volume Progress",
+                    icon = Icons.Default.ContentCopy,
+                    unitLabel = "Vol",
+                    currentUnits = currentVolumes,
+                    totalUnits = totalVolumes,
+                    accentColor = Color(0xFFA855F7),
+                    onIncrement = { AnilistTrackerCoordinator.updateProgressVolumes(currentVolumes + 1) },
+                    onDecrement = { if (currentVolumes > 0) AnilistTrackerCoordinator.updateProgressVolumes(currentVolumes - 1) },
+                    onSetExact = { target -> AnilistTrackerCoordinator.updateProgressVolumes(target) },
+                )
+            } else {
+                // Episode Stepper (Anime)
+                TrackerProgressStepperSection(
+                    title = "Episode Progress",
+                    icon = Icons.Default.EditNote,
+                    unitLabel = "Ep",
+                    currentUnits = entry?.progress ?: 0,
+                    totalUnits = media.episodes,
+                    accentColor = activeColor,
+                    onIncrement = { AnilistTrackerCoordinator.incrementProgress() },
+                    onDecrement = { AnilistTrackerCoordinator.decrementProgress() },
+                    onSetExact = { target -> AnilistTrackerCoordinator.updateProgress(target) },
+                )
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // --- 6. SCORE RATING SECTION (1-10 STARS APPLE DIAL) ---
+            val rawScore = entry?.score ?: 0.0
+            val currentScore = if (rawScore >= 10.0) rawScore / 10.0 else rawScore
+            val scoreInt = ((currentScore * 10.0).roundToInt() / 10.0).roundToInt()
+
+            TrackerGlassCard {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Star,
+                            contentDescription = null,
+                            tint = Color(0xFFFFB800),
+                            modifier = Modifier.size(17.dp),
+                        )
+                        Text(
+                            text = "Score Rating",
+                            style = MaterialTheme.typography.labelMedium.copy(
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 13.sp,
+                            ),
+                            color = Color.White,
+                        )
+                    }
+
+                    if (scoreInt > 0) {
+                        val ratingLabel = when (scoreInt) {
+                            10 -> "10 • Masterpiece"
+                            9 -> "9 • Great"
+                            8 -> "8 • Very Good"
+                            7 -> "7 • Good"
+                            6 -> "6 • Fine"
+                            5 -> "5 • Average"
+                            4 -> "4 • Bad"
+                            3 -> "3 • Very Bad"
+                            2 -> "2 • Horrible"
+                            1 -> "1 • Appalling"
+                            else -> "$scoreInt • Rated"
                         }
 
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(6.dp),
                         ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(30.dp)
-                                    .clip(CircleShape)
-                                    .background(Color.White.copy(alpha = 0.08f))
-                                    .clickable(
-                                        enabled = currentRepeat > 0,
-                                        role = Role.Button,
-                                    ) {
-                                        if (currentRepeat > 0) {
-                                            AnilistTrackerCoordinator.updateRepeat(currentRepeat - 1)
-                                        }
-                                    },
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Remove,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(14.dp),
-                                    tint = if (currentRepeat > 0) Color.White else Color.White.copy(alpha = 0.20f),
-                                )
-                            }
-
                             Text(
-                                text = "$currentRepeat",
-                                style = MaterialTheme.typography.labelMedium.copy(
+                                text = ratingLabel,
+                                style = MaterialTheme.typography.labelSmall.copy(
                                     fontWeight = FontWeight.Bold,
-                                    fontSize = 13.sp,
+                                    fontSize = 12.sp,
                                 ),
-                                color = Color.White,
-                                modifier = Modifier.padding(horizontal = 6.dp),
+                                color = Color(0xFFFFB800),
                             )
-
                             Box(
                                 modifier = Modifier
-                                    .size(30.dp)
+                                    .size(18.dp)
                                     .clip(CircleShape)
-                                    .background(Color.White.copy(alpha = 0.08f))
+                                    .background(Color.White.copy(alpha = 0.10f))
                                     .clickable(role = Role.Button) {
-                                        AnilistTrackerCoordinator.updateRepeat(currentRepeat + 1)
+                                        hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                        AnilistTrackerCoordinator.updateScore(0.0)
                                     },
                                 contentAlignment = Alignment.Center,
                             ) {
                                 Icon(
-                                    imageVector = Icons.Default.Add,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(14.dp),
-                                    tint = Color.White,
+                                    imageVector = Icons.Default.Close,
+                                    contentDescription = "Clear Score",
+                                    tint = Color.White.copy(alpha = 0.65f),
+                                    modifier = Modifier.size(11.dp),
                                 )
                             }
                         }
-                    }
-
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(1.dp)
-                            .background(Color.White.copy(alpha = 0.06f)),
-                    )
-
-                    // Private Entry Switch
-                    val isPrivate = entry?.private ?: false
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            modifier = Modifier.weight(1f),
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Lock,
-                                contentDescription = null,
-                                modifier = Modifier.size(17.dp),
-                                tint = Color.White.copy(alpha = 0.60f),
-                            )
-                            Column {
-                                Text(
-                                    text = "Private Entry",
-                                    style = MaterialTheme.typography.labelMedium.copy(
-                                        fontWeight = FontWeight.SemiBold,
-                                        fontSize = 12.5.sp,
-                                    ),
-                                    color = Color.White,
-                                )
-                                Text(
-                                    text = "Hide this entry from your public profile",
-                                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
-                                    color = Color.White.copy(alpha = 0.45f),
-                                )
-                            }
-                        }
-
-                        Switch(
-                            checked = isPrivate,
-                            onCheckedChange = { AnilistTrackerCoordinator.updatePrivate(it) },
+                    } else {
+                        Text(
+                            text = "Unrated",
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontWeight = FontWeight.Medium,
+                                fontSize = 12.sp,
+                            ),
+                            color = Color.White.copy(alpha = 0.45f),
                         )
                     }
+                }
 
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(1.dp)
-                            .background(Color.White.copy(alpha = 0.06f)),
-                    )
+                Spacer(modifier = Modifier.height(12.dp))
 
-                    // Hidden from Status Lists Switch
-                    val isHidden = entry?.hiddenFromStatusLists ?: false
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            modifier = Modifier.weight(1f),
+                // 10-Star Row
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    (1..10).forEach { starIndex ->
+                        val isFilled = starIndex <= scoreInt
+                        Box(
+                            modifier = Modifier
+                                .size(32.dp)
+                                .clip(CircleShape)
+                                .clickable(role = Role.Button) {
+                                    hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    val newScore = if (scoreInt == starIndex) 0.0 else starIndex.toDouble()
+                                    AnilistTrackerCoordinator.updateScore(newScore)
+                                },
+                            contentAlignment = Alignment.Center,
                         ) {
                             Icon(
-                                imageVector = Icons.Default.VisibilityOff,
-                                contentDescription = null,
-                                modifier = Modifier.size(17.dp),
-                                tint = Color.White.copy(alpha = 0.60f),
+                                imageVector = if (isFilled) Icons.Default.Star else Icons.Default.StarBorder,
+                                contentDescription = "Rate $starIndex",
+                                modifier = Modifier.size(22.dp),
+                                tint = if (isFilled) Color(0xFFFFB800) else Color.White.copy(alpha = 0.22f),
                             )
-                            Column {
-                                Text(
-                                    text = "Hide from Status Lists",
-                                    style = MaterialTheme.typography.labelMedium.copy(
-                                        fontWeight = FontWeight.SemiBold,
-                                        fontSize = 12.5.sp,
-                                    ),
-                                    color = Color.White,
-                                )
-                                Text(
-                                    text = "Only show in custom lists",
-                                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
-                                    color = Color.White.copy(alpha = 0.45f),
-                                )
-                            }
                         }
-
-                        Switch(
-                            checked = isHidden,
-                            onCheckedChange = { AnilistTrackerCoordinator.updateHiddenFromStatusLists(it) },
-                        )
                     }
+                }
+            }
 
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(1.dp)
-                            .background(Color.White.copy(alpha = 0.06f)),
-                    )
+            Spacer(modifier = Modifier.height(14.dp))
 
-                    // Personal Notes Text Field
-                    var notesText by remember(entry?.notes) { mutableStateOf(entry?.notes.orEmpty()) }
-                    var isNotesDirty by remember(entry?.notes) { mutableStateOf(false) }
-
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.EditNote,
-                                contentDescription = null,
-                                modifier = Modifier.size(17.dp),
-                                tint = Color.White.copy(alpha = 0.60f),
-                            )
+            // --- 7. TRACKING DATES (APPLE GROUPED INSET CARD) ---
+            TrackerGlassCard {
+                // Start Date
+                val startedAt = entry?.startedAt
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.CalendarMonth,
+                            contentDescription = null,
+                            modifier = Modifier.size(17.dp),
+                            tint = Color.White.copy(alpha = 0.65f),
+                        )
+                        Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
                             Text(
-                                text = "Personal Notes",
+                                text = "Start Date",
                                 style = MaterialTheme.typography.labelMedium.copy(
                                     fontWeight = FontWeight.SemiBold,
                                     fontSize = 12.5.sp,
                                 ),
                                 color = Color.White,
                             )
+                            Text(
+                                text = startedAt?.formatted() ?: "Not set",
+                                style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.5.sp),
+                                color = if (startedAt?.isSet == true) Color(0xFF00A2FF) else Color.White.copy(alpha = 0.45f),
+                            )
+                        }
+                    }
+
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(999.dp))
+                                .background(Color.White.copy(alpha = 0.08f))
+                                .border(
+                                    1.dp,
+                                    Brush.verticalGradient(
+                                        listOf(
+                                            Color.White.copy(alpha = 0.22f),
+                                            Color.White.copy(alpha = 0.08f),
+                                        ),
+                                    ),
+                                    RoundedCornerShape(999.dp),
+                                )
+                                .clickable(role = Role.Button) {
+                                    val now = io.ktor.util.date.GMTDate()
+                                    val today = AnilistFuzzyDate(
+                                        year = now.year,
+                                        month = now.month.ordinal + 1,
+                                        day = now.dayOfMonth,
+                                    )
+                                    AnilistTrackerCoordinator.updateStartedAt(today)
+                                }
+                                .padding(horizontal = 10.dp, vertical = 4.dp),
+                        ) {
+                            Text(
+                                text = "Set Today",
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    fontWeight = FontWeight.SemiBold,
+                                    fontSize = 11.sp,
+                                ),
+                                color = Color.White.copy(alpha = 0.88f),
+                            )
+                        }
+                        if (startedAt?.isSet == true) {
+                            Box(
+                                modifier = Modifier
+                                    .size(26.dp)
+                                    .clip(CircleShape)
+                                    .background(Color.White.copy(alpha = 0.08f))
+                                    .clickable(role = Role.Button) { AnilistTrackerCoordinator.updateStartedAt(null) },
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Close,
+                                    contentDescription = "Clear",
+                                    modifier = Modifier.size(13.dp),
+                                    tint = Color.White.copy(alpha = 0.65f),
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(1.dp)
+                        .background(Color.White.copy(alpha = 0.08f)),
+                )
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // Finish / End Date
+                val completedAt = entry?.completedAt
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.CalendarToday,
+                            contentDescription = null,
+                            modifier = Modifier.size(17.dp),
+                            tint = Color.White.copy(alpha = 0.65f),
+                        )
+                        Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                            Text(
+                                text = "Finish Date",
+                                style = MaterialTheme.typography.labelMedium.copy(
+                                    fontWeight = FontWeight.SemiBold,
+                                    fontSize = 12.5.sp,
+                                ),
+                                color = Color.White,
+                            )
+                            Text(
+                                text = completedAt?.formatted() ?: "Not set",
+                                style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.5.sp),
+                                color = if (completedAt?.isSet == true) Color(0xFF10B981) else Color.White.copy(alpha = 0.45f),
+                            )
+                        }
+                    }
+
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(999.dp))
+                                .background(Color.White.copy(alpha = 0.08f))
+                                .border(
+                                    1.dp,
+                                    Brush.verticalGradient(
+                                        listOf(
+                                            Color.White.copy(alpha = 0.22f),
+                                            Color.White.copy(alpha = 0.08f),
+                                        ),
+                                    ),
+                                    RoundedCornerShape(999.dp),
+                                )
+                                .clickable(role = Role.Button) {
+                                    val now = io.ktor.util.date.GMTDate()
+                                    val today = AnilistFuzzyDate(
+                                        year = now.year,
+                                        month = now.month.ordinal + 1,
+                                        day = now.dayOfMonth,
+                                    )
+                                    AnilistTrackerCoordinator.updateCompletedAt(today)
+                                }
+                                .padding(horizontal = 10.dp, vertical = 4.dp),
+                        ) {
+                            Text(
+                                text = "Set Today",
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    fontWeight = FontWeight.SemiBold,
+                                    fontSize = 11.sp,
+                                ),
+                                color = Color.White.copy(alpha = 0.88f),
+                            )
+                        }
+                        if (completedAt?.isSet == true) {
+                            Box(
+                                modifier = Modifier
+                                    .size(26.dp)
+                                    .clip(CircleShape)
+                                    .background(Color.White.copy(alpha = 0.08f))
+                                    .clickable(role = Role.Button) { AnilistTrackerCoordinator.updateCompletedAt(null) },
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Close,
+                                    contentDescription = "Clear",
+                                    modifier = Modifier.size(13.dp),
+                                    tint = Color.White.copy(alpha = 0.65f),
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // --- 8. ADVANCED DETAILS (APPLE ACCORDION) ---
+            var showAdvancedOptions by remember { mutableStateOf(false) }
+
+            TrackerGlassCard {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(10.dp))
+                        .clickable(role = Role.Button) { showAdvancedOptions = !showAdvancedOptions },
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Tune,
+                            contentDescription = null,
+                            modifier = Modifier.size(17.dp),
+                            tint = Color(0xFF00A2FF),
+                        )
+                        Text(
+                            text = "Advanced Tracking Details",
+                            style = MaterialTheme.typography.labelMedium.copy(
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 13.sp,
+                            ),
+                            color = Color.White,
+                        )
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(999.dp))
+                            .background(Color.White.copy(alpha = 0.08f))
+                            .border(
+                                1.dp,
+                                Brush.verticalGradient(
+                                    listOf(
+                                        Color.White.copy(alpha = 0.22f),
+                                        Color.White.copy(alpha = 0.08f),
+                                    ),
+                                ),
+                                RoundedCornerShape(999.dp),
+                            )
+                            .padding(horizontal = 9.dp, vertical = 3.dp),
+                    ) {
+                        Text(
+                            text = if (showAdvancedOptions) "Hide ▲" else "Expand ▼",
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 11.sp,
+                            ),
+                            color = Color(0xFF00A2FF),
+                        )
+                    }
+                }
+
+                AnimatedVisibility(
+                    visible = showAdvancedOptions,
+                    enter = expandVertically() + fadeIn(),
+                    exit = shrinkVertically() + fadeOut(),
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 14.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        // Repeat Stepper
+                        val currentRepeat = entry?.repeat ?: 0
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Replay,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(17.dp),
+                                    tint = Color.White.copy(alpha = 0.65f),
+                                )
+                                Column {
+                                    Text(
+                                        text = if (isReading) "Reread Count" else "Rewatch Count",
+                                        style = MaterialTheme.typography.labelMedium.copy(
+                                            fontWeight = FontWeight.SemiBold,
+                                            fontSize = 12.5.sp,
+                                        ),
+                                        color = Color.White,
+                                    )
+                                    Text(
+                                        text = if (isReading) "$currentRepeat times reread" else "$currentRepeat times rewatched",
+                                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+                                        color = Color.White.copy(alpha = 0.45f),
+                                    )
+                                }
+                            }
+
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(30.dp)
+                                        .clip(CircleShape)
+                                        .background(Color.White.copy(alpha = 0.08f))
+                                        .clickable(
+                                            enabled = currentRepeat > 0,
+                                            role = Role.Button,
+                                        ) {
+                                            if (currentRepeat > 0) {
+                                                AnilistTrackerCoordinator.updateRepeat(currentRepeat - 1)
+                                            }
+                                        },
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Remove,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(14.dp),
+                                        tint = if (currentRepeat > 0) Color.White else Color.White.copy(alpha = 0.20f),
+                                    )
+                                }
+
+                                Text(
+                                    text = "$currentRepeat",
+                                    style = MaterialTheme.typography.labelMedium.copy(
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 13.sp,
+                                    ),
+                                    color = Color.White,
+                                    modifier = Modifier.padding(horizontal = 6.dp),
+                                )
+
+                                Box(
+                                    modifier = Modifier
+                                        .size(30.dp)
+                                        .clip(CircleShape)
+                                        .background(Color.White.copy(alpha = 0.08f))
+                                        .clickable(role = Role.Button) {
+                                            AnilistTrackerCoordinator.updateRepeat(currentRepeat + 1)
+                                        },
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Add,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(14.dp),
+                                        tint = Color.White,
+                                    )
+                                }
+                            }
                         }
 
-                        OutlinedTextField(
-                            value = notesText,
-                            onValueChange = {
-                                notesText = it
-                                isNotesDirty = true
-                            },
-                            placeholder = { Text("Write personal thoughts, reminders, or tags...", fontSize = 12.sp, color = Color.White.copy(0.35f)) },
-                            minLines = 2,
-                            maxLines = 4,
-                            shape = RoundedCornerShape(12.dp),
-                            textStyle = MaterialTheme.typography.bodySmall.copy(fontSize = 12.5.sp, color = Color.White),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = Color(0xFF00A2FF),
-                                unfocusedBorderColor = Color.White.copy(0.12f),
-                            ),
-                            modifier = Modifier.fillMaxWidth(),
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(1.dp)
+                                .background(Color.White.copy(alpha = 0.08f)),
                         )
 
-                        if (isNotesDirty) {
+                        // Private Entry Switch
+                        val isPrivate = entry?.private ?: false
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
                             Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.End,
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                modifier = Modifier.weight(1f),
                             ) {
-                                Button(
-                                    onClick = {
-                                        AnilistTrackerCoordinator.updateNotes(notesText)
-                                        isNotesDirty = false
-                                    },
-                                    shape = RoundedCornerShape(10.dp),
-                                    colors = ButtonDefaults.buttonColors(
-                                        containerColor = Color(0xFF00A2FF),
-                                        contentColor = Color.White,
+                                Icon(
+                                    imageVector = Icons.Default.Lock,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(17.dp),
+                                    tint = Color.White.copy(alpha = 0.65f),
+                                )
+                                Column {
+                                    Text(
+                                        text = "Private Entry",
+                                        style = MaterialTheme.typography.labelMedium.copy(
+                                            fontWeight = FontWeight.SemiBold,
+                                            fontSize = 12.5.sp,
+                                        ),
+                                        color = Color.White,
+                                    )
+                                    Text(
+                                        text = "Hide this entry from your public profile",
+                                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+                                        color = Color.White.copy(alpha = 0.45f),
+                                    )
+                                }
+                            }
+
+                            Switch(
+                                checked = isPrivate,
+                                onCheckedChange = { AnilistTrackerCoordinator.updatePrivate(it) },
+                            )
+                        }
+
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(1.dp)
+                                .background(Color.White.copy(alpha = 0.08f)),
+                        )
+
+                        // Hidden from Status Lists Switch
+                        val isHidden = entry?.hiddenFromStatusLists ?: false
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                modifier = Modifier.weight(1f),
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.VisibilityOff,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(17.dp),
+                                    tint = Color.White.copy(alpha = 0.65f),
+                                )
+                                Column {
+                                    Text(
+                                        text = "Hide from Status Lists",
+                                        style = MaterialTheme.typography.labelMedium.copy(
+                                            fontWeight = FontWeight.SemiBold,
+                                            fontSize = 12.5.sp,
+                                        ),
+                                        color = Color.White,
+                                    )
+                                    Text(
+                                        text = "Only show in custom lists",
+                                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+                                        color = Color.White.copy(alpha = 0.45f),
+                                    )
+                                }
+                            }
+
+                            Switch(
+                                checked = isHidden,
+                                onCheckedChange = { AnilistTrackerCoordinator.updateHiddenFromStatusLists(it) },
+                            )
+                        }
+
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(1.dp)
+                                .background(Color.White.copy(alpha = 0.08f)),
+                        )
+
+                        // Personal Notes Text Field
+                        var notesText by remember(entry?.notes) { mutableStateOf(entry?.notes.orEmpty()) }
+                        var isNotesDirty by remember(entry?.notes) { mutableStateOf(false) }
+
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.EditNote,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(17.dp),
+                                    tint = Color.White.copy(alpha = 0.65f),
+                                )
+                                Text(
+                                    text = "Personal Notes",
+                                    style = MaterialTheme.typography.labelMedium.copy(
+                                        fontWeight = FontWeight.SemiBold,
+                                        fontSize = 12.5.sp,
                                     ),
+                                    color = Color.White,
+                                )
+                            }
+
+                            OutlinedTextField(
+                                value = notesText,
+                                onValueChange = {
+                                    notesText = it
+                                    isNotesDirty = true
+                                },
+                                placeholder = { Text("Write personal thoughts, reminders, or tags...", fontSize = 12.sp, color = Color.White.copy(0.35f)) },
+                                minLines = 2,
+                                maxLines = 4,
+                                shape = RoundedCornerShape(12.dp),
+                                textStyle = MaterialTheme.typography.bodySmall.copy(fontSize = 12.5.sp, color = Color.White),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = Color(0xFF00A2FF),
+                                    unfocusedBorderColor = Color.White.copy(0.18f),
+                                ),
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+
+                            if (isNotesDirty) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.End,
                                 ) {
-                                    Text("Save Notes", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                    Button(
+                                        onClick = {
+                                            AnilistTrackerCoordinator.updateNotes(notesText)
+                                            isNotesDirty = false
+                                        },
+                                        shape = RoundedCornerShape(10.dp),
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = Color(0xFF00A2FF),
+                                            contentColor = Color.White,
+                                        ),
+                                    ) {
+                                        Text("Save Notes", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                    }
                                 }
                             }
                         }
                     }
                 }
             }
-        }
 
-        // --- 11. DESTRUCTIVE ACTION (Guarded 2-Step Confirmation) ---
-        if (entry != null) {
-            Spacer(modifier = Modifier.height(14.dp))
+            // --- 9. DESTRUCTIVE ACTION (GUARDED 2-STEP CONFIRMATION) ---
+            if (entry != null) {
+                Spacer(modifier = Modifier.height(14.dp))
 
-            var confirmDelete by remember { mutableStateOf(false) }
-            LaunchedEffect(confirmDelete) {
-                if (confirmDelete) {
-                    delay(4000)
-                    confirmDelete = false
+                var confirmDelete by remember { mutableStateOf(false) }
+                LaunchedEffect(confirmDelete) {
+                    if (confirmDelete) {
+                        delay(4000)
+                        confirmDelete = false
+                    }
                 }
-            }
 
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(44.dp)
-                    .clip(RoundedCornerShape(13.dp))
-                    .background(if (confirmDelete) Color(0xFFEF4444).copy(alpha = 0.22f) else Color(0xFFEF4444).copy(alpha = 0.08f))
-                    .border(
-                        1.dp,
-                        if (confirmDelete) Color(0xFFEF4444).copy(alpha = 0.65f) else Color(0xFFEF4444).copy(alpha = 0.20f),
-                        RoundedCornerShape(13.dp),
-                    )
-                    .clickable(role = Role.Button) {
-                        if (!confirmDelete) {
-                            hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            confirmDelete = true
-                        } else {
-                            hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
-                            AnilistTrackerCoordinator.deleteEntry()
-                            onClose()
-                        }
-                    },
-                contentAlignment = Alignment.Center,
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.DeleteOutline,
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp),
-                        tint = Color(0xFFEF4444),
-                    )
-                    Text(
-                        text = if (confirmDelete) "Tap Again to Confirm Removal" else "Remove from AniList",
-                        style = MaterialTheme.typography.labelMedium.copy(
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 13.sp,
-                        ),
-                        color = Color(0xFFEF4444),
-                    )
-                }
-            }
-        }
-
-        // Expandable Match Diagnostics
-        if (!trackerState.debugInfo.isNullOrBlank()) {
-            var showDiagnostics by remember { mutableStateOf(false) }
-            Spacer(modifier = Modifier.height(10.dp))
-            Surface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(10.dp))
-                    .clickable(role = Role.Button) { showDiagnostics = !showDiagnostics },
-                color = Color.Transparent,
-            ) {
-                Row(
+                Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 4.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        text = "Match Diagnostics",
-                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
-                        color = Color.White.copy(alpha = 0.40f),
-                    )
-                    Text(
-                        text = if (showDiagnostics) "Hide ▲" else "View ▼",
-                        style = MaterialTheme.typography.labelSmall.copy(
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                        ),
-                        color = Color(0xFF00A2FF),
-                    )
-                }
-            }
-
-            AnimatedVisibility(
-                visible = showDiagnostics,
-                enter = expandVertically() + fadeIn(),
-                exit = shrinkVertically() + fadeOut(),
-            ) {
-                val clipboardManager = LocalClipboardManager.current
-                var copied by remember { mutableStateOf(false) }
-
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(Color.White.copy(alpha = 0.04f))
-                        .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(12.dp))
-                        .padding(10.dp),
-                ) {
-                    Text(
-                        text = trackerState.debugInfo.orEmpty(),
-                        style = MaterialTheme.typography.bodySmall.copy(
-                            fontSize = 11.sp,
-                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
-                        ),
-                        color = Color.White.copy(alpha = 0.85f),
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    OutlinedButton(
-                        onClick = {
-                            clipboardManager.setText(AnnotatedString(trackerState.debugInfo.orEmpty()))
-                            copied = true
+                        .height(44.dp)
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(
+                            if (confirmDelete) {
+                                Brush.verticalGradient(
+                                    listOf(
+                                        Color(0xFFEF4444).copy(alpha = 0.28f),
+                                        Color(0xFFEF4444).copy(alpha = 0.16f),
+                                    ),
+                                )
+                            } else {
+                                Brush.verticalGradient(
+                                    listOf(
+                                        Color(0xFFEF4444).copy(alpha = 0.14f),
+                                        Color(0xFFEF4444).copy(alpha = 0.05f),
+                                    ),
+                                )
+                            },
+                        )
+                        .border(
+                            1.dp,
+                            if (confirmDelete) {
+                                Brush.verticalGradient(
+                                    listOf(
+                                        Color(0xFFEF4444).copy(alpha = 0.85f),
+                                        Color(0xFFEF4444).copy(alpha = 0.50f),
+                                    ),
+                                )
+                            } else {
+                                Brush.verticalGradient(
+                                    listOf(
+                                        Color(0xFFEF4444).copy(alpha = 0.40f),
+                                        Color(0xFFEF4444).copy(alpha = 0.15f),
+                                    ),
+                                )
+                            },
+                            RoundedCornerShape(14.dp),
+                        )
+                        .clickable(role = Role.Button) {
+                            if (!confirmDelete) {
+                                hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                confirmDelete = true
+                            } else {
+                                hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                                AnilistTrackerCoordinator.deleteEntry()
+                                onClose()
+                            }
                         },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(10.dp),
-                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.15f)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
                         Icon(
-                            imageVector = Icons.Default.ContentCopy,
-                            contentDescription = "Copy Log",
-                            modifier = Modifier.size(14.dp),
+                            imageVector = Icons.Default.DeleteOutline,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp),
+                            tint = Color(0xFFEF4444),
                         )
-                        Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = if (copied) "✓ Log Copied to Clipboard!" else "Copy Diagnostics Log",
-                            fontSize = 12.sp,
-                            color = Color.White.copy(alpha = 0.80f),
+                            text = if (confirmDelete) "Tap Again to Confirm Removal" else "Remove from AniList",
+                            style = MaterialTheme.typography.labelMedium.copy(
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 13.sp,
+                            ),
+                            color = Color(0xFFEF4444),
                         )
                     }
                 }
             }
-        }
 
-        Spacer(modifier = Modifier.height(28.dp))
+            // Expandable Match Diagnostics
+            if (!trackerState.debugInfo.isNullOrBlank()) {
+                var showDiagnostics by remember { mutableStateOf(false) }
+                Spacer(modifier = Modifier.height(10.dp))
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(10.dp))
+                        .clickable(role = Role.Button) { showDiagnostics = !showDiagnostics },
+                    color = Color.Transparent,
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = "Match Diagnostics",
+                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
+                            color = Color.White.copy(alpha = 0.40f),
+                        )
+                        Text(
+                            text = if (showDiagnostics) "Hide ▲" else "View ▼",
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                            ),
+                            color = Color(0xFF00A2FF),
+                        )
+                    }
+                }
+
+                AnimatedVisibility(
+                    visible = showDiagnostics,
+                    enter = expandVertically() + fadeIn(),
+                    exit = shrinkVertically() + fadeOut(),
+                ) {
+                    val clipboardManager = LocalClipboardManager.current
+                    var copied by remember { mutableStateOf(false) }
+
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(Color.White.copy(alpha = 0.04f))
+                            .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(12.dp))
+                            .padding(10.dp),
+                    ) {
+                        Text(
+                            text = trackerState.debugInfo.orEmpty(),
+                            style = MaterialTheme.typography.bodySmall.copy(
+                                fontSize = 11.sp,
+                                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                            ),
+                            color = Color.White.copy(alpha = 0.85f),
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        OutlinedButton(
+                            onClick = {
+                                clipboardManager.setText(AnnotatedString(trackerState.debugInfo.orEmpty()))
+                                copied = true
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(10.dp),
+                            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.18f)),
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.ContentCopy,
+                                contentDescription = "Copy Log",
+                                modifier = Modifier.size(14.dp),
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = if (copied) "✓ Log Copied to Clipboard!" else "Copy Diagnostics Log",
+                                fontSize = 12.sp,
+                                color = Color.White.copy(alpha = 0.80f),
+                            )
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+        }
     }
 
     if (showUserProfileSheet && trackerState.user != null) {
@@ -1859,9 +2044,7 @@ private fun TrackerProgressStepperSection(
         (currentUnits.toFloat() / totalUnits).coerceIn(0f, 1f)
     } else 0f
 
-    TrackerGlassCard(
-        backgroundColor = Color.White.copy(alpha = 0.045f),
-    ) {
+    TrackerGlassCard {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -1913,7 +2096,7 @@ private fun TrackerProgressStepperSection(
                     .fillMaxWidth()
                     .height(6.dp)
                     .clip(RoundedCornerShape(3.dp))
-                    .background(Color.White.copy(alpha = 0.06f)),
+                    .background(Color.White.copy(alpha = 0.08f)),
             ) {
                 Box(
                     modifier = Modifier
@@ -1922,7 +2105,7 @@ private fun TrackerProgressStepperSection(
                         .clip(RoundedCornerShape(3.dp))
                         .background(
                             Brush.horizontalGradient(
-                                listOf(accentColor, accentColor.copy(alpha = 0.70f)),
+                                listOf(accentColor, Color(0xFF38BDF8)),
                             ),
                         ),
                 )
@@ -1936,19 +2119,26 @@ private fun TrackerProgressStepperSection(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            // Continuous Segmented Pill
+            // Continuous Segmented Water Pill
             Row(
                 modifier = Modifier
                     .weight(1f)
                     .height(44.dp)
                     .clip(RoundedCornerShape(13.dp))
-                    .background(Color.White.copy(alpha = 0.05f))
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(
+                                Color.White.copy(alpha = 0.08f),
+                                Color.White.copy(alpha = 0.04f),
+                            ),
+                        ),
+                    )
                     .border(
                         1.dp,
                         Brush.verticalGradient(
                             listOf(
-                                Color.White.copy(alpha = 0.14f),
-                                Color.White.copy(alpha = 0.04f),
+                                Color.White.copy(alpha = 0.30f),
+                                Color.White.copy(alpha = 0.08f),
                             ),
                         ),
                         RoundedCornerShape(13.dp),
@@ -1973,7 +2163,7 @@ private fun TrackerProgressStepperSection(
                         imageVector = Icons.Default.Remove,
                         contentDescription = "Decrease",
                         modifier = Modifier.size(16.dp),
-                        tint = if (currentUnits > 0) Color.White else Color.White.copy(alpha = 0.20f),
+                        tint = if (currentUnits > 0) Color.White else Color.White.copy(alpha = 0.25f),
                     )
                 }
 
@@ -1982,7 +2172,7 @@ private fun TrackerProgressStepperSection(
                     modifier = Modifier
                         .width(1.dp)
                         .height(20.dp)
-                        .background(Color.White.copy(alpha = 0.10f)),
+                        .background(Color.White.copy(alpha = 0.14f)),
                 )
 
                 // Middle: Direct input / badge segment
@@ -2012,7 +2202,7 @@ private fun TrackerProgressStepperSection(
                             imageVector = Icons.Default.Edit,
                             contentDescription = "Edit Exact",
                             modifier = Modifier.size(12.dp),
-                            tint = accentColor.copy(alpha = 0.65f),
+                            tint = accentColor.copy(alpha = 0.70f),
                         )
                     }
                 }
@@ -2022,7 +2212,7 @@ private fun TrackerProgressStepperSection(
                     modifier = Modifier
                         .width(1.dp)
                         .height(20.dp)
-                        .background(Color.White.copy(alpha = 0.10f)),
+                        .background(Color.White.copy(alpha = 0.14f)),
                 )
 
                 // Plus segment
@@ -2044,7 +2234,7 @@ private fun TrackerProgressStepperSection(
                         imageVector = Icons.Default.Add,
                         contentDescription = "Increase",
                         modifier = Modifier.size(16.dp),
-                        tint = if (canIncrement) Color.White else Color.White.copy(alpha = 0.20f),
+                        tint = if (canIncrement) Color.White else Color.White.copy(alpha = 0.25f),
                     )
                 }
             }
@@ -2055,13 +2245,29 @@ private fun TrackerProgressStepperSection(
                     modifier = Modifier
                         .height(44.dp)
                         .clip(RoundedCornerShape(13.dp))
-                        .background(accentColor.copy(alpha = 0.15f))
-                        .border(1.dp, accentColor.copy(alpha = 0.35f), RoundedCornerShape(13.dp))
+                        .background(
+                            Brush.verticalGradient(
+                                listOf(
+                                    accentColor.copy(alpha = 0.28f),
+                                    accentColor.copy(alpha = 0.14f),
+                                ),
+                            ),
+                        )
+                        .border(
+                            1.dp,
+                            Brush.verticalGradient(
+                                listOf(
+                                    accentColor.copy(alpha = 0.70f),
+                                    accentColor.copy(alpha = 0.40f),
+                                ),
+                            ),
+                            RoundedCornerShape(13.dp),
+                        )
                         .clickable(role = Role.Button) {
                             hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                             onSetExact(totalUnits)
                         }
-                        .padding(horizontal = 12.dp),
+                        .padding(horizontal = 14.dp),
                     contentAlignment = Alignment.Center,
                 ) {
                     Row(
@@ -2094,21 +2300,21 @@ private fun TrackerProgressStepperSection(
             onDismissRequest = { showExactEditDialog = false },
         ) {
             Surface(
-                shape = RoundedCornerShape(20.dp),
-                color = Color(0xFF131620),
+                shape = RoundedCornerShape(22.dp),
+                color = Color(0xFF0F1322).copy(alpha = 0.92f),
                 border = BorderStroke(
                     1.dp,
                     Brush.verticalGradient(
                         listOf(
-                            Color.White.copy(alpha = 0.20f),
-                            Color.White.copy(alpha = 0.05f),
+                            Color.White.copy(alpha = 0.35f),
+                            Color.White.copy(alpha = 0.10f),
                         ),
                     ),
                 ),
-                shadowElevation = 16.dp,
+                shadowElevation = 20.dp,
             ) {
                 Column(
-                    modifier = Modifier.padding(20.dp),
+                    modifier = Modifier.padding(22.dp),
                     verticalArrangement = Arrangement.spacedBy(14.dp),
                 ) {
                     Text(
@@ -2129,7 +2335,7 @@ private fun TrackerProgressStepperSection(
                         placeholder = { Text("0", color = Color.White.copy(0.4f)) },
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = accentColor,
-                            unfocusedBorderColor = Color.White.copy(0.15f),
+                            unfocusedBorderColor = Color.White.copy(0.18f),
                             focusedTextColor = Color.White,
                             unfocusedTextColor = Color.White,
                         ),
@@ -2144,9 +2350,9 @@ private fun TrackerProgressStepperSection(
                             onClick = { showExactEditDialog = false },
                             shape = RoundedCornerShape(12.dp),
                             modifier = Modifier.weight(1f),
-                            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.15f)),
+                            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.18f)),
                         ) {
-                            Text("Cancel", color = Color.White.copy(alpha = 0.75f), fontSize = 13.sp)
+                            Text("Cancel", color = Color.White.copy(alpha = 0.80f), fontSize = 13.sp)
                         }
 
                         Button(
