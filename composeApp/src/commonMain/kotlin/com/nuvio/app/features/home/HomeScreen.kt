@@ -1158,19 +1158,6 @@ fun HomeScreen(
                 }
             }
         }
-        val statusBarPadding = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
-        val notificationTopPadding = maxOf(topChromePadding ?: 0.dp, statusBarPadding) + 16.dp
-        val isNarrowScreen = maxWidth < 520.dp
-
-        com.nuvio.app.features.anilist.ui.components.AnilistOutageNotification(
-            modifier = Modifier
-                .align(if (isNarrowScreen) Alignment.TopCenter else Alignment.TopEnd)
-                .padding(
-                    top = notificationTopPadding,
-                    start = if (isNarrowScreen) 16.dp else 0.dp,
-                    end = if (isNarrowScreen) 16.dp else 24.dp,
-                ),
-        )
     }
 }
 

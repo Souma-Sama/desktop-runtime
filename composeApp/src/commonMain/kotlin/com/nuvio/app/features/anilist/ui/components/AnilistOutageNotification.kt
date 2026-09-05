@@ -27,12 +27,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -58,20 +54,15 @@ import com.nuvio.app.features.anilist.AnilistPreferencesRepository
 @Composable
 fun AnilistOutageNotification(
     modifier: Modifier = Modifier,
+    visible: Boolean = true,
 ) {
     val prefs by AnilistPreferencesRepository.preferences.collectAsStateWithLifecycle()
     if (!prefs.enabled) return
 
     val outageMessage by AnilistApi.outageMessage.collectAsStateWithLifecycle()
-    var isDismissed by rememberSaveable { mutableStateOf(false) }
+    val isDismissed by AnilistApi.isOutageDismissed.collectAsStateWithLifecycle()
 
-    LaunchedEffect(outageMessage) {
-        if (outageMessage == null) {
-            isDismissed = false
-        }
-    }
-
-    val isVisible = !isDismissed && !outageMessage.isNullOrBlank()
+    val isVisible = visible && !isDismissed && !outageMessage.isNullOrBlank()
 
     AnimatedVisibility(
         visible = isVisible,
@@ -192,7 +183,7 @@ fun AnilistOutageNotification(
                         .clickable(
                             interactionSource = remember { MutableInteractionSource() },
                             indication = null,
-                            onClick = { isDismissed = true },
+                            onClick = { AnilistApi.dismissOutage() },
                         ),
                     contentAlignment = Alignment.Center,
                 ) {

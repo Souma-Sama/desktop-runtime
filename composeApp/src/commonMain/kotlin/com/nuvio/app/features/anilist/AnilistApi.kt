@@ -56,6 +56,29 @@ object AnilistApi {
     private val _outageMessage = MutableStateFlow<String?>(null)
     val outageMessage: StateFlow<String?> = _outageMessage.asStateFlow()
 
+    private val _isOutageDismissed = MutableStateFlow(false)
+    val isOutageDismissed: StateFlow<Boolean> = _isOutageDismissed.asStateFlow()
+
+    fun dismissOutage() {
+        _isOutageDismissed.value = true
+    }
+
+    private fun setOutage(message: String) {
+        if (_outageMessage.value != message) {
+            _outageMessage.value = message
+            _isOutageDismissed.value = false
+        }
+        lastErrorMessage = message
+    }
+
+    private fun clearOutage() {
+        if (_outageMessage.value != null) {
+            _outageMessage.value = null
+            _isOutageDismissed.value = false
+        }
+        lastErrorMessage = null
+    }
+
     var lastErrorMessage: String? = null
         private set
 
@@ -125,8 +148,7 @@ object AnilistApi {
                     val exMsg = e.message
                     if (exMsg?.contains("temporarily disabled", ignoreCase = true) == true ||
                         exMsg?.contains("stability issues", ignoreCase = true) == true) {
-                        _outageMessage.value = exMsg
-                        lastErrorMessage = exMsg
+                        setOutage(exMsg)
                         return@withPermit null
                     }
                     lastDebugLog = "HTTP POST $GRAPHQL_ENDPOINT failed (attempt $attempt): ${e.message}\nPayload: $payload"
@@ -166,8 +188,7 @@ object AnilistApi {
 
                         if (isOutage) {
                             val cleanMsg = errMsg ?: "The AniList API has been temporarily disabled due to severe stability issues."
-                            _outageMessage.value = cleanMsg
-                            lastErrorMessage = cleanMsg
+                            setOutage(cleanMsg)
                             log.w { "AniList API outage detected: $cleanMsg" }
                             return@withPermit null
                         }
@@ -184,8 +205,7 @@ object AnilistApi {
                     }
 
                     if (root.containsKey("data") && root["data"] !is JsonNull) {
-                        _outageMessage.value = null
-                        lastErrorMessage = null
+                        clearOutage()
                         if (!isMutation) {
                             responseCacheMutex.withLock {
                                 responseCache[cacheKey] = CachedGraphQLResponse(timestamp = now, data = root)
@@ -193,8 +213,7 @@ object AnilistApi {
                         }
                         return@withPermit root
                     } else if (errors == null || errors.isEmpty()) {
-                        _outageMessage.value = null
-                        lastErrorMessage = null
+                        clearOutage()
                         return@withPermit root
                     }
                 } catch (e: Exception) {

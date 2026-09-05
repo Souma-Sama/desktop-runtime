@@ -371,5 +371,21 @@ internal fun MainTabsDestination(
                 }
             }
         }
+
+        val statusBarPadding = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+        val notificationTopPadding = max(statusBarPadding + 16.dp, 36.dp)
+        val isNarrowScreen = screenWidth < 520.dp
+
+        com.nuvio.app.features.anilist.ui.components.AnilistOutageNotification(
+            visible = initialHomeReady && selectedTab == AppScreenTab.Home,
+            modifier = Modifier
+                .align(if (isNarrowScreen) Alignment.TopCenter else Alignment.TopEnd)
+                .padding(
+                    top = notificationTopPadding,
+                    start = if (isNarrowScreen) 16.dp else 0.dp,
+                    end = if (isNarrowScreen) 16.dp else 24.dp,
+                )
+                .zIndex(100f),
+        )
     }
 }
