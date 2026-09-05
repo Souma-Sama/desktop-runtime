@@ -32,7 +32,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -243,6 +245,11 @@ internal fun DetailRatingsRow(
                 fontSize = 15.sp,
                 fontWeight = FontWeight.ExtraBold,
                 letterSpacing = (-0.2).sp,
+                shadow = Shadow(
+                    color = Color.Black.copy(alpha = 0.85f),
+                    blurRadius = 6f,
+                    offset = Offset(0f, 1f),
+                ),
             )
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -379,7 +386,7 @@ private val ratingVisuals = listOf(
         displayName = "MyAnimeList",
         logo = Res.drawable.rating_mal,
         logoWidth = 20.dp,
-        valueColor = Color(0xFF2E51A2),
+        valueColor = Color(0xFF4B7CD8),
         format = ::formatTwoDecimals,
     ),
     RatingVisuals(

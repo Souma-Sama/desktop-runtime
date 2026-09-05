@@ -45,6 +45,7 @@ import androidx.compose.ui.BiasAlignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
@@ -52,6 +53,7 @@ import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.layout.ContentScale
@@ -146,11 +148,12 @@ fun DesktopDetailBackdrop(
         val baseSideFade = if (isAnimeMedia) {
             Brush.horizontalGradient(
                 colorStops = arrayOf(
-                    0.00f to sideGradientColor.copy(alpha = 0.88f * gradientIntensity),
-                    0.08f to sideGradientColor.copy(alpha = 0.65f * gradientIntensity),
-                    0.18f to sideGradientColor.copy(alpha = 0.32f * gradientIntensity),
-                    0.30f to sideGradientColor.copy(alpha = 0.10f * gradientIntensity),
-                    0.45f to Color.Transparent,
+                    0.00f to sideGradientColor.copy(alpha = 0.94f * gradientIntensity),
+                    0.10f to sideGradientColor.copy(alpha = 0.80f * gradientIntensity),
+                    0.24f to sideGradientColor.copy(alpha = 0.55f * gradientIntensity),
+                    0.40f to sideGradientColor.copy(alpha = 0.28f * gradientIntensity),
+                    0.56f to sideGradientColor.copy(alpha = 0.08f * gradientIntensity),
+                    0.68f to Color.Transparent,
                     1.00f to Color.Transparent,
                 ),
             )
@@ -258,9 +261,10 @@ fun DesktopDetailBackdrop(
                         Brush.verticalGradient(
                             colorStops = arrayOf(
                                 0.00f to Color.Transparent,
-                                0.50f to Color.Transparent,
-                                0.66f to sideGradientColor.copy(alpha = 0.28f * gradientIntensity),
-                                0.82f to sideGradientColor.copy(alpha = 0.70f * gradientIntensity),
+                                0.38f to Color.Transparent,
+                                0.52f to sideGradientColor.copy(alpha = 0.22f * gradientIntensity),
+                                0.68f to sideGradientColor.copy(alpha = 0.55f * gradientIntensity),
+                                0.82f to sideGradientColor.copy(alpha = 0.80f * gradientIntensity),
                                 0.95f to sideGradientColor,
                                 1.00f to sideGradientColor,
                             ),
@@ -346,16 +350,35 @@ fun DesktopDetailHero(
             val anilistPrefs by AnilistPreferencesRepository.preferences.collectAsStateWithLifecycle()
             val heroLogoScale = anilistPrefs.heroTitleLogoScale
             if (logoUrl != null && !logoLoadError) {
-                AsyncImage(
-                    model = logoUrl,
-                    contentDescription = stringResource(Res.string.detail_logo_content_description, title ?: meta.name),
+                Box(
                     modifier = Modifier
-                        .widthIn(max = logoMaxWidth * heroLogoScale)
-                        .height(logoMaxHeight * heroLogoScale),
-                    alignment = Alignment.CenterStart,
-                    contentScale = ContentScale.Fit,
-                    onError = { logoLoadError = true },
-                )
+                        .drawBehind {
+                            drawCircle(
+                                brush = Brush.radialGradient(
+                                    colors = listOf(
+                                        Color.Black.copy(alpha = 0.45f),
+                                        Color.Black.copy(alpha = 0.18f),
+                                        Color.Transparent,
+                                    ),
+                                    center = center,
+                                    radius = (size.maxDimension * 0.75f).coerceAtLeast(120f),
+                                ),
+                                radius = (size.maxDimension * 0.75f).coerceAtLeast(120f),
+                                center = center,
+                            )
+                        },
+                ) {
+                    AsyncImage(
+                        model = logoUrl,
+                        contentDescription = stringResource(Res.string.detail_logo_content_description, title ?: meta.name),
+                        modifier = Modifier
+                            .widthIn(max = logoMaxWidth * heroLogoScale)
+                            .height(logoMaxHeight * heroLogoScale),
+                        alignment = Alignment.CenterStart,
+                        contentScale = ContentScale.Fit,
+                        onError = { logoLoadError = true },
+                    )
+                }
             } else {
                 Text(
                     text = title ?: meta.name,
@@ -364,6 +387,11 @@ fun DesktopDetailHero(
                         lineHeight = NuvioTokens.LineHeight.displayMd,
                         fontWeight = FontWeight.ExtraBold,
                         letterSpacing = NuvioTokens.LetterSpacing.none,
+                        shadow = Shadow(
+                            color = Color.Black.copy(alpha = 0.85f),
+                            blurRadius = 8f,
+                            offset = Offset(0f, 1f),
+                        ),
                     ),
                     color = colorScheme.onBackground,
                     maxLines = 3,
@@ -387,8 +415,13 @@ fun DesktopDetailHero(
                         fontSize = NuvioTokens.Type.bodyMd,
                         fontWeight = FontWeight.SemiBold,
                         letterSpacing = NuvioTokens.LetterSpacing.none,
+                        shadow = Shadow(
+                            color = Color.Black.copy(alpha = 0.85f),
+                            blurRadius = 6f,
+                            offset = Offset(0f, 1f),
+                        ),
                     ),
-                    color = colorScheme.onSurfaceVariant,
+                    color = Color.White.copy(alpha = 0.95f),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -402,8 +435,13 @@ fun DesktopDetailHero(
                         fontSize = NuvioTokens.Type.bodyLg,
                         lineHeight = NuvioTokens.LineHeight.bodyLg,
                         letterSpacing = NuvioTokens.LetterSpacing.none,
+                        shadow = Shadow(
+                            color = Color.Black.copy(alpha = 0.85f),
+                            blurRadius = 6f,
+                            offset = Offset(0f, 1f),
+                        ),
                     ),
-                    color = colorScheme.onSurface,
+                    color = Color.White.copy(alpha = 0.95f),
                 )
             }
             Spacer(modifier = Modifier.height(space.s28))
@@ -517,17 +555,26 @@ private fun DesktopHeroMetaRow(meta: MetaDetails) {
                     fontSize = NuvioTokens.Type.bodyLg,
                     fontWeight = FontWeight.Bold,
                     letterSpacing = NuvioTokens.LetterSpacing.none,
+                    shadow = Shadow(
+                        color = Color.Black.copy(alpha = 0.85f),
+                        blurRadius = 6f,
+                        offset = Offset(0f, 1f),
+                    ),
                 ),
-                color = colorScheme.onBackground,
+                color = Color.White,
                 maxLines = 1,
             )
         }
         meta.ageRating?.takeIf { it.isNotBlank() }?.let { rating ->
             Box(
                 modifier = Modifier
+                    .background(
+                        Color.Black.copy(alpha = 0.35f),
+                        RoundedCornerShape(NuvioTokens.Radius.sm),
+                    )
                     .border(
                         NuvioTokens.Border.thin,
-                        colorScheme.onBackground.copy(alpha = opacity.overlayLight),
+                        Color.White.copy(alpha = 0.35f),
                         RoundedCornerShape(NuvioTokens.Radius.sm),
                     )
                     .padding(horizontal = space.s8, vertical = space.s2),
@@ -538,8 +585,13 @@ private fun DesktopHeroMetaRow(meta: MetaDetails) {
                         fontSize = NuvioTokens.Type.bodySm,
                         fontWeight = FontWeight.SemiBold,
                         letterSpacing = NuvioTokens.LetterSpacing.none,
+                        shadow = Shadow(
+                            color = Color.Black.copy(alpha = 0.85f),
+                            blurRadius = 4f,
+                            offset = Offset(0f, 1f),
+                        ),
                     ),
-                    color = colorScheme.onSurfaceVariant,
+                    color = Color.White.copy(alpha = 0.90f),
                 )
             }
         }
@@ -570,6 +622,11 @@ private fun DesktopHeroMetaRow(meta: MetaDetails) {
                         style = MaterialTheme.typography.labelSmall.copy(
                             fontWeight = FontWeight.Bold,
                             fontSize = 11.sp,
+                            shadow = Shadow(
+                                color = Color.Black.copy(alpha = 0.85f),
+                                blurRadius = 4f,
+                                offset = Offset(0f, 1f),
+                            ),
                         ),
                         color = androidx.compose.ui.graphics.Color(0xFF34D399),
                     )
