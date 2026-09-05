@@ -606,6 +606,7 @@ object AnilistMetaDetailsResolver {
                             episode = actualEpNumber,
                             effectiveImdbId = if (hasValidImdbId) effectiveImdbId else null,
                             kitsuId = kitsuId,
+                            relativeEpisode = idx,
                         )
                         MetaVideo(
                             id = videoId,
@@ -636,6 +637,7 @@ object AnilistMetaDetailsResolver {
                             episode = actualEpNumber,
                             effectiveImdbId = if (hasValidImdbId) effectiveImdbId else null,
                             kitsuId = kitsuId,
+                            relativeEpisode = epIdx,
                         )
 
                         MetaVideo(
@@ -958,6 +960,7 @@ object AnilistMetaDetailsResolver {
                         episode = actualEpNumber,
                         effectiveImdbId = if (hasValidImdbId) effectiveImdbId else null,
                         kitsuId = kitsuId,
+                        relativeEpisode = idx,
                     )
                     val kitsuEp = kitsuEpisodes[actualEpNumber] ?: kitsuEpisodes[idx]
                     val streamingEp = media?.streamingEpisodes?.getOrNull(idx - 1)
@@ -1005,6 +1008,7 @@ object AnilistMetaDetailsResolver {
                     episode = actualEpNumber,
                     effectiveImdbId = if (hasValidImdbId) effectiveImdbId else null,
                     kitsuId = kitsuId,
+                    relativeEpisode = idx,
                 )
                 MetaVideo(
                     id = videoId,
@@ -1040,6 +1044,7 @@ object AnilistMetaDetailsResolver {
                     episode = actualEpNumber,
                     effectiveImdbId = if (hasValidImdbId) effectiveImdbId else null,
                     kitsuId = kitsuId,
+                    relativeEpisode = idx,
                 )
                 MetaVideo(
                     id = videoId,
@@ -1071,6 +1076,7 @@ object AnilistMetaDetailsResolver {
                     episode = actualEpNumber,
                     effectiveImdbId = if (hasValidImdbId) effectiveImdbId else null,
                     kitsuId = kitsuId,
+                    relativeEpisode = idx,
                 )
                 MetaVideo(
                     id = videoId,
@@ -1106,6 +1112,7 @@ object AnilistMetaDetailsResolver {
                     episode = actualEpNumber,
                     effectiveImdbId = if (hasValidImdbId) effectiveImdbId else null,
                     kitsuId = kitsuId,
+                    relativeEpisode = idx,
                 )
                 MetaVideo(
                     id = videoId,
@@ -1398,22 +1405,35 @@ object AnilistMetaDetailsResolver {
         result
     }.getOrElse { emptyMap() }
 
-    private fun resolveEpisodeOffset(
+    internal suspend fun getMediaOffset(media: AnilistMedia): Int {
+        val arm = resolveArmMapping(media.id)
+        return resolveEpisodeOffset(media, arm.season, emptyList())
+    }
+
+    private suspend fun resolveEpisodeOffset(
         media: AnilistMedia?,
         targetSeason: Int,
         cinemetaVideos: List<MetaVideo>,
     ): Int {
-        if (media == null) return 0
+        if (media == null || targetSeason <= 0) return 0
+
+        // 1. Dynamic ARM Season-Aware Prequel Summation
+        val armOffset = collectPrequelChainBySeason(media.relations, targetSeason)
+        if (armOffset > 0) {
+            return armOffset
+        }
+
+        // 2. Secondary Heuristic: Title Regex Part/Cour Summation
         val title = (media.title?.displayTitle.orEmpty() + " " + media.title?.romaji.orEmpty() + " " + media.title?.english.orEmpty())
         val partNum = extractPartNumber(title)
         if (partNum <= 1) return 0
 
-        // 1. Traverse all prequels in the chain
+        // Traverse all prequels in the chain
         val traversed = collectPrequelChain(media.relations, title)
         val accountedParts = traversed.map { it.partNumber }.toSet()
         var totalOffset = traversed.sumOf { it.episodes }
 
-        // 2. If some earlier parts were not reached in relations (e.g. shallow API relations cache),
+        // If some earlier parts were not reached in relations (e.g. shallow API relations cache),
         // fill in missing parts using the closest known prequel's episode count
         val missingParts = (1 until partNum).filter { it !in accountedParts }
         if (missingParts.isNotEmpty()) {
@@ -1424,6 +1444,38 @@ object AnilistMetaDetailsResolver {
         }
 
         return totalOffset
+    }
+
+    private suspend fun collectPrequelChainBySeason(
+        relations: List<AnilistRelation>,
+        targetSeason: Int,
+        visitedIds: MutableSet<Int> = mutableSetOf(),
+    ): Int {
+        var sum = 0
+        val prequels = relations.filter { it.relationType.equals("PREQUEL", ignoreCase = true) }
+        for (prequel in prequels) {
+            if (!visitedIds.add(prequel.id)) continue
+            val prequelArm = resolveArmMapping(prequel.id)
+            if (prequelArm.season == targetSeason) {
+                val cachedMedia = AnilistApi.getCachedMedia(prequel.id)
+                val eps = prequel.episodes
+                    ?: cachedMedia?.episodes
+                    ?: runCatching { AnilistApi.fetchMediaById(prequel.id)?.episodes }.getOrNull()
+                    ?: 12
+                sum += eps
+
+                val nestedRelations = if (prequel.relations.isNotEmpty()) {
+                    prequel.relations
+                } else {
+                    cachedMedia?.relations?.takeIf { it.isNotEmpty() }
+                        ?: runCatching { AnilistApi.fetchMediaById(prequel.id)?.relations }.getOrNull().orEmpty()
+                }
+                if (nestedRelations.isNotEmpty()) {
+                    sum += collectPrequelChainBySeason(nestedRelations, targetSeason, visitedIds)
+                }
+            }
+        }
+        return sum
     }
 
     private data class PrequelPartInfo(val partNumber: Int, val episodes: Int)
@@ -1539,6 +1591,7 @@ object AnilistMetaDetailsResolver {
         effectiveImdbId: String?,
         kitsuId: String?,
         isMovie: Boolean = false,
+        relativeEpisode: Int = episode,
     ): String {
         return AnimeStreamIdManager.resolvePlaybackVideoId(
             parentMetaId = "ani_$anilistId",
@@ -1549,10 +1602,11 @@ object AnilistMetaDetailsResolver {
                 if (isMovie) effectiveImdbId else "$effectiveImdbId:$season:$episode"
             } else if (!kitsuId.isNullOrBlank()) {
                 val clean = kitsuId.removePrefix("kitsu:")
-                if (isMovie) "kitsu:$clean" else "kitsu:$clean:$episode"
+                if (isMovie) "kitsu:$clean" else "kitsu:$clean:$relativeEpisode"
             } else {
-                if (isMovie) "anilist:$anilistId" else "anilist:$anilistId:$episode"
+                if (isMovie) "anilist:$anilistId" else "anilist:$anilistId:$relativeEpisode"
             },
+            relativeEpisode = relativeEpisode,
         )
     }
 }

@@ -33,6 +33,9 @@ object AnilistTrackerCoordinator {
         scope.launch {
             AnilistAuthRepository.isAuthenticated.collect { isAuth ->
                 _trackerState.update { it.copy(isAuthenticated = isAuth, user = AnilistAuthRepository.currentUser.value) }
+                if (isAuth) {
+                    processPendingScrobbles()
+                }
             }
         }
     }
@@ -459,11 +462,87 @@ object AnilistTrackerCoordinator {
         updateProgress(currentProgress + 1)
     }
 
+    private val markedProgressMap = mutableMapOf<Int, Int>()
+
+    fun processPendingScrobbles() {
+        val token = AnilistAuthRepository.token.value ?: return
+        val pending = AnilistPreferencesRepository.snapshot().pendingScrobbleMutations
+        if (pending.isEmpty()) return
+
+        scope.launch {
+            for (mutation in pending) {
+                try {
+                    val status = mutation.status?.let { s ->
+                        runCatching { AnilistMediaListStatus.valueOf(s) }.getOrNull()
+                    }
+                    val updated = AnilistApi.updateMediaListEntry(
+                        mediaId = mutation.mediaId,
+                        entryId = mutation.entryId,
+                        status = status,
+                        progress = mutation.progress,
+                        token = token,
+                    )
+                    if (updated != null) {
+                        AnilistPreferencesRepository.removePendingScrobble(mutation.mediaId)
+                        applyLocalEntryUpdate(updated)
+                    }
+                } catch (e: Exception) {
+                    log.w(e) { "Failed to process queued scrobble for media ${mutation.mediaId}" }
+                }
+            }
+        }
+    }
+
+    fun preparePlaybackTracking(
+        title: String,
+        mediaId: String?,
+        season: Int?,
+        episode: Int?,
+    ) {
+        val token = AnilistAuthRepository.token.value ?: return
+        val prefs = AnilistPreferencesRepository.snapshot()
+        if (!prefs.autoMarkEpisodeWatched) return
+
+        val rawTitle = title.replace(Regex("""\r|\n"""), " ").replace(Regex("""\s+"""), " ").trim()
+        val anilistId = extractAnilistId(mediaId) ?: extractAnilistId(rawTitle)
+
+        scope.launch {
+            try {
+                processPendingScrobbles()
+
+                var media = _trackerState.value.media
+                if (media == null || (anilistId != null && media.id != anilistId)) {
+                    if (anilistId != null) {
+                        media = AnilistApi.fetchMediaById(anilistId, token = token)
+                    } else if (rawTitle.isNotBlank()) {
+                        val candidates = generateSearchCandidates(rawTitle)
+                        for (query in candidates) {
+                            val results = AnilistApi.searchAnime(query = query, token = token)
+                            if (results.isNotEmpty()) {
+                                media = results.first()
+                                break
+                            }
+                        }
+                    }
+                }
+                if (media != null) {
+                    mediaCache[media.id.toString()] = media
+                    mediaCache["ani_${media.id}"] = media
+                    mediaCache["anilist:${media.id}"] = media
+                    com.nuvio.app.features.anilist.catalog.AnilistMetaDetailsResolver.getMediaOffset(media)
+                }
+            } catch (e: Exception) {
+                log.w(e) { "Failed to pre-flight playback tracking" }
+            }
+        }
+    }
+
     fun markEpisodeWatchedFromPlayback(
         title: String,
         mediaId: String?,
         season: Int?,
         episode: Int?,
+        relativeEpisode: Int? = null,
         progressPercent: Float,
         onSuccess: ((Int) -> Unit)? = null,
     ) {
@@ -472,7 +551,6 @@ object AnilistTrackerCoordinator {
         if (!prefs.autoMarkEpisodeWatched) return
         if (progressPercent < prefs.watchedPercentageThreshold) return
 
-        val targetEpisode = episode ?: 1
         val rawTitle = title.replace(Regex("""\r|\n"""), " ").replace(Regex("""\s+"""), " ").trim()
 
         scope.launch {
@@ -496,21 +574,57 @@ object AnilistTrackerCoordinator {
 
                 if (media == null) return@launch
 
+                // Calculate accurate relative episode
+                var targetEpisode = relativeEpisode ?: (episode ?: 1)
+                val maxEpisodes = media.episodes ?: Int.MAX_VALUE
+
+                // If episode exceeds total episodes for this cour, it is a continuous multi-cour episode
+                if (media.episodes != null && targetEpisode > media.episodes) {
+                    val offset = com.nuvio.app.features.anilist.catalog.AnilistMetaDetailsResolver.getMediaOffset(media)
+                    if (offset > 0 && targetEpisode > offset) {
+                        targetEpisode -= offset
+                    }
+                }
+
                 val currentEntry = media.mediaListEntry ?: _trackerState.value.entry
                 val currentProgress = currentEntry?.progress ?: 0
+                val safeProgress = targetEpisode.coerceIn(0, maxEpisodes)
 
-                if (targetEpisode > currentProgress) {
-                    val maxEpisodes = media.episodes ?: Int.MAX_VALUE
-                    val safeProgress = targetEpisode.coerceIn(0, maxEpisodes)
+                val alreadyMarked = markedProgressMap[media.id] ?: 0
+                if (safeProgress <= currentProgress || safeProgress <= alreadyMarked) {
+                    return@launch
+                }
 
-                    val nextStatus = if (prefs.autoCompleteOnLastEpisode && media.episodes != null && safeProgress >= media.episodes) {
-                        AnilistMediaListStatus.COMPLETED
-                    } else if (prefs.autoMoveToWatchingOnStart && (currentEntry?.status == null || currentEntry.status == AnilistMediaListStatus.PLANNING)) {
-                        AnilistMediaListStatus.CURRENT
-                    } else {
-                        currentEntry?.status ?: AnilistMediaListStatus.CURRENT
-                    }
+                // Mark progress in memory to prevent duplicate requests on seek
+                markedProgressMap[media.id] = safeProgress
 
+                val nextStatus = if (prefs.autoCompleteOnLastEpisode && media.episodes != null && safeProgress >= media.episodes) {
+                    AnilistMediaListStatus.COMPLETED
+                } else if (prefs.autoMoveToWatchingOnStart && (currentEntry?.status == null || currentEntry.status == AnilistMediaListStatus.PLANNING)) {
+                    AnilistMediaListStatus.CURRENT
+                } else {
+                    currentEntry?.status ?: AnilistMediaListStatus.CURRENT
+                }
+
+                // 1. Optimistic Local UI Update (0ms delay)
+                AnilistLibraryRepository.updateItem(
+                    mediaId = media.id,
+                    title = media.title?.displayTitle,
+                    status = nextStatus,
+                    progress = safeProgress,
+                    totalEpisodes = media.episodes,
+                    posterUrl = media.coverImage?.extraLarge ?: media.coverImage?.large,
+                )
+                com.nuvio.app.features.anilist.catalog.AnilistCatalogRepository.clearCache()
+                val optimisticEntry = (currentEntry ?: AnilistMediaListEntry(id = 0, mediaId = media.id)).copy(
+                    status = nextStatus,
+                    progress = safeProgress,
+                )
+                applyLocalEntryUpdate(optimisticEntry)
+                onSuccess?.invoke(safeProgress)
+
+                // 2. Dispatch Remote Network Mutation
+                try {
                     val updatedEntry = AnilistApi.updateMediaListEntry(
                         mediaId = media.id,
                         entryId = currentEntry?.id?.takeIf { it > 0 },
@@ -520,18 +634,37 @@ object AnilistTrackerCoordinator {
                     )
 
                     if (updatedEntry != null) {
-                        AnilistLibraryRepository.updateItem(
+                        applyLocalEntryUpdate(updatedEntry)
+                        AnilistPreferencesRepository.removePendingScrobble(media.id)
+                    } else {
+                        // Queue to offline outbox if API returned null
+                        AnilistPreferencesRepository.enqueuePendingScrobble(
+                            PendingScrobbleMutation(
+                                mediaId = media.id,
+                                entryId = currentEntry?.id?.takeIf { it > 0 },
+                                status = nextStatus.name,
+                                progress = safeProgress,
+                                totalEpisodes = media.episodes,
+                                title = media.title?.displayTitle,
+                                posterUrl = media.coverImage?.extraLarge ?: media.coverImage?.large,
+                                timestampEpochMs = com.nuvio.app.core.time.EpisodeReleaseDatePlatform.nowEpochMs(),
+                            )
+                        )
+                    }
+                } catch (netEx: Exception) {
+                    log.w(netEx) { "Network error while saving progress to AniList; queued for retry" }
+                    AnilistPreferencesRepository.enqueuePendingScrobble(
+                        PendingScrobbleMutation(
                             mediaId = media.id,
-                            title = media.title?.displayTitle,
-                            status = nextStatus,
+                            entryId = currentEntry?.id?.takeIf { it > 0 },
+                            status = nextStatus.name,
                             progress = safeProgress,
                             totalEpisodes = media.episodes,
+                            title = media.title?.displayTitle,
                             posterUrl = media.coverImage?.extraLarge ?: media.coverImage?.large,
+                            timestampEpochMs = com.nuvio.app.core.time.EpisodeReleaseDatePlatform.nowEpochMs(),
                         )
-                        com.nuvio.app.features.anilist.catalog.AnilistCatalogRepository.clearCache()
-                        applyLocalEntryUpdate(updatedEntry)
-                        onSuccess?.invoke(safeProgress)
-                    }
+                    )
                 }
             } catch (e: Exception) {
                 log.w(e) { "Failed to auto-mark episode progress on AniList" }

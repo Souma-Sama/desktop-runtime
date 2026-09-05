@@ -210,6 +210,19 @@ object AnilistPreferencesRepository {
         updateAndPersist { it.copy(trackerTheme = theme) }
     }
 
+    fun enqueuePendingScrobble(mutation: PendingScrobbleMutation) {
+        updateAndPersist { current ->
+            val filtered = current.pendingScrobbleMutations.filterNot { it.mediaId == mutation.mediaId }
+            current.copy(pendingScrobbleMutations = filtered + mutation)
+        }
+    }
+
+    fun removePendingScrobble(mediaId: Int) {
+        updateAndPersist { current ->
+            current.copy(pendingScrobbleMutations = current.pendingScrobbleMutations.filterNot { it.mediaId == mediaId })
+        }
+    }
+
     private fun updateAndPersist(transform: (AnilistPreferences) -> AnilistPreferences) {
         ensureLoaded()
         _preferences.update { current ->

@@ -26,6 +26,7 @@ object AnimeStreamIdFormatter {
         season: Int,
         episode: Int,
         isMovie: Boolean,
+        relativeEpisode: Int = episode,
     ): String {
         return when (option.type) {
             AnimeStreamIdType.IMDB -> {
@@ -34,7 +35,7 @@ object AnimeStreamIdFormatter {
             }
             AnimeStreamIdType.KITSU -> {
                 val cleanKitsu = option.rawId.removePrefix("kitsu:").trim()
-                if (isMovie) "kitsu:$cleanKitsu" else "kitsu:$cleanKitsu:$episode"
+                if (isMovie) "kitsu:$cleanKitsu" else "kitsu:$cleanKitsu:$relativeEpisode"
             }
             AnimeStreamIdType.TMDB -> {
                 val cleanTmdb = option.rawId.removePrefix("tmdb:").trim()
@@ -42,7 +43,7 @@ object AnimeStreamIdFormatter {
             }
             AnimeStreamIdType.ANILIST -> {
                 val cleanAnilist = option.rawId.removePrefix("anilist:").removePrefix("ani_").trim()
-                if (isMovie) "anilist:$cleanAnilist" else "anilist:$cleanAnilist:$episode"
+                if (isMovie) "anilist:$cleanAnilist" else "anilist:$cleanAnilist:$relativeEpisode"
             }
             AnimeStreamIdType.CUSTOM -> {
                 val custom = option.rawId.trim()

@@ -9,6 +9,18 @@ data class AnilistSectionSettings(
 )
 
 @Serializable
+data class PendingScrobbleMutation(
+    val mediaId: Int,
+    val entryId: Int? = null,
+    val status: String? = null,
+    val progress: Int,
+    val totalEpisodes: Int? = null,
+    val title: String? = null,
+    val posterUrl: String? = null,
+    val timestampEpochMs: Long = 0L,
+)
+
+@Serializable
 data class AnilistPreferences(
     val enabled: Boolean = true,
     val autoMarkEpisodeWatched: Boolean = true,
@@ -38,6 +50,7 @@ data class AnilistPreferences(
     val streamIdOverrides: Map<Int, String> = emptyMap(),
     val useFloatingGlassDesktopSidebar: Boolean = true,
     val trackerTheme: AnilistTrackerTheme = AnilistTrackerTheme.FROSTED_GLASS,
+    val pendingScrobbleMutations: List<PendingScrobbleMutation> = emptyList(),
 ) {
     companion object {
         val defaultUnauthenticatedSections = listOf(

@@ -134,6 +134,7 @@ object AnimeStreamIdManager {
         episode: Int,
         isMovie: Boolean,
         fallbackVideoId: String,
+        relativeEpisode: Int = episode,
     ): String {
         val anilistId = AnilistTrackerCoordinator.extractAnilistId(parentMetaId)
             ?: return fallbackVideoId
@@ -144,6 +145,7 @@ object AnimeStreamIdManager {
             season = targetSeason,
             episode = episode,
             isMovie = isMovie,
+            relativeEpisode = relativeEpisode,
         )
     }
 }

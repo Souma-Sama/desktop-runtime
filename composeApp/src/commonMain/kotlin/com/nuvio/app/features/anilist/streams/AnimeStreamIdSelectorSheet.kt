@@ -60,6 +60,7 @@ fun AnimeStreamIdSelectorSheet(
     anilistId: Int,
     seasonNumber: Int? = null,
     episodeNumber: Int? = null,
+    relativeEpisodeNumber: Int? = null,
     isMovie: Boolean = false,
     onDismiss: () -> Unit,
     onOptionSelected: ((AnimeStreamIdOption) -> Unit)? = null,
@@ -134,6 +135,7 @@ fun AnimeStreamIdSelectorSheet(
                         season = effectiveSeason,
                         episode = episodeNumber ?: 1,
                         isMovie = isMovie,
+                        relativeEpisode = relativeEpisodeNumber ?: (episodeNumber ?: 1),
                     )
                     StreamIdOptionCard(
                         option = option,
@@ -163,6 +165,7 @@ fun AnimeStreamIdSelectorSheet(
                         season = effectiveCustomSeason,
                         episode = episodeNumber ?: 1,
                         isMovie = isMovie,
+                        relativeEpisode = relativeEpisodeNumber ?: (episodeNumber ?: 1),
                     )
                 } else null
 

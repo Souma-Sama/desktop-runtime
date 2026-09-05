@@ -137,6 +137,15 @@ internal fun PlayerScreenRuntime.emitTrackingScrobbleStart() {
     val requestGeneration = scrobbleStartRequestGeneration + 1L
     scrobbleStartRequestGeneration = requestGeneration
 
+    if (com.nuvio.app.features.anilist.KaiHooks.isKaiMedia(parentMetaId)) {
+        com.nuvio.app.features.anilist.AnilistTrackerCoordinator.preparePlaybackTracking(
+            title = title,
+            mediaId = parentMetaId,
+            season = activeSeasonNumber,
+            episode = activeEpisodeNumber,
+        )
+    }
+
     scope.launch {
         val media = currentTrackingMedia()
         if (!media.hasResolvableIdentity) {
@@ -342,11 +351,18 @@ internal fun PlayerScreenRuntime.checkAnilistAutoMarkProgress() {
     if (!prefs.autoMarkEpisodeWatched) return
     if (progressPercent >= prefs.watchedPercentageThreshold.toFloat()) {
         hasAutoMarkedAnilistForCurrentEpisode = true
+        val parsedRelativeEp = if (activeVideoId?.startsWith("kitsu:", ignoreCase = true) == true ||
+            activeVideoId?.startsWith("anilist:", ignoreCase = true) == true
+        ) {
+            activeVideoId?.substringAfterLast(':')?.toIntOrNull()
+        } else null
+
         com.nuvio.app.features.anilist.AnilistTrackerCoordinator.markEpisodeWatchedFromPlayback(
             title = title,
             mediaId = parentMetaId,
             season = activeSeasonNumber,
             episode = activeEpisodeNumber,
+            relativeEpisode = parsedRelativeEp,
             progressPercent = progressPercent,
             onSuccess = { ep ->
                 if (prefs.showSyncNotification) {
