@@ -16,25 +16,32 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.CalendarToday
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.DeleteOutline
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.EditNote
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.OpenInNew
@@ -49,17 +56,16 @@ import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.PauseCircle
 import androidx.compose.material.icons.outlined.PlayCircle
 import androidx.compose.material.icons.outlined.RemoveCircleOutline
+import androidx.compose.material3.BasicAlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -74,12 +80,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import kotlin.math.roundToInt
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalClipboardManager
@@ -88,10 +94,12 @@ import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
 import coil3.compose.AsyncImage
 import com.nuvio.app.core.ui.NuvioModalBottomSheet
 import com.nuvio.app.core.ui.dismissNuvioBottomSheet
@@ -99,14 +107,17 @@ import com.nuvio.app.features.anilist.AnilistAuthRepository
 import com.nuvio.app.features.anilist.AnilistFuzzyDate
 import com.nuvio.app.features.anilist.AnilistMediaListStatus
 import com.nuvio.app.features.anilist.AnilistTrackerCoordinator
+import com.nuvio.app.isDesktop
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.rating_anilist
 import org.jetbrains.compose.resources.painterResource
+import kotlin.math.roundToInt
 
 // Status Color Tokens
 private val StatusColorWatching = Color(0xFF00A2FF)
-private val StatusColorPlanning = Color(0xFF8B5CF6)
+private val StatusColorPlanning = Color(0xFFA855F7)
 private val StatusColorCompleted = Color(0xFF10B981)
 private val StatusColorOnHold = Color(0xFFF59E0B)
 private val StatusColorDropped = Color(0xFFEF4444)
@@ -120,6 +131,49 @@ fun getStatusColor(status: AnilistMediaListStatus?): Color = when (status) {
     AnilistMediaListStatus.DROPPED -> StatusColorDropped
     AnilistMediaListStatus.REPEATING -> StatusColorRepeating
     null -> Color(0xFF00A2FF)
+}
+
+@Composable
+private fun TrackerGlassCard(
+    modifier: Modifier = Modifier,
+    shape: RoundedCornerShape = RoundedCornerShape(18.dp),
+    backgroundColor: Color = Color.White.copy(alpha = 0.045f),
+    borderColor: Color? = null,
+    borderBrush: Brush? = Brush.verticalGradient(
+        listOf(
+            Color.White.copy(alpha = 0.14f),
+            Color.White.copy(alpha = 0.04f),
+        ),
+    ),
+    onClick: (() -> Unit)? = null,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    val finalBorderModifier = when {
+        borderBrush != null -> Modifier.border(1.dp, borderBrush, shape)
+        borderColor != null -> Modifier.border(1.dp, borderColor, shape)
+        else -> Modifier
+    }
+
+    val clickModifier = if (onClick != null) {
+        Modifier.clickable(role = Role.Button, onClick = onClick)
+    } else {
+        Modifier
+    }
+
+    Box(
+        modifier = modifier
+            .clip(shape)
+            .background(backgroundColor)
+            .then(finalBorderModifier)
+            .then(clickModifier),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(14.dp),
+            content = content,
+        )
+    }
 }
 
 @Composable
@@ -137,7 +191,6 @@ fun AnimeTrackerButton(
 
     var showSheet by remember { mutableStateOf(false) }
     val trackerState by AnilistTrackerCoordinator.trackerState.collectAsState()
-    val libraryUiState by com.nuvio.app.features.anilist.AnilistLibraryRepository.uiState.collectAsState()
     val effectiveTitle = title?.takeIf { it.isNotBlank() } ?: meta?.name.orEmpty()
     val hapticFeedback = LocalHapticFeedback.current
 
@@ -154,9 +207,9 @@ fun AnimeTrackerButton(
 
     val containerColor by animateColorAsState(
         targetValue = when {
-            isTrackingActive -> statusColor.copy(alpha = 0.16f)
+            isTrackingActive -> statusColor.copy(alpha = 0.20f)
             showSheet -> MaterialTheme.colorScheme.onBackground
-            else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.85f)
+            else -> Color(0xFF141722).copy(alpha = 0.85f)
         },
         animationSpec = tween(250),
         label = "TrackerButtonBg",
@@ -164,9 +217,9 @@ fun AnimeTrackerButton(
 
     val borderColor by animateColorAsState(
         targetValue = when {
-            isTrackingActive -> statusColor.copy(alpha = 0.65f)
+            isTrackingActive -> statusColor.copy(alpha = 0.80f)
             showSheet -> MaterialTheme.colorScheme.primary
-            else -> MaterialTheme.colorScheme.outline.copy(alpha = 0.18f)
+            else -> Color.White.copy(alpha = 0.18f)
         },
         animationSpec = tween(250),
         label = "TrackerButtonBorder",
@@ -272,30 +325,64 @@ fun AnimeTrackerSheet(
         }
     }
 
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    val coroutineScope = rememberCoroutineScope()
-
-    NuvioModalBottomSheet(
-        onDismissRequest = {
-            coroutineScope.launch {
-                dismissNuvioBottomSheet(sheetState = sheetState, onDismiss = onDismiss)
+    if (isDesktop) {
+        Dialog(onDismissRequest = onDismiss) {
+            Surface(
+                modifier = Modifier
+                    .widthIn(min = 480.dp, max = 540.dp)
+                    .clip(RoundedCornerShape(26.dp)),
+                shape = RoundedCornerShape(26.dp),
+                color = Color(0xFF0C0E15).copy(alpha = 0.94f),
+                border = BorderStroke(
+                    1.dp,
+                    Brush.verticalGradient(
+                        listOf(
+                            Color.White.copy(alpha = 0.24f),
+                            Color.White.copy(alpha = 0.08f),
+                            Color.White.copy(alpha = 0.02f),
+                        ),
+                    ),
+                ),
+                shadowElevation = 24.dp,
+            ) {
+                AnimeTrackerSheetContent(
+                    meta = meta,
+                    preview = preview,
+                    title = effectiveTitle,
+                    onClose = onDismiss,
+                )
             }
-        },
-        sheetState = sheetState,
-    ) {
-        AnimeTrackerSheetContent(
-            meta = meta,
-            preview = preview,
-            title = effectiveTitle,
-            onClose = {
+        }
+    } else {
+        val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        val coroutineScope = rememberCoroutineScope()
+
+        NuvioModalBottomSheet(
+            onDismissRequest = {
                 coroutineScope.launch {
                     dismissNuvioBottomSheet(sheetState = sheetState, onDismiss = onDismiss)
                 }
             },
-        )
+            sheetState = sheetState,
+            containerColor = Color(0xFF0C0E15).copy(alpha = 0.96f),
+            shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+            showDragHandle = true,
+        ) {
+            AnimeTrackerSheetContent(
+                meta = meta,
+                preview = preview,
+                title = effectiveTitle,
+                onClose = {
+                    coroutineScope.launch {
+                        dismissNuvioBottomSheet(sheetState = sheetState, onDismiss = onDismiss)
+                    }
+                },
+            )
+        }
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AnimeTrackerSheetContent(
     meta: com.nuvio.app.features.details.MetaDetails? = null,
@@ -315,8 +402,9 @@ fun AnimeTrackerSheetContent(
     Column(
         modifier = Modifier
             .fillMaxWidth()
+            .then(if (isDesktop) Modifier.heightIn(max = 760.dp) else Modifier)
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp, vertical = 8.dp),
+            .padding(horizontal = 22.dp, vertical = if (isDesktop) 20.dp else 12.dp),
     ) {
         // --- 1. HEADER BAR ---
         Row(
@@ -326,46 +414,79 @@ fun AnimeTrackerSheetContent(
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                Surface(
-                    color = Color(0xFF00A2FF).copy(alpha = 0.15f),
-                    shape = RoundedCornerShape(10.dp),
+                Box(
+                    modifier = Modifier
+                        .size(38.dp)
+                        .clip(RoundedCornerShape(11.dp))
+                        .background(
+                            Brush.linearGradient(
+                                listOf(Color(0xFF00B4D8), Color(0xFF0077B6)),
+                            ),
+                        )
+                        .border(
+                            width = 1.dp,
+                            color = Color.White.copy(alpha = 0.35f),
+                            shape = RoundedCornerShape(11.dp),
+                        ),
+                    contentAlignment = Alignment.Center,
                 ) {
                     Image(
                         painter = painterResource(Res.drawable.rating_anilist),
-                        contentDescription = null,
-                        modifier = Modifier
-                            .padding(6.dp)
-                            .size(22.dp),
+                        contentDescription = "AniList",
+                        modifier = Modifier.size(22.dp),
                     )
                 }
-                Column {
+
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     Text(
                         text = "AniList Tracker",
                         style = MaterialTheme.typography.titleMedium.copy(
                             fontWeight = FontWeight.Bold,
                             fontSize = 17.sp,
+                            letterSpacing = (-0.2).sp,
                         ),
-                        color = MaterialTheme.colorScheme.onSurface,
+                        color = Color.White,
                     )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(5.dp),
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(6.dp)
+                                .clip(CircleShape)
+                                .background(if (trackerState.isAuthenticated) Color(0xFF10B981) else Color(0xFFF59E0B)),
+                        )
+                        Text(
+                            text = if (trackerState.isAuthenticated) "Cloud Synced" else "Not Logged In",
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Medium,
+                            ),
+                            color = Color.White.copy(alpha = 0.55f),
+                        )
+                    }
                 }
             }
 
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 if (trackerState.isAuthenticated) {
                     val user = trackerState.user
-                    Surface(
-                        onClick = { showUserProfileSheet = true },
-                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f),
-                        shape = RoundedCornerShape(12.dp),
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(999.dp))
+                            .background(Color.White.copy(alpha = 0.07f))
+                            .border(1.dp, Color.White.copy(alpha = 0.12f), RoundedCornerShape(999.dp))
+                            .clickable(role = Role.Button) { showUserProfileSheet = true }
+                            .padding(horizontal = 10.dp, vertical = 5.dp),
                     ) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
                             horizontalArrangement = Arrangement.spacedBy(6.dp),
                         ) {
                             val avatarUrl = user?.avatarUrl
@@ -382,119 +503,128 @@ fun AnimeTrackerSheetContent(
                             Text(
                                 text = user?.name ?: "Connected",
                                 style = MaterialTheme.typography.labelSmall.copy(
-                                    fontWeight = FontWeight.Bold,
+                                    fontWeight = FontWeight.SemiBold,
                                     fontSize = 12.sp,
                                 ),
-                                color = MaterialTheme.colorScheme.primary,
+                                color = Color.White.copy(alpha = 0.90f),
                                 maxLines = 1,
                             )
                         }
                     }
                 }
 
-                IconButton(
-                    onClick = onClose,
-                    modifier = Modifier.size(32.dp),
+                Box(
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(CircleShape)
+                        .background(Color.White.copy(alpha = 0.08f))
+                        .border(1.dp, Color.White.copy(alpha = 0.14f), CircleShape)
+                        .clickable(role = Role.Button) { onClose() },
+                    contentAlignment = Alignment.Center,
                 ) {
                     Icon(
                         imageVector = Icons.Default.Close,
                         contentDescription = "Close",
-                        modifier = Modifier.size(18.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(16.dp),
+                        tint = Color.White.copy(alpha = 0.85f),
                     )
                 }
             }
         }
 
-        Spacer(modifier = Modifier.height(14.dp))
+        Spacer(modifier = Modifier.height(16.dp))
 
         // --- 2. AUTHENTICATION PROMPT (If not logged in) ---
         if (!trackerState.isAuthenticated) {
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.12f)),
+            TrackerGlassCard(
+                backgroundColor = Color.White.copy(alpha = 0.04f),
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text(
-                        text = "Connect your AniList account to sync watch progress, ratings, dates, notes, and custom lists across devices.",
-                        style = MaterialTheme.typography.bodySmall.copy(
-                            fontSize = 13.sp,
-                            lineHeight = 18.sp,
-                        ),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    text = "Connect your AniList account to synchronize your watch history, scores, dates, notes, and custom lists across all your devices.",
+                    style = MaterialTheme.typography.bodySmall.copy(
+                        fontSize = 13.sp,
+                        lineHeight = 18.sp,
+                    ),
+                    color = Color.White.copy(alpha = 0.70f),
+                )
+                Spacer(modifier = Modifier.height(14.dp))
 
-                    if (!showTokenInput) {
+                if (!showTokenInput) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        Button(
+                            onClick = {
+                                uriHandler.openUri(AnilistAuthRepository.OAUTH_AUTHORIZE_URL)
+                            },
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color(0xFF00A2FF),
+                                contentColor = Color.White,
+                            ),
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.OpenInNew,
+                                contentDescription = null,
+                                modifier = Modifier.size(15.dp),
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Authorize", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                        }
+                        OutlinedButton(
+                            onClick = { showTokenInput = true },
+                            shape = RoundedCornerShape(12.dp),
+                            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.15f)),
+                        ) {
+                            Text("Paste Token", fontSize = 13.sp, color = Color.White.copy(alpha = 0.80f))
+                        }
+                    }
+                } else {
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        OutlinedTextField(
+                            value = tokenInput,
+                            onValueChange = { tokenInput = it },
+                            placeholder = { Text("Paste AniList Token / Pin URL...", fontSize = 12.sp, color = Color.White.copy(0.35f)) },
+                            singleLine = true,
+                            shape = RoundedCornerShape(12.dp),
+                            textStyle = MaterialTheme.typography.bodySmall.copy(fontSize = 13.sp, color = Color.White),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = Color(0xFF00A2FF),
+                                unfocusedBorderColor = Color.White.copy(0.15f),
+                            ),
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        Spacer(modifier = Modifier.height(10.dp))
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
                             Button(
                                 onClick = {
-                                    uriHandler.openUri(AnilistAuthRepository.OAUTH_AUTHORIZE_URL)
+                                    if (tokenInput.isNotBlank()) {
+                                        coroutineScope.launch {
+                                            val token = tokenInput.substringAfter("access_token=").substringBefore("&").trim()
+                                            AnilistAuthRepository.loginWithToken(token)
+                                            showTokenInput = false
+                                        }
+                                    }
                                 },
-                                shape = RoundedCornerShape(12.dp),
+                                enabled = tokenInput.isNotBlank(),
+                                shape = RoundedCornerShape(10.dp),
                                 modifier = Modifier.weight(1f),
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = Color(0xFF00A2FF),
                                     contentColor = Color.White,
                                 ),
                             ) {
-                                Icon(
-                                    imageVector = Icons.Default.OpenInNew,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(15.dp),
-                                )
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text("Authorize", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                                Text("Save Token", fontSize = 13.sp, fontWeight = FontWeight.Bold)
                             }
-                            OutlinedButton(
-                                onClick = { showTokenInput = true },
-                                shape = RoundedCornerShape(12.dp),
+                            TextButton(
+                                onClick = { showTokenInput = false },
                             ) {
-                                Text("Paste Token", fontSize = 13.sp)
-                            }
-                        }
-                    } else {
-                        Column(modifier = Modifier.fillMaxWidth()) {
-                            OutlinedTextField(
-                                value = tokenInput,
-                                onValueChange = { tokenInput = it },
-                                placeholder = { Text("Paste AniList Token / Pin URL...", fontSize = 12.sp) },
-                                singleLine = true,
-                                shape = RoundedCornerShape(12.dp),
-                                textStyle = MaterialTheme.typography.bodySmall.copy(fontSize = 13.sp),
-                                modifier = Modifier.fillMaxWidth(),
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            ) {
-                                Button(
-                                    onClick = {
-                                        if (tokenInput.isNotBlank()) {
-                                            coroutineScope.launch {
-                                                val token = tokenInput.substringAfter("access_token=").substringBefore("&").trim()
-                                                AnilistAuthRepository.loginWithToken(token)
-                                                showTokenInput = false
-                                            }
-                                        }
-                                    },
-                                    enabled = tokenInput.isNotBlank(),
-                                    shape = RoundedCornerShape(10.dp),
-                                    modifier = Modifier.weight(1f),
-                                ) {
-                                    Text("Save Token", fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                                }
-                                TextButton(
-                                    onClick = { showTokenInput = false },
-                                ) {
-                                    Text("Cancel", fontSize = 13.sp)
-                                }
+                                Text("Cancel", fontSize = 13.sp, color = Color.White.copy(alpha = 0.60f))
                             }
                         }
                     }
@@ -509,22 +639,25 @@ fun AnimeTrackerSheetContent(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(140.dp),
+                    .height(160.dp),
                 contentAlignment = Alignment.Center,
             ) {
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     CircularProgressIndicator(
-                        modifier = Modifier.size(28.dp),
+                        modifier = Modifier.size(32.dp),
                         strokeWidth = 2.5.dp,
                         color = Color(0xFF00A2FF),
                     )
                     Text(
                         text = "Matching anime on AniList...",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.labelMedium.copy(
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Medium,
+                        ),
+                        color = Color.White.copy(alpha = 0.65f),
                     )
                 }
             }
@@ -534,81 +667,84 @@ fun AnimeTrackerSheetContent(
 
         // --- 4. UNMATCHED ANIME STATE ---
         if (trackerState.media == null) {
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.12f)),
+            TrackerGlassCard(
+                backgroundColor = Color.White.copy(alpha = 0.04f),
             ) {
-                Column(modifier = Modifier.padding(14.dp)) {
-                    Text(
-                        text = trackerState.error ?: "Could not automatically match this anime on AniList.",
-                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 13.sp),
-                        color = MaterialTheme.colorScheme.error,
-                        fontWeight = FontWeight.Medium,
-                    )
-                    Spacer(modifier = Modifier.height(10.dp))
+                Text(
+                    text = trackerState.error ?: "Could not automatically match this anime on AniList.",
+                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 13.sp),
+                    color = Color(0xFFEF4444),
+                    fontWeight = FontWeight.Medium,
+                )
+                Spacer(modifier = Modifier.height(12.dp))
 
-                    val effectiveRetryTitle = title?.takeIf { it.isNotBlank() } ?: preview?.name ?: meta?.name.orEmpty()
-                    if (effectiveRetryTitle.isNotBlank() || preview != null || meta != null) {
-                        Button(
-                            onClick = {
-                                val metaYear = preview?.releaseInfo?.take(4)?.toIntOrNull() ?: meta?.releaseInfo?.take(4)?.toIntOrNull()
-                                AnilistTrackerCoordinator.loadForMedia(
-                                    title = effectiveRetryTitle,
-                                    mediaId = preview?.id ?: meta?.id,
-                                    year = metaYear,
-                                    genres = preview?.genres ?: meta?.genres.orEmpty(),
-                                    country = meta?.country,
-                                    language = meta?.language,
-                                    forceRefresh = true,
-                                )
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp),
-                        ) {
-                            Icon(imageVector = Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(15.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("Retry Auto-Detect", fontSize = 13.sp)
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(10.dp))
-                    OutlinedTextField(
-                        value = manualSearchText,
-                        onValueChange = { manualSearchText = it },
-                        placeholder = { Text("Search title or enter AniList ID...", fontSize = 12.sp) },
-                        singleLine = true,
-                        shape = RoundedCornerShape(12.dp),
-                        textStyle = MaterialTheme.typography.bodySmall.copy(fontSize = 13.sp),
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
+                val effectiveRetryTitle = title?.takeIf { it.isNotBlank() } ?: preview?.name ?: meta?.name.orEmpty()
+                if (effectiveRetryTitle.isNotBlank() || preview != null || meta != null) {
                     Button(
                         onClick = {
-                            if (manualSearchText.isNotBlank()) {
-                                val query = manualSearchText.trim()
-                                val numId = query.toIntOrNull()
-                                if (numId != null) {
-                                    AnilistTrackerCoordinator.loadForMedia(
-                                        title = query,
-                                        mediaId = "anilist:$numId",
-                                        forceRefresh = true,
-                                    )
-                                } else {
-                                    AnilistTrackerCoordinator.loadForMedia(
-                                        title = query,
-                                        forceRefresh = true,
-                                    )
-                                }
-                            }
+                            val metaYear = preview?.releaseInfo?.take(4)?.toIntOrNull() ?: meta?.releaseInfo?.take(4)?.toIntOrNull()
+                            AnilistTrackerCoordinator.loadForMedia(
+                                title = effectiveRetryTitle,
+                                mediaId = preview?.id ?: meta?.id,
+                                year = metaYear,
+                                genres = preview?.genres ?: meta?.genres.orEmpty(),
+                                country = meta?.country,
+                                language = meta?.language,
+                                forceRefresh = true,
+                            )
                         },
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(12.dp),
-                        enabled = manualSearchText.isNotBlank(),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFF00A2FF),
+                            contentColor = Color.White,
+                        ),
                     ) {
-                        Text("Search AniList", fontSize = 13.sp)
+                        Icon(imageVector = Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(15.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Retry Auto-Detect", fontSize = 13.sp, fontWeight = FontWeight.Bold)
                     }
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+                OutlinedTextField(
+                    value = manualSearchText,
+                    onValueChange = { manualSearchText = it },
+                    placeholder = { Text("Search title or enter AniList ID...", fontSize = 12.sp, color = Color.White.copy(0.35f)) },
+                    singleLine = true,
+                    shape = RoundedCornerShape(12.dp),
+                    textStyle = MaterialTheme.typography.bodySmall.copy(fontSize = 13.sp, color = Color.White),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = Color(0xFF00A2FF),
+                        unfocusedBorderColor = Color.White.copy(0.15f),
+                    ),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Button(
+                    onClick = {
+                        if (manualSearchText.isNotBlank()) {
+                            val query = manualSearchText.trim()
+                            val numId = query.toIntOrNull()
+                            if (numId != null) {
+                                AnilistTrackerCoordinator.loadForMedia(
+                                    title = query,
+                                    mediaId = "anilist:$numId",
+                                    forceRefresh = true,
+                                )
+                            } else {
+                                AnilistTrackerCoordinator.loadForMedia(
+                                    title = query,
+                                    forceRefresh = true,
+                                )
+                            }
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    enabled = manualSearchText.isNotBlank(),
+                ) {
+                    Text("Search AniList", fontSize = 13.sp)
                 }
             }
             Spacer(modifier = Modifier.height(24.dp))
@@ -621,27 +757,23 @@ fun AnimeTrackerSheetContent(
             com.nuvio.app.features.anilist.KaiHooks.isNonVideoMedia(media.format)
         }
 
-        // --- 5. MATCHED ANIME / MANGA IDENTITY CARD ---
-        Surface(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(16.dp),
-            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.12f)),
+        // --- 5. MATCHED ANIME / MANGA HERO IDENTITY CARD ---
+        TrackerGlassCard(
+            backgroundColor = Color.White.copy(alpha = 0.045f),
         ) {
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(10.dp),
+                modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
             ) {
-                // Cover Image
+                // Cover Poster
                 val cover = media.coverImage?.large ?: media.coverImage?.medium
                 Box(
                     modifier = Modifier
-                        .size(width = 48.dp, height = 68.dp)
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(MaterialTheme.colorScheme.surfaceVariant),
+                        .size(width = 54.dp, height = 76.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Color.White.copy(alpha = 0.06f))
+                        .border(1.dp, Color.White.copy(alpha = 0.16f), RoundedCornerShape(12.dp)),
                 ) {
                     if (cover != null) {
                         AsyncImage(
@@ -653,9 +785,10 @@ fun AnimeTrackerSheetContent(
                     }
                 }
 
+                // Metadata Details
                 Column(
                     modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
                     Text(
                         text = media.title?.displayTitle ?: if (isReading) "Manga" else "Anime",
@@ -664,7 +797,7 @@ fun AnimeTrackerSheetContent(
                             fontSize = 14.sp,
                             lineHeight = 18.sp,
                         ),
-                        color = MaterialTheme.colorScheme.onSurface,
+                        color = Color.White,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
                     )
@@ -688,30 +821,73 @@ fun AnimeTrackerSheetContent(
                         Text(
                             text = metaLine,
                             style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            color = Color.White.copy(alpha = 0.55f),
                             maxLines = 1,
                         )
                     }
 
-                    if (media.averageScore != null && media.averageScore > 0) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        if (media.averageScore != null && media.averageScore > 0) {
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(999.dp))
+                                    .background(Color(0xFFFFB800).copy(alpha = 0.12f))
+                                    .border(1.dp, Color(0xFFFFB800).copy(alpha = 0.30f), RoundedCornerShape(999.dp))
+                                    .padding(horizontal = 7.dp, vertical = 2.dp),
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(3.dp),
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Star,
+                                        contentDescription = null,
+                                        tint = Color(0xFFFFB800),
+                                        modifier = Modifier.size(11.dp),
+                                    )
+                                    Text(
+                                        text = "${media.averageScore}% Score",
+                                        style = MaterialTheme.typography.labelSmall.copy(
+                                            fontSize = 10.5.sp,
+                                            fontWeight = FontWeight.Bold,
+                                        ),
+                                        color = Color(0xFFFFB800),
+                                    )
+                                }
+                            }
+                        }
+
+                        val mediaWebUrl = "https://anilist.co/${if (isReading) "manga" else "anime"}/${media.id}"
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(999.dp))
+                                .background(Color.White.copy(alpha = 0.06f))
+                                .border(1.dp, Color.White.copy(alpha = 0.12f), RoundedCornerShape(999.dp))
+                                .clickable(role = Role.Button) { uriHandler.openUri(mediaWebUrl) }
+                                .padding(horizontal = 7.dp, vertical = 2.dp),
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.Star,
-                                contentDescription = null,
-                                tint = Color(0xFFFFB800),
-                                modifier = Modifier.size(12.dp),
-                            )
-                            Text(
-                                text = "${media.averageScore}% community score",
-                                style = MaterialTheme.typography.labelSmall.copy(
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                ),
-                                color = MaterialTheme.colorScheme.primary,
-                            )
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(3.dp),
+                            ) {
+                                Text(
+                                    text = "AniList",
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        fontSize = 10.5.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                    ),
+                                    color = Color.White.copy(alpha = 0.70f),
+                                )
+                                Icon(
+                                    imageVector = Icons.Default.OpenInNew,
+                                    contentDescription = null,
+                                    tint = Color.White.copy(alpha = 0.70f),
+                                    modifier = Modifier.size(10.dp),
+                                )
+                            }
                         }
                     }
                 }
@@ -720,17 +896,18 @@ fun AnimeTrackerSheetContent(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // --- 6. STATUS CAPSULES GRID ---
+        // --- 6. STATUS CAPSULES GRID (2x3) ---
         Text(
             text = if (isReading) "Reading Status" else "Watch Status",
             style = MaterialTheme.typography.labelMedium.copy(
                 fontWeight = FontWeight.Bold,
                 fontSize = 13.sp,
+                letterSpacing = 0.2.sp,
             ),
-            color = MaterialTheme.colorScheme.onSurface,
+            color = Color.White.copy(alpha = 0.90f),
         )
 
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(10.dp))
 
         val currentStatus = entry?.status
         val statuses = listOf(
@@ -750,49 +927,75 @@ fun AnimeTrackerSheetContent(
                 ) {
                     rowStatuses.forEach { (status, icon, color) ->
                         val isSelected = currentStatus == status
-                        Surface(
+                        val backgroundModifier = if (isSelected) {
+                            Modifier.background(
+                                Brush.verticalGradient(
+                                    listOf(color.copy(alpha = 0.22f), color.copy(alpha = 0.12f)),
+                                ),
+                            )
+                        } else {
+                            Modifier.background(Color.White.copy(alpha = 0.035f))
+                        }
+                        val borderModifier = if (isSelected) {
+                            Modifier.border(1.5.dp, color.copy(alpha = 0.85f), RoundedCornerShape(14.dp))
+                        } else {
+                            Modifier.border(1.dp, Color.White.copy(alpha = 0.07f), RoundedCornerShape(14.dp))
+                        }
+
+                        Box(
                             modifier = Modifier
                                 .weight(1f)
                                 .clip(RoundedCornerShape(14.dp))
-                                .clickable {
+                                .then(backgroundModifier)
+                                .then(borderModifier)
+                                .clickable(role = Role.Button) {
                                     hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                     AnilistTrackerCoordinator.updateStatus(status)
-                                },
-                            shape = RoundedCornerShape(14.dp),
-                            color = if (isSelected) color.copy(alpha = 0.18f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
-                            border = BorderStroke(
-                                width = if (isSelected) 1.5.dp else 1.dp,
-                                color = if (isSelected) color.copy(alpha = 0.8f) else MaterialTheme.colorScheme.outline.copy(alpha = 0.1f),
-                            ),
+                                }
+                                .padding(horizontal = 12.dp, vertical = 10.dp),
                         ) {
                             Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                                modifier = Modifier.fillMaxWidth(),
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
                             ) {
-                                Icon(
-                                    imageVector = icon,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(17.dp),
-                                    tint = if (isSelected) color else MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                                val statusLabel = when (status) {
-                                    AnilistMediaListStatus.CURRENT -> if (isReading) "Reading" else "Watching"
-                                    AnilistMediaListStatus.PLANNING -> if (isReading) "Plan to Read" else "Plan to Watch"
-                                    AnilistMediaListStatus.REPEATING -> if (isReading) "Rereading" else "Rewatching"
-                                    else -> status.label
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    modifier = Modifier.weight(1f, fill = false),
+                                ) {
+                                    Icon(
+                                        imageVector = icon,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(16.dp),
+                                        tint = if (isSelected) color else Color.White.copy(alpha = 0.50f),
+                                    )
+                                    val statusLabel = when (status) {
+                                        AnilistMediaListStatus.CURRENT -> if (isReading) "Reading" else "Watching"
+                                        AnilistMediaListStatus.PLANNING -> if (isReading) "Plan to Read" else "Plan to Watch"
+                                        AnilistMediaListStatus.REPEATING -> if (isReading) "Rereading" else "Rewatching"
+                                        else -> status.label
+                                    }
+                                    Text(
+                                        text = statusLabel,
+                                        style = MaterialTheme.typography.labelMedium.copy(
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                            fontSize = 12.5.sp,
+                                        ),
+                                        color = if (isSelected) color else Color.White.copy(alpha = 0.75f),
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
                                 }
-                                Text(
-                                    text = statusLabel,
-                                    style = MaterialTheme.typography.labelMedium.copy(
-                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                        fontSize = 13.sp,
-                                    ),
-                                    color = if (isSelected) color else MaterialTheme.colorScheme.onSurface,
-                                    maxLines = 1,
-                                )
+
+                                if (isSelected) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(6.dp)
+                                            .clip(CircleShape)
+                                            .background(color),
+                                    )
+                                }
                             }
                         }
                     }
@@ -802,367 +1005,89 @@ fun AnimeTrackerSheetContent(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // --- 7. PROGRESS STEPPERS & PROGRESS BAR ---
+        // --- 7. PROGRESS STEPPERS (Continuous Apple Pill with Direct Dialog & Max) ---
         val activeColor = getStatusColor(currentStatus)
         if (isReading) {
-            // Chapters Card
-            val chaptersTotal = media.chapters
-            val currentChapters = entry?.progress ?: 0
-            val chapterFraction = if (chaptersTotal != null && chaptersTotal > 0) {
-                (currentChapters.toFloat() / chaptersTotal).coerceIn(0f, 1f)
-            } else 0f
+            // Chapters Stepper
+            TrackerProgressStepperSection(
+                title = "Chapter Progress",
+                icon = Icons.Default.EditNote,
+                unitLabel = "Ch",
+                currentUnits = entry?.progress ?: 0,
+                totalUnits = media.chapters,
+                accentColor = activeColor,
+                onIncrement = { AnilistTrackerCoordinator.incrementProgress() },
+                onDecrement = { AnilistTrackerCoordinator.decrementProgress() },
+                onSetExact = { target -> AnilistTrackerCoordinator.updateProgress(target) },
+            )
 
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.1f)),
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(14.dp),
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.EditNote,
-                                contentDescription = null,
-                                modifier = Modifier.size(18.dp),
-                                tint = activeColor,
-                            )
-                            Text(
-                                text = "Chapter Progress",
-                                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, fontSize = 13.sp),
-                                color = MaterialTheme.colorScheme.onSurface,
-                            )
-                        }
+            Spacer(modifier = Modifier.height(12.dp))
 
-                        Text(
-                            text = if (chaptersTotal != null) {
-                                "Ch $currentChapters / $chaptersTotal"
-                            } else {
-                                "Ch $currentChapters"
-                            },
-                            style = MaterialTheme.typography.labelMedium.copy(
-                                fontWeight = FontWeight.ExtraBold,
-                                fontSize = 14.sp,
-                            ),
-                            color = activeColor,
-                        )
-                    }
-
-                    if (chaptersTotal != null && chaptersTotal > 0) {
-                        Spacer(modifier = Modifier.height(8.dp))
-                        val animatedProgress by animateFloatAsState(
-                            targetValue = chapterFraction,
-                            animationSpec = tween(300),
-                            label = "ChapterProgressBar",
-                        )
-                        LinearProgressIndicator(
-                            progress = { animatedProgress },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(6.dp)
-                                .clip(RoundedCornerShape(3.dp)),
-                            color = activeColor,
-                            trackColor = MaterialTheme.colorScheme.surfaceVariant,
-                            strokeCap = StrokeCap.Round,
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        OutlinedButton(
-                            onClick = {
-                                hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                AnilistTrackerCoordinator.decrementProgress()
-                            },
-                            enabled = currentChapters > 0,
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier.weight(1f),
-                        ) {
-                            Text("-1", fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                        }
-
-                        Button(
-                            onClick = {
-                                hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                AnilistTrackerCoordinator.incrementProgress()
-                            },
-                            enabled = chaptersTotal == null || currentChapters < chaptersTotal,
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier.weight(1f),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = activeColor,
-                                contentColor = Color.White,
-                            ),
-                        ) {
-                            Text("+1 Ch", fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                        }
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(10.dp))
-
-            // Volumes Card
-            val volumesTotal = media.volumes
+            // Volumes Stepper
             val currentVolumes = entry?.progressVolumes ?: 0
-            val volumeFraction = if (volumesTotal != null && volumesTotal > 0) {
-                (currentVolumes.toFloat() / volumesTotal).coerceIn(0f, 1f)
-            } else 0f
-
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.1f)),
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(14.dp),
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.ContentCopy,
-                                contentDescription = null,
-                                modifier = Modifier.size(16.dp),
-                                tint = MaterialTheme.colorScheme.primary,
-                            )
-                            Text(
-                                text = "Volume Progress",
-                                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, fontSize = 13.sp),
-                                color = MaterialTheme.colorScheme.onSurface,
-                            )
-                        }
-
-                        Text(
-                            text = if (volumesTotal != null) {
-                                "Vol $currentVolumes / $volumesTotal"
-                            } else {
-                                "Vol $currentVolumes"
-                            },
-                            style = MaterialTheme.typography.labelMedium.copy(
-                                fontWeight = FontWeight.ExtraBold,
-                                fontSize = 14.sp,
-                            ),
-                            color = MaterialTheme.colorScheme.primary,
-                        )
-                    }
-
-                    if (volumesTotal != null && volumesTotal > 0) {
-                        Spacer(modifier = Modifier.height(8.dp))
-                        val animatedVolProgress by animateFloatAsState(
-                            targetValue = volumeFraction,
-                            animationSpec = tween(300),
-                            label = "VolumeProgressBar",
-                        )
-                        LinearProgressIndicator(
-                            progress = { animatedVolProgress },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(6.dp)
-                                .clip(RoundedCornerShape(3.dp)),
-                            color = MaterialTheme.colorScheme.primary,
-                            trackColor = MaterialTheme.colorScheme.surfaceVariant,
-                            strokeCap = StrokeCap.Round,
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        OutlinedButton(
-                            onClick = {
-                                hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                if (currentVolumes > 0) {
-                                    AnilistTrackerCoordinator.updateProgressVolumes(currentVolumes - 1)
-                                }
-                            },
-                            enabled = currentVolumes > 0,
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier.weight(1f),
-                        ) {
-                            Text("-1", fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                        }
-
-                        Button(
-                            onClick = {
-                                hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                AnilistTrackerCoordinator.updateProgressVolumes(currentVolumes + 1)
-                            },
-                            enabled = volumesTotal == null || currentVolumes < volumesTotal,
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier.weight(1f),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.primary,
-                                contentColor = Color.White,
-                            ),
-                        ) {
-                            Text("+1 Vol", fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                        }
-                    }
-                }
-            }
+            val totalVolumes = media.volumes
+            TrackerProgressStepperSection(
+                title = "Volume Progress",
+                icon = Icons.Default.ContentCopy,
+                unitLabel = "Vol",
+                currentUnits = currentVolumes,
+                totalUnits = totalVolumes,
+                accentColor = Color(0xFFA855F7),
+                onIncrement = { AnilistTrackerCoordinator.updateProgressVolumes(currentVolumes + 1) },
+                onDecrement = { if (currentVolumes > 0) AnilistTrackerCoordinator.updateProgressVolumes(currentVolumes - 1) },
+                onSetExact = { target -> AnilistTrackerCoordinator.updateProgressVolumes(target) },
+            )
         } else {
-            // Episode Progress (Anime)
-            val episodesTotal = media.episodes
-            val currentProgress = entry?.progress ?: 0
-            val progressFraction = if (episodesTotal != null && episodesTotal > 0) {
-                (currentProgress.toFloat() / episodesTotal).coerceIn(0f, 1f)
-            } else {
-                0f
-            }
-
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.1f)),
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(14.dp),
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(
-                            text = "Episode Progress",
-                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, fontSize = 13.sp),
-                            color = MaterialTheme.colorScheme.onSurface,
-                        )
-
-                        Text(
-                            text = if (episodesTotal != null) {
-                                "Ep $currentProgress / $episodesTotal"
-                            } else {
-                                "Ep $currentProgress"
-                            },
-                            style = MaterialTheme.typography.labelMedium.copy(
-                                fontWeight = FontWeight.ExtraBold,
-                                fontSize = 14.sp,
-                            ),
-                            color = activeColor,
-                        )
-                    }
-
-                    if (episodesTotal != null && episodesTotal > 0) {
-                        Spacer(modifier = Modifier.height(8.dp))
-                        val animatedProgress by animateFloatAsState(
-                            targetValue = progressFraction,
-                            animationSpec = tween(300),
-                            label = "ProgressBar",
-                        )
-                        LinearProgressIndicator(
-                            progress = { animatedProgress },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(6.dp)
-                                .clip(RoundedCornerShape(3.dp)),
-                            color = activeColor,
-                            trackColor = MaterialTheme.colorScheme.surfaceVariant,
-                            strokeCap = StrokeCap.Round,
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        OutlinedButton(
-                            onClick = {
-                                hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                AnilistTrackerCoordinator.decrementProgress()
-                            },
-                            enabled = currentProgress > 0,
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier.weight(1f),
-                        ) {
-                            Text("-1", fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                        }
-
-                        Button(
-                            onClick = {
-                                hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                AnilistTrackerCoordinator.incrementProgress()
-                            },
-                            enabled = episodesTotal == null || currentProgress < episodesTotal,
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier.weight(1f),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = activeColor,
-                                contentColor = Color.White,
-                            ),
-                        ) {
-                            Text("+1 Ep", fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                        }
-                    }
-                }
-            }
+            // Episode Stepper (Anime)
+            TrackerProgressStepperSection(
+                title = "Episode Progress",
+                icon = Icons.Default.EditNote,
+                unitLabel = "Ep",
+                currentUnits = entry?.progress ?: 0,
+                totalUnits = media.episodes,
+                accentColor = activeColor,
+                onIncrement = { AnilistTrackerCoordinator.incrementProgress() },
+                onDecrement = { AnilistTrackerCoordinator.decrementProgress() },
+                onSetExact = { target -> AnilistTrackerCoordinator.updateProgress(target) },
+            )
         }
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // --- 8. SCORE RATING SECTION (1-10 STARS) ---
+        // --- 8. SCORE RATING SECTION (1-10 STARS APPLE DIAL) ---
         val rawScore = entry?.score ?: 0.0
         val currentScore = if (rawScore >= 10.0) rawScore / 10.0 else rawScore
         val scoreInt = ((currentScore * 10.0).roundToInt() / 10.0).roundToInt()
 
-        Surface(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(16.dp),
-            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.1f)),
+        TrackerGlassCard(
+            backgroundColor = Color.White.copy(alpha = 0.045f),
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(14.dp),
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    Text(
-                        text = "Score",
-                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, fontSize = 13.sp),
-                        color = MaterialTheme.colorScheme.onSurface,
+                    Icon(
+                        imageVector = Icons.Default.Star,
+                        contentDescription = null,
+                        tint = Color(0xFFFFB800),
+                        modifier = Modifier.size(17.dp),
                     )
+                    Text(
+                        text = "Score Rating",
+                        style = MaterialTheme.typography.labelMedium.copy(
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 13.sp,
+                        ),
+                        color = Color.White,
+                    )
+                }
 
+                if (scoreInt > 0) {
                     val ratingLabel = when (scoreInt) {
                         10 -> "10 • Masterpiece"
                         9 -> "9 • Great"
@@ -1174,47 +1099,79 @@ fun AnimeTrackerSheetContent(
                         3 -> "3 • Very Bad"
                         2 -> "2 • Horrible"
                         1 -> "1 • Appalling"
-                        else -> "Unrated"
+                        else -> "$scoreInt • Rated"
                     }
 
-                    Text(
-                        text = ratingLabel,
-                        style = MaterialTheme.typography.labelSmall.copy(
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 12.sp,
-                        ),
-                        color = if (scoreInt > 0) Color(0xFFFFB800) else MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(10.dp))
-
-                // Star Row
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    (1..10).forEach { starIndex ->
-                        val isFilled = starIndex <= scoreInt
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        Text(
+                            text = ratingLabel,
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 12.sp,
+                            ),
+                            color = Color(0xFFFFB800),
+                        )
                         Box(
                             modifier = Modifier
-                                .size(28.dp)
+                                .size(18.dp)
                                 .clip(CircleShape)
-                                .clickable {
+                                .background(Color.White.copy(alpha = 0.08f))
+                                .clickable(role = Role.Button) {
                                     hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                    val newScore = if (scoreInt == starIndex) 0.0 else starIndex.toDouble()
-                                    AnilistTrackerCoordinator.updateScore(newScore)
+                                    AnilistTrackerCoordinator.updateScore(0.0)
                                 },
                             contentAlignment = Alignment.Center,
                         ) {
                             Icon(
-                                imageVector = if (isFilled) Icons.Default.Star else Icons.Default.StarBorder,
-                                contentDescription = "Rate $starIndex",
-                                modifier = Modifier.size(22.dp),
-                                tint = if (isFilled) Color(0xFFFFB800) else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f),
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "Clear Score",
+                                tint = Color.White.copy(alpha = 0.60f),
+                                modifier = Modifier.size(11.dp),
                             )
                         }
+                    }
+                } else {
+                    Text(
+                        text = "Unrated",
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontWeight = FontWeight.Medium,
+                            fontSize = 12.sp,
+                        ),
+                        color = Color.White.copy(alpha = 0.40f),
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // 10-Star Row
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                (1..10).forEach { starIndex ->
+                    val isFilled = starIndex <= scoreInt
+                    Box(
+                        modifier = Modifier
+                            .size(32.dp)
+                            .clip(CircleShape)
+                            .clickable(role = Role.Button) {
+                                hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                val newScore = if (scoreInt == starIndex) 0.0 else starIndex.toDouble()
+                                AnilistTrackerCoordinator.updateScore(newScore)
+                            },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            imageVector = if (isFilled) Icons.Default.Star else Icons.Default.StarBorder,
+                            contentDescription = "Rate $starIndex",
+                            modifier = Modifier.size(22.dp),
+                            tint = if (isFilled) Color(0xFFFFB800) else Color.White.copy(alpha = 0.20f),
+                        )
                     }
                 }
             }
@@ -1222,52 +1179,54 @@ fun AnimeTrackerSheetContent(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // --- 9. TRACKING DATES (Start Date & Finish Date) ---
-        Surface(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(16.dp),
-            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.1f)),
+        // --- 9. TRACKING DATES (Apple Grouped Inset Card) ---
+        TrackerGlassCard(
+            backgroundColor = Color.White.copy(alpha = 0.045f),
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(14.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp),
+            // Start Date
+            val startedAt = entry?.startedAt
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                // Start Date
-                val startedAt = entry?.startedAt
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.CalendarMonth,
-                            contentDescription = null,
-                            modifier = Modifier.size(17.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    Icon(
+                        imageVector = Icons.Default.CalendarMonth,
+                        contentDescription = null,
+                        modifier = Modifier.size(17.dp),
+                        tint = Color.White.copy(alpha = 0.60f),
+                    )
+                    Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                        Text(
+                            text = "Start Date",
+                            style = MaterialTheme.typography.labelMedium.copy(
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 12.5.sp,
+                            ),
+                            color = Color.White,
                         )
-                        Column {
-                            Text(
-                                text = "Start Date",
-                                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
-                            )
-                            Text(
-                                text = startedAt?.formatted() ?: "Not set",
-                                style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
-                                color = if (startedAt?.isSet == true) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
+                        Text(
+                            text = startedAt?.formatted() ?: "Not set",
+                            style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.5.sp),
+                            color = if (startedAt?.isSet == true) Color(0xFF00A2FF) else Color.White.copy(alpha = 0.40f),
+                        )
                     }
+                }
 
-                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        TextButton(
-                            onClick = {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(999.dp))
+                            .background(Color.White.copy(alpha = 0.07f))
+                            .border(1.dp, Color.White.copy(alpha = 0.12f), RoundedCornerShape(999.dp))
+                            .clickable(role = Role.Button) {
                                 val now = io.ktor.util.date.GMTDate()
                                 val today = AnilistFuzzyDate(
                                     year = now.year,
@@ -1275,56 +1234,91 @@ fun AnimeTrackerSheetContent(
                                     day = now.dayOfMonth,
                                 )
                                 AnilistTrackerCoordinator.updateStartedAt(today)
-                            },
-                        ) {
-                            Text("Set Today", fontSize = 12.sp)
-                        }
-                        if (startedAt?.isSet == true) {
-                            IconButton(
-                                onClick = { AnilistTrackerCoordinator.updateStartedAt(null) },
-                                modifier = Modifier.size(30.dp),
-                            ) {
-                                Icon(imageVector = Icons.Default.Close, contentDescription = "Clear", modifier = Modifier.size(15.dp))
                             }
+                            .padding(horizontal = 10.dp, vertical = 4.dp),
+                    ) {
+                        Text(
+                            text = "Set Today",
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 11.sp,
+                            ),
+                            color = Color.White.copy(alpha = 0.85f),
+                        )
+                    }
+                    if (startedAt?.isSet == true) {
+                        Box(
+                            modifier = Modifier
+                                .size(26.dp)
+                                .clip(CircleShape)
+                                .background(Color.White.copy(alpha = 0.06f))
+                                .clickable(role = Role.Button) { AnilistTrackerCoordinator.updateStartedAt(null) },
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "Clear",
+                                modifier = Modifier.size(13.dp),
+                                tint = Color.White.copy(alpha = 0.60f),
+                            )
                         }
                     }
                 }
+            }
 
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+            Spacer(modifier = Modifier.height(10.dp))
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(1.dp)
+                    .background(Color.White.copy(alpha = 0.06f)),
+            )
+            Spacer(modifier = Modifier.height(10.dp))
 
-                // Finish / End Date
-                val completedAt = entry?.completedAt
+            // Finish / End Date
+            val completedAt = entry?.completedAt
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.CalendarToday,
-                            contentDescription = null,
-                            modifier = Modifier.size(17.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    Icon(
+                        imageVector = Icons.Default.CalendarToday,
+                        contentDescription = null,
+                        modifier = Modifier.size(17.dp),
+                        tint = Color.White.copy(alpha = 0.60f),
+                    )
+                    Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                        Text(
+                            text = "Finish Date",
+                            style = MaterialTheme.typography.labelMedium.copy(
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 12.5.sp,
+                            ),
+                            color = Color.White,
                         )
-                        Column {
-                            Text(
-                                text = "Finish Date",
-                                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
-                            )
-                            Text(
-                                text = completedAt?.formatted() ?: "Not set",
-                                style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
-                                color = if (completedAt?.isSet == true) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
+                        Text(
+                            text = completedAt?.formatted() ?: "Not set",
+                            style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.5.sp),
+                            color = if (completedAt?.isSet == true) Color(0xFF10B981) else Color.White.copy(alpha = 0.40f),
+                        )
                     }
+                }
 
-                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        TextButton(
-                            onClick = {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(999.dp))
+                            .background(Color.White.copy(alpha = 0.07f))
+                            .border(1.dp, Color.White.copy(alpha = 0.12f), RoundedCornerShape(999.dp))
+                            .clickable(role = Role.Button) {
                                 val now = io.ktor.util.date.GMTDate()
                                 val today = AnilistFuzzyDate(
                                     year = now.year,
@@ -1332,17 +1326,33 @@ fun AnimeTrackerSheetContent(
                                     day = now.dayOfMonth,
                                 )
                                 AnilistTrackerCoordinator.updateCompletedAt(today)
-                            },
-                        ) {
-                            Text("Set Today", fontSize = 12.sp)
-                        }
-                        if (completedAt?.isSet == true) {
-                            IconButton(
-                                onClick = { AnilistTrackerCoordinator.updateCompletedAt(null) },
-                                modifier = Modifier.size(30.dp),
-                            ) {
-                                Icon(imageVector = Icons.Default.Close, contentDescription = "Clear", modifier = Modifier.size(15.dp))
                             }
+                            .padding(horizontal = 10.dp, vertical = 4.dp),
+                    ) {
+                        Text(
+                            text = "Set Today",
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 11.sp,
+                            ),
+                            color = Color.White.copy(alpha = 0.85f),
+                        )
+                    }
+                    if (completedAt?.isSet == true) {
+                        Box(
+                            modifier = Modifier
+                                .size(26.dp)
+                                .clip(CircleShape)
+                                .background(Color.White.copy(alpha = 0.06f))
+                            .clickable(role = Role.Button) { AnilistTrackerCoordinator.updateCompletedAt(null) },
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "Clear",
+                                modifier = Modifier.size(13.dp),
+                                tint = Color.White.copy(alpha = 0.60f),
+                            )
                         }
                     }
                 }
@@ -1351,269 +1361,323 @@ fun AnimeTrackerSheetContent(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // --- 10. ADVANCED DETAILS (Repeat, Privacy, Notes) ---
+        // --- 10. ADVANCED DETAILS (Apple Accordion: Repeat, Privacy, Notes) ---
         var showAdvancedOptions by remember { mutableStateOf(false) }
 
-        Surface(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(16.dp),
-            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.1f)),
+        TrackerGlassCard(
+            backgroundColor = Color.White.copy(alpha = 0.045f),
         ) {
-            Column(
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(14.dp),
+                    .clip(RoundedCornerShape(10.dp))
+                    .clickable(role = Role.Button) { showAdvancedOptions = !showAdvancedOptions },
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(10.dp))
-                        .clickable { showAdvancedOptions = !showAdvancedOptions },
-                    horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Tune,
-                            contentDescription = null,
-                            modifier = Modifier.size(17.dp),
-                            tint = MaterialTheme.colorScheme.primary,
-                        )
-                        Text(
-                            text = "Advanced Tracking Details",
-                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, fontSize = 13.sp),
-                            color = MaterialTheme.colorScheme.onSurface,
-                        )
-                    }
-
+                    Icon(
+                        imageVector = Icons.Default.Tune,
+                        contentDescription = null,
+                        modifier = Modifier.size(17.dp),
+                        tint = Color(0xFF00A2FF),
+                    )
                     Text(
-                        text = if (showAdvancedOptions) "Hide ▲" else "Expand ▼",
-                        style = MaterialTheme.typography.labelSmall.copy(
+                        text = "Advanced Tracking Details",
+                        style = MaterialTheme.typography.labelMedium.copy(
                             fontWeight = FontWeight.Bold,
-                            fontSize = 12.sp,
+                            fontSize = 13.sp,
                         ),
-                        color = MaterialTheme.colorScheme.primary,
+                        color = Color.White,
                     )
                 }
 
-                AnimatedVisibility(
-                    visible = showAdvancedOptions,
-                    enter = expandVertically() + fadeIn(),
-                    exit = shrinkVertically() + fadeOut(),
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(999.dp))
+                        .background(Color.White.copy(alpha = 0.06f))
+                        .border(1.dp, Color.White.copy(alpha = 0.10f), RoundedCornerShape(999.dp))
+                        .padding(horizontal = 9.dp, vertical = 3.dp),
                 ) {
-                    Column(
+                    Text(
+                        text = if (showAdvancedOptions) "Hide ▲" else "Expand ▼",
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 11.sp,
+                        ),
+                        color = Color(0xFF00A2FF),
+                    )
+                }
+            }
+
+            AnimatedVisibility(
+                visible = showAdvancedOptions,
+                enter = expandVertically() + fadeIn(),
+                exit = shrinkVertically() + fadeOut(),
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 14.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    // Repeat Stepper
+                    val currentRepeat = entry?.repeat ?: 0
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Replay,
+                                contentDescription = null,
+                                modifier = Modifier.size(17.dp),
+                                tint = Color.White.copy(alpha = 0.60f),
+                            )
+                            Column {
+                                Text(
+                                    text = if (isReading) "Reread Count" else "Rewatch Count",
+                                    style = MaterialTheme.typography.labelMedium.copy(
+                                        fontWeight = FontWeight.SemiBold,
+                                        fontSize = 12.5.sp,
+                                    ),
+                                    color = Color.White,
+                                )
+                                Text(
+                                    text = if (isReading) "$currentRepeat times reread" else "$currentRepeat times rewatched",
+                                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+                                    color = Color.White.copy(alpha = 0.45f),
+                                )
+                            }
+                        }
+
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(30.dp)
+                                    .clip(CircleShape)
+                                    .background(Color.White.copy(alpha = 0.08f))
+                                    .clickable(
+                                        enabled = currentRepeat > 0,
+                                        role = Role.Button,
+                                    ) {
+                                        if (currentRepeat > 0) {
+                                            AnilistTrackerCoordinator.updateRepeat(currentRepeat - 1)
+                                        }
+                                    },
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Remove,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(14.dp),
+                                    tint = if (currentRepeat > 0) Color.White else Color.White.copy(alpha = 0.20f),
+                                )
+                            }
+
+                            Text(
+                                text = "$currentRepeat",
+                                style = MaterialTheme.typography.labelMedium.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 13.sp,
+                                ),
+                                color = Color.White,
+                                modifier = Modifier.padding(horizontal = 6.dp),
+                            )
+
+                            Box(
+                                modifier = Modifier
+                                    .size(30.dp)
+                                    .clip(CircleShape)
+                                    .background(Color.White.copy(alpha = 0.08f))
+                                    .clickable(role = Role.Button) {
+                                        AnilistTrackerCoordinator.updateRepeat(currentRepeat + 1)
+                                    },
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Add,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(14.dp),
+                                    tint = Color.White,
+                                )
+                            }
+                        }
+                    }
+
+                    Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(top = 14.dp),
-                        verticalArrangement = Arrangement.spacedBy(14.dp),
+                            .height(1.dp)
+                            .background(Color.White.copy(alpha = 0.06f)),
+                    )
+
+                    // Private Entry Switch
+                    val isPrivate = entry?.private ?: false
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
-
-                        // Repeat Count Stepper
-                        val currentRepeat = entry?.repeat ?: 0
                         Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.weight(1f),
                         ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Replay,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(17.dp),
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                                Column {
-                                    Text(
-                                        text = if (isReading) "Reread Count" else "Rewatch Count",
-                                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
-                                    )
-                                    Text(
-                                        text = if (isReading) "$currentRepeat times reread" else "$currentRepeat times rewatched",
-                                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
-                                }
-                            }
-
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            ) {
-                                Surface(
-                                    modifier = Modifier.size(30.dp),
-                                    shape = CircleShape,
-                                    color = MaterialTheme.colorScheme.surfaceVariant,
-                                ) {
-                                    IconButton(
-                                        onClick = {
-                                            if (currentRepeat > 0) {
-                                                AnilistTrackerCoordinator.updateRepeat(currentRepeat - 1)
-                                            }
-                                        },
-                                        enabled = currentRepeat > 0,
-                                        modifier = Modifier.size(30.dp),
-                                    ) {
-                                        Icon(imageVector = Icons.Default.Remove, contentDescription = null, modifier = Modifier.size(15.dp))
-                                    }
-                                }
-
+                            Icon(
+                                imageVector = Icons.Default.Lock,
+                                contentDescription = null,
+                                modifier = Modifier.size(17.dp),
+                                tint = Color.White.copy(alpha = 0.60f),
+                            )
+                            Column {
                                 Text(
-                                    text = "$currentRepeat",
-                                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, fontSize = 13.sp),
-                                    modifier = Modifier.padding(horizontal = 6.dp),
+                                    text = "Private Entry",
+                                    style = MaterialTheme.typography.labelMedium.copy(
+                                        fontWeight = FontWeight.SemiBold,
+                                        fontSize = 12.5.sp,
+                                    ),
+                                    color = Color.White,
                                 )
-
-                                Surface(
-                                    modifier = Modifier.size(30.dp),
-                                    shape = CircleShape,
-                                    color = MaterialTheme.colorScheme.surfaceVariant,
-                                ) {
-                                    IconButton(
-                                        onClick = { AnilistTrackerCoordinator.updateRepeat(currentRepeat + 1) },
-                                        modifier = Modifier.size(30.dp),
-                                    ) {
-                                        Icon(imageVector = Icons.Default.Add, contentDescription = null, modifier = Modifier.size(15.dp))
-                                    }
-                                }
+                                Text(
+                                    text = "Hide this entry from your public profile",
+                                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+                                    color = Color.White.copy(alpha = 0.45f),
+                                )
                             }
                         }
 
-                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+                        Switch(
+                            checked = isPrivate,
+                            onCheckedChange = { AnilistTrackerCoordinator.updatePrivate(it) },
+                        )
+                    }
 
-                        // Private Entry Switch
-                        val isPrivate = entry?.private ?: false
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(1.dp)
+                            .background(Color.White.copy(alpha = 0.06f)),
+                    )
+
+                    // Hidden from Status Lists Switch
+                    val isHidden = entry?.hiddenFromStatusLists ?: false
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
                         Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.weight(1f),
                         ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                modifier = Modifier.weight(1f),
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Lock,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(17.dp),
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            Icon(
+                                imageVector = Icons.Default.VisibilityOff,
+                                contentDescription = null,
+                                modifier = Modifier.size(17.dp),
+                                tint = Color.White.copy(alpha = 0.60f),
+                            )
+                            Column {
+                                Text(
+                                    text = "Hide from Status Lists",
+                                    style = MaterialTheme.typography.labelMedium.copy(
+                                        fontWeight = FontWeight.SemiBold,
+                                        fontSize = 12.5.sp,
+                                    ),
+                                    color = Color.White,
                                 )
-                                Column {
-                                    Text(
-                                        text = "Private Entry",
-                                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
-                                    )
-                                    Text(
-                                        text = "Hide this anime from your public profile",
-                                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
-                                }
+                                Text(
+                                    text = "Only show in custom lists",
+                                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+                                    color = Color.White.copy(alpha = 0.45f),
+                                )
                             }
+                        }
 
-                            Switch(
-                                checked = isPrivate,
-                                onCheckedChange = { AnilistTrackerCoordinator.updatePrivate(it) },
+                        Switch(
+                            checked = isHidden,
+                            onCheckedChange = { AnilistTrackerCoordinator.updateHiddenFromStatusLists(it) },
+                        )
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(1.dp)
+                            .background(Color.White.copy(alpha = 0.06f)),
+                    )
+
+                    // Personal Notes Text Field
+                    var notesText by remember(entry?.notes) { mutableStateOf(entry?.notes.orEmpty()) }
+                    var isNotesDirty by remember(entry?.notes) { mutableStateOf(false) }
+
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.EditNote,
+                                contentDescription = null,
+                                modifier = Modifier.size(17.dp),
+                                tint = Color.White.copy(alpha = 0.60f),
+                            )
+                            Text(
+                                text = "Personal Notes",
+                                style = MaterialTheme.typography.labelMedium.copy(
+                                    fontWeight = FontWeight.SemiBold,
+                                    fontSize = 12.5.sp,
+                                ),
+                                color = Color.White,
                             )
                         }
 
-                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
-
-                        // Hidden from Status Lists Switch
-                        val isHidden = entry?.hiddenFromStatusLists ?: false
-                        Row(
+                        OutlinedTextField(
+                            value = notesText,
+                            onValueChange = {
+                                notesText = it
+                                isNotesDirty = true
+                            },
+                            placeholder = { Text("Write personal thoughts, reminders, or tags...", fontSize = 12.sp, color = Color.White.copy(0.35f)) },
+                            minLines = 2,
+                            maxLines = 4,
+                            shape = RoundedCornerShape(12.dp),
+                            textStyle = MaterialTheme.typography.bodySmall.copy(fontSize = 12.5.sp, color = Color.White),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = Color(0xFF00A2FF),
+                                unfocusedBorderColor = Color.White.copy(0.12f),
+                            ),
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
+                        )
+
+                        if (isNotesDirty) {
                             Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                modifier = Modifier.weight(1f),
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.VisibilityOff,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(17.dp),
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                                Column {
-                                    Text(
-                                        text = "Hide from Status Lists",
-                                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
-                                    )
-                                    Text(
-                                        text = "Only show in custom lists",
-                                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
-                                }
-                            }
-
-                            Switch(
-                                checked = isHidden,
-                                onCheckedChange = { AnilistTrackerCoordinator.updateHiddenFromStatusLists(it) },
-                            )
-                        }
-
-                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
-
-                        // Personal Notes Text Field
-                        var notesText by remember(entry?.notes) { mutableStateOf(entry?.notes.orEmpty()) }
-                        var isNotesDirty by remember(entry?.notes) { mutableStateOf(false) }
-
-                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.EditNote,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(17.dp),
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                                Text(
-                                    text = "Personal Notes",
-                                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
-                                )
-                            }
-
-                            OutlinedTextField(
-                                value = notesText,
-                                onValueChange = {
-                                    notesText = it
-                                    isNotesDirty = true
-                                },
-                                placeholder = { Text("Write your thoughts or reminders...", fontSize = 12.sp) },
-                                minLines = 2,
-                                maxLines = 4,
-                                shape = RoundedCornerShape(12.dp),
-                                textStyle = MaterialTheme.typography.bodySmall.copy(fontSize = 13.sp),
                                 modifier = Modifier.fillMaxWidth(),
-                            )
-
-                            if (isNotesDirty) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.End,
+                                horizontalArrangement = Arrangement.End,
+                            ) {
+                                Button(
+                                    onClick = {
+                                        AnilistTrackerCoordinator.updateNotes(notesText)
+                                        isNotesDirty = false
+                                    },
+                                    shape = RoundedCornerShape(10.dp),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = Color(0xFF00A2FF),
+                                        contentColor = Color.White,
+                                    ),
                                 ) {
-                                    Button(
-                                        onClick = {
-                                            AnilistTrackerCoordinator.updateNotes(notesText)
-                                            isNotesDirty = false
-                                        },
-                                        shape = RoundedCornerShape(10.dp),
-                                    ) {
-                                        Text("Save Notes", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                                    }
+                                    Text("Save Notes", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                                 }
                             }
                         }
@@ -1622,42 +1686,72 @@ fun AnimeTrackerSheetContent(
             }
         }
 
-        // --- 10. REMOVE FROM ANILIST & MATCH DIAGNOSTICS ---
+        // --- 11. DESTRUCTIVE ACTION (Guarded 2-Step Confirmation) ---
         if (entry != null) {
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(14.dp))
 
-            TextButton(
-                onClick = {
-                    hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
-                    AnilistTrackerCoordinator.deleteEntry()
-                },
-                modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.textButtonColors(
-                    contentColor = MaterialTheme.colorScheme.error,
-                ),
+            var confirmDelete by remember { mutableStateOf(false) }
+            LaunchedEffect(confirmDelete) {
+                if (confirmDelete) {
+                    delay(4000)
+                    confirmDelete = false
+                }
+            }
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(44.dp)
+                    .clip(RoundedCornerShape(13.dp))
+                    .background(if (confirmDelete) Color(0xFFEF4444).copy(alpha = 0.22f) else Color(0xFFEF4444).copy(alpha = 0.08f))
+                    .border(
+                        1.dp,
+                        if (confirmDelete) Color(0xFFEF4444).copy(alpha = 0.65f) else Color(0xFFEF4444).copy(alpha = 0.20f),
+                        RoundedCornerShape(13.dp),
+                    )
+                    .clickable(role = Role.Button) {
+                        if (!confirmDelete) {
+                            hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            confirmDelete = true
+                        } else {
+                            hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                            AnilistTrackerCoordinator.deleteEntry()
+                            onClose()
+                        }
+                    },
+                contentAlignment = Alignment.Center,
             ) {
-                Icon(
-                    imageVector = Icons.Default.DeleteOutline,
-                    contentDescription = null,
-                    modifier = Modifier.size(16.dp),
-                )
-                Spacer(modifier = Modifier.width(6.dp))
-                Text(
-                    text = "Remove from AniList",
-                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.DeleteOutline,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                        tint = Color(0xFFEF4444),
+                    )
+                    Text(
+                        text = if (confirmDelete) "Tap Again to Confirm Removal" else "Remove from AniList",
+                        style = MaterialTheme.typography.labelMedium.copy(
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 13.sp,
+                        ),
+                        color = Color(0xFFEF4444),
+                    )
+                }
             }
         }
 
         // Expandable Match Diagnostics
         if (!trackerState.debugInfo.isNullOrBlank()) {
             var showDiagnostics by remember { mutableStateOf(false) }
-            Spacer(modifier = Modifier.height(6.dp))
+            Spacer(modifier = Modifier.height(10.dp))
             Surface(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(10.dp))
-                    .clickable { showDiagnostics = !showDiagnostics },
+                    .clickable(role = Role.Button) { showDiagnostics = !showDiagnostics },
                 color = Color.Transparent,
             ) {
                 Row(
@@ -1670,7 +1764,7 @@ fun AnimeTrackerSheetContent(
                     Text(
                         text = "Match Diagnostics",
                         style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = Color.White.copy(alpha = 0.40f),
                     )
                     Text(
                         text = if (showDiagnostics) "Hide ▲" else "View ▼",
@@ -1678,7 +1772,7 @@ fun AnimeTrackerSheetContent(
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Bold,
                         ),
-                        color = MaterialTheme.colorScheme.primary,
+                        color = Color(0xFF00A2FF),
                     )
                 }
             }
@@ -1695,7 +1789,8 @@ fun AnimeTrackerSheetContent(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(12.dp))
-                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                        .background(Color.White.copy(alpha = 0.04f))
+                        .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(12.dp))
                         .padding(10.dp),
                 ) {
                     Text(
@@ -1704,7 +1799,7 @@ fun AnimeTrackerSheetContent(
                             fontSize = 11.sp,
                             fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
                         ),
-                        color = MaterialTheme.colorScheme.onSurface,
+                        color = Color.White.copy(alpha = 0.85f),
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     OutlinedButton(
@@ -1714,6 +1809,7 @@ fun AnimeTrackerSheetContent(
                         },
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(10.dp),
+                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.15f)),
                     ) {
                         Icon(
                             imageVector = Icons.Default.ContentCopy,
@@ -1724,13 +1820,14 @@ fun AnimeTrackerSheetContent(
                         Text(
                             text = if (copied) "✓ Log Copied to Clipboard!" else "Copy Diagnostics Log",
                             fontSize = 12.sp,
+                            color = Color.White.copy(alpha = 0.80f),
                         )
                     }
                 }
             }
         }
 
-        Spacer(modifier = Modifier.height(36.dp))
+        Spacer(modifier = Modifier.height(28.dp))
     }
 
     if (showUserProfileSheet && trackerState.user != null) {
@@ -1739,5 +1836,338 @@ fun AnimeTrackerSheetContent(
             username = trackerState.user?.name,
             onDismiss = { showUserProfileSheet = false },
         )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun TrackerProgressStepperSection(
+    title: String,
+    icon: ImageVector,
+    unitLabel: String,
+    currentUnits: Int,
+    totalUnits: Int?,
+    accentColor: Color,
+    onIncrement: () -> Unit,
+    onDecrement: () -> Unit,
+    onSetExact: (Int) -> Unit,
+) {
+    var showExactEditDialog by remember { mutableStateOf(false) }
+    val hapticFeedback = LocalHapticFeedback.current
+
+    val fraction = if (totalUnits != null && totalUnits > 0) {
+        (currentUnits.toFloat() / totalUnits).coerceIn(0f, 1f)
+    } else 0f
+
+    TrackerGlassCard(
+        backgroundColor = Color.White.copy(alpha = 0.045f),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    modifier = Modifier.size(17.dp),
+                    tint = accentColor,
+                )
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.labelMedium.copy(
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 13.sp,
+                    ),
+                    color = Color.White,
+                )
+            }
+
+            Text(
+                text = if (totalUnits != null) {
+                    "$unitLabel $currentUnits of $totalUnits"
+                } else {
+                    "$unitLabel $currentUnits"
+                },
+                style = MaterialTheme.typography.labelMedium.copy(
+                    fontWeight = FontWeight.ExtraBold,
+                    fontSize = 13.5.sp,
+                ),
+                color = accentColor,
+            )
+        }
+
+        if (totalUnits != null && totalUnits > 0) {
+            Spacer(modifier = Modifier.height(10.dp))
+            val animatedProgress by animateFloatAsState(
+                targetValue = fraction,
+                animationSpec = tween(300),
+                label = "ProgressPillTrack",
+            )
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(6.dp)
+                    .clip(RoundedCornerShape(3.dp))
+                    .background(Color.White.copy(alpha = 0.06f)),
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(animatedProgress)
+                        .fillMaxHeight()
+                        .clip(RoundedCornerShape(3.dp))
+                        .background(
+                            Brush.horizontalGradient(
+                                listOf(accentColor, accentColor.copy(alpha = 0.70f)),
+                            ),
+                        ),
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            // Continuous Segmented Pill
+            Row(
+                modifier = Modifier
+                    .weight(1f)
+                    .height(44.dp)
+                    .clip(RoundedCornerShape(13.dp))
+                    .background(Color.White.copy(alpha = 0.05f))
+                    .border(
+                        1.dp,
+                        Brush.verticalGradient(
+                            listOf(
+                                Color.White.copy(alpha = 0.14f),
+                                Color.White.copy(alpha = 0.04f),
+                            ),
+                        ),
+                        RoundedCornerShape(13.dp),
+                    ),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                // Minus segment
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .clickable(
+                            enabled = currentUnits > 0,
+                            role = Role.Button,
+                        ) {
+                            hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            onDecrement()
+                        },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Remove,
+                        contentDescription = "Decrease",
+                        modifier = Modifier.size(16.dp),
+                        tint = if (currentUnits > 0) Color.White else Color.White.copy(alpha = 0.20f),
+                    )
+                }
+
+                // Vertical Divider
+                Box(
+                    modifier = Modifier
+                        .width(1.dp)
+                        .height(20.dp)
+                        .background(Color.White.copy(alpha = 0.10f)),
+                )
+
+                // Middle: Direct input / badge segment
+                Box(
+                    modifier = Modifier
+                        .weight(1.4f)
+                        .fillMaxHeight()
+                        .clickable(role = Role.Button) {
+                            hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            showExactEditDialog = true
+                        },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        Text(
+                            text = "$unitLabel $currentUnits",
+                            style = MaterialTheme.typography.labelMedium.copy(
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 13.sp,
+                            ),
+                            color = accentColor,
+                        )
+                        Icon(
+                            imageVector = Icons.Default.Edit,
+                            contentDescription = "Edit Exact",
+                            modifier = Modifier.size(12.dp),
+                            tint = accentColor.copy(alpha = 0.65f),
+                        )
+                    }
+                }
+
+                // Vertical Divider
+                Box(
+                    modifier = Modifier
+                        .width(1.dp)
+                        .height(20.dp)
+                        .background(Color.White.copy(alpha = 0.10f)),
+                )
+
+                // Plus segment
+                val canIncrement = totalUnits == null || currentUnits < totalUnits
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .clickable(
+                            enabled = canIncrement,
+                            role = Role.Button,
+                        ) {
+                            hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            onIncrement()
+                        },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = "Increase",
+                        modifier = Modifier.size(16.dp),
+                        tint = if (canIncrement) Color.White else Color.White.copy(alpha = 0.20f),
+                    )
+                }
+            }
+
+            // Quick Max completion button if total is known and not reached
+            if (totalUnits != null && currentUnits < totalUnits) {
+                Box(
+                    modifier = Modifier
+                        .height(44.dp)
+                        .clip(RoundedCornerShape(13.dp))
+                        .background(accentColor.copy(alpha = 0.15f))
+                        .border(1.dp, accentColor.copy(alpha = 0.35f), RoundedCornerShape(13.dp))
+                        .clickable(role = Role.Button) {
+                            hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            onSetExact(totalUnits)
+                        }
+                        .padding(horizontal = 12.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Check,
+                            contentDescription = null,
+                            modifier = Modifier.size(14.dp),
+                            tint = accentColor,
+                        )
+                        Text(
+                            text = "All",
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 12.sp,
+                            ),
+                            color = accentColor,
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    if (showExactEditDialog) {
+        var textInput by remember { mutableStateOf(currentUnits.toString()) }
+        BasicAlertDialog(
+            onDismissRequest = { showExactEditDialog = false },
+        ) {
+            Surface(
+                shape = RoundedCornerShape(20.dp),
+                color = Color(0xFF131620),
+                border = BorderStroke(
+                    1.dp,
+                    Brush.verticalGradient(
+                        listOf(
+                            Color.White.copy(alpha = 0.20f),
+                            Color.White.copy(alpha = 0.05f),
+                        ),
+                    ),
+                ),
+                shadowElevation = 16.dp,
+            ) {
+                Column(
+                    modifier = Modifier.padding(20.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp),
+                ) {
+                    Text(
+                        text = "Set $unitLabel Progress",
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 16.sp,
+                        ),
+                        color = Color.White,
+                    )
+
+                    OutlinedTextField(
+                        value = textInput,
+                        onValueChange = { textInput = it.filter { ch -> ch.isDigit() } },
+                        singleLine = true,
+                        shape = RoundedCornerShape(12.dp),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        placeholder = { Text("0", color = Color.White.copy(0.4f)) },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = accentColor,
+                            unfocusedBorderColor = Color.White.copy(0.15f),
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White,
+                        ),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        OutlinedButton(
+                            onClick = { showExactEditDialog = false },
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.weight(1f),
+                            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.15f)),
+                        ) {
+                            Text("Cancel", color = Color.White.copy(alpha = 0.75f), fontSize = 13.sp)
+                        }
+
+                        Button(
+                            onClick = {
+                                val target = textInput.toIntOrNull() ?: currentUnits
+                                val clamped = if (totalUnits != null) target.coerceIn(0, totalUnits) else target.coerceAtLeast(0)
+                                onSetExact(clamped)
+                                showExactEditDialog = false
+                            },
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = accentColor,
+                                contentColor = Color.White,
+                            ),
+                        ) {
+                            Text("Save", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                        }
+                    }
+                }
+            }
+        }
     }
 }

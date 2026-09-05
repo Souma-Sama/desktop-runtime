@@ -1238,14 +1238,8 @@ fun MetaDetailsScreen(
                                     .background(scrolledBackgroundColor),
                             )
                         }
-                        val mobileStatusBarPadding = if (!isDesktop && !useDesktopDetailLayout) {
-                            WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
-                        } else {
-                            0.dp
-                        }
                         LazyColumn(
                             state = listState,
-                            contentPadding = PaddingValues(top = mobileStatusBarPadding),
                             modifier = Modifier
                                 .fillMaxSize()
                                 .nestedScroll(heroStretchState.nestedScrollConnection)
@@ -1544,24 +1538,14 @@ fun MetaDetailsScreen(
                             )
                         }
 
-                        if (!isDesktop && !useDesktopDetailLayout) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(mobileStatusBarPadding)
-                                    .background(colorScheme.background)
-                                    .zIndex(10f),
-                            )
-                        }
-
                         if (!isDesktop && !useDesktopDetailLayout && showHeroBackButton) {
                             NuvioBackButton(
                                 onClick = onBackFromDetails,
                                 modifier = Modifier.padding(
                                     start = 12.dp,
-                                    top = mobileStatusBarPadding + 8.dp,
-                                ).zIndex(11f),
-                                containerColor = Color.Black.copy(alpha = 0.40f),
+                                    top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + 8.dp,
+                                ).zIndex(2f),
+                                containerColor = Color.Transparent,
                                 contentColor = MaterialTheme.colorScheme.onBackground,
                             )
                         }
@@ -1589,7 +1573,7 @@ fun MetaDetailsScreen(
                                 backgroundColor = dominantBackdropColor.takeIf { dominantColorEnabled },
                                 onBack = onBackFromDetails,
                                 onToggleSaved = toggleSaved,
-                                modifier = Modifier.zIndex(12f),
+                                modifier = Modifier.zIndex(2f),
                             )
                         }
 
@@ -1860,20 +1844,6 @@ fun MetaDetailsScreen(
         }
 
         if (displayedMeta == null) {
-            val loadingStatusBarPadding = if (!isDesktop) {
-                WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
-            } else {
-                0.dp
-            }
-            if (!isDesktop) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(loadingStatusBarPadding)
-                        .background(MaterialTheme.colorScheme.background)
-                        .zIndex(10f),
-                )
-            }
             BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
                 val loadingBackButtonStartPadding = if (isDesktop) {
                     desktopPageHorizontalPaddingForWidth(maxWidth.value)
@@ -1883,7 +1853,7 @@ fun MetaDetailsScreen(
                 val loadingBackButtonTopPadding = if (isDesktop) {
                     32.dp
                 } else {
-                    loadingStatusBarPadding + 8.dp
+                    WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + 8.dp
                 }
                 NuvioBackButton(
                     onClick = onBack,
@@ -1891,7 +1861,7 @@ fun MetaDetailsScreen(
                         start = loadingBackButtonStartPadding,
                         top = loadingBackButtonTopPadding,
                     ),
-                    containerColor = if (isDesktop) Color.Black.copy(alpha = 0.34f) else Color.Black.copy(alpha = 0.40f),
+                    containerColor = if (isDesktop) Color.Black.copy(alpha = 0.34f) else Color.Transparent,
                     showContainerOnDesktop = isDesktop,
                     contentColor = MaterialTheme.colorScheme.onBackground,
                     buttonSize = if (isDesktop) 48.dp else 40.dp,
