@@ -14,7 +14,24 @@ object MetaHubArtwork {
     fun extractImdbId(rawId: String?): String? {
         if (rawId.isNullOrBlank()) return null
         imdbRegex.find(rawId)?.value?.let { return it }
-        return resolvedImdbCache[rawId]
+        resolvedImdbCache[rawId]?.let { return it }
+        val anilistId = AnilistTrackerCoordinator.extractAnilistId(rawId)
+        if (anilistId != null) {
+            resolvedImdbCache["ani_$anilistId"]?.let { return it }
+            resolvedImdbCache["anilist:$anilistId"]?.let { return it }
+        }
+        return null
+    }
+
+    fun cacheImdbId(rawId: String?, imdbId: String?) {
+        if (rawId.isNullOrBlank() || imdbId.isNullOrBlank()) return
+        val clean = imdbRegex.find(imdbId)?.value ?: return
+        resolvedImdbCache[rawId] = clean
+        val anilistId = AnilistTrackerCoordinator.extractAnilistId(rawId)
+        if (anilistId != null) {
+            resolvedImdbCache["ani_$anilistId"] = clean
+            resolvedImdbCache["anilist:$anilistId"] = clean
+        }
     }
 
     suspend fun resolveImdbId(rawId: String?): String? = withContext(Dispatchers.Default) {
@@ -26,14 +43,16 @@ object MetaHubArtwork {
             if (anilistId != null) {
                 val arm = AnilistMetaDetailsResolver.resolveArmMapping(anilistId)
                 if (!arm.imdbId.isNullOrBlank()) {
-                    resolvedImdbCache[rawId] = arm.imdbId
+                    cacheImdbId(rawId, arm.imdbId)
                     return@withContext arm.imdbId
                 }
 
                 val media = AnilistApi.getCachedMedia(anilistId)
+                    ?: AnilistTrackerCoordinator.getCachedMedia(anilistId)
+                    ?: runCatching { AnilistApi.fetchMediaById(anilistId) }.getOrNull()
                 val imdb = AnilistMetaDetailsResolver.resolveEffectiveImdbId(media, arm.imdbId)
                 if (!imdb.isNullOrBlank()) {
-                    resolvedImdbCache[rawId] = imdb
+                    cacheImdbId(rawId, imdb)
                     return@withContext imdb
                 }
             }
