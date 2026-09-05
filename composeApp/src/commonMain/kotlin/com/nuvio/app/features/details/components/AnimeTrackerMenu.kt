@@ -55,6 +55,7 @@ import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.PauseCircle
 import androidx.compose.material.icons.outlined.PlayCircle
 import androidx.compose.material.icons.outlined.RemoveCircleOutline
+import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material3.BasicAlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -71,6 +72,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -79,6 +82,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -107,6 +111,7 @@ import com.nuvio.app.features.anilist.AnilistAuthRepository
 import com.nuvio.app.features.anilist.AnilistFuzzyDate
 import com.nuvio.app.features.anilist.AnilistMediaListStatus
 import com.nuvio.app.features.anilist.AnilistTrackerCoordinator
+import com.nuvio.app.features.anilist.AnilistTrackerTheme
 import com.nuvio.app.isDesktop
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -133,38 +138,434 @@ fun getStatusColor(status: AnilistMediaListStatus?): Color = when (status) {
     null -> Color(0xFF00A2FF)
 }
 
+// Static Shape Tokens to prevent recomposition allocations
+private val ShapePill = CircleShape
+private val ShapeSheetTop = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
+private val ShapeDialog = RoundedCornerShape(26.dp)
+private val ShapeModal = RoundedCornerShape(22.dp)
+private val ShapeCard = RoundedCornerShape(18.dp)
+private val ShapeTile = RoundedCornerShape(14.dp)
+private val ShapeStepper = RoundedCornerShape(13.dp)
+private val ShapePoster = RoundedCornerShape(12.dp)
+private val ShapeEmblem = RoundedCornerShape(11.dp)
+private val ShapeAction = RoundedCornerShape(10.dp)
+private val ShapeRoundCapsule = RoundedCornerShape(999.dp)
+private val ShapeProgressBar = RoundedCornerShape(3.dp)
+
+// Static Cached Utility Brushes
+private val PosterBorderBrush = Brush.verticalGradient(
+    listOf(Color.White.copy(alpha = 0.35f), Color.White.copy(alpha = 0.10f)),
+)
+private val AnilistEmblemBgBrush = Brush.linearGradient(
+    listOf(Color(0xFF00B4D8), Color(0xFF0077B6)),
+)
+private val AnilistEmblemBorderBrush = Brush.verticalGradient(
+    listOf(Color.White.copy(alpha = 0.50f), Color.White.copy(alpha = 0.20f)),
+)
+private val DeleteNormalBgBrush = Brush.verticalGradient(
+    listOf(Color(0xFFEF4444).copy(alpha = 0.14f), Color(0xFFEF4444).copy(alpha = 0.05f)),
+)
+private val DeleteConfirmBgBrush = Brush.verticalGradient(
+    listOf(Color(0xFFEF4444).copy(alpha = 0.28f), Color(0xFFEF4444).copy(alpha = 0.16f)),
+)
+private val DeleteNormalBorderBrush = Brush.verticalGradient(
+    listOf(Color(0xFFEF4444).copy(alpha = 0.40f), Color(0xFFEF4444).copy(alpha = 0.15f)),
+)
+private val DeleteConfirmBorderBrush = Brush.verticalGradient(
+    listOf(Color(0xFFEF4444).copy(alpha = 0.85f), Color(0xFFEF4444).copy(alpha = 0.50f)),
+)
+
+private data class TrackerStatusItem(
+    val status: AnilistMediaListStatus,
+    val icon: ImageVector,
+    val color: Color,
+)
+
+private val TrackerStatusItems = listOf(
+    TrackerStatusItem(AnilistMediaListStatus.CURRENT, Icons.Outlined.PlayCircle, StatusColorWatching),
+    TrackerStatusItem(AnilistMediaListStatus.PLANNING, Icons.Default.CalendarToday, StatusColorPlanning),
+    TrackerStatusItem(AnilistMediaListStatus.COMPLETED, Icons.Outlined.CheckCircle, StatusColorCompleted),
+    TrackerStatusItem(AnilistMediaListStatus.PAUSED, Icons.Outlined.PauseCircle, StatusColorOnHold),
+    TrackerStatusItem(AnilistMediaListStatus.DROPPED, Icons.Outlined.RemoveCircleOutline, StatusColorDropped),
+    TrackerStatusItem(AnilistMediaListStatus.REPEATING, Icons.Default.Replay, StatusColorRepeating),
+)
+
+@Immutable
+data class TrackerThemeTokens(
+    val theme: AnilistTrackerTheme,
+    val dialogBackground: Color,
+    val dialogBorder: Brush,
+    val headerBackground: Brush,
+    val headerHairline: Brush,
+    val cardBackground: Brush?,
+    val cardBackgroundColor: Color,
+    val cardBorder: Brush,
+    val cardGleam: Brush?,
+    val subtleChipBackground: Color,
+    val subtleChipBorder: Brush,
+    val stepperBackground: Brush,
+    val stepperBorder: Brush,
+    val stepperDivider: Color,
+    val actionButtonBackground: Brush,
+    val actionButtonBorder: Brush,
+    val statusUnselectedBg: Brush,
+    val statusUnselectedBorder: Brush,
+    val statusSelectedBgs: Map<Color, Brush>,
+    val statusSelectedBorders: Map<Color, Brush>,
+    val scrimAlpha: Float,
+)
+
+private val FrostedGlassTokens by lazy {
+    val selectedBgs = TrackerStatusItems.associate { item ->
+        item.color to Brush.verticalGradient(
+            listOf(item.color.copy(alpha = 0.32f), item.color.copy(alpha = 0.15f)),
+        )
+    }
+    val selectedBorders = TrackerStatusItems.associate { item ->
+        item.color to Brush.verticalGradient(
+            listOf(item.color.copy(alpha = 0.90f), item.color.copy(alpha = 0.55f)),
+        )
+    }
+    TrackerThemeTokens(
+        theme = AnilistTrackerTheme.FROSTED_GLASS,
+        dialogBackground = Color(0xFF0C101C).copy(alpha = 0.94f),
+        dialogBorder = Brush.verticalGradient(
+            listOf(
+                Color.White.copy(alpha = 0.40f),
+                Color.White.copy(alpha = 0.14f),
+                Color.White.copy(alpha = 0.05f),
+                Color.White.copy(alpha = 0.18f),
+            ),
+        ),
+        headerBackground = Brush.verticalGradient(
+            listOf(
+                Color(0xFF182034).copy(alpha = 0.88f),
+                Color(0xFF0F1424).copy(alpha = 0.88f),
+            ),
+        ),
+        headerHairline = Brush.horizontalGradient(
+            listOf(
+                Color.Transparent,
+                Color.White.copy(alpha = 0.18f),
+                Color.White.copy(alpha = 0.06f),
+                Color.Transparent,
+            ),
+        ),
+        cardBackground = Brush.verticalGradient(
+            listOf(
+                Color(0xFF1A2236).copy(alpha = 0.74f),
+                Color(0xFF121726).copy(alpha = 0.74f),
+            ),
+        ),
+        cardBackgroundColor = Color(0xFF182033).copy(alpha = 0.74f),
+        cardBorder = Brush.verticalGradient(
+            listOf(
+                Color.White.copy(alpha = 0.20f),
+                Color.White.copy(alpha = 0.07f),
+            ),
+        ),
+        cardGleam = Brush.horizontalGradient(
+            listOf(
+                Color.Transparent,
+                Color.White.copy(alpha = 0.16f),
+                Color.White.copy(alpha = 0.05f),
+                Color.Transparent,
+            ),
+        ),
+        subtleChipBackground = Color(0xFF1E283E).copy(alpha = 0.70f),
+        subtleChipBorder = Brush.verticalGradient(
+            listOf(
+                Color.White.copy(alpha = 0.24f),
+                Color.White.copy(alpha = 0.08f),
+            ),
+        ),
+        stepperBackground = Brush.verticalGradient(
+            listOf(
+                Color(0xFF1A2236).copy(alpha = 0.82f),
+                Color(0xFF131828).copy(alpha = 0.82f),
+            ),
+        ),
+        stepperBorder = Brush.verticalGradient(
+            listOf(
+                Color.White.copy(alpha = 0.24f),
+                Color.White.copy(alpha = 0.08f),
+            ),
+        ),
+        stepperDivider = Color.White.copy(alpha = 0.15f),
+        actionButtonBackground = Brush.verticalGradient(
+            listOf(
+                Color(0xFF1E283E).copy(alpha = 0.85f),
+                Color(0xFF151C2C).copy(alpha = 0.85f),
+            ),
+        ),
+        actionButtonBorder = Brush.verticalGradient(
+            listOf(
+                Color.White.copy(alpha = 0.28f),
+                Color.White.copy(alpha = 0.10f),
+            ),
+        ),
+        statusUnselectedBg = Brush.verticalGradient(
+            listOf(
+                Color(0xFF1A2236).copy(alpha = 0.65f),
+                Color(0xFF121726).copy(alpha = 0.65f),
+            ),
+        ),
+        statusUnselectedBorder = Brush.verticalGradient(
+            listOf(
+                Color.White.copy(alpha = 0.16f),
+                Color.White.copy(alpha = 0.05f),
+            ),
+        ),
+        statusSelectedBgs = selectedBgs,
+        statusSelectedBorders = selectedBorders,
+        scrimAlpha = 0.55f,
+    )
+}
+
+private val WaterGlassTokens by lazy {
+    val selectedBgs = TrackerStatusItems.associate { item ->
+        item.color to Brush.verticalGradient(
+            listOf(item.color.copy(alpha = 0.36f), item.color.copy(alpha = 0.16f)),
+        )
+    }
+    val selectedBorders = TrackerStatusItems.associate { item ->
+        item.color to Brush.verticalGradient(
+            listOf(item.color.copy(alpha = 0.95f), item.color.copy(alpha = 0.60f)),
+        )
+    }
+    TrackerThemeTokens(
+        theme = AnilistTrackerTheme.WATER_GLASS,
+        dialogBackground = Color(0xFF0C101D).copy(alpha = 0.72f),
+        dialogBorder = Brush.verticalGradient(
+            listOf(
+                Color.White.copy(alpha = 0.45f),
+                Color.White.copy(alpha = 0.16f),
+                Color.White.copy(alpha = 0.05f),
+                Color.White.copy(alpha = 0.15f),
+            ),
+        ),
+        headerBackground = Brush.verticalGradient(
+            listOf(
+                Color.White.copy(alpha = 0.08f),
+                Color.White.copy(alpha = 0.02f),
+            ),
+        ),
+        headerHairline = Brush.horizontalGradient(
+            listOf(
+                Color.Transparent,
+                Color.White.copy(alpha = 0.16f),
+                Color.White.copy(alpha = 0.06f),
+                Color.Transparent,
+            ),
+        ),
+        cardBackground = Brush.verticalGradient(
+            listOf(
+                Color.White.copy(alpha = 0.08f),
+                Color.White.copy(alpha = 0.035f),
+            ),
+        ),
+        cardBackgroundColor = Color.Transparent,
+        cardBorder = Brush.verticalGradient(
+            listOf(
+                Color.White.copy(alpha = 0.32f),
+                Color.White.copy(alpha = 0.08f),
+                Color.White.copy(alpha = 0.02f),
+            ),
+        ),
+        cardGleam = Brush.horizontalGradient(
+            listOf(
+                Color.Transparent,
+                Color.White.copy(alpha = 0.25f),
+                Color.White.copy(alpha = 0.08f),
+                Color.Transparent,
+            ),
+        ),
+        subtleChipBackground = Color.White.copy(alpha = 0.08f),
+        subtleChipBorder = Brush.verticalGradient(
+            listOf(
+                Color.White.copy(alpha = 0.22f),
+                Color.White.copy(alpha = 0.08f),
+            ),
+        ),
+        stepperBackground = Brush.verticalGradient(
+            listOf(
+                Color.White.copy(alpha = 0.08f),
+                Color.White.copy(alpha = 0.04f),
+            ),
+        ),
+        stepperBorder = Brush.verticalGradient(
+            listOf(
+                Color.White.copy(alpha = 0.30f),
+                Color.White.copy(alpha = 0.08f),
+            ),
+        ),
+        stepperDivider = Color.White.copy(alpha = 0.14f),
+        actionButtonBackground = Brush.verticalGradient(
+            listOf(
+                Color.White.copy(alpha = 0.10f),
+                Color.White.copy(alpha = 0.04f),
+            ),
+        ),
+        actionButtonBorder = Brush.verticalGradient(
+            listOf(
+                Color.White.copy(alpha = 0.32f),
+                Color.White.copy(alpha = 0.08f),
+            ),
+        ),
+        statusUnselectedBg = Brush.verticalGradient(
+            listOf(
+                Color.White.copy(alpha = 0.065f),
+                Color.White.copy(alpha = 0.025f),
+            ),
+        ),
+        statusUnselectedBorder = Brush.verticalGradient(
+            listOf(
+                Color.White.copy(alpha = 0.18f),
+                Color.White.copy(alpha = 0.06f),
+            ),
+        ),
+        statusSelectedBgs = selectedBgs,
+        statusSelectedBorders = selectedBorders,
+        scrimAlpha = 0.35f,
+    )
+}
+
+private val MidnightGlassTokens by lazy {
+    val selectedBgs = TrackerStatusItems.associate { item ->
+        item.color to Brush.verticalGradient(
+            listOf(item.color.copy(alpha = 0.28f), item.color.copy(alpha = 0.12f)),
+        )
+    }
+    val selectedBorders = TrackerStatusItems.associate { item ->
+        item.color to Brush.verticalGradient(
+            listOf(item.color.copy(alpha = 0.85f), item.color.copy(alpha = 0.45f)),
+        )
+    }
+    TrackerThemeTokens(
+        theme = AnilistTrackerTheme.MIDNIGHT_GLASS,
+        dialogBackground = Color(0xFF070910).copy(alpha = 0.97f),
+        dialogBorder = Brush.verticalGradient(
+            listOf(
+                Color.White.copy(alpha = 0.25f),
+                Color.White.copy(alpha = 0.08f),
+                Color.White.copy(alpha = 0.02f),
+                Color.White.copy(alpha = 0.08f),
+            ),
+        ),
+        headerBackground = Brush.verticalGradient(
+            listOf(
+                Color(0xFF141824).copy(alpha = 0.92f),
+                Color(0xFF0D101A).copy(alpha = 0.92f),
+            ),
+        ),
+        headerHairline = Brush.horizontalGradient(
+            listOf(
+                Color.Transparent,
+                Color.White.copy(alpha = 0.12f),
+                Color.White.copy(alpha = 0.04f),
+                Color.Transparent,
+            ),
+        ),
+        cardBackground = Brush.verticalGradient(
+            listOf(
+                Color(0xFF131724),
+                Color(0xFF0D101A),
+            ),
+        ),
+        cardBackgroundColor = Color(0xFF121622),
+        cardBorder = Brush.verticalGradient(
+            listOf(
+                Color.White.copy(alpha = 0.14f),
+                Color.White.copy(alpha = 0.04f),
+            ),
+        ),
+        cardGleam = Brush.horizontalGradient(
+            listOf(
+                Color.Transparent,
+                Color.White.copy(alpha = 0.10f),
+                Color.Transparent,
+            ),
+        ),
+        subtleChipBackground = Color(0xFF1A2030),
+        subtleChipBorder = Brush.verticalGradient(
+            listOf(
+                Color.White.copy(alpha = 0.18f),
+                Color.White.copy(alpha = 0.05f),
+            ),
+        ),
+        stepperBackground = Brush.verticalGradient(
+            listOf(
+                Color(0xFF151926),
+                Color(0xFF0F121C),
+            ),
+        ),
+        stepperBorder = Brush.verticalGradient(
+            listOf(
+                Color.White.copy(alpha = 0.18f),
+                Color.White.copy(alpha = 0.05f),
+            ),
+        ),
+        stepperDivider = Color.White.copy(alpha = 0.10f),
+        actionButtonBackground = Brush.verticalGradient(
+            listOf(
+                Color(0xFF192030),
+                Color(0xFF111520),
+            ),
+        ),
+        actionButtonBorder = Brush.verticalGradient(
+            listOf(
+                Color.White.copy(alpha = 0.20f),
+                Color.White.copy(alpha = 0.06f),
+            ),
+        ),
+        statusUnselectedBg = Brush.verticalGradient(
+            listOf(
+                Color(0xFF141824),
+                Color(0xFF0E111A),
+            ),
+        ),
+        statusUnselectedBorder = Brush.verticalGradient(
+            listOf(
+                Color.White.copy(alpha = 0.12f),
+                Color.White.copy(alpha = 0.03f),
+            ),
+        ),
+        statusSelectedBgs = selectedBgs,
+        statusSelectedBorders = selectedBorders,
+        scrimAlpha = 0.65f,
+    )
+}
+
+fun getTrackerThemeTokens(theme: AnilistTrackerTheme): TrackerThemeTokens = when (theme) {
+    AnilistTrackerTheme.FROSTED_GLASS -> FrostedGlassTokens
+    AnilistTrackerTheme.WATER_GLASS -> WaterGlassTokens
+    AnilistTrackerTheme.MIDNIGHT_GLASS -> MidnightGlassTokens
+}
+
+val LocalTrackerThemeTokens = staticCompositionLocalOf {
+    FrostedGlassTokens
+}
+
 @Composable
 private fun TrackerGlassCard(
     modifier: Modifier = Modifier,
-    shape: RoundedCornerShape = RoundedCornerShape(18.dp),
-    backgroundColor: Color = Color.Transparent,
-    backgroundBrush: Brush? = Brush.verticalGradient(
-        listOf(
-            Color.White.copy(alpha = 0.08f),
-            Color.White.copy(alpha = 0.035f),
-        ),
-    ),
-    borderBrush: Brush? = Brush.verticalGradient(
-        listOf(
-            Color.White.copy(alpha = 0.32f),
-            Color.White.copy(alpha = 0.08f),
-            Color.White.copy(alpha = 0.02f),
-        ),
-    ),
+    shape: RoundedCornerShape = ShapeCard,
+    backgroundColor: Color? = null,
+    backgroundBrush: Brush? = null,
+    borderBrush: Brush? = null,
     onClick: (() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    val bgModifier = if (backgroundBrush != null) {
-        Modifier.background(backgroundBrush)
-    } else {
-        Modifier.background(backgroundColor)
+    val tokens = LocalTrackerThemeTokens.current
+    val effectiveBgModifier = when {
+        backgroundBrush != null -> Modifier.background(backgroundBrush)
+        backgroundColor != null -> Modifier.background(backgroundColor)
+        tokens.cardBackground != null -> Modifier.background(tokens.cardBackground)
+        else -> Modifier.background(tokens.cardBackgroundColor)
     }
 
-    val borderModifier = if (borderBrush != null) {
-        Modifier.border(1.dp, borderBrush, shape)
-    } else {
-        Modifier
-    }
+    val effectiveBorder = borderBrush ?: tokens.cardBorder
+    val borderModifier = Modifier.border(1.dp, effectiveBorder, shape)
 
     val clickModifier = if (onClick != null) {
         Modifier.clickable(role = Role.Button, onClick = onClick)
@@ -175,26 +576,19 @@ private fun TrackerGlassCard(
     Box(
         modifier = modifier
             .clip(shape)
-            .then(bgModifier)
+            .then(effectiveBgModifier)
             .then(borderModifier)
             .then(clickModifier),
     ) {
-        // Specular top light refraction line (Water Glass gleam)
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(1.dp)
-                .background(
-                    Brush.horizontalGradient(
-                        listOf(
-                            Color.Transparent,
-                            Color.White.copy(alpha = 0.25f),
-                            Color.White.copy(alpha = 0.08f),
-                            Color.Transparent,
-                        ),
-                    ),
-                ),
-        )
+        val gleam = tokens.cardGleam
+        if (gleam != null) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(1.dp)
+                    .background(gleam),
+            )
+        }
 
         Column(
             modifier = Modifier
@@ -340,6 +734,10 @@ fun AnimeTrackerSheet(
     val country = meta?.country
     val language = meta?.language
 
+    val anilistPrefs by com.nuvio.app.features.anilist.AnilistPreferencesRepository.preferences.collectAsState()
+    val currentTheme = anilistPrefs.trackerTheme
+    val themeTokens = remember(currentTheme) { getTrackerThemeTokens(currentTheme) }
+
     LaunchedEffect(effectiveTitle, mediaId) {
         if (effectiveTitle.isNotBlank()) {
             AnilistTrackerCoordinator.loadForMedia(
@@ -363,26 +761,18 @@ fun AnimeTrackerSheet(
                 modifier = Modifier
                     .fillMaxHeight(0.88f)
                     .widthIn(min = 480.dp, max = 530.dp)
-                    .clip(RoundedCornerShape(26.dp)),
-                shape = RoundedCornerShape(26.dp),
-                color = Color(0xFF0C101D).copy(alpha = 0.72f),
-                border = BorderStroke(
-                    1.dp,
-                    Brush.verticalGradient(
-                        listOf(
-                            Color.White.copy(alpha = 0.45f),
-                            Color.White.copy(alpha = 0.16f),
-                            Color.White.copy(alpha = 0.05f),
-                            Color.White.copy(alpha = 0.15f),
-                        ),
-                    ),
-                ),
+                    .clip(ShapeDialog),
+                shape = ShapeDialog,
+                color = themeTokens.dialogBackground,
+                border = BorderStroke(1.dp, themeTokens.dialogBorder),
                 shadowElevation = 24.dp,
             ) {
                 AnimeTrackerSheetContent(
                     meta = meta,
                     preview = preview,
                     title = effectiveTitle,
+                    currentTheme = currentTheme,
+                    themeTokens = themeTokens,
                     onClose = onDismiss,
                 )
             }
@@ -398,14 +788,16 @@ fun AnimeTrackerSheet(
                 }
             },
             sheetState = sheetState,
-            containerColor = Color(0xFF0C101D).copy(alpha = 0.88f),
-            shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+            containerColor = themeTokens.dialogBackground,
+            shape = ShapeSheetTop,
             showDragHandle = true,
         ) {
             AnimeTrackerSheetContent(
                 meta = meta,
                 preview = preview,
                 title = effectiveTitle,
+                currentTheme = currentTheme,
+                themeTokens = themeTokens,
                 onClose = {
                     coroutineScope.launch {
                         dismissNuvioBottomSheet(sheetState = sheetState, onDismiss = onDismiss)
@@ -422,6 +814,8 @@ fun AnimeTrackerSheetContent(
     meta: com.nuvio.app.features.details.MetaDetails? = null,
     preview: com.nuvio.app.features.home.MetaPreview? = null,
     title: String? = null,
+    currentTheme: AnilistTrackerTheme = AnilistTrackerTheme.FROSTED_GLASS,
+    themeTokens: TrackerThemeTokens = remember(currentTheme) { getTrackerThemeTokens(currentTheme) },
     onClose: () -> Unit,
 ) {
     val trackerState by AnilistTrackerCoordinator.trackerState.collectAsState()
@@ -433,190 +827,170 @@ fun AnimeTrackerSheetContent(
     val uriHandler = LocalUriHandler.current
     var showUserProfileSheet by rememberSaveable { mutableStateOf(false) }
 
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .fillMaxHeight(),
-    ) {
-        // --- 1. PINNED APPLE WATER GLASS HEADER BAR ---
-        Box(
+    CompositionLocalProvider(LocalTrackerThemeTokens provides themeTokens) {
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(
-                    Brush.verticalGradient(
-                        listOf(
-                            Color.White.copy(alpha = 0.08f),
-                            Color.White.copy(alpha = 0.02f),
-                        ),
-                    ),
-                )
-                .padding(horizontal = 20.dp, vertical = 14.dp),
+                .fillMaxHeight(),
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
+            // --- 1. PINNED APPLE GLASS HEADER BAR ---
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(themeTokens.headerBackground)
+                    .padding(horizontal = 20.dp, vertical = 14.dp),
             ) {
                 Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(11.dp),
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(36.dp)
-                            .clip(RoundedCornerShape(11.dp))
-                            .background(
-                                Brush.linearGradient(
-                                    listOf(Color(0xFF00B4D8), Color(0xFF0077B6)),
-                                ),
-                            )
-                            .border(
-                                width = 1.dp,
-                                brush = Brush.verticalGradient(
-                                    listOf(
-                                        Color.White.copy(alpha = 0.50f),
-                                        Color.White.copy(alpha = 0.20f),
-                                    ),
-                                ),
-                                shape = RoundedCornerShape(11.dp),
-                            ),
-                        contentAlignment = Alignment.Center,
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(11.dp),
                     ) {
-                        Image(
-                            painter = painterResource(Res.drawable.rating_anilist),
-                            contentDescription = "AniList",
-                            modifier = Modifier.size(20.dp),
-                        )
-                    }
-
-                    Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
-                        Text(
-                            text = "AniList Tracker",
-                            style = MaterialTheme.typography.titleMedium.copy(
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 16.sp,
-                                letterSpacing = (-0.2).sp,
-                            ),
-                            color = Color.White,
-                        )
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(5.dp),
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(6.dp)
-                                    .clip(CircleShape)
-                                    .background(if (trackerState.isAuthenticated) Color(0xFF10B981) else Color(0xFFF59E0B)),
-                            )
-                            Text(
-                                text = if (trackerState.isAuthenticated) "Cloud Synced" else "Not Logged In",
-                                style = MaterialTheme.typography.labelSmall.copy(
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Medium,
-                                ),
-                                color = Color.White.copy(alpha = 0.55f),
-                            )
-                        }
-                    }
-                }
-
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    if (trackerState.isAuthenticated) {
-                        val user = trackerState.user
                         Box(
                             modifier = Modifier
-                                .clip(RoundedCornerShape(999.dp))
-                                .background(Color.White.copy(alpha = 0.08f))
-                                .border(
-                                    1.dp,
-                                    Brush.verticalGradient(
-                                        listOf(
-                                            Color.White.copy(alpha = 0.22f),
-                                            Color.White.copy(alpha = 0.08f),
-                                        ),
-                                    ),
-                                    RoundedCornerShape(999.dp),
-                                )
-                                .clickable(role = Role.Button) { showUserProfileSheet = true }
-                                .padding(horizontal = 9.dp, vertical = 4.dp),
+                                .size(36.dp)
+                                .clip(ShapeEmblem)
+                                .background(AnilistEmblemBgBrush)
+                                .border(1.dp, AnilistEmblemBorderBrush, ShapeEmblem),
+                            contentAlignment = Alignment.Center,
                         ) {
+                            Image(
+                                painter = painterResource(Res.drawable.rating_anilist),
+                                contentDescription = "AniList",
+                                modifier = Modifier.size(20.dp),
+                            )
+                        }
+
+                        Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                            Text(
+                                text = "AniList Tracker",
+                                style = MaterialTheme.typography.titleMedium.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 16.sp,
+                                    letterSpacing = (-0.2).sp,
+                                ),
+                                color = Color.White,
+                            )
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                horizontalArrangement = Arrangement.spacedBy(5.dp),
                             ) {
-                                val avatarUrl = user?.avatarUrl
-                                if (avatarUrl != null) {
-                                    AsyncImage(
-                                        model = avatarUrl,
-                                        contentDescription = null,
-                                        modifier = Modifier
-                                            .size(17.dp)
-                                            .clip(CircleShape),
-                                        contentScale = ContentScale.Crop,
-                                    )
-                                }
+                                Box(
+                                    modifier = Modifier
+                                        .size(6.dp)
+                                        .clip(ShapePill)
+                                        .background(if (trackerState.isAuthenticated) Color(0xFF10B981) else Color(0xFFF59E0B)),
+                                )
                                 Text(
-                                    text = user?.name ?: "Connected",
+                                    text = if (trackerState.isAuthenticated) "Cloud Synced" else "Not Logged In",
                                     style = MaterialTheme.typography.labelSmall.copy(
-                                        fontWeight = FontWeight.SemiBold,
-                                        fontSize = 11.5.sp,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Medium,
                                     ),
-                                    color = Color.White.copy(alpha = 0.90f),
-                                    maxLines = 1,
+                                    color = Color.White.copy(alpha = 0.55f),
                                 )
                             }
                         }
                     }
 
-                    Box(
-                        modifier = Modifier
-                            .size(30.dp)
-                            .clip(CircleShape)
-                            .background(Color.White.copy(alpha = 0.09f))
-                            .border(
-                                1.dp,
-                                Brush.verticalGradient(
-                                    listOf(
-                                        Color.White.copy(alpha = 0.25f),
-                                        Color.White.copy(alpha = 0.08f),
-                                    ),
-                                ),
-                                CircleShape,
-                            )
-                            .clickable(role = Role.Button) { onClose() },
-                        contentAlignment = Alignment.Center,
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Close,
-                            contentDescription = "Close",
-                            modifier = Modifier.size(15.dp),
-                            tint = Color.White.copy(alpha = 0.85f),
-                        )
+                        if (trackerState.isAuthenticated) {
+                            val user = trackerState.user
+                            Box(
+                                modifier = Modifier
+                                    .clip(ShapeRoundCapsule)
+                                    .background(themeTokens.subtleChipBackground)
+                                    .border(1.dp, themeTokens.subtleChipBorder, ShapeRoundCapsule)
+                                    .clickable(role = Role.Button) { showUserProfileSheet = true }
+                                    .padding(horizontal = 9.dp, vertical = 4.dp),
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                ) {
+                                    val avatarUrl = user?.avatarUrl
+                                    if (avatarUrl != null) {
+                                        AsyncImage(
+                                            model = avatarUrl,
+                                            contentDescription = null,
+                                            modifier = Modifier
+                                                .size(17.dp)
+                                                .clip(ShapePill),
+                                            contentScale = ContentScale.Crop,
+                                        )
+                                    }
+                                    Text(
+                                        text = user?.name ?: "Connected",
+                                        style = MaterialTheme.typography.labelSmall.copy(
+                                            fontWeight = FontWeight.SemiBold,
+                                            fontSize = 11.5.sp,
+                                        ),
+                                        color = Color.White.copy(alpha = 0.90f),
+                                        maxLines = 1,
+                                    )
+                                }
+                            }
+                        }
+
+                        // Theme switcher palette button
+                        Box(
+                            modifier = Modifier
+                                .size(30.dp)
+                                .clip(ShapePill)
+                                .background(themeTokens.subtleChipBackground)
+                                .border(1.dp, themeTokens.subtleChipBorder, ShapePill)
+                                .clickable(role = Role.Button) {
+                                    hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    val nextTheme = when (currentTheme) {
+                                        AnilistTrackerTheme.FROSTED_GLASS -> AnilistTrackerTheme.WATER_GLASS
+                                        AnilistTrackerTheme.WATER_GLASS -> AnilistTrackerTheme.MIDNIGHT_GLASS
+                                        AnilistTrackerTheme.MIDNIGHT_GLASS -> AnilistTrackerTheme.FROSTED_GLASS
+                                    }
+                                    com.nuvio.app.features.anilist.AnilistPreferencesRepository.setTrackerTheme(nextTheme)
+                                },
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.Palette,
+                                contentDescription = "Theme: ${currentTheme.label}",
+                                modifier = Modifier.size(15.dp),
+                                tint = Color.White.copy(alpha = 0.85f),
+                            )
+                        }
+
+                        Box(
+                            modifier = Modifier
+                                .size(30.dp)
+                                .clip(ShapePill)
+                                .background(themeTokens.subtleChipBackground)
+                                .border(1.dp, themeTokens.subtleChipBorder, ShapePill)
+                                .clickable(role = Role.Button) { onClose() },
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "Close",
+                                modifier = Modifier.size(15.dp),
+                                tint = Color.White.copy(alpha = 0.85f),
+                            )
+                        }
                     }
                 }
             }
-        }
 
-        // Frosted specular hairline divider
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(1.dp)
-                .background(
-                    Brush.horizontalGradient(
-                        listOf(
-                            Color.Transparent,
-                            Color.White.copy(alpha = 0.16f),
-                            Color.White.copy(alpha = 0.06f),
-                            Color.Transparent,
-                        ),
-                    ),
-                ),
-        )
+            // Hairline divider
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(1.dp)
+                    .background(themeTokens.headerHairline),
+            )
 
         // --- 2. SCROLLABLE WATER GLASS BODY ---
         Column(
@@ -648,7 +1022,7 @@ fun AnimeTrackerSheetContent(
                                 onClick = {
                                     uriHandler.openUri(AnilistAuthRepository.OAUTH_AUTHORIZE_URL)
                                 },
-                                shape = RoundedCornerShape(12.dp),
+                                shape = ShapePoster,
                                 modifier = Modifier.weight(1f),
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = Color(0xFF00A2FF),
@@ -665,7 +1039,7 @@ fun AnimeTrackerSheetContent(
                             }
                             OutlinedButton(
                                 onClick = { showTokenInput = true },
-                                shape = RoundedCornerShape(12.dp),
+                                shape = ShapePoster,
                                 border = BorderStroke(1.dp, Color.White.copy(alpha = 0.18f)),
                             ) {
                                 Text("Paste Token", fontSize = 13.sp, color = Color.White.copy(alpha = 0.85f))
@@ -678,7 +1052,7 @@ fun AnimeTrackerSheetContent(
                                 onValueChange = { tokenInput = it },
                                 placeholder = { Text("Paste AniList Token / Pin URL...", fontSize = 12.sp, color = Color.White.copy(0.35f)) },
                                 singleLine = true,
-                                shape = RoundedCornerShape(12.dp),
+                                shape = ShapePoster,
                                 textStyle = MaterialTheme.typography.bodySmall.copy(fontSize = 13.sp, color = Color.White),
                                 colors = OutlinedTextFieldDefaults.colors(
                                     focusedBorderColor = Color(0xFF00A2FF),
@@ -702,7 +1076,7 @@ fun AnimeTrackerSheetContent(
                                         }
                                     },
                                     enabled = tokenInput.isNotBlank(),
-                                    shape = RoundedCornerShape(10.dp),
+                                    shape = ShapeAction,
                                     modifier = Modifier.weight(1f),
                                     colors = ButtonDefaults.buttonColors(
                                         containerColor = Color(0xFF00A2FF),
@@ -782,7 +1156,7 @@ fun AnimeTrackerSheetContent(
                                 )
                             },
                             modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp),
+                            shape = ShapePoster,
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = Color(0xFF00A2FF),
                                 contentColor = Color.White,
@@ -800,7 +1174,7 @@ fun AnimeTrackerSheetContent(
                         onValueChange = { manualSearchText = it },
                         placeholder = { Text("Search title or enter AniList ID...", fontSize = 12.sp, color = Color.White.copy(0.35f)) },
                         singleLine = true,
-                        shape = RoundedCornerShape(12.dp),
+                        shape = ShapePoster,
                         textStyle = MaterialTheme.typography.bodySmall.copy(fontSize = 13.sp, color = Color.White),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = Color(0xFF00A2FF),
@@ -829,7 +1203,7 @@ fun AnimeTrackerSheetContent(
                             }
                         },
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp),
+                        shape = ShapePoster,
                         enabled = manualSearchText.isNotBlank(),
                     ) {
                         Text("Search AniList", fontSize = 13.sp)
@@ -857,18 +1231,9 @@ fun AnimeTrackerSheetContent(
                     Box(
                         modifier = Modifier
                             .size(width = 54.dp, height = 76.dp)
-                            .clip(RoundedCornerShape(12.dp))
+                            .clip(ShapePoster)
                             .background(Color.White.copy(alpha = 0.08f))
-                            .border(
-                                1.dp,
-                                Brush.verticalGradient(
-                                    listOf(
-                                        Color.White.copy(alpha = 0.35f),
-                                        Color.White.copy(alpha = 0.10f),
-                                    ),
-                                ),
-                                RoundedCornerShape(12.dp),
-                            ),
+                            .border(1.dp, PosterBorderBrush, ShapePoster),
                     ) {
                         if (cover != null) {
                             AsyncImage(
@@ -928,9 +1293,9 @@ fun AnimeTrackerSheetContent(
                             if (media.averageScore != null && media.averageScore > 0) {
                                 Box(
                                     modifier = Modifier
-                                        .clip(RoundedCornerShape(999.dp))
+                                        .clip(ShapeRoundCapsule)
                                         .background(Color(0xFFFFB800).copy(alpha = 0.14f))
-                                        .border(1.dp, Color(0xFFFFB800).copy(alpha = 0.35f), RoundedCornerShape(999.dp))
+                                        .border(1.dp, Color(0xFFFFB800).copy(alpha = 0.35f), ShapeRoundCapsule)
                                         .padding(horizontal = 7.dp, vertical = 2.dp),
                                 ) {
                                     Row(
@@ -958,18 +1323,9 @@ fun AnimeTrackerSheetContent(
                             val mediaWebUrl = "https://anilist.co/${if (isReading) "manga" else "anime"}/${media.id}"
                             Box(
                                 modifier = Modifier
-                                    .clip(RoundedCornerShape(999.dp))
-                                    .background(Color.White.copy(alpha = 0.08f))
-                                    .border(
-                                        1.dp,
-                                        Brush.verticalGradient(
-                                            listOf(
-                                                Color.White.copy(alpha = 0.22f),
-                                                Color.White.copy(alpha = 0.08f),
-                                            ),
-                                        ),
-                                        RoundedCornerShape(999.dp),
-                                    )
+                                    .clip(ShapeRoundCapsule)
+                                    .background(themeTokens.subtleChipBackground)
+                                    .border(1.dp, themeTokens.subtleChipBorder, ShapeRoundCapsule)
                                     .clickable(role = Role.Button) { uriHandler.openUri(mediaWebUrl) }
                                     .padding(horizontal = 7.dp, vertical = 2.dp),
                             ) {
@@ -1000,7 +1356,7 @@ fun AnimeTrackerSheetContent(
 
             Spacer(modifier = Modifier.height(14.dp))
 
-            // --- 4. STATUS CAPSULES (2x3 WATER GLASS TILES) ---
+            // --- 4. STATUS CAPSULES (2x3 TILES) ---
             Text(
                 text = if (isReading) "Reading Status" else "Watch Status",
                 style = MaterialTheme.typography.labelMedium.copy(
@@ -1014,75 +1370,35 @@ fun AnimeTrackerSheetContent(
             Spacer(modifier = Modifier.height(8.dp))
 
             val currentStatus = entry?.status
-            val statuses = listOf(
-                Triple(AnilistMediaListStatus.CURRENT, Icons.Outlined.PlayCircle, StatusColorWatching),
-                Triple(AnilistMediaListStatus.PLANNING, Icons.Default.CalendarToday, StatusColorPlanning),
-                Triple(AnilistMediaListStatus.COMPLETED, Icons.Outlined.CheckCircle, StatusColorCompleted),
-                Triple(AnilistMediaListStatus.PAUSED, Icons.Outlined.PauseCircle, StatusColorOnHold),
-                Triple(AnilistMediaListStatus.DROPPED, Icons.Outlined.RemoveCircleOutline, StatusColorDropped),
-                Triple(AnilistMediaListStatus.REPEATING, Icons.Default.Replay, StatusColorRepeating),
-            )
 
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                statuses.chunked(2).forEach { rowStatuses ->
+                TrackerStatusItems.chunked(2).forEach { rowStatuses ->
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        rowStatuses.forEach { (status, icon, color) ->
-                            val isSelected = currentStatus == status
-                            val backgroundModifier = if (isSelected) {
-                                Modifier.background(
-                                    Brush.verticalGradient(
-                                        listOf(
-                                            color.copy(alpha = 0.36f),
-                                            color.copy(alpha = 0.16f),
-                                        ),
-                                    ),
-                                )
+                        rowStatuses.forEach { item ->
+                            val isSelected = currentStatus == item.status
+                            val bgBrush = if (isSelected) {
+                                themeTokens.statusSelectedBgs[item.color] ?: themeTokens.statusUnselectedBg
                             } else {
-                                Modifier.background(
-                                    Brush.verticalGradient(
-                                        listOf(
-                                            Color.White.copy(alpha = 0.065f),
-                                            Color.White.copy(alpha = 0.025f),
-                                        ),
-                                    ),
-                                )
+                                themeTokens.statusUnselectedBg
                             }
-                            val borderModifier = if (isSelected) {
-                                Modifier.border(
-                                    1.5.dp,
-                                    Brush.verticalGradient(
-                                        listOf(
-                                            color.copy(alpha = 0.95f),
-                                            color.copy(alpha = 0.60f),
-                                        ),
-                                    ),
-                                    RoundedCornerShape(14.dp),
-                                )
+                            val borderBrush = if (isSelected) {
+                                themeTokens.statusSelectedBorders[item.color] ?: themeTokens.statusUnselectedBorder
                             } else {
-                                Modifier.border(
-                                    1.dp,
-                                    Brush.verticalGradient(
-                                        listOf(
-                                            Color.White.copy(alpha = 0.18f),
-                                            Color.White.copy(alpha = 0.06f),
-                                        ),
-                                    ),
-                                    RoundedCornerShape(14.dp),
-                                )
+                                themeTokens.statusUnselectedBorder
                             }
 
                             Box(
                                 modifier = Modifier
                                     .weight(1f)
-                                    .clip(RoundedCornerShape(14.dp))
-                                    .then(backgroundModifier)
-                                    .then(borderModifier)
+                                    .clip(ShapeTile)
+                                    .background(bgBrush)
+                                    .border(if (isSelected) 1.5.dp else 1.dp, borderBrush, ShapeTile)
                                     .clickable(role = Role.Button) {
                                         hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                        AnilistTrackerCoordinator.updateStatus(status)
+                                        AnilistTrackerCoordinator.updateStatus(item.status)
                                     }
                                     .padding(horizontal = 12.dp, vertical = 11.dp),
                             ) {
@@ -1097,16 +1413,16 @@ fun AnimeTrackerSheetContent(
                                         modifier = Modifier.weight(1f, fill = false),
                                     ) {
                                         Icon(
-                                            imageVector = icon,
+                                            imageVector = item.icon,
                                             contentDescription = null,
                                             modifier = Modifier.size(16.dp),
-                                            tint = if (isSelected) color else Color.White.copy(alpha = 0.65f),
+                                            tint = if (isSelected) item.color else Color.White.copy(alpha = 0.65f),
                                         )
-                                        val statusLabel = when (status) {
+                                        val statusLabel = when (item.status) {
                                             AnilistMediaListStatus.CURRENT -> if (isReading) "Reading" else "Watching"
                                             AnilistMediaListStatus.PLANNING -> if (isReading) "Plan to Read" else "Plan to Watch"
                                             AnilistMediaListStatus.REPEATING -> if (isReading) "Rereading" else "Rewatching"
-                                            else -> status.label
+                                            else -> item.status.label
                                         }
                                         Text(
                                             text = statusLabel,
@@ -1114,7 +1430,7 @@ fun AnimeTrackerSheetContent(
                                                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                                                 fontSize = 12.5.sp,
                                             ),
-                                            color = if (isSelected) color else Color.White.copy(alpha = 0.82f),
+                                            color = if (isSelected) item.color else Color.White.copy(alpha = 0.82f),
                                             maxLines = 1,
                                             overflow = TextOverflow.Ellipsis,
                                         )
@@ -1124,9 +1440,9 @@ fun AnimeTrackerSheetContent(
                                         Box(
                                             modifier = Modifier
                                                 .size(7.dp)
-                                                .clip(CircleShape)
-                                                .background(color)
-                                                .border(1.dp, Color.White.copy(alpha = 0.50f), CircleShape),
+                                                .clip(ShapePill)
+                                                .background(item.color)
+                                                .border(1.dp, Color.White.copy(alpha = 0.50f), ShapePill),
                                         )
                                     }
                                 }
@@ -1248,8 +1564,8 @@ fun AnimeTrackerSheetContent(
                             Box(
                                 modifier = Modifier
                                     .size(18.dp)
-                                    .clip(CircleShape)
-                                    .background(Color.White.copy(alpha = 0.10f))
+                                    .clip(ShapePill)
+                                    .background(themeTokens.subtleChipBackground)
                                     .clickable(role = Role.Button) {
                                         hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                         AnilistTrackerCoordinator.updateScore(0.0)
@@ -1289,7 +1605,7 @@ fun AnimeTrackerSheetContent(
                         Box(
                             modifier = Modifier
                                 .size(32.dp)
-                                .clip(CircleShape)
+                                .clip(ShapePill)
                                 .clickable(role = Role.Button) {
                                     hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                     val newScore = if (scoreInt == starIndex) 0.0 else starIndex.toDouble()
@@ -1352,18 +1668,9 @@ fun AnimeTrackerSheetContent(
                     ) {
                         Box(
                             modifier = Modifier
-                                .clip(RoundedCornerShape(999.dp))
-                                .background(Color.White.copy(alpha = 0.08f))
-                                .border(
-                                    1.dp,
-                                    Brush.verticalGradient(
-                                        listOf(
-                                            Color.White.copy(alpha = 0.22f),
-                                            Color.White.copy(alpha = 0.08f),
-                                        ),
-                                    ),
-                                    RoundedCornerShape(999.dp),
-                                )
+                                .clip(ShapeRoundCapsule)
+                                .background(themeTokens.subtleChipBackground)
+                                .border(1.dp, themeTokens.subtleChipBorder, ShapeRoundCapsule)
                                 .clickable(role = Role.Button) {
                                     val now = io.ktor.util.date.GMTDate()
                                     val today = AnilistFuzzyDate(
@@ -1388,8 +1695,8 @@ fun AnimeTrackerSheetContent(
                             Box(
                                 modifier = Modifier
                                     .size(26.dp)
-                                    .clip(CircleShape)
-                                    .background(Color.White.copy(alpha = 0.08f))
+                                    .clip(ShapePill)
+                                    .background(themeTokens.subtleChipBackground)
                                     .clickable(role = Role.Button) { AnilistTrackerCoordinator.updateStartedAt(null) },
                                 contentAlignment = Alignment.Center,
                             ) {
@@ -1453,18 +1760,9 @@ fun AnimeTrackerSheetContent(
                     ) {
                         Box(
                             modifier = Modifier
-                                .clip(RoundedCornerShape(999.dp))
-                                .background(Color.White.copy(alpha = 0.08f))
-                                .border(
-                                    1.dp,
-                                    Brush.verticalGradient(
-                                        listOf(
-                                            Color.White.copy(alpha = 0.22f),
-                                            Color.White.copy(alpha = 0.08f),
-                                        ),
-                                    ),
-                                    RoundedCornerShape(999.dp),
-                                )
+                                .clip(ShapeRoundCapsule)
+                                .background(themeTokens.subtleChipBackground)
+                                .border(1.dp, themeTokens.subtleChipBorder, ShapeRoundCapsule)
                                 .clickable(role = Role.Button) {
                                     val now = io.ktor.util.date.GMTDate()
                                     val today = AnilistFuzzyDate(
@@ -1489,8 +1787,8 @@ fun AnimeTrackerSheetContent(
                             Box(
                                 modifier = Modifier
                                     .size(26.dp)
-                                    .clip(CircleShape)
-                                    .background(Color.White.copy(alpha = 0.08f))
+                                    .clip(ShapePill)
+                                    .background(themeTokens.subtleChipBackground)
                                     .clickable(role = Role.Button) { AnilistTrackerCoordinator.updateCompletedAt(null) },
                                 contentAlignment = Alignment.Center,
                             ) {
@@ -1515,7 +1813,7 @@ fun AnimeTrackerSheetContent(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(10.dp))
+                        .clip(ShapeAction)
                         .clickable(role = Role.Button) { showAdvancedOptions = !showAdvancedOptions },
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
@@ -1542,18 +1840,9 @@ fun AnimeTrackerSheetContent(
 
                     Box(
                         modifier = Modifier
-                            .clip(RoundedCornerShape(999.dp))
-                            .background(Color.White.copy(alpha = 0.08f))
-                            .border(
-                                1.dp,
-                                Brush.verticalGradient(
-                                    listOf(
-                                        Color.White.copy(alpha = 0.22f),
-                                        Color.White.copy(alpha = 0.08f),
-                                    ),
-                                ),
-                                RoundedCornerShape(999.dp),
-                            )
+                            .clip(ShapeRoundCapsule)
+                            .background(themeTokens.subtleChipBackground)
+                            .border(1.dp, themeTokens.subtleChipBorder, ShapeRoundCapsule)
                             .padding(horizontal = 9.dp, vertical = 3.dp),
                     ) {
                         Text(
@@ -1619,8 +1908,8 @@ fun AnimeTrackerSheetContent(
                                 Box(
                                     modifier = Modifier
                                         .size(30.dp)
-                                        .clip(CircleShape)
-                                        .background(Color.White.copy(alpha = 0.08f))
+                                        .clip(ShapePill)
+                                        .background(themeTokens.subtleChipBackground)
                                         .clickable(
                                             enabled = currentRepeat > 0,
                                             role = Role.Button,
@@ -1652,8 +1941,8 @@ fun AnimeTrackerSheetContent(
                                 Box(
                                     modifier = Modifier
                                         .size(30.dp)
-                                        .clip(CircleShape)
-                                        .background(Color.White.copy(alpha = 0.08f))
+                                        .clip(ShapePill)
+                                        .background(themeTokens.subtleChipBackground)
                                         .clickable(role = Role.Button) {
                                             AnilistTrackerCoordinator.updateRepeat(currentRepeat + 1)
                                         },
@@ -1806,7 +2095,7 @@ fun AnimeTrackerSheetContent(
                                 placeholder = { Text("Write personal thoughts, reminders, or tags...", fontSize = 12.sp, color = Color.White.copy(0.35f)) },
                                 minLines = 2,
                                 maxLines = 4,
-                                shape = RoundedCornerShape(12.dp),
+                                shape = ShapePoster,
                                 textStyle = MaterialTheme.typography.bodySmall.copy(fontSize = 12.5.sp, color = Color.White),
                                 colors = OutlinedTextFieldDefaults.colors(
                                     focusedBorderColor = Color(0xFF00A2FF),
@@ -1825,7 +2114,7 @@ fun AnimeTrackerSheetContent(
                                             AnilistTrackerCoordinator.updateNotes(notesText)
                                             isNotesDirty = false
                                         },
-                                        shape = RoundedCornerShape(10.dp),
+                                        shape = ShapeAction,
                                         colors = ButtonDefaults.buttonColors(
                                             containerColor = Color(0xFF00A2FF),
                                             contentColor = Color.White,
@@ -1856,42 +2145,12 @@ fun AnimeTrackerSheetContent(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(44.dp)
-                        .clip(RoundedCornerShape(14.dp))
-                        .background(
-                            if (confirmDelete) {
-                                Brush.verticalGradient(
-                                    listOf(
-                                        Color(0xFFEF4444).copy(alpha = 0.28f),
-                                        Color(0xFFEF4444).copy(alpha = 0.16f),
-                                    ),
-                                )
-                            } else {
-                                Brush.verticalGradient(
-                                    listOf(
-                                        Color(0xFFEF4444).copy(alpha = 0.14f),
-                                        Color(0xFFEF4444).copy(alpha = 0.05f),
-                                    ),
-                                )
-                            },
-                        )
+                        .clip(ShapeTile)
+                        .background(if (confirmDelete) DeleteConfirmBgBrush else DeleteNormalBgBrush)
                         .border(
                             1.dp,
-                            if (confirmDelete) {
-                                Brush.verticalGradient(
-                                    listOf(
-                                        Color(0xFFEF4444).copy(alpha = 0.85f),
-                                        Color(0xFFEF4444).copy(alpha = 0.50f),
-                                    ),
-                                )
-                            } else {
-                                Brush.verticalGradient(
-                                    listOf(
-                                        Color(0xFFEF4444).copy(alpha = 0.40f),
-                                        Color(0xFFEF4444).copy(alpha = 0.15f),
-                                    ),
-                                )
-                            },
-                            RoundedCornerShape(14.dp),
+                            if (confirmDelete) DeleteConfirmBorderBrush else DeleteNormalBorderBrush,
+                            ShapeTile,
                         )
                         .clickable(role = Role.Button) {
                             if (!confirmDelete) {
@@ -1934,7 +2193,7 @@ fun AnimeTrackerSheetContent(
                 Surface(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(10.dp))
+                        .clip(ShapeAction)
                         .clickable(role = Role.Button) { showDiagnostics = !showDiagnostics },
                     color = Color.Transparent,
                 ) {
@@ -1972,9 +2231,9 @@ fun AnimeTrackerSheetContent(
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clip(RoundedCornerShape(12.dp))
+                            .clip(ShapePoster)
                             .background(Color.White.copy(alpha = 0.04f))
-                            .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(12.dp))
+                            .border(1.dp, Color.White.copy(alpha = 0.08f), ShapePoster)
                             .padding(10.dp),
                     ) {
                         Text(
@@ -1992,7 +2251,7 @@ fun AnimeTrackerSheetContent(
                                 copied = true
                             },
                             modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(10.dp),
+                            shape = ShapeAction,
                             border = BorderStroke(1.dp, Color.White.copy(alpha = 0.18f)),
                         ) {
                             Icon(
@@ -2037,12 +2296,19 @@ private fun TrackerProgressStepperSection(
     onDecrement: () -> Unit,
     onSetExact: (Int) -> Unit,
 ) {
+    val tokens = LocalTrackerThemeTokens.current
     var showExactEditDialog by remember { mutableStateOf(false) }
     val hapticFeedback = LocalHapticFeedback.current
 
     val fraction = if (totalUnits != null && totalUnits > 0) {
         (currentUnits.toFloat() / totalUnits).coerceIn(0f, 1f)
     } else 0f
+
+    val progressTrackBrush = remember(accentColor) {
+        Brush.horizontalGradient(
+            listOf(accentColor, Color(0xFF38BDF8)),
+        )
+    }
 
     TrackerGlassCard {
         Row(
@@ -2095,19 +2361,15 @@ private fun TrackerProgressStepperSection(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(6.dp)
-                    .clip(RoundedCornerShape(3.dp))
+                    .clip(ShapeProgressBar)
                     .background(Color.White.copy(alpha = 0.08f)),
             ) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth(animatedProgress)
                         .fillMaxHeight()
-                        .clip(RoundedCornerShape(3.dp))
-                        .background(
-                            Brush.horizontalGradient(
-                                listOf(accentColor, Color(0xFF38BDF8)),
-                            ),
-                        ),
+                        .clip(ShapeProgressBar)
+                        .background(progressTrackBrush),
                 )
             }
         }
@@ -2119,29 +2381,17 @@ private fun TrackerProgressStepperSection(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            // Continuous Segmented Water Pill
+            // Continuous Segmented Stepper Pill
             Row(
                 modifier = Modifier
                     .weight(1f)
                     .height(44.dp)
-                    .clip(RoundedCornerShape(13.dp))
-                    .background(
-                        Brush.verticalGradient(
-                            listOf(
-                                Color.White.copy(alpha = 0.08f),
-                                Color.White.copy(alpha = 0.04f),
-                            ),
-                        ),
-                    )
+                    .clip(ShapeStepper)
+                    .background(tokens.stepperBackground)
                     .border(
                         1.dp,
-                        Brush.verticalGradient(
-                            listOf(
-                                Color.White.copy(alpha = 0.30f),
-                                Color.White.copy(alpha = 0.08f),
-                            ),
-                        ),
-                        RoundedCornerShape(13.dp),
+                        tokens.stepperBorder,
+                        ShapeStepper,
                     ),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -2172,7 +2422,7 @@ private fun TrackerProgressStepperSection(
                     modifier = Modifier
                         .width(1.dp)
                         .height(20.dp)
-                        .background(Color.White.copy(alpha = 0.14f)),
+                        .background(tokens.stepperDivider),
                 )
 
                 // Middle: Direct input / badge segment
@@ -2212,7 +2462,7 @@ private fun TrackerProgressStepperSection(
                     modifier = Modifier
                         .width(1.dp)
                         .height(20.dp)
-                        .background(Color.White.copy(alpha = 0.14f)),
+                        .background(tokens.stepperDivider),
                 )
 
                 // Plus segment
@@ -2244,24 +2494,12 @@ private fun TrackerProgressStepperSection(
                 Box(
                     modifier = Modifier
                         .height(44.dp)
-                        .clip(RoundedCornerShape(13.dp))
-                        .background(
-                            Brush.verticalGradient(
-                                listOf(
-                                    accentColor.copy(alpha = 0.28f),
-                                    accentColor.copy(alpha = 0.14f),
-                                ),
-                            ),
-                        )
+                        .clip(ShapeStepper)
+                        .background(tokens.actionButtonBackground)
                         .border(
                             1.dp,
-                            Brush.verticalGradient(
-                                listOf(
-                                    accentColor.copy(alpha = 0.70f),
-                                    accentColor.copy(alpha = 0.40f),
-                                ),
-                            ),
-                            RoundedCornerShape(13.dp),
+                            tokens.actionButtonBorder,
+                            ShapeStepper,
                         )
                         .clickable(role = Role.Button) {
                             hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
@@ -2300,16 +2538,11 @@ private fun TrackerProgressStepperSection(
             onDismissRequest = { showExactEditDialog = false },
         ) {
             Surface(
-                shape = RoundedCornerShape(22.dp),
-                color = Color(0xFF0F1322).copy(alpha = 0.92f),
+                shape = ShapeModal,
+                color = tokens.dialogBackground,
                 border = BorderStroke(
                     1.dp,
-                    Brush.verticalGradient(
-                        listOf(
-                            Color.White.copy(alpha = 0.35f),
-                            Color.White.copy(alpha = 0.10f),
-                        ),
-                    ),
+                    tokens.dialogBorder,
                 ),
                 shadowElevation = 20.dp,
             ) {
@@ -2330,7 +2563,7 @@ private fun TrackerProgressStepperSection(
                         value = textInput,
                         onValueChange = { textInput = it.filter { ch -> ch.isDigit() } },
                         singleLine = true,
-                        shape = RoundedCornerShape(12.dp),
+                        shape = ShapePoster,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         placeholder = { Text("0", color = Color.White.copy(0.4f)) },
                         colors = OutlinedTextFieldDefaults.colors(
@@ -2348,7 +2581,7 @@ private fun TrackerProgressStepperSection(
                     ) {
                         OutlinedButton(
                             onClick = { showExactEditDialog = false },
-                            shape = RoundedCornerShape(12.dp),
+                            shape = ShapePoster,
                             modifier = Modifier.weight(1f),
                             border = BorderStroke(1.dp, Color.White.copy(alpha = 0.18f)),
                         ) {
@@ -2362,7 +2595,7 @@ private fun TrackerProgressStepperSection(
                                 onSetExact(clamped)
                                 showExactEditDialog = false
                             },
-                            shape = RoundedCornerShape(12.dp),
+                            shape = ShapePoster,
                             modifier = Modifier.weight(1f),
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = accentColor,

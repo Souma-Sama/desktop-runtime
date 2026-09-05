@@ -77,6 +77,7 @@ import com.nuvio.app.features.anilist.AnilistPreferences
 import com.nuvio.app.features.anilist.AnilistPreferencesRepository
 import com.nuvio.app.features.anilist.AnilistScoreFormat
 import com.nuvio.app.features.anilist.AnilistTitleLanguage
+import com.nuvio.app.features.anilist.AnilistTrackerTheme
 import com.nuvio.app.features.anilist.AnilistUser
 import kotlinx.coroutines.launch
 import nuvio.composeapp.generated.resources.Res
@@ -104,6 +105,7 @@ private enum class AnilistPickerType {
     TITLE_LANGUAGE,
     SCORE_FORMAT,
     POSTER_SCORE_FORMAT,
+    TRACKER_THEME,
 }
 
 internal fun LazyListScope.anilistSettingsContent(
@@ -887,6 +889,16 @@ private fun AnilistDisplayPreferencesSection(isTablet: Boolean) {
 
             SettingsGroupDivider(isTablet = isTablet)
 
+            TrackingPreferenceActionRow(
+                title = "Tracker Glass Theme",
+                description = "Choose the glass visual theme for the tracking modal (Frosted Glass, Water Glass, or Midnight Glass)",
+                value = prefs.trackerTheme.label,
+                isTablet = isTablet,
+                onClick = { activePicker = AnilistPickerType.TRACKER_THEME.name },
+            )
+
+            SettingsGroupDivider(isTablet = isTablet)
+
             SettingsSwitchRow(
                 title = "Hide 18+ / NSFW Content",
                 description = "Filter out 18+ hentai and explicit adult content across catalogs, search, and charts. Standard anime and Ecchi titles remain visible.",
@@ -947,6 +959,33 @@ private fun AnilistDisplayPreferencesSection(isTablet: Boolean) {
                 options = scoreOptions,
                 onSelected = {
                     AnilistPreferencesRepository.setPreferredScoreFormat(it)
+                    activePicker = null
+                },
+                onDismiss = { activePicker = null },
+            )
+        }
+
+        AnilistPickerType.TRACKER_THEME.name -> {
+            val themeOptions = AnilistTrackerTheme.entries.map { theme ->
+                TrackingPickerOption(
+                    value = theme,
+                    title = theme.label,
+                    description = when (theme) {
+                        AnilistTrackerTheme.FROSTED_GLASS -> "Frosted Acrylic: Balanced diffusion, high text legibility, and refined specular sheen"
+                        AnilistTrackerTheme.WATER_GLASS -> "Water Glass: Translucent liquid caustics, vibrant specular refraction, and edge gleam"
+                        AnilistTrackerTheme.MIDNIGHT_GLASS -> "Midnight Glass: Deep obsidian dark glass with high contrast and vivid status accents"
+                    },
+                )
+            }
+
+            TrackingAdaptivePicker(
+                isTablet = isTablet,
+                title = "Tracker Glass Theme",
+                subtitle = "Select your preferred visual style for the tracking dialog",
+                selectedValue = prefs.trackerTheme,
+                options = themeOptions,
+                onSelected = {
+                    AnilistPreferencesRepository.setTrackerTheme(it)
                     activePicker = null
                 },
                 onDismiss = { activePicker = null },

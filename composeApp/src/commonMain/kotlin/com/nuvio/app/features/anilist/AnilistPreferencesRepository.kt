@@ -206,6 +206,10 @@ object AnilistPreferencesRepository {
         updateAndPersist { it.copy(useFloatingGlassDesktopSidebar = enabled) }
     }
 
+    fun setTrackerTheme(theme: AnilistTrackerTheme) {
+        updateAndPersist { it.copy(trackerTheme = theme) }
+    }
+
     private fun updateAndPersist(transform: (AnilistPreferences) -> AnilistPreferences) {
         ensureLoaded()
         _preferences.update { current ->

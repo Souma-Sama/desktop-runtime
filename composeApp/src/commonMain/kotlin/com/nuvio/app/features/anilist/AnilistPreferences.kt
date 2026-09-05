@@ -37,6 +37,7 @@ data class AnilistPreferences(
     val librarySections: List<AnilistSectionSettings> = defaultAuthenticatedSections,
     val streamIdOverrides: Map<Int, String> = emptyMap(),
     val useFloatingGlassDesktopSidebar: Boolean = true,
+    val trackerTheme: AnilistTrackerTheme = AnilistTrackerTheme.FROSTED_GLASS,
 ) {
     companion object {
         val defaultUnauthenticatedSections = listOf(
@@ -83,3 +84,11 @@ enum class AnilistPosterScoreFormat(val label: String) {
     PERCENTAGE("Percentage (e.g. 84%)"),
     POINT_10("10-Point Score (e.g. 8.4)"),
 }
+
+@Serializable
+enum class AnilistTrackerTheme(val label: String) {
+    FROSTED_GLASS("Frosted Glass"),
+    WATER_GLASS("Water Glass"),
+    MIDNIGHT_GLASS("Midnight Glass"),
+}
+
