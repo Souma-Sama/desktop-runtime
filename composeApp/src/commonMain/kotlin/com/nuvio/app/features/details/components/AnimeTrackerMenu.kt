@@ -2273,6 +2273,7 @@ fun AnimeTrackerSheetContent(
             Spacer(modifier = Modifier.height(24.dp))
         }
     }
+}
 
     if (showUserProfileSheet && trackerState.user != null) {
         com.nuvio.app.features.anilist.profile.AnilistUserProfileSheet(
