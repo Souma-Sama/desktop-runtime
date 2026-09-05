@@ -140,7 +140,7 @@ fun AnilistUserProfileSheet(
     var profile by remember { mutableStateOf<AnilistFullUserProfile?>(null) }
     var isLoading by remember { mutableStateOf(true) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
-    var selectedTab by remember { mutableStateOf(AniHyouProfileTab.STATS) }
+    var selectedTab by remember { mutableStateOf(AniHyouProfileTab.INFO) }
     var isFollowing by remember { mutableStateOf(false) }
 
     val anilistPrefs by AnilistPreferencesRepository.preferences.collectAsState()
@@ -603,6 +603,7 @@ private fun AniHyouPillNavigationBar(
     onTabSelected: (AniHyouProfileTab) -> Unit,
     themeTokens: TrackerThemeTokens,
 ) {
+    val navScrollState = rememberScrollState()
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -613,8 +614,14 @@ private fun AniHyouPillNavigationBar(
             .padding(3.dp),
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
+            modifier = if (isDesktop) {
+                Modifier.fillMaxWidth()
+            } else {
+                Modifier
+                    .fillMaxWidth()
+                    .nuvioHorizontalScroll(navScrollState)
+            },
+            horizontalArrangement = if (isDesktop) Arrangement.SpaceBetween else Arrangement.spacedBy(4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             AniHyouProfileTab.entries.forEach { tab ->
@@ -628,9 +635,14 @@ private fun AniHyouPillNavigationBar(
                     animationSpec = tween(180),
                 )
 
+                val tabBoxModifier = if (isDesktop) {
+                    Modifier.weight(1f)
+                } else {
+                    Modifier.padding(horizontal = 14.dp)
+                }
+
                 Box(
-                    modifier = Modifier
-                        .weight(1f)
+                    modifier = tabBoxModifier
                         .height(36.dp)
                         .clip(ShapePill)
                         .background(pillBg)
@@ -654,6 +666,8 @@ private fun AniHyouPillNavigationBar(
                                 fontSize = 11.5.sp,
                             ),
                             color = contentColor,
+                            maxLines = 1,
+                            softWrap = false,
                         )
                     }
                 }

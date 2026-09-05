@@ -5,6 +5,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -87,6 +88,7 @@ import com.nuvio.app.core.auth.AuthRepository
 import com.nuvio.app.core.auth.DeviceLinkAuthRepository
 import com.nuvio.app.core.auth.DeviceLinkAuthState
 import com.nuvio.app.core.build.AppFeaturePolicy
+import com.nuvio.app.features.anilist.auth.AnilistLoginDialog
 import com.nuvio.app.features.settings.AppBrandWordmark
 import kotlin.math.abs
 import kotlin.math.cos
@@ -110,6 +112,8 @@ import nuvio.composeapp.generated.resources.compose_auth_tagline
 import nuvio.composeapp.generated.resources.compose_auth_terms_link
 import nuvio.composeapp.generated.resources.compose_auth_terms_prefix
 import nuvio.composeapp.generated.resources.compose_auth_welcome_back
+import nuvio.composeapp.generated.resources.rating_anilist
+import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
 
 internal val AuthTextPrimary = Color(0xFFF5F7F8)
@@ -202,6 +206,7 @@ fun AuthScreen(
     var passwordFieldBounds by remember { mutableStateOf<Rect?>(null) }
     var showServerSheet by rememberSaveable { mutableStateOf(false) }
     var showOfficialServerDialog by rememberSaveable { mutableStateOf(false) }
+    var showAnilistLoginDialog by rememberSaveable { mutableStateOf(false) }
 
     fun submitAuth() {
         if (email.isBlank() || password.length < 6 || isLoading) return
@@ -309,6 +314,9 @@ fun AuthScreen(
                             DeviceLinkAuthRepository.cancel()
                             AuthRepository.signInAnonymously()
                         },
+                        onAnilistSignIn = {
+                            showAnilistLoginDialog = true
+                        },
                         onStartDeviceLink = ::startDeviceLink,
                         onCancelDeviceLink = DeviceLinkAuthRepository::cancel,
                         onEmailBoundsChange = { emailFieldBounds = it },
@@ -340,6 +348,9 @@ fun AuthScreen(
                             focusManager.clearFocus(force = true)
                             DeviceLinkAuthRepository.cancel()
                             AuthRepository.signInAnonymously()
+                        },
+                        onAnilistSignIn = {
+                            showAnilistLoginDialog = true
                         },
                         onStartDeviceLink = ::startDeviceLink,
                         onCancelDeviceLink = DeviceLinkAuthRepository::cancel,
@@ -409,6 +420,18 @@ fun AuthScreen(
             },
         )
     }
+
+    if (showAnilistLoginDialog) {
+        AnilistLoginDialog(
+            onDismiss = { showAnilistLoginDialog = false },
+            onSuccess = {
+                showAnilistLoginDialog = false
+                focusManager.clearFocus(force = true)
+                DeviceLinkAuthRepository.cancel()
+                AuthRepository.signInAnonymously()
+            },
+        )
+    }
 }
 
 @Composable
@@ -428,6 +451,7 @@ private fun AuthMobileLayout(
     onSubmit: () -> Unit,
     onToggleAuthMode: () -> Unit,
     onContinueWithoutAccount: () -> Unit,
+    onAnilistSignIn: () -> Unit,
     onStartDeviceLink: () -> Unit,
     onCancelDeviceLink: () -> Unit,
     onEmailBoundsChange: (Rect) -> Unit,
@@ -489,6 +513,7 @@ private fun AuthMobileLayout(
                 onSubmit = onSubmit,
                 onToggleAuthMode = onToggleAuthMode,
                 onContinueWithoutAccount = onContinueWithoutAccount,
+                onAnilistSignIn = onAnilistSignIn,
                 onStartDeviceLink = onStartDeviceLink,
                 onCancelDeviceLink = onCancelDeviceLink,
                 onEmailBoundsChange = onEmailBoundsChange,
@@ -520,6 +545,7 @@ private fun AuthLargeLayout(
     onSubmit: () -> Unit,
     onToggleAuthMode: () -> Unit,
     onContinueWithoutAccount: () -> Unit,
+    onAnilistSignIn: () -> Unit,
     onStartDeviceLink: () -> Unit,
     onCancelDeviceLink: () -> Unit,
     onEmailBoundsChange: (Rect) -> Unit,
@@ -619,6 +645,7 @@ private fun AuthLargeLayout(
                     onSubmit = onSubmit,
                     onToggleAuthMode = onToggleAuthMode,
                     onContinueWithoutAccount = onContinueWithoutAccount,
+                    onAnilistSignIn = onAnilistSignIn,
                     onStartDeviceLink = onStartDeviceLink,
                     onCancelDeviceLink = onCancelDeviceLink,
                     onEmailBoundsChange = onEmailBoundsChange,
@@ -708,6 +735,7 @@ private fun AuthForm(
     onSubmit: () -> Unit,
     onToggleAuthMode: () -> Unit,
     onContinueWithoutAccount: () -> Unit,
+    onAnilistSignIn: () -> Unit,
     onStartDeviceLink: () -> Unit,
     onCancelDeviceLink: () -> Unit,
     onEmailBoundsChange: (Rect) -> Unit,
@@ -815,6 +843,15 @@ private fun AuthForm(
 
             Spacer(modifier = Modifier.height(14.dp * scale))
         }
+
+        AuthAnilistButton(
+            enabled = !isLoading,
+            height = metrics.secondaryHeight,
+            scale = scale,
+            onClick = onAnilistSignIn,
+        )
+
+        Spacer(modifier = Modifier.height(14.dp * scale))
 
         AuthSecondaryButton(
             text = stringResource(Res.string.compose_auth_continue_without_account),
@@ -1092,6 +1129,52 @@ private fun AuthDivider(scale: Float) {
                 .height(1.dp)
                 .background(AuthDividerColor),
         )
+    }
+}
+
+@Composable
+private fun AuthAnilistButton(
+    enabled: Boolean,
+    height: Dp,
+    scale: Float,
+    onClick: () -> Unit,
+) {
+    Button(
+        onClick = onClick,
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(height),
+        enabled = enabled,
+        shape = RoundedCornerShape(16.dp),
+        border = BorderStroke(1.dp, Color(0xFF02A9FF).copy(alpha = 0.35f)),
+        contentPadding = PaddingValues(0.dp),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = Color(0xFF02A9FF).copy(alpha = 0.12f),
+            contentColor = Color.White,
+            disabledContainerColor = Color(0xFF02A9FF).copy(alpha = 0.06f),
+            disabledContentColor = Color.White.copy(alpha = 0.45f),
+        ),
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center,
+        ) {
+            Image(
+                painter = painterResource(Res.drawable.rating_anilist),
+                contentDescription = "AniList",
+                modifier = Modifier.size(20.dp * scale),
+            )
+            Spacer(modifier = Modifier.width(10.dp * scale))
+            Text(
+                text = "Sign In with AniList",
+                style = MaterialTheme.typography.titleMedium.copy(
+                    fontSize = (15f * scale).sp,
+                    lineHeight = (21f * scale).sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color(0xFF02A9FF),
+                ),
+            )
+        }
     }
 }
 

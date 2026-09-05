@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
@@ -965,7 +966,7 @@ fun AnimeTrackerSheetContent(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(themeTokens.headerBackground)
-                    .padding(horizontal = 20.dp, vertical = 14.dp),
+                    .padding(horizontal = 16.dp, vertical = 14.dp),
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -973,8 +974,9 @@ fun AnimeTrackerSheetContent(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Row(
+                        modifier = Modifier.weight(1f, fill = false),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(11.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
                         Box(
                             modifier = Modifier
@@ -996,10 +998,12 @@ fun AnimeTrackerSheetContent(
                                 text = "AniList Tracker",
                                 style = MaterialTheme.typography.titleMedium.copy(
                                     fontWeight = FontWeight.Bold,
-                                    fontSize = 16.sp,
+                                    fontSize = 15.5.sp,
                                     letterSpacing = (-0.2).sp,
                                 ),
                                 color = Color.White,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
                             )
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
@@ -1018,14 +1022,17 @@ fun AnimeTrackerSheetContent(
                                         fontWeight = FontWeight.Medium,
                                     ),
                                     color = Color.White.copy(alpha = 0.55f),
+                                    maxLines = 1,
                                 )
                             }
                         }
                     }
 
+                    Spacer(modifier = Modifier.width(6.dp))
+
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
                         if (trackerState.isAuthenticated) {
                             val user = trackerState.user
@@ -1035,11 +1042,11 @@ fun AnimeTrackerSheetContent(
                                     .background(themeTokens.subtleChipBackground)
                                     .border(1.dp, themeTokens.subtleChipBorder, ShapeRoundCapsule)
                                     .clickable(role = Role.Button) { showUserProfileSheet = true }
-                                    .padding(horizontal = 9.dp, vertical = 4.dp),
+                                    .padding(horizontal = 8.dp, vertical = 4.dp),
                             ) {
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(5.dp),
                                 ) {
                                     val avatarUrl = user?.avatarUrl
                                     if (avatarUrl != null) {
@@ -1060,6 +1067,8 @@ fun AnimeTrackerSheetContent(
                                         ),
                                         color = Color.White.copy(alpha = 0.90f),
                                         maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier.widthIn(max = 85.dp),
                                     )
                                 }
                             }
@@ -1068,7 +1077,7 @@ fun AnimeTrackerSheetContent(
                         // Theme switcher palette button
                         Box(
                             modifier = Modifier
-                                .size(30.dp)
+                                .requiredSize(30.dp)
                                 .clip(ShapePill)
                                 .background(themeTokens.subtleChipBackground)
                                 .border(1.dp, themeTokens.subtleChipBorder, ShapePill)
@@ -1094,7 +1103,7 @@ fun AnimeTrackerSheetContent(
 
                         Box(
                             modifier = Modifier
-                                .size(30.dp)
+                                .requiredSize(30.dp)
                                 .clip(ShapePill)
                                 .background(themeTokens.subtleChipBackground)
                                 .border(1.dp, themeTokens.subtleChipBorder, ShapePill)
