@@ -1,8 +1,12 @@
 package com.nuvio.app.features.home
 
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.ui.Alignment
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -1154,6 +1158,19 @@ fun HomeScreen(
                 }
             }
         }
+        val statusBarPadding = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+        val notificationTopPadding = maxOf(topChromePadding ?: 0.dp, statusBarPadding) + 16.dp
+        val isNarrowScreen = maxWidth < 520.dp
+
+        com.nuvio.app.features.anilist.ui.components.AnilistOutageNotification(
+            modifier = Modifier
+                .align(if (isNarrowScreen) Alignment.TopCenter else Alignment.TopEnd)
+                .padding(
+                    top = notificationTopPadding,
+                    start = if (isNarrowScreen) 16.dp else 0.dp,
+                    end = if (isNarrowScreen) 16.dp else 24.dp,
+                ),
+        )
     }
 }
 
