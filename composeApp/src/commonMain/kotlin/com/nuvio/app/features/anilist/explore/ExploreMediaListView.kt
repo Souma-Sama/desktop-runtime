@@ -146,12 +146,15 @@ internal fun ExploreMediaListView(
             }
 
             try {
-                val catalogPage = AnilistCatalogRepository.fetchAdvancedFilterPage(
-                    filter = activeFilter,
-                    searchQuery = searchQuery,
-                    page = targetPage,
-                    perPage = 30,
-                )
+                val catalogPage = kotlinx.coroutines.withTimeoutOrNull(15_000L) {
+                    AnilistCatalogRepository.fetchAdvancedFilterPage(
+                        filter = activeFilter,
+                        searchQuery = searchQuery,
+                        page = targetPage,
+                        perPage = 30,
+                    )
+                } ?: throw IllegalStateException("Request timed out. Please check your network connection.")
+
                 if (append) {
                     val existingIds = items.map { it.id }.toSet()
                     val newItems = catalogPage.items.filter { it.id !in existingIds }
@@ -324,6 +327,17 @@ internal fun ExploreMediaListView(
                             Text("Retry")
                         }
                     }
+                }
+            } else if (items.isEmpty()) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = "No media found",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
             } else {
                 LazyColumn(

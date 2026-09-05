@@ -3,19 +3,14 @@ package com.nuvio.app.features.addons
 import com.nuvio.app.core.storage.DesktopStorage
 import com.nuvio.app.core.network.DesktopIPv4FirstDns
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
-import nuvio.composeapp.generated.resources.Res
-import nuvio.composeapp.generated.resources.network_empty_response_body
-import nuvio.composeapp.generated.resources.network_request_failed_http
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.ResponseBody
-import org.jetbrains.compose.resources.getString
 import java.io.ByteArrayOutputStream
 import java.io.InputStream
 import java.util.concurrent.TimeUnit
@@ -48,6 +43,7 @@ private val desktopHttpClient = OkHttpClient.Builder()
     .connectTimeout(12, TimeUnit.SECONDS)
     .readTimeout(12, TimeUnit.SECONDS)
     .writeTimeout(12, TimeUnit.SECONDS)
+    .callTimeout(18, TimeUnit.SECONDS)
     .followRedirects(true)
     .followSslRedirects(true)
     .build()
@@ -140,10 +136,10 @@ private suspend fun executeTextRequest(
     desktopHttpClient.newCall(request).execute().use { response ->
         val payload = readResponseBody(response.body)
         if (!response.isSuccessful) {
-            error(runBlocking { getString(Res.string.network_request_failed_http, response.code) })
+            error("HTTP request failed with status ${response.code}")
         }
         if (payload.isBlank()) {
-            throw IllegalStateException(runBlocking { getString(Res.string.network_empty_response_body) })
+            throw IllegalStateException("HTTP response body was empty")
         }
         payload
     }
@@ -160,6 +156,9 @@ private fun buildDesktopRequest(
     val contentType = sanitizedHeaders.getHeaderIgnoreCase("Content-Type")
         ?: "application/json"
     val builder = Request.Builder().url(url.encodeUnsafeHttpUrlCharacters())
+    if (sanitizedHeaders.none { (key, _) -> key.equals("User-Agent", ignoreCase = true) }) {
+        builder.header("User-Agent", "Nuvio Kai/1.0")
+    }
     sanitizedHeaders
         .filterNot { (key, _) -> key.equals("Content-Type", ignoreCase = true) }
         .forEach { (key, value) ->

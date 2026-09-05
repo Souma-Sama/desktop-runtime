@@ -89,8 +89,22 @@ fun ThreadDetailSheet(
     var profileToViewName by remember { mutableStateOf<String?>(null) }
 
     val isLoggedIn = AnilistAuthRepository.isAuthenticated.value
-    val threadBodyBlocks = remember(thread.body, primaryColor) {
-        parseAnilistRichContent(thread.body, primaryColor)
+    var currentBody by remember(thread.id, thread.body) { mutableStateOf(thread.body) }
+    var isLoadingBody by remember(thread.id) { mutableStateOf(thread.body.isBlank()) }
+
+    LaunchedEffect(thread.id) {
+        if (currentBody.isBlank()) {
+            isLoadingBody = true
+            val body = com.nuvio.app.features.anilist.AnilistApi.getThreadBody(thread.id)
+            if (!body.isNullOrBlank()) {
+                currentBody = body
+            }
+            isLoadingBody = false
+        }
+    }
+
+    val threadBodyBlocks = remember(currentBody, primaryColor) {
+        parseAnilistRichContent(currentBody, primaryColor)
     }
 
     LaunchedEffect(thread.id) {
@@ -281,6 +295,23 @@ fun ThreadDetailSheet(
                         }
 
                         // 3. Thread Body AST Blocks
+                        if (isLoadingBody && threadBodyBlocks.isEmpty()) {
+                            item {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(60.dp),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(24.dp),
+                                        strokeWidth = 2.dp,
+                                        color = primaryColor,
+                                    )
+                                }
+                            }
+                        }
+
                         items(
                             count = threadBodyBlocks.size,
                             key = { index -> "thread-body-$index" },

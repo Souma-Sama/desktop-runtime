@@ -151,6 +151,9 @@ object AnilistPreferencesRepository {
 
     fun setPreferredTitleLanguage(language: AnilistTitleLanguage) {
         updateAndPersist { it.copy(preferredTitleLanguage = language) }
+        com.nuvio.app.features.anilist.catalog.AnilistCatalogRepository.clearCache()
+        com.nuvio.app.features.anilist.catalog.AnilistMetaDetailsResolver.clearCache()
+        com.nuvio.app.features.home.HomeRepository.refresh(force = true)
     }
 
     fun setPreferredScoreFormat(format: AnilistScoreFormat) {

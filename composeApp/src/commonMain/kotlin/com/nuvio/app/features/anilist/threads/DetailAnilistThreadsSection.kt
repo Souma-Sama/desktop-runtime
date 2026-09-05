@@ -63,11 +63,16 @@ fun DetailAnilistThreadsSection(
 
     LaunchedEffect(mediaId) {
         isLoading = true
-        val result = AnilistThreadsRepository.getMediaThreads(mediaId = mediaId)
-        result.onSuccess {
-            threads = it.threads
-            isLoading = false
-        }.onFailure {
+        try {
+            val result = kotlinx.coroutines.withTimeoutOrNull(8000L) {
+                AnilistThreadsRepository.getMediaThreads(mediaId = mediaId)
+            }
+            if (result != null && result.isSuccess) {
+                threads = result.getOrNull()?.threads.orEmpty()
+            }
+        } catch (e: Exception) {
+            // Gracefully ignore and dismiss spinner
+        } finally {
             isLoading = false
         }
     }

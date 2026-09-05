@@ -43,6 +43,13 @@ object AnilistMetaDetailsResolver {
     private val resolvedMetaDetailsCache = mutableMapOf<String, MetaDetails>()
     private val episodeOffsetCache = mutableMapOf<Int, Int>()
 
+    fun clearCache() {
+        resolvedMetaDetailsCache.clear()
+        episodeOffsetCache.clear()
+        cinemetaVideosCache.clear()
+        kitsuIdCache.clear()
+    }
+
     fun buildBaseMetaFromAnilistMedia(
         media: AnilistMedia,
         backdrop: String? = null,
@@ -283,6 +290,11 @@ object AnilistMetaDetailsResolver {
         // If we already have cached media (from home/catalog/search/anichart), construct baseMeta instantly!
         if (cached != null) {
             val cachedArm = armMappingCache[anilistId]
+            if (cachedArm == null) {
+                launch {
+                    runCatching { resolveArmMapping(anilistId) }
+                }
+            }
             val isSpecial = isSpecialAnime(cached)
             val targetSeason = when {
                 cachedArm?.season == 0 -> 0
@@ -331,7 +343,7 @@ object AnilistMetaDetailsResolver {
         val armDeferred = async {
             val cachedArm = armMappingCache[anilistId]
             cachedArm ?: runCatching {
-                withTimeoutOrNull(3000L) { resolveArmMapping(anilistId) }
+                withTimeoutOrNull(6000L) { resolveArmMapping(anilistId) }
             }.getOrNull() ?: ArmMapping(null, null, null, null, null, 1)
         }
 
@@ -393,7 +405,7 @@ object AnilistMetaDetailsResolver {
                 cachedMedia
             } else {
                 runCatching {
-                    withTimeoutOrNull(3000L) {
+                    withTimeoutOrNull(8000L) {
                         AnilistApi.fetchMediaById(anilistId, token = token)
                     }
                 }.getOrNull() ?: cachedMedia
@@ -404,7 +416,7 @@ object AnilistMetaDetailsResolver {
         val armDeferred = async {
             val cachedArm = armMappingCache[anilistId]
             cachedArm ?: runCatching {
-                withTimeoutOrNull(2000L) { resolveArmMapping(anilistId) }
+                withTimeoutOrNull(6000L) { resolveArmMapping(anilistId) }
             }.getOrNull() ?: ArmMapping(null, null, null, null, null, 1)
         }
 
@@ -728,7 +740,7 @@ object AnilistMetaDetailsResolver {
     suspend fun resolveArmMapping(anilistId: Int): ArmMapping {
         armMappingCache[anilistId]?.let { return it }
 
-        return withTimeoutOrNull(2500L) {
+        return withTimeoutOrNull(7000L) {
             runCatching {
                 val url = "https://arm.haglund.dev/api/v2/ids?source=anilist&id=$anilistId"
                 val text = httpGetText(url) ?: return@runCatching ArmMapping(null, null, null, null, null, 1)

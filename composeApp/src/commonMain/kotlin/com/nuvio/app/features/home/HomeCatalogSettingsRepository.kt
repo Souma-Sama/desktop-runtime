@@ -351,14 +351,16 @@ object HomeCatalogSettingsRepository {
         val normalized = current
             .filterKeys { it !in knownKeys }
             .toMutableMap()
+        val hasAnyExistingHeroSource = current.values.any { it.heroSourceEnabled }
         var enabledHeroSourceCount = 0
         orderedEntries.forEach { entry ->
             val stored = current[entry.key]
             val heroSourceEnabled = if (entry.isCollection) {
                 false
+            } else if (stored != null) {
+                stored.heroSourceEnabled && enabledHeroSourceCount < HERO_SOURCE_SELECTION_LIMIT
             } else {
-                (stored?.heroSourceEnabled ?: true) &&
-                    enabledHeroSourceCount < HERO_SOURCE_SELECTION_LIMIT
+                (!hasAnyExistingHeroSource) && enabledHeroSourceCount < HERO_SOURCE_SELECTION_LIMIT
             }
             if (heroSourceEnabled) {
                 enabledHeroSourceCount += 1
@@ -371,7 +373,7 @@ object HomeCatalogSettingsRepository {
                 order = stored?.order ?: nextOrder++,
             )
         }
-        if (enabledHeroSourceCount == 0 && com.nuvio.app.features.anilist.KaiHooks.isKaiEnabled()) {
+        if (!hasAnyExistingHeroSource && enabledHeroSourceCount == 0 && com.nuvio.app.features.anilist.KaiHooks.isKaiEnabled()) {
             val defaultKey = "anilist:anime:trending"
             val existing = normalized[defaultKey]
             if (existing != null && definitions.any { it.key == defaultKey }) {
@@ -404,7 +406,7 @@ object HomeCatalogSettingsRepository {
                     addonName = definition.addonName,
                     customTitle = preference?.customTitle.orEmpty(),
                     enabled = preference?.enabled ?: true,
-                    heroSourceEnabled = preference?.heroSourceEnabled ?: true,
+                    heroSourceEnabled = preference?.heroSourceEnabled ?: false,
                     order = preference?.order ?: 0,
                 )
             }

@@ -135,6 +135,7 @@ fun HomeHeroSection(
         items.take(6).forEach { item ->
             launch {
                 MetaHubArtwork.resolveImdbId(item.id)
+                MetaHubArtwork.resolveLogoUrl(item.id)
             }
         }
     }
@@ -846,6 +847,7 @@ private fun HeroContentBlock(
         mutableStateOf(item.logo?.takeIf { it.isNotBlank() } ?: MetaHubArtwork.getLogoUrl(item.id))
     }
     LaunchedEffect(item.type, item.id) {
+        logoLoadError = false
         if (resolvedLogo == null) {
             val logo = MetaHubArtwork.resolveLogoUrl(item.id)
             if (logo != null) {
@@ -856,6 +858,16 @@ private fun HeroContentBlock(
     val logoUrl = resolvedLogo
     val anilistPrefs by AnilistPreferencesRepository.preferences.collectAsStateWithLifecycle()
     val heroLogoScale = anilistPrefs.heroTitleLogoScale
+    val displayTitle = remember(item.id, item.name, anilistPrefs.preferredTitleLanguage) {
+        val anilistId = com.nuvio.app.features.anilist.AnilistTrackerCoordinator.extractAnilistId(item.id)
+        if (anilistId != null) {
+            val cached = com.nuvio.app.features.anilist.AnilistApi.getCachedMedia(anilistId)
+                ?: com.nuvio.app.features.anilist.AnilistTrackerCoordinator.getCachedMedia(anilistId)
+            cached?.title?.getDisplayTitle(anilistPrefs.preferredTitleLanguage) ?: item.name
+        } else {
+            item.name
+        }
+    }
 
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -864,7 +876,7 @@ private fun HeroContentBlock(
         if (logoUrl != null && !logoLoadError) {
             AsyncImage(
                 model = logoUrl,
-                contentDescription = item.name,
+                contentDescription = displayTitle,
                 modifier = Modifier
                     .fillMaxWidth((layout.logoWidthFraction * heroLogoScale).coerceIn(0.25f, 1f))
                     .aspectRatio(2.6f)
@@ -873,11 +885,12 @@ private fun HeroContentBlock(
                     },
                 alignment = if (layout.isTablet) Alignment.CenterStart else Alignment.Center,
                 contentScale = ContentScale.Fit,
+                onSuccess = { logoLoadError = false },
                 onError = { logoLoadError = true },
             )
         } else {
             Text(
-                text = item.name,
+                text = displayTitle,
                 modifier = Modifier
                     .fillMaxWidth()
                     .clickable(enabled = onItemClick != null) {
@@ -934,6 +947,7 @@ private fun DesktopHeroContentBlock(
         mutableStateOf(item.logo?.takeIf { it.isNotBlank() } ?: MetaHubArtwork.getLogoUrl(item.id))
     }
     LaunchedEffect(item.type, item.id) {
+        logoLoadError = false
         if (resolvedLogo == null) {
             val logo = MetaHubArtwork.resolveLogoUrl(item.id)
             if (logo != null) {
@@ -944,6 +958,16 @@ private fun DesktopHeroContentBlock(
     val logoUrl = resolvedLogo
     val anilistPrefs by AnilistPreferencesRepository.preferences.collectAsStateWithLifecycle()
     val heroLogoScale = anilistPrefs.heroTitleLogoScale
+    val displayTitle = remember(item.id, item.name, anilistPrefs.preferredTitleLanguage) {
+        val anilistId = com.nuvio.app.features.anilist.AnilistTrackerCoordinator.extractAnilistId(item.id)
+        if (anilistId != null) {
+            val cached = com.nuvio.app.features.anilist.AnilistApi.getCachedMedia(anilistId)
+                ?: com.nuvio.app.features.anilist.AnilistTrackerCoordinator.getCachedMedia(anilistId)
+            cached?.title?.getDisplayTitle(anilistPrefs.preferredTitleLanguage) ?: item.name
+        } else {
+            item.name
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -966,19 +990,20 @@ private fun DesktopHeroContentBlock(
             ) {
                 AsyncImage(
                     model = logoUrl,
-                    contentDescription = item.name,
+                    contentDescription = displayTitle,
                     modifier = Modifier
                         .fillMaxWidth((desktopHeroLogoWidthFraction(layout) * heroLogoScale).coerceIn(0.25f, 1f))
                         .fillMaxHeight(),
                     alignment = Alignment.CenterStart,
                     contentScale = ContentScale.Fit,
                     clipToBounds = false,
+                    onSuccess = { logoLoadError = false },
                     onError = { logoLoadError = true },
                 )
             }
         } else {
             Text(
-                text = item.name,
+                text = displayTitle,
                 modifier = Modifier.fillMaxWidth(),
                 style = if (isCompact) {
                     MaterialTheme.typography.titleLarge.copy(

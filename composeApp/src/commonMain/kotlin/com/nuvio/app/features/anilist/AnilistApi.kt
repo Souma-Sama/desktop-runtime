@@ -4,6 +4,7 @@ import co.touchlab.kermit.Logger
 import com.nuvio.app.features.addons.httpPostJsonWithHeaders
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
@@ -79,23 +80,34 @@ object AnilistApi {
             }
 
             var attempt = 0
-            val maxAttempts = 3
+            val maxAttempts = 2
 
             while (attempt < maxAttempts) {
                 attempt++
                 var responseText: String? = null
                 try {
-                    responseText = httpPostJsonWithHeaders(
-                        url = GRAPHQL_ENDPOINT,
-                        body = payload,
-                        headers = headers,
-                    )
-                    lastDebugLog = "HTTP POST $GRAPHQL_ENDPOINT\nPayload: $payload\nResponse: ${responseText?.take(400)}"
+                    responseText = withTimeoutOrNull(10_000L) {
+                        httpPostJsonWithHeaders(
+                            url = GRAPHQL_ENDPOINT,
+                            body = payload,
+                            headers = headers,
+                        )
+                    }
+                    if (responseText == null) {
+                        lastDebugLog = "HTTP POST $GRAPHQL_ENDPOINT timed out (attempt $attempt)\nPayload: $payload"
+                        log.w { "executeGraphQL attempt $attempt timed out after 10s" }
+                        if (attempt < maxAttempts) {
+                            delay(500L * attempt)
+                            continue
+                        }
+                        return@withPermit null
+                    }
+                    lastDebugLog = "HTTP POST $GRAPHQL_ENDPOINT\nPayload: $payload\nResponse: ${responseText.take(400)}"
                 } catch (e: Exception) {
                     lastDebugLog = "HTTP POST $GRAPHQL_ENDPOINT failed (attempt $attempt): ${e.message}\nPayload: $payload"
                     log.w(e) { "executeGraphQL attempt $attempt failed: ${e.message}" }
                     if (attempt < maxAttempts) {
-                        delay(1000L * attempt)
+                        delay(500L * attempt)
                         continue
                     }
                     return@withPermit null
@@ -104,7 +116,7 @@ object AnilistApi {
                 if (responseText.isNullOrBlank()) {
                     lastDebugLog = "GraphQL response empty for payload: $payload"
                     if (attempt < maxAttempts) {
-                        delay(800L * attempt)
+                        delay(500L * attempt)
                         continue
                     }
                     return@withPermit null
@@ -3699,7 +3711,6 @@ object AnilistApi {
                 threads(mediaCategoryId: ${'$'}mediaId, sort: [IS_STICKY, REPLIED_AT_DESC]) {
                   id
                   title
-                  body
                   replyCount
                   viewCount
                   isSticky
@@ -3786,6 +3797,25 @@ object AnilistApi {
             page = page,
             hasNextPage = hasNextPage,
         )
+    }
+
+    suspend fun getThreadBody(threadId: Int): String? {
+        val query = """
+            query (${'$'}id: Int) {
+              Thread(id: ${'$'}id) {
+                id
+                body
+              }
+            }
+        """.trimIndent()
+        val variables = buildJsonObject {
+            put("id", threadId)
+        }
+        val root = executeGraphQL(query = query, variables = variables)
+        return root?.get("data")
+            .asJsonObjectOrNull()?.get("Thread")
+            .asJsonObjectOrNull()?.get("body")
+            ?.asStringOrNull()
     }
 
     suspend fun getThreadComments(

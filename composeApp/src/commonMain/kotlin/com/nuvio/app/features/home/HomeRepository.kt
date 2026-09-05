@@ -49,14 +49,22 @@ object HomeRepository {
     private var lastPublishedCatalogHeroEmpty: Boolean = true
     private var lastErrorMessage: String? = null
     private var isForceRefresh: Boolean = false
+    private var lastAddons: List<ManagedAddon> = emptyList()
+
+    fun refresh(force: Boolean = true) {
+        if (lastAddons.isNotEmpty()) {
+            refresh(lastAddons, force = force)
+        }
+    }
 
     fun refresh(addons: List<ManagedAddon>, force: Boolean = false) {
+        lastAddons = addons
         isForceRefresh = force
         val activeAddons = addons.enabledAddons()
         val requests = buildHomeCatalogDefinitions(activeAddons)
         currentDefinitions = requests
         val requestCacheKeys = requests.mapTo(mutableSetOf(), HomeCatalogDefinition::cacheKey)
-        cachedSections = cachedSections.filterKeys(requestCacheKeys::contains)
+        cachedSections = if (force) emptyMap() else cachedSections.filterKeys(requestCacheKeys::contains)
         val requestKey = requests.joinToString(separator = "|", transform = HomeCatalogDefinition::cacheKey)
         currentRequestKey = requestKey
 
@@ -193,17 +201,30 @@ object HomeRepository {
         val anilistPrefs = com.nuvio.app.features.anilist.AnilistPreferencesRepository.snapshot()
         val catalogHeroItems = if (snapshot.heroEnabled) {
             val existingHero = _uiState.value.heroItems
-            if (existingHero.isNotEmpty() && !isForceRefresh && (isLoading || !lastPublishedCatalogHeroEmpty)) {
-                existingHero
-            } else {
-                val heroRandom = Random((requestKey?.hashCode() ?: 0).absoluteValue + 1)
-                val primaryItems = currentDefinitions
-                    .filter { definition ->
-                        val isNativeAnilist = definition.manifestUrl == "native://anilist" || definition.manifestUrl == "builtin://anilist" || definition.key.contains("anilist", ignoreCase = true)
-                        if (isNativeAnilist && !anilistPrefs.enabled) false
-                        else preferences[definition.key]?.heroSourceEnabled != false
+            val heroRandom = Random((requestKey?.hashCode() ?: 0).absoluteValue + 1)
+            val hasExplicitHeroPreferences = preferences.values.any { it.heroSourceEnabled }
+            val primaryItems = currentDefinitions
+                .filter { definition ->
+                    val isNativeAnilist = definition.manifestUrl == "native://anilist" || definition.manifestUrl == "builtin://anilist" || definition.key.contains("anilist", ignoreCase = true)
+                    if (isNativeAnilist && !anilistPrefs.enabled) false
+                    else if (hasExplicitHeroPreferences) {
+                        preferences[definition.key]?.heroSourceEnabled == true
+                    } else {
+                        preferences[definition.key]?.heroSourceEnabled != false
                     }
-                    .mapNotNull { definition -> cachedSections[definition.cacheKey] }
+                }
+                .mapNotNull { definition -> cachedSections[definition.cacheKey] }
+                .map { section -> section.withReleaseFilter() }
+                .flatMap { section -> section.items }
+                .filter { item ->
+                    if (!anilistPrefs.enabled) {
+                        !item.id.startsWith("ani_") && !item.id.startsWith("anilist:")
+                    } else true
+                }
+                .distinctBy { item -> "${item.type}:${item.id}" }
+
+            val fallbackItems = if (primaryItems.isEmpty() && !hasExplicitHeroPreferences) {
+                cachedSections.values
                     .map { section -> section.withReleaseFilter() }
                     .flatMap { section -> section.items }
                     .filter { item ->
@@ -212,25 +233,25 @@ object HomeRepository {
                         } else true
                     }
                     .distinctBy { item -> "${item.type}:${item.id}" }
+            } else emptyList()
 
-                val fallbackItems = if (primaryItems.isEmpty()) {
-                    cachedSections.values
-                        .map { section -> section.withReleaseFilter() }
-                        .flatMap { section -> section.items }
-                        .filter { item ->
-                            if (!anilistPrefs.enabled) {
-                                !item.id.startsWith("ani_") && !item.id.startsWith("anilist:")
-                            } else true
-                        }
-                        .distinctBy { item -> "${item.type}:${item.id}" }
-                } else emptyList()
+            val chosen = primaryItems.ifEmpty { fallbackItems }
+            val candidateItems = if (chosen.isNotEmpty()) {
+                chosen.shuffled(heroRandom).take(HOME_HERO_ITEM_LIMIT)
+            } else {
+                emptyList()
+            }
 
-                val chosen = (primaryItems.ifEmpty { fallbackItems })
-                if (chosen.isNotEmpty()) {
-                    chosen.shuffled(heroRandom).take(HOME_HERO_ITEM_LIMIT)
-                } else {
-                    existingHero
-                }
+            val existingHeroMatchesPrimary = existingHero.isNotEmpty() && primaryItems.isNotEmpty() && existingHero.all { heroItem ->
+                primaryItems.any { it.id == heroItem.id }
+            }
+
+            if (existingHeroMatchesPrimary && !isForceRefresh && (isLoading || !lastPublishedCatalogHeroEmpty)) {
+                existingHero
+            } else if (candidateItems.isNotEmpty()) {
+                candidateItems
+            } else {
+                existingHero
             }
         } else {
             emptyList()
