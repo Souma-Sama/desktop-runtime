@@ -56,6 +56,9 @@ object AnilistApi {
     private val _outageMessage = MutableStateFlow<String?>(null)
     val outageMessage: StateFlow<String?> = _outageMessage.asStateFlow()
 
+    private val _outageTimestamp = MutableStateFlow<Long>(0L)
+    val outageTimestamp: StateFlow<Long> = _outageTimestamp.asStateFlow()
+
     private val _isOutageDismissed = MutableStateFlow(false)
     val isOutageDismissed: StateFlow<Boolean> = _isOutageDismissed.asStateFlow()
 
@@ -64,9 +67,13 @@ object AnilistApi {
     }
 
     private fun setOutage(message: String) {
+        val now = com.nuvio.app.core.time.EpisodeReleaseDatePlatform.nowEpochMs()
         if (_outageMessage.value != message) {
             _outageMessage.value = message
             _isOutageDismissed.value = false
+            _outageTimestamp.value = now
+        } else if (_outageTimestamp.value == 0L) {
+            _outageTimestamp.value = now
         }
         lastErrorMessage = message
     }
@@ -75,8 +82,38 @@ object AnilistApi {
         if (_outageMessage.value != null) {
             _outageMessage.value = null
             _isOutageDismissed.value = false
+            _outageTimestamp.value = 0L
         }
         lastErrorMessage = null
+    }
+
+    private var lastHealthCheckMs: Long = 0L
+    private var isHealthChecking = false
+
+    suspend fun checkHealth(force: Boolean = false) {
+        val now = com.nuvio.app.core.time.EpisodeReleaseDatePlatform.nowEpochMs()
+        if (!force && now - lastHealthCheckMs < 60_000L) return
+        if (isHealthChecking) return
+        isHealthChecking = true
+        try {
+            lastHealthCheckMs = now
+            val query = """
+                query {
+                    Page(page: 1, perPage: 1) {
+                        media(type: ANIME, sort: ID) {
+                            id
+                        }
+                    }
+                }
+            """.trimIndent()
+            executeGraphQL(
+                query = query,
+                priority = AnilistRequestPriority.SOCIAL,
+                bypassCache = true,
+            )
+        } finally {
+            isHealthChecking = false
+        }
     }
 
     var lastErrorMessage: String? = null

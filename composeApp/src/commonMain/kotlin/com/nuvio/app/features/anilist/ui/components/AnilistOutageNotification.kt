@@ -27,8 +27,12 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -59,8 +63,28 @@ fun AnilistOutageNotification(
     val prefs by AnilistPreferencesRepository.preferences.collectAsStateWithLifecycle()
     if (!prefs.enabled) return
 
+    LaunchedEffect(prefs.enabled) {
+        if (!prefs.enabled) return@LaunchedEffect
+        while (true) {
+            AnilistApi.checkHealth()
+            delay(5 * 60_000L) // Background re-check every 5 minutes
+        }
+    }
+
     val outageMessage by AnilistApi.outageMessage.collectAsStateWithLifecycle()
     val isDismissed by AnilistApi.isOutageDismissed.collectAsStateWithLifecycle()
+    val outageTimestamp by AnilistApi.outageTimestamp.collectAsStateWithLifecycle()
+
+    var currentNowMs by remember {
+        mutableStateOf(com.nuvio.app.core.time.EpisodeReleaseDatePlatform.nowEpochMs())
+    }
+
+    LaunchedEffect(outageTimestamp) {
+        while (true) {
+            currentNowMs = com.nuvio.app.core.time.EpisodeReleaseDatePlatform.nowEpochMs()
+            delay(30_000L) // Update relative time text every 30 seconds
+        }
+    }
 
     val isVisible = visible && !isDismissed && !outageMessage.isNullOrBlank()
 
@@ -145,7 +169,7 @@ fun AnilistOutageNotification(
                             color = Color(0xFFFF6B6B),
                         )
                         Text(
-                            text = "now",
+                            text = formatRelativeTime(outageTimestamp, currentNowMs),
                             style = MaterialTheme.typography.labelSmall.copy(
                                 fontSize = 10.5.sp,
                             ),
@@ -196,5 +220,16 @@ fun AnilistOutageNotification(
                 }
             }
         }
+    }
+}
+
+internal fun formatRelativeTime(timestampMs: Long, nowMs: Long): String {
+    if (timestampMs <= 0L) return "now"
+    val diffSec = maxOf(0L, (nowMs - timestampMs) / 1000L)
+    return when {
+        diffSec < 60L -> "now"
+        diffSec < 3600L -> "${diffSec / 60L}m ago"
+        diffSec < 86400L -> "${diffSec / 3600L}h ago"
+        else -> "${diffSec / 86400L}d ago"
     }
 }
