@@ -162,7 +162,7 @@ object AnilistApi {
                         val isOutage = status == 403 ||
                             errMsg?.contains("temporarily disabled", ignoreCase = true) == true ||
                             errMsg?.contains("stability issues", ignoreCase = true) == true ||
-                            errMsg?.contains("maintenance", ignoreCase = true)
+                            errMsg?.contains("maintenance", ignoreCase = true) == true
 
                         if (isOutage) {
                             val cleanMsg = errMsg ?: "The AniList API has been temporarily disabled due to severe stability issues."
